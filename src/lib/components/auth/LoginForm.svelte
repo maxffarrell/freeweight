@@ -34,27 +34,27 @@
   }
 </script>
 
-<Card class="w-full max-w-md p-8">
+<Card class="w-full max-w-md p-8 nb-card">
   <form onsubmit={handleSubmit}>
     <div class="space-y-6">
       <div class="text-center">
-        <h2 class="text-2xl font-black uppercase">
+        <h2 class="text-3xl font-black uppercase">
           Sign In
         </h2>
-        <p class="mt-2 text-sm font-bold uppercase">
+        <p class="mt-2 text-sm font-bold uppercase opacity-70">
           Welcome back to your gym
         </p>
       </div>
 
       {#if error}
-        <div class="bg-red-500 border-4 border-black text-white px-4 py-3 font-bold uppercase">
+        <div class="bg-[#e74c3c] border-[3px] border-black text-white px-4 py-3 font-bold uppercase shadow-[4px_4px_0_0_#000]">
           {error}
         </div>
       {/if}
 
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="email">
+          <label class="block text-sm font-black uppercase mb-2" for="email">
             Email
           </label>
           <Input
@@ -67,7 +67,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="password">
+          <label class="block text-sm font-black uppercase mb-2" for="password">
             Password
           </label>
           <Input

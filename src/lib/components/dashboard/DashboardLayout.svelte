@@ -60,25 +60,25 @@
   let currentPath = $derived($page.url.pathname);
 </script>
 
-<div class="min-h-screen bg-[var(--color-background)]">
+<div class="min-h-screen bg-white">
   <div class="flex h-screen">
     <!-- Sidebar -->
-    <div class="w-64 bg-[var(--color-surface)] border-r-4 border-[var(--color-border)] flex flex-col">
-      <div class="p-6">
-        <a href="/" class="flex items-center gap-2 text-[var(--color-text)]">
+    <div class="w-64 bg-[#f8f4e5] border-r-[3px] border-black flex flex-col">
+      <div class="p-6 border-b-[3px] border-black">
+        <a href="/" class="flex items-center gap-2 text-black">
           <Dumbbell class="w-8 h-8" />
           <span class="text-xl font-black uppercase">FreeWeight</span>
         </a>
       </div>
 
-      <nav class="px-4 space-y-2 flex-1">
+      <nav class="px-4 py-4 space-y-2 flex-1">
         {#each navItems as item}
           {@const isActive = currentPath === item.href}
           <a
             href={item.href}
-            class="flex items-center gap-3 px-4 py-3 font-bold uppercase text-sm border-2 transition-all duration-100 {isActive
-              ? 'bg-[var(--color-primary)] text-[var(--color-text)] border-[var(--color-border)] shadow-[4px_4px_0px_0px_var(--color-shadow)]'
-              : 'text-[var(--color-text)] border-transparent hover:bg-[var(--color-primary)] hover:border-[var(--color-border)] hover:shadow-[2px_2px_0px_0px_var(--color-shadow)] hover:translate-x-[1px] hover:translate-y-[1px]'}"
+            class="flex items-center gap-3 px-4 py-3 font-bold uppercase text-sm border-[3px] transition-all duration-100 {isActive
+              ? 'bg-[#FFFF00] border-black shadow-[4px_4px_0_0_#000]'
+              : 'border-transparent hover:bg-[#FFFF00] hover:border-black hover:shadow-[2px_2px_0_0_#000] hover:translate-x-[-1px] hover:translate-y-[-1px]'}"
           >
             <item.icon class="w-5 h-5" />
             <span>{item.label}</span>
@@ -86,12 +86,12 @@
         {/each}
       </nav>
 
-      <div class="p-4">
-        <div class="neo-card p-2 mb-3">
-          <div class="font-black text-[var(--color-text)] uppercase text-xs truncate leading-tight">
+      <div class="p-4 border-t-[3px] border-black">
+        <div class="bg-white border-[3px] border-black p-2 mb-3 shadow-[2px_2px_0_0_#000]">
+          <div class="font-black text-black uppercase text-xs truncate leading-tight">
             {user?.name || 'User'}
           </div>
-          <div class="text-[10px] font-bold text-[var(--color-text)] capitalize opacity-70">
+          <div class="text-[10px] font-bold text-black capitalize opacity-70">
             {user?.role || 'member'}
           </div>
         </div>
@@ -110,11 +110,11 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- Header -->
-      <div class="bg-[var(--color-surface)] border-b-4 border-[var(--color-border)] p-4 flex justify-end">
+      <div class="bg-white border-b-[3px] border-black p-4 flex justify-end">
         <!-- Theme switcher placeholder -->
       </div>
       
-      <main class="flex-1 overflow-auto p-6">
+      <main class="flex-1 overflow-auto p-6 bg-[#dfe5f2]">
         {@render children()}
       </main>
     </div>

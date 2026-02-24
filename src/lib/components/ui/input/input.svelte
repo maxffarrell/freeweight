@@ -25,9 +25,10 @@
 		bind:this={ref}
 		data-slot={dataSlot}
 		class={cn(
-			"selection:bg-primary dark:bg-input/30 selection:text-primary-foreground border-input ring-offset-background placeholder:text-muted-foreground flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 pt-1.5 text-sm font-medium shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50",
-			"focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-			"aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+			"flex h-10 w-full rounded-[4px] border-[3px] border-black bg-white px-3 py-2 text-sm font-bold uppercase shadow-[4px_4px_0_0_#000] transition-all duration-200",
+			"focus:outline-none focus:shadow-[6px_6px_0_0_#000]",
+			"disabled:cursor-not-allowed disabled:opacity-50",
+			"placeholder:text-gray-500",
 			className
 		)}
 		type="file"
@@ -40,9 +41,10 @@
 		bind:this={ref}
 		data-slot={dataSlot}
 		class={cn(
-			"border-input bg-background selection:bg-primary dark:bg-input/30 selection:text-primary-foreground ring-offset-background placeholder:text-muted-foreground flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-			"focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-			"aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+			"flex h-10 w-full rounded-[4px] border-[3px] border-black bg-white px-4 py-2 text-base font-bold uppercase shadow-[4px_4px_0_0_#000] transition-all duration-200",
+			"focus:outline-none focus:shadow-[6px_6px_0_0_#000]",
+			"disabled:cursor-not-allowed disabled:opacity-50",
+			"placeholder:text-gray-500 placeholder:font-bold placeholder:uppercase placeholder:text-xs",
 			className
 		)}
 		{type}

@@ -53,27 +53,27 @@
   }
 </script>
 
-<Card class="w-full max-w-md p-8">
+<Card class="w-full max-w-md p-8 nb-card">
   <form onsubmit={handleSubmit}>
     <div class="space-y-6">
       <div class="text-center">
-        <h2 class="text-2xl font-black uppercase">
+        <h2 class="text-3xl font-black uppercase">
           {defaultRole === 'owner' ? 'Create Gym Account' : 'Join Gym'}
         </h2>
-        <p class="mt-2 text-sm font-bold uppercase">
+        <p class="mt-2 text-sm font-bold uppercase opacity-70">
           {defaultRole === 'owner' ? 'Start managing your gym today' : 'Get started with your fitness journey'}
         </p>
       </div>
 
       {#if error}
-        <div class="bg-red-500 border-4 border-black text-white px-4 py-3 font-bold uppercase">
+        <div class="bg-[#e74c3c] border-[3px] border-black text-white px-4 py-3 font-bold uppercase shadow-[4px_4px_0_0_#000]">
           {error}
         </div>
       {/if}
 
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="name">
+          <label class="block text-sm font-black uppercase mb-2" for="name">
             Full Name
           </label>
           <Input
@@ -86,7 +86,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="reg-email">
+          <label class="block text-sm font-black uppercase mb-2" for="reg-email">
             Email
           </label>
           <Input
@@ -99,7 +99,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="reg-password">
+          <label class="block text-sm font-black uppercase mb-2" for="reg-password">
             Password
           </label>
           <Input
@@ -112,7 +112,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="password-confirm">
+          <label class="block text-sm font-black uppercase mb-2" for="password-confirm">
             Confirm Password
           </label>
           <Input
@@ -125,13 +125,13 @@
         </div>
 
         <div>
-          <label class="block text-sm font-black mb-2 uppercase" for="role">
+          <label class="block text-sm font-black uppercase mb-2" for="role">
             Account Type
           </label>
           <select
             id="role"
             bind:value={role}
-            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex h-10 w-full rounded-[4px] border-[3px] border-black bg-white px-4 py-2 text-sm font-bold uppercase shadow-[4px_4px_0_0_#000] focus:outline-none focus:shadow-[6px_6px_0_0_#000]"
           >
             <option value="member">GYM MEMBER</option>
             <option value="owner">GYM OWNER</option>

@@ -4,25 +4,23 @@
 	import { type VariantProps, tv } from "tailwind-variants";
 
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+		base: "inline-flex shrink-0 items-center justify-center gap-2 rounded-[4px] font-bold uppercase text-sm transition-all duration-200 border-[3px] border-black cursor-pointer",
 		variants: {
 			variant: {
-				default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
-				destructive:
-					"bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 text-white shadow-xs",
-				outline:
-					"bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 border shadow-xs",
-				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-xs",
-				ghost: "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-				link: "text-primary underline-offset-4 hover:underline",
+				default: "bg-[#FFFF00] text-black shadow-[4px_4px_0_0_#000]",
+				destructive: "bg-[#e74c3c] text-white shadow-[4px_4px_0_0_#000]",
+				outline: "bg-transparent text-black shadow-[4px_4px_0_0_#000]",
+				secondary: "bg-[#FF69B4] text-black shadow-[4px_4px_0_0_#000]",
+				ghost: "bg-transparent border-transparent shadow-none hover:bg-[#FFFF00]",
+				link: "text-black underline-offset-4 hover:underline border-transparent shadow-none",
 			},
 			size: {
-				default: "h-9 px-4 py-2 has-[>svg]:px-3",
-				sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-				lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-				icon: "size-9",
+				default: "h-10 px-4 py-2",
+				sm: "h-8 px-3 py-1 text-xs",
+				lg: "h-12 px-6 py-3 text-base",
+				icon: "size-10",
 				"icon-sm": "size-8",
-				"icon-lg": "size-10",
+				"icon-lg": "size-12",
 			},
 		},
 		defaultVariants: {
@@ -59,7 +57,12 @@
 	<a
 		bind:this={ref}
 		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
+		class={cn(
+			buttonVariants({ variant, size }),
+			"hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000]",
+			"active:translate-x-[2px] active:translate-y-[2px] active:shadow-[0_0_0_0_#000]",
+			className
+		)}
 		href={disabled ? undefined : href}
 		aria-disabled={disabled}
 		role={disabled ? "link" : undefined}
@@ -72,7 +75,12 @@
 	<button
 		bind:this={ref}
 		data-slot="button"
-		class={cn(buttonVariants({ variant, size }), className)}
+		class={cn(
+			buttonVariants({ variant, size }),
+			"hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000]",
+			"active:translate-x-[2px] active:translate-y-[2px] active:shadow-[0_0_0_0_#000]",
+			className
+		)}
 		{type}
 		{disabled}
 		{...restProps}
