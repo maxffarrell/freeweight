@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { auth } from '$lib/auth';
-  import { Card } from '$lib/components/ui/card/index.js';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { auth } from '#lib/auth.js';
+  import { Card } from '#lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
 
   let user = $derived($auth.user);
 </script>

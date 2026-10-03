@@ -1,9 +1,9 @@
 import PocketBase from 'pocketbase';
-import { env } from '$env/dynamic/private';
+import { POCKETBASE_URL } from '$app/env/private';
 
 // Create a singleton for server-side use
 export function createPocketBase() {
-  const pb = new PocketBase(env.POCKETBASE_URL || 'http://127.0.0.1:8090');
+  const pb = new PocketBase(POCKETBASE_URL || 'http://127.0.0.1:8090');
   return pb;
 }
 

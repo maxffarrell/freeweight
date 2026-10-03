@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { auth } from '$lib/auth';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Card } from '$lib/components/ui/card/index.js';
+  import { auth } from '#lib/auth.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Card } from '#lib/components/ui/card/index.js';
 
   // Check if user is already logged in
   $effect(() => {
