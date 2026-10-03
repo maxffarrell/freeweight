@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { auth } from '$lib/auth';
+  import { auth } from '#lib/auth.js';
   import { goto } from '$app/navigation';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Card } from '$lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Card } from '#lib/components/ui/card/index.js';
 
   interface Props {
     defaultRole?: 'owner' | 'member';

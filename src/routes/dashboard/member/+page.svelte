@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Card } from '$lib/components/ui/card/index.js';
+  import { Card } from '#lib/components/ui/card/index.js';
   import { Calendar, Users, QrCode, Activity } from 'lucide-svelte';
 </script>
 

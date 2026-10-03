@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import PocketBase from 'pocketbase';
-import type { User } from '$lib/pocketbase';
+import type { User } from '#lib/pocketbase.js';
 import { goto } from '$app/navigation';
 
 // Create client-side pocketbase instance (uses public env)

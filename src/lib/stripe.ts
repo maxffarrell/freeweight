@@ -1,9 +1,9 @@
 import Stripe from 'stripe';
-import { env } from '$env/dynamic/private';
+import { STRIPE_SECRET_KEY } from '$app/env/private';
 
 // Server-side Stripe instance (lazy initialization)
 function getStripe() {
-  const key = env.STRIPE_SECRET_KEY;
+  const key = STRIPE_SECRET_KEY;
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not set');
   }

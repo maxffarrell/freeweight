@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Card } from '$lib/components/ui/card/index.js';
+  import { Card } from '#lib/components/ui/card/index.js';
 </script>
 
 <div class="space-y-6">

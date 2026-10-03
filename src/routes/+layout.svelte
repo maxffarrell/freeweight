@@ -1,9 +1,9 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { auth } from '$lib/auth';
-  import { theme } from '$lib/theme';
-  import favicon from '$lib/assets/favicon.svg';
+  import { auth } from '#lib/auth.js';
+  import { theme } from '#lib/theme.js';
+  import favicon from '#lib/assets/favicon.svg';
 
   let { children } = $props();
 

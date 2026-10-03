@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { auth } from '$lib/auth';
-  import { Card } from '$lib/components/ui/card/index.js';
+  import { auth } from '#lib/auth.js';
+  import { Card } from '#lib/components/ui/card/index.js';
   import { 
     Users, 
     Calendar, 

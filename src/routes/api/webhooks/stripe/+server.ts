@@ -1,9 +1,9 @@
-import { json } from '@sveltejs/kit';
+
 import type { RequestHandler } from './$types';
-import { stripe } from '$lib/stripe';
-import { pb } from '$lib/server/pocketbase';
+import { stripe } from '#lib/stripe.js';
+import { pb } from '#lib/server/pocketbase.js';
 import Stripe from 'stripe';
-import { env } from '$env/dynamic/private';
+import { STRIPE_WEBHOOK_SECRET } from '$app/env/private';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -11,10 +11,10 @@ export const POST: RequestHandler = async ({ request }) => {
     const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
-      return json({ error: 'Missing signature' }, { status: 400 });
+      return Response.json({ error: 'Missing signature' }, { status: 400 });
     }
 
-    const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = STRIPE_WEBHOOK_SECRET;
 
     let event: Stripe.Event;
 
@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ request }) => {
       event = stripe.instance.webhooks.constructEvent(body, signature, webhookSecret || '');
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
-      return json({ error: 'Invalid signature' }, { status: 400 });
+      return Response.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
     // Handle the event
@@ -51,11 +51,11 @@ export const POST: RequestHandler = async ({ request }) => {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
-    return json({ received: true });
+    return Response.json({ received: true });
 
   } catch (error: any) {
     console.error('Webhook error:', error);
-    return json({ error: 'Webhook handler failed' }, { status: 500 });
+    return Response.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 };
 
@@ -98,7 +98,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       const attemptCount = invoice.attempt_count || 0;
       
       const newStatus = attemptCount >= 3 ? 'cancelled' : 'paused';
-      
+
       await pb.collection('memberships').update(membership.id, {
         status: newStatus,
         updated: new Date().toISOString(),
@@ -129,15 +129,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       const membership = memberships.items[0];
       
       let status = 'active';
-      if (subscription.status === 'canceled') status = 'cancelled';
-      else if (subscription.status === 'past_due') status = 'paused';
-      else if (subscription.status === 'unpaid') status = 'paused';
 
-      await pb.collection('memberships').update(membership.id, {
-        status,
-        updated: new Date().toISOString(),
-      });
+      if (subscription.status === 'canceled') status = 'cancelled'; else if (subscription.status === 'past_due') status = 'paused'; else if (subscription.status === 'unpaid') status = 'paused';
 
+      await pb.collection('memberships').update(membership.id, { status, updated: new Date().toISOString() });
       console.log(`Subscription updated: ${subscription.id}, status: ${status}`);
     }
   } catch (error) {

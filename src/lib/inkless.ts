@@ -1,9 +1,9 @@
 // Inkless API integration for digital signature capture
 // Documentation: https://useinkless.com/docs
-import { env } from '$env/dynamic/private';
+import { INKLESS_API_KEY as inklessApiKey } from '$app/env/private';
 
 const INKLESS_API_BASE = 'https://api.useinkless.com/v1';
-const INKLESS_API_KEY = env.INKLESS_API_KEY || '';
+const INKLESS_API_KEY = inklessApiKey || '';
 
 export interface InklessDocument {
   id: string;

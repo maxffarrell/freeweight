@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { auth } from '$lib/auth';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import { auth } from '#lib/auth.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import { 
     Dumbbell, 
     Users, 
@@ -57,7 +57,7 @@
   }
 
   let navItems = $derived(getNavItems(user?.role));
-  let currentPath = $derived($page.url.pathname);
+  let currentPath = $derived(page.url.pathname);
 </script>
 
 <div class="min-h-screen bg-white">
