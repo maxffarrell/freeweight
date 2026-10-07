@@ -26,13 +26,17 @@
 		recordPayment,
 		getCurrency
 	} from '#lib/remote/billing.remote.ts';
-	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
+	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
+	import Upload from '@lucide/svelte/icons/upload';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import FileText from '@lucide/svelte/icons/file-text';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
@@ -47,6 +51,43 @@
 			.filter((c) => c.charge.status === 'open')
 			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
 	);
+
+	// ------- documents -------
+	const docs = $derived(await getMemberDocuments(id));
+	let uploading = $state(false);
+	let fileInput = $state<HTMLInputElement>();
+	const fileSize = (n: number) =>
+		n < 1024
+			? `${n} B`
+			: n < 1048576
+				? `${(n / 1024).toFixed(0)} KB`
+				: `${(n / 1048576).toFixed(1)} MB`;
+	async function uploadFiles(files: FileList | null | undefined) {
+		if (!files?.length) return;
+		uploading = true;
+		const body = new FormData();
+		for (const f of files) body.append('file', f);
+		body.append('entityType', 'member');
+		body.append('entityId', id);
+		const res = await fetch('/api/documents', { method: 'POST', body });
+		uploading = false;
+		if (!res.ok) {
+			toast.error((await res.json().catch(() => null))?.message ?? 'Upload failed');
+			return;
+		}
+		toast.success(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`);
+		await getMemberDocuments(id).refresh();
+		if (fileInput) fileInput.value = '';
+	}
+	async function removeDoc(docId: string, docName: string) {
+		if (!confirm(`Delete ${docName}?`)) return;
+		try {
+			await deleteDocument(docId);
+			await getMemberDocuments(id).refresh();
+		} catch {
+			toast.error('Could not delete');
+		}
+	}
 
 	// ------- edit member -------
 	let editOpen = $state(false);
@@ -322,6 +363,52 @@
 						{m.credits.used} of {m.credits.limit} classes used this period
 					</p>
 				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<Card.Title class="text-base">Documents</Card.Title>
+				<Button size="sm" variant="outline" disabled={uploading} onclick={() => fileInput?.click()}>
+					<Upload />
+					{uploading ? 'Uploading…' : 'Upload'}
+				</Button>
+				<input
+					bind:this={fileInput}
+					type="file"
+					multiple
+					class="hidden"
+					onchange={(e) => uploadFiles(e.currentTarget.files)}
+				/>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each docs as doc (doc.id)}
+					<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+						<a
+							href="/api/documents/{doc.id}"
+							target="_blank"
+							class="flex min-w-0 items-center gap-2 hover:underline"
+						>
+							<FileText class="size-4 shrink-0 text-muted-foreground" />
+							<span class="truncate">{doc.name}</span>
+						</a>
+						<div class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+							<span>{fileSize(doc.size)} · {formatRelative(doc.createdAt)}</span>
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-7 px-1.5 text-destructive"
+								onclick={() => removeDoc(doc.id, doc.name)}
+								aria-label="Delete {doc.name}"><Trash2 class="size-3.5" /></Button
+							>
+						</div>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						No documents yet — upload contracts, forms, or notes. Members can see these in their
+						portal.
+					</p>
+				{/each}
 			</Card.Content>
 		</Card.Root>
 	</div>

@@ -17,12 +17,14 @@
 		withdrawMembershipCancel,
 		getProviders,
 		startCheckout,
-		signWaiver
+		signWaiver,
+		getMyDocuments
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
 	import type { PageProps } from './$types';
 
@@ -31,6 +33,7 @@
 	const d = $derived(await getPortalOverview(memberId));
 	const bookable = $derived(await getBookable(memberId));
 	const providers = $derived(await getProviders(memberId));
+	const docs = $derived(await getMyDocuments(memberId));
 	const tz = $derived(d.settings?.timezone ?? 'UTC');
 	const currency = $derived(d.settings?.currency ?? 'usd');
 
@@ -242,6 +245,26 @@
 			</Card.Footer>
 		{/if}
 	</Card.Root>
+
+	{#if docs.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"><FileText /> Documents</Card.Title>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each docs as doc (doc.id)}
+					<a
+						href="/api/portal/documents/{doc.id}?m={memberId}"
+						target="_blank"
+						class="flex items-center gap-2 py-1.5 text-sm hover:underline"
+					>
+						<FileText class="size-4 shrink-0 text-muted-foreground" />
+						<span class="truncate">{doc.name}</span>
+					</a>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<Card.Root>
 		<Card.Header>

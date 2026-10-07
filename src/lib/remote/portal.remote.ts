@@ -3,8 +3,8 @@ import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { gymMember } from '#lib/server/db/schema.ts';
-import { and, eq } from 'drizzle-orm';
+import { document, gymMember } from '#lib/server/db/schema.ts';
+import { and, desc, eq } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import { idSchema } from '#lib/schemas.ts';
 
@@ -93,3 +93,19 @@ export const startCheckout = command(
 		return { url: await svc.portalCheckout(m.id, provider) };
 	}
 );
+
+/** The member's own documents — the portal Documents card. */
+export const getMyDocuments = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return db
+		.select({
+			id: document.id,
+			name: document.name,
+			contentType: document.contentType,
+			size: document.size,
+			createdAt: document.createdAt
+		})
+		.from(document)
+		.where(and(eq(document.entityType, 'member'), eq(document.entityId, m.id)))
+		.orderBy(desc(document.createdAt));
+});

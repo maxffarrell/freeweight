@@ -446,6 +446,30 @@ export const notificationLog = pgTable(
 	(t) => [uniqueIndex('notification_log_once_idx').on(t.kind, t.entityId, t.recipient)]
 );
 
+/** Files uploaded by staff — attached to a member (or other entity) via entityType/entityId. */
+export const document = pgTable(
+	'document',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		contentType: text('content_type').notNull(),
+		size: integer('size').notNull(),
+		storageKey: text('storage_key').notNull(),
+		entityType: text('entity_type'),
+		entityId: text('entity_id'),
+		uploadedBy: text('uploaded_by').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('document_entity_idx').on(t.organizationId, t.entityType, t.entityId)]
+);
+
+/** Blob bodies for the default Postgres blob store (see services/storage.ts). */
+export const documentBlob = pgTable('document_blob', {
+	storageKey: text('storage_key').primaryKey(),
+	data: text('data').notNull()
+});
+
 export const activity = pgTable(
 	'activity',
 	{
