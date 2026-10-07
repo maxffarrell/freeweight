@@ -143,6 +143,68 @@ export async function checkOut(ctx: OrgContext, checkInId: string) {
 	return row;
 }
 
+/**
+ * Desk undo for a mis-scan: deletes the check-in row and reverts that day's
+ * auto-attend — but only when no other check-in still justifies "attended".
+ */
+export async function voidCheckIn(ctx: OrgContext, checkInId: string) {
+	const [row] = await db
+		.delete(checkIn)
+		.where(and(eq(checkIn.organizationId, ctx.orgId), eq(checkIn.id, checkInId)))
+		.returning();
+	if (!row) error(404, 'Check-in not found');
+	let reverted = 0;
+	if (!row.guestName) {
+		const [st] = await db
+			.select({ timezone: gymSettings.timezone })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, ctx.orgId));
+		const tz = st?.timezone ?? 'UTC';
+		// Bound to the check-in's own local day so old log rows void correctly too.
+		const day = localDate(row.checkedAt, tz);
+		const [{ n }] = await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.organizationId, ctx.orgId),
+					eq(checkIn.memberId, row.memberId),
+					isNull(checkIn.guestName),
+					gte(checkIn.checkedAt, zonedToUtc(`${day}T00:00`, tz)),
+					lt(checkIn.checkedAt, zonedToUtc(`${addDays(day, 1)}T00:00`, tz))
+				)
+			);
+		if (!n) {
+			const upd = await db
+				.update(booking)
+				.set({ status: 'booked' })
+				.from(classSession)
+				.where(
+					and(
+						eq(booking.sessionId, classSession.id),
+						eq(booking.organizationId, ctx.orgId),
+						eq(booking.memberId, row.memberId),
+						eq(booking.status, 'attended'),
+						gte(classSession.startsAt, zonedToUtc(`${day}T00:00`, tz)),
+						lt(classSession.startsAt, zonedToUtc(`${addDays(day, 1)}T00:00`, tz)),
+						lt(classSession.startsAt, new Date())
+					)
+				)
+				.returning({ id: booking.id });
+			reverted = upd.length;
+		}
+	}
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'check_in',
+		entityId: row.id,
+		action: 'voided',
+		summary: 'Check-in voided'
+	});
+	return { reverted };
+}
+
 /** Minutes a fresh check-in must be open before a repeat QR scan means "check out" instead of a duplicate. */
 const TOGGLE_GRACE_MS = 15 * 60_000;
 
