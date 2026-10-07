@@ -9,6 +9,7 @@ import {
 	sendAnniversaryGreetings,
 	sendBirthdayGreetings,
 	sendClassReminders,
+	sendInstructorRosters,
 	sendPastDueNotices,
 	sendTrialEndingNotices,
 	sendWeeklyDigest,
@@ -39,6 +40,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let generated = 0;
 	let digests = 0;
 	let winbacks = 0;
+	let rosters = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -101,6 +103,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`win-back cron failed for ${o.id}`, err);
 		}
+		try {
+			rosters += await sendInstructorRosters(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`instructor-roster cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
 	return json({
@@ -115,7 +123,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		suspended,
 		generated,
 		digests,
-		winbacks
+		winbacks,
+		rosters
 	});
 };
 

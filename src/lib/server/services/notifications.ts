@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -1297,4 +1297,93 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/**
+ * Daily cron: emails each staff instructor their roster for the day — class,
+ * time, location, booked/waitlist counts. Staff mail, so no unsubscribe check.
+ */
+export async function sendInstructorRosters(orgId: string) {
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	const sessions = await db
+		.select({
+			id: classSession.id,
+			instructorId: classSession.instructorId,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			capacity: classSession.capacity,
+			locationName: location.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				isNotNull(classSession.instructorId),
+				sql`to_char(${classSession.startsAt} at time zone ${tz}, 'YYYY-MM-DD') = ${today}`
+			)
+		)
+		.orderBy(asc(classSession.startsAt));
+	if (!sessions.length) return 0;
+
+	const counts = await db
+		.select({
+			sessionId: booking.sessionId,
+			status: booking.status,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(
+					booking.sessionId,
+					sessions.map((s) => s.id)
+				)
+			)
+		)
+		.groupBy(booking.sessionId, booking.status);
+	const countsBySession = new Map<string, { booked: number; waitlisted: number }>();
+	for (const c of counts) {
+		const entry = countsBySession.get(c.sessionId) ?? { booked: 0, waitlisted: 0 };
+		if (c.status === 'waitlisted') entry.waitlisted = c.n;
+		else if (c.status === 'booked' || c.status === 'attended') entry.booked = c.n;
+		countsBySession.set(c.sessionId, entry);
+	}
+
+	const instructorIds = [...new Set(sessions.map((s) => s.instructorId as string))];
+	const instructors = await db
+		.select({ id: member.id, name: user.name, email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(inArray(member.id, instructorIds));
+
+	let sent = 0;
+	for (const instructor of instructors) {
+		if (!instructor.email) continue;
+		if (!(await logOnce(orgId, 'instructor_roster', `${instructor.id}:${today}`, instructor.email)))
+			continue;
+		const lines = sessions
+			.filter((s) => s.instructorId === instructor.id)
+			.map((s) => {
+				const c = countsBySession.get(s.id) ?? { booked: 0, waitlisted: 0 };
+				const where = s.locationName ? ` at ${s.locationName}` : '';
+				return `${localTime(s.startsAt, tz)} — ${s.className}${where} · ${c.booked}/${s.capacity} booked${c.waitlisted ? `, ${c.waitlisted} waitlisted` : ''}`;
+			});
+		if (!lines.length) continue;
+		await sendEmail({
+			to: instructor.email,
+			subject: `Today's classes at ${name} — ${lines.length} on your schedule`,
+			...renderEmail({
+				orgName: name,
+				heading: `Your classes today, ${instructor.name.split(' ')[0]}`,
+				lines: [`${formatDate(today)} at ${name}:`, ...lines]
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
