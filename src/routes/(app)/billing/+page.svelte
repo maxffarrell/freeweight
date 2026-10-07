@@ -28,6 +28,8 @@
 	import { chargeKinds, paymentMethods } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Wallet from '@lucide/svelte/icons/wallet';
+	import Download from '@lucide/svelte/icons/download';
+	import { toCsv } from '#lib/csv.ts';
 
 	const currency = await getCurrency();
 	const memberList = await getMembers();
@@ -116,6 +118,27 @@
 		pending = false;
 	}
 
+	function exportCharges() {
+		const csv = toCsv([
+			['Member', 'Description', 'Kind', 'Due', 'Status', 'Amount', 'Paid', 'Balance'],
+			...charges.map((c) => [
+				c.memberName,
+				c.charge.description,
+				c.charge.kind,
+				c.charge.dueDate,
+				c.charge.status,
+				(c.charge.amount / 100).toFixed(2),
+				(c.paid / 100).toFixed(2),
+				((c.charge.amount - c.paid) / 100).toFixed(2)
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `charges-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+
 	async function voidCharge(id: string) {
 		try {
 			await updateCharge({ id, status: 'void' });
@@ -161,6 +184,7 @@
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
 				</select>
+				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
