@@ -137,6 +137,7 @@ export async function shiftHours(orgId: string, range: { from: string; to: strin
 		.select({
 			memberId: shift.memberId,
 			staffName: user.name,
+			hourlyRateCents: member.hourlyRateCents,
 			shifts: sql<number>`count(*)`.mapWith(Number),
 			minutes:
 				sql<number>`coalesce(sum(extract(epoch from (coalesce(${shift.clockedOutAt}, now()) - ${shift.clockedInAt})) / 60), 0)`.mapWith(
@@ -153,7 +154,7 @@ export async function shiftHours(orgId: string, range: { from: string; to: strin
 				lt(shift.clockedInAt, new Date(new Date(`${range.to}T00:00:00Z`).getTime() + DAY_MS))
 			)
 		)
-		.groupBy(shift.memberId, user.name);
+		.groupBy(shift.memberId, user.name, member.hourlyRateCents);
 	return rows.sort((a, b) => b.minutes - a.minutes);
 }
 
@@ -231,6 +232,21 @@ export async function deleteShift(ctx: OrgContext, id: string) {
 		.returning({ id: shift.id });
 	if (!row) error(404, 'Shift not found');
 	return { id: row.id };
+}
+
+/** Admin: set a staff member's hourly desk rate (null clears). Class pay uses class-type rates. */
+export async function setStaffRate(
+	ctx: OrgContext,
+	memberId: string,
+	hourlyRateCents: number | null
+) {
+	const [row] = await db
+		.update(member)
+		.set({ hourlyRateCents })
+		.where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)))
+		.returning({ id: member.id });
+	if (!row) error(404, 'Staff member not found');
+	return row;
 }
 
 /** Every rota window in the org, grouped by staff — the shift-log rota section. */

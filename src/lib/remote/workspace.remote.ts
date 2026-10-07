@@ -86,6 +86,7 @@ export const getStaff = query(async () => {
 			email: user.email,
 			image: user.image,
 			role: member.role,
+			hourlyRateCents: member.hourlyRateCents,
 			createdAt: member.createdAt
 		})
 		.from(member)

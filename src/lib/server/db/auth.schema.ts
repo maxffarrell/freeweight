@@ -94,6 +94,8 @@ export const member = pgTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		role: text('role').default('member').notNull(),
+		/** Hourly pay for desk/floor work — class teaching is paid via class-type rates. */
+		hourlyRateCents: integer('hourly_rate_cents'),
 		createdAt: timestamp('created_at').notNull()
 	},
 	(table) => [
