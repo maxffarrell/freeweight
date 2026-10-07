@@ -141,12 +141,7 @@ export async function redeemablePromo(orgId: string, code: string) {
 	const [row] = await db
 		.select()
 		.from(promoCode)
-		.where(
-			and(
-				eq(promoCode.organizationId, orgId),
-				eq(promoCode.code, code.trim().toUpperCase())
-			)
-		)
+		.where(and(eq(promoCode.organizationId, orgId), eq(promoCode.code, code.trim().toUpperCase())))
 		.limit(1);
 	if (!row || !row.active) error(400, 'Invalid promo code');
 	if (row.expiresAt && row.expiresAt < todayISO()) error(400, 'Promo code has expired');
@@ -167,11 +162,7 @@ export async function markPromoUsed(orgId: string, id: string) {
  * Distributes a promo across the up-front amounts (signup fee, then first charge):
  * percent off applies per-charge; a flat amount is consumed in order.
  */
-export function promoApply(
-	promo: PromoDiscount,
-	state: { left: number | null },
-	amount: number
-) {
+export function promoApply(promo: PromoDiscount, state: { left: number | null }, amount: number) {
 	if (promo.percentOff != null)
 		return Math.max(0, amount - Math.round((amount * promo.percentOff) / 100));
 	if (state.left != null) {

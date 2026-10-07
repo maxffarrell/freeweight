@@ -259,8 +259,7 @@
 	let planChangeHadPrice = $state(false);
 	async function submitPlanChange(e: SubmitEvent) {
 		e.preventDefault();
-		const price =
-			planChangePrice != null ? planChangePrice : planChangeHadPrice ? null : undefined;
+		const price = planChangePrice != null ? planChangePrice : planChangeHadPrice ? null : undefined;
 		if (!planChangePlanId && price === undefined) return;
 		pending = true;
 		try {
@@ -518,8 +517,8 @@
 							<p class="truncate font-medium">{mm.planName}</p>
 							<p class="text-xs text-muted-foreground">
 								{formatMoney(mm.membership.price ?? mm.amount, currency)}{mm.isPack
-								? ' pack'
-								: `/${mm.interval}`}{mm.membership.price != null ? ' (custom)' : ''} · from {formatDate(
+									? ' pack'
+									: `/${mm.interval}`}{mm.membership.price != null ? ' (custom)' : ''} · from {formatDate(
 									mm.membership.startsAt
 								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}{mm
 									.membership.frozenUntil
@@ -894,8 +893,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Change plan or price</Dialog.Title>
 			<Dialog.Description>
-				Changes apply from the next charge — no proration. Set a custom price to bill this
-				member something other than the plan's list price.
+				Changes apply from the next charge — no proration. Set a custom price to bill this member
+				something other than the plan's list price.
 			</Dialog.Description>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitPlanChange}>
@@ -925,8 +924,7 @@
 				<Button
 					type="submit"
 					disabled={pending ||
-						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}
-					>Save</Button
+						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}>Save</Button
 				>
 			</Dialog.Footer>
 		</form>

@@ -240,9 +240,7 @@
 		<Card.Header class="flex-row items-center justify-between">
 			<div>
 				<Card.Title class="text-base">Promo codes</Card.Title>
-				<Card.Description
-					>Discount the up-front charge on your public join page.</Card.Description
-				>
+				<Card.Description>Discount the up-front charge on your public join page.</Card.Description>
 			</div>
 			<Button size="sm" variant="outline" onclick={() => (promoOpen = true)}
 				><Plus /> New code</Button

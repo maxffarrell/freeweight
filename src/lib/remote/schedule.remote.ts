@@ -9,6 +9,7 @@ import {
 	bookingUpdate,
 	classTypeInput,
 	classTypeUpdate,
+	closureInput,
 	emailRosterInput,
 	idSchema,
 	sessionInput,
@@ -75,6 +76,19 @@ export const updateSession = command(sessionUpdate, async (input) => {
 	void getSessions().refresh();
 	void getSession(s!.id).refresh();
 	return s;
+});
+
+export const getClosures = query(async () => svc.listClosures((await requireOrg()).orgId));
+export const addClosure = command(closureInput, async (input) => {
+	const c = await svc.addClosure(await requireOrg(), input);
+	void getClosures().refresh();
+	void getSessions().refresh();
+	return c;
+});
+export const removeClosure = command(idSchema, async (id) => {
+	const c = await svc.removeClosure(await requireOrg(), id);
+	void getClosures().refresh();
+	return c;
 });
 
 export const getInstructors = query(async () => svc.listInstructors((await requireOrg()).orgId));
