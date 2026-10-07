@@ -376,6 +376,11 @@
 				<Field.Field>
 					<Field.Label>Price</Field.Label>
 					<MoneyInput bind:value={amount} required />
+					{#if editing}
+						<Field.Description
+							>Members on this plan get an email when the price changes.</Field.Description
+						>
+					{/if}
 				</Field.Field>
 				{#if isPack}
 					<Field.Field>
