@@ -616,7 +616,14 @@
 			<Dialog.Title>
 				{rosterSess?.className} — {rosterSess ? localTime(rosterSess.session.startsAt, tz) : ''}
 			</Dialog.Title>
-			<Dialog.Description>Check in the booked members as they arrive.</Dialog.Description>
+			<Dialog.Description>
+				Check in the booked members as they arrive.
+				{#if rosterSess?.session.checkinCode}
+					Class code for self check-in: <code class="font-mono"
+						>{rosterSess.session.checkinCode}</code
+					>
+				{/if}
+			</Dialog.Description>
 		</Dialog.Header>
 		<div class="divide-y rounded-lg border">
 			{#each sessRoster as r (r.booking.id)}

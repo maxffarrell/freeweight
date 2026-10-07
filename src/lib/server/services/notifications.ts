@@ -2293,6 +2293,7 @@ export async function sendInstructorRosters(orgId: string) {
 			className: classType.name,
 			startsAt: classSession.startsAt,
 			capacity: classSession.capacity,
+			checkinCode: classSession.checkinCode,
 			locationName: location.name
 		})
 		.from(classSession)
@@ -2351,7 +2352,7 @@ export async function sendInstructorRosters(orgId: string) {
 			.map((s) => {
 				const c = countsBySession.get(s.id) ?? { booked: 0, waitlisted: 0 };
 				const where = s.locationName ? ` at ${s.locationName}` : '';
-				return `${localTime(s.startsAt, tz)} — ${s.className}${where} · ${c.booked}/${s.capacity} booked${c.waitlisted ? `, ${c.waitlisted} waitlisted` : ''}`;
+				return `${localTime(s.startsAt, tz)} — ${s.className}${where} · ${c.booked}/${s.capacity} booked${c.waitlisted ? `, ${c.waitlisted} waitlisted` : ''}${s.checkinCode ? ` · check-in code ${s.checkinCode}` : ''}`;
 			});
 		if (!lines.length) continue;
 		await sendEmail({
