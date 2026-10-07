@@ -15,7 +15,8 @@ import { emit } from './events.ts';
 import {
 	notifyChargePosted,
 	notifyMembershipSuspended,
-	notifyPaymentReceived
+	notifyPaymentReceived,
+	notifyPaymentRefunded
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
@@ -399,7 +400,7 @@ export async function listCharges(orgId: string, status?: string) {
 		.select({
 			charge,
 			memberName: gymMember.name,
-			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)}), 0)`.mapWith(
+			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
 				Number
 			)
 		})
@@ -476,7 +477,7 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 			const open = await tx
 				.select({
 					id: charge.id,
-					open: sql<number>`${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)}), 0)`.mapWith(
+					open: sql<number>`${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
 						Number
 					)
 				})
@@ -524,7 +525,7 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 		await tx.execute(sql`
 			update ${charge} c set status = 'paid', updated_at = now()
 			where c.organization_id = ${ctx.orgId} and c.status = 'open'
-			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id) >= c.amount
+			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.refunded_at is null) >= c.amount
 		`);
 		return out;
 	});
@@ -547,6 +548,41 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 	return rows[0];
 }
 
+/**
+ * Marks a payment refunded: it stops counting toward the charge it covered and
+ * toward revenue; a charge it fully paid reopens to 'open'. Provider refunds
+ * (Stripe) must be issued in the provider dashboard first — this only records it.
+ */
+export async function refundPayment(ctx: OrgContext, paymentId: string) {
+	const [p] = await db
+		.select()
+		.from(payment)
+		.where(and(eq(payment.id, paymentId), eq(payment.organizationId, ctx.orgId)));
+	if (!p) error(404, 'Payment not found');
+	if (p.refundedAt) error(409, 'Payment already refunded');
+	await db.transaction(async (tx) => {
+		await tx.update(payment).set({ refundedAt: new Date() }).where(eq(payment.id, p.id));
+		if (p.chargeId)
+			await tx.execute(sql`
+				update ${charge} c set status = 'open', updated_at = now()
+				where c.id = ${p.chargeId} and c.status = 'paid'
+				  and (select coalesce(sum(p2.amount), 0) from ${payment} p2
+				       where p2.charge_id = c.id and p2.refunded_at is null) < c.amount
+			`);
+	});
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'payment',
+		entityId: p.id,
+		action: 'refunded',
+		summary: `Refunded ${formatMoney(p.amount)}`,
+		data: { memberId: p.memberId }
+	});
+	notifyPaymentRefunded(ctx.orgId, p.id).catch(() => {});
+	return p;
+}
+
 export async function listPayments(orgId: string) {
 	return db
 		.select({ payment, memberName: gymMember.name })
@@ -562,7 +598,7 @@ export async function memberBalance(orgId: string, memberId: string) {
 	const [row] = await db
 		.select({
 			balance:
-				sql<number>`coalesce(sum(case when ${outer(charge.status)} = 'open' then ${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)}), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.charge_id is null), 0)`.mapWith(
+				sql<number>`coalesce(sum(case when ${outer(charge.status)} = 'open' then ${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 		})

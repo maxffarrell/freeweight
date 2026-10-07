@@ -33,7 +33,7 @@ export async function recordOnlinePayment(p: OnlinePayment) {
 		const open = await tx
 			.select({
 				id: charge.id,
-				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = "charge"."id"), 0)`.mapWith(
+				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = "charge"."id" and p.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 			})

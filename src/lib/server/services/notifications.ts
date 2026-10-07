@@ -216,6 +216,40 @@ export async function notifyPaymentReceived(
 	});
 }
 
+/** "Your payment was refunded" — one email per refundPayment call. */
+export async function notifyPaymentRefunded(orgId: string, paymentId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			amount: payment.amount
+		})
+		.from(payment)
+		.innerJoin(gymMember, eq(payment.memberId, gymMember.id))
+		.where(eq(payment.id, paymentId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'payment_refunded', paymentId, row.email))) return;
+	const [name, st] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const money = formatMoney(row.amount, st[0]?.currency ?? 'usd');
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Refund issued: ${money} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: `Hi ${row.memberName} — ${money} refunded`,
+			lines: [
+				`${name} issued a ${money} refund to you.`,
+				'If a charge was reopened it will show in your member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /**
  * Daily past-due notice: one email per member with open charges older than today (org tz),
  * summarizing the total overdue. Dedup key includes the newest overdue dueDate, so a member
@@ -744,12 +778,13 @@ export async function sendWeeklyDigest(orgId: string) {
 		.where(
 			and(
 				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
 				gte(payment.createdAt, new Date(`${weekAgo}T00:00:00Z`))
 			)
 		);
 	const [openBalance] = await db
 		.select({
-			n: sql<number>`coalesce(sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id}), 0)), 0)`.mapWith(
+			n: sql<number>`coalesce(sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0)), 0)`.mapWith(
 				Number
 			)
 		})

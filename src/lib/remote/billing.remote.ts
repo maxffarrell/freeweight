@@ -71,6 +71,15 @@ export const recordPayment = command(paymentInput, async (input) => {
 	return p;
 });
 
+/** Refunds a recorded payment — reopens the charge it covered and emails the member. */
+export const refundPayment = command(idSchema, async (id) => {
+	const p = await svc.refundPayment(await requireOrg(), id);
+	void getPayments().refresh();
+	void getCharges().refresh();
+	void getMember(p.memberId).refresh();
+	return p;
+});
+
 export const getMemberBalance = query(idSchema, async (memberId) =>
 	svc.memberBalance((await requireOrg()).orgId, memberId)
 );

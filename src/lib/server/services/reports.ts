@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -63,7 +63,9 @@ async function revenueByMonth(orgId: string) {
 			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
 		})
 		.from(payment)
-		.where(and(eq(payment.organizationId, orgId), gte(payment.paidAt, since)))
+		.where(
+			and(eq(payment.organizationId, orgId), isNull(payment.refundedAt), gte(payment.paidAt, since))
+		)
 		.groupBy(sql`to_char(${payment.paidAt}, 'YYYY-MM')`)
 		.orderBy(asc(sql`to_char(${payment.paidAt}, 'YYYY-MM')`));
 }

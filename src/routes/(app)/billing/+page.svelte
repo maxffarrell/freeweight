@@ -20,6 +20,7 @@
 		updateMembership,
 		getPayments,
 		recordPayment,
+		refundPayment,
 		getCurrency
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
@@ -39,6 +40,17 @@
 
 	async function filterCharges() {
 		charges = await getCharges({ status: chargeFilter || undefined });
+	}
+
+	async function refund(paymentId: string, amount: number) {
+		if (!confirm(`Refund ${formatMoney(amount, currency)}? The charge it covered reopens.`)) return;
+		try {
+			await refundPayment(paymentId);
+			payments = await getPayments();
+			toast.success('Payment refunded');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not refund'));
+		}
 	}
 
 	let pending = $state(false);
@@ -287,11 +299,12 @@
 								<Table.Head>When</Table.Head>
 								<Table.Head>Method</Table.Head>
 								<Table.Head class="text-right">Amount</Table.Head>
+								<Table.Head></Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
 							{#each payments as p (p.payment.id)}
-								<Table.Row>
+								<Table.Row class={p.payment.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>
 										<a class="font-medium hover:underline" href="/members/{p.payment.memberId}"
 											>{p.memberName}</a
@@ -302,10 +315,24 @@
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(p.payment.amount, currency)}</Table.Cell
 									>
+									<Table.Cell class="text-right">
+										{#if p.payment.refundedAt}
+											<span class="text-xs text-muted-foreground"
+												>refunded {formatDate(p.payment.refundedAt)}</span
+											>
+										{:else}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => refund(p.payment.id, p.payment.amount)}>Refund</Button
+											>
+										{/if}
+									</Table.Cell>
 								</Table.Row>
 							{:else}
 								<Table.Row
-									><Table.Cell colspan={4} class="text-muted-foreground">No payments.</Table.Cell
+									><Table.Cell colspan={5} class="text-muted-foreground">No payments.</Table.Cell
 									></Table.Row
 								>
 							{/each}

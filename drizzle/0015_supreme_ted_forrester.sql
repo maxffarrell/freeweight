@@ -1,0 +1,1 @@
+ALTER TABLE "payment" ADD COLUMN "refunded_at" timestamp with time zone;

@@ -24,6 +24,7 @@
 		createMembership,
 		updateMembership,
 		recordPayment,
+		refundPayment,
 		getCurrency
 	} from '#lib/remote/billing.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
@@ -86,6 +87,16 @@
 			await getMemberDocuments(id).refresh();
 		} catch {
 			toast.error('Could not delete');
+		}
+	}
+
+	async function refund(paymentId: string, amount: number) {
+		if (!confirm(`Refund ${formatMoney(amount, currency)}? The charge it covered reopens.`)) return;
+		try {
+			await refundPayment(paymentId);
+			toast.success('Payment refunded');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not refund'));
 		}
 	}
 
@@ -464,20 +475,35 @@
 								<Table.Head>Date</Table.Head>
 								<Table.Head>Method</Table.Head>
 								<Table.Head class="text-right">Amount</Table.Head>
+								<Table.Head></Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
 							{#each m.payments as p (p.id)}
-								<Table.Row>
+								<Table.Row class={p.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>{formatDate(p.paidAt)}</Table.Cell>
 									<Table.Cell class="capitalize">{p.method}</Table.Cell>
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(p.amount, currency)}</Table.Cell
 									>
+									<Table.Cell class="text-right">
+										{#if p.refundedAt}
+											<span class="text-xs text-muted-foreground"
+												>refunded {formatDate(p.refundedAt)}</span
+											>
+										{:else}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => refund(p.id, p.amount)}>Refund</Button
+											>
+										{/if}
+									</Table.Cell>
 								</Table.Row>
 							{:else}
 								<Table.Row
-									><Table.Cell colspan={3} class="text-muted-foreground">No payments.</Table.Cell
+									><Table.Cell colspan={4} class="text-muted-foreground">No payments.</Table.Cell
 									></Table.Row
 								>
 							{/each}

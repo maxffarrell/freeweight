@@ -381,6 +381,8 @@ export const payment = pgTable(
 		/** Provider payment ID (e.g. a Stripe PaymentIntent) for payments made online. */
 		externalId: text('external_id'),
 		paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),
+		/** Set by refundPayment — refunded payments stop counting toward charge/revenue sums. */
+		refundedAt: timestamp('refunded_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [
