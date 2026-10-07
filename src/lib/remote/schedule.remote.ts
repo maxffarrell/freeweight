@@ -154,3 +154,6 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 	void getTodayCheckIns().refresh();
 	return r;
 });
+
+/** The instructor's own upcoming sessions — powers the "My classes" page. */
+export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));

@@ -148,6 +148,42 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 		.orderBy(asc(classSession.startsAt));
 }
 
+/**
+ * The instructor's view: sessions the signed-in staff member teaches,
+ * from 2h ago through `days` ahead, with live counts. Staff without a
+ * linked member row teach nothing.
+ */
+export async function myTeachingSessions(ctx: OrgContext, days = 14) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	if (!me) return [];
+	const until = new Date(Date.now() + days * 86400_000);
+	return db
+		.select({
+			session: classSession,
+			className: classType.name,
+			color: classType.color,
+			locationName: location.name,
+			booked: bookedCount(classSession.id),
+			waitlisted: waitlistedCount(classSession.id)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, me.id),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date(Date.now() - 2 * 3600_000)),
+				lt(classSession.startsAt, until)
+			)
+		)
+		.orderBy(asc(classSession.startsAt));
+}
+
 export async function getSession(orgId: string, id: string) {
 	const [row] = await db
 		.select({
