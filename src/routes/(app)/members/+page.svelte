@@ -24,6 +24,7 @@
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
+		getDuplicates,
 		importMembers,
 		tagMembers
 	} from '#lib/remote/members.remote.ts';
@@ -55,6 +56,7 @@
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let members = $state(await getMembers());
+	const dupes = await getDuplicates();
 
 	// ------- bulk selection + tag -------
 	const selected = new SvelteSet<string>();
@@ -346,6 +348,25 @@
 			</Select.Content>
 		</Select.Root>
 	</div>
+
+	{#if dupes.length}
+		<div
+			class="flex flex-col gap-1 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40"
+		>
+			<span class="font-medium"
+				>{dupes.length} possible duplicate{dupes.length === 1 ? '' : 's'} — open a member to merge</span
+			>
+			{#each dupes as d (d.reason)}
+				<span class="text-muted-foreground"
+					>{d.reason}:
+					{#each d.members as m, i (m.id)}{#if i},&nbsp;{/if}<a
+							class="underline underline-offset-2 hover:text-foreground"
+							href="/members/{m.id}">{m.name}</a
+						>{/each}</span
+				>
+			{/each}
+		</div>
+	{/if}
 
 	{#if selected.size}
 		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">

@@ -90,6 +90,44 @@ export async function listMembers(
 		.orderBy(MEMBER_ORDER[sort]);
 }
 
+/**
+ * Possible duplicate members — groups of 2+ sharing a normalized email (exact,
+ * case-insensitive) or a normalized name (case/whitespace-insensitive). Groups
+ * that fully overlap are merged; capped at 10. Feeds the members-list hint
+ * that points staff at member merge.
+ */
+export async function findDuplicates(orgId: string) {
+	const rows = await db
+		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, orgId))
+		.orderBy(asc(gymMember.name));
+	const byKey = new Map<string, typeof rows>();
+	for (const r of rows) {
+		const keys = [
+			r.email ? `e:${r.email.trim().toLowerCase()}` : null,
+			`n:${r.name.trim().toLowerCase().replace(/\s+/g, ' ')}`
+		];
+		for (const key of keys) {
+			if (!key) continue;
+			const g = byKey.get(key) ?? [];
+			if (!g.some((m) => m.id === r.id)) g.push(r);
+			byKey.set(key, g);
+		}
+	}
+	const seen = new Set<string>();
+	const out: { reason: string; members: typeof rows }[] = [];
+	for (const [key, members] of byKey) {
+		if (members.length < 2 || members.every((m) => seen.has(m.id))) continue;
+		for (const m of members) seen.add(m.id);
+		out.push({
+			reason: key.startsWith('e:') ? `same email ${members[0]!.email}` : 'same name',
+			members
+		});
+	}
+	return out.slice(0, 10);
+}
+
 /** Every tag in use in the workspace — feeds the list filter and member-page autocomplete. */
 export async function listTags(orgId: string) {
 	const rows = await db
