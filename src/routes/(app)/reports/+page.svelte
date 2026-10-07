@@ -475,6 +475,41 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.amenities.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Amenity use</Card.Title>
+				<Card.Description
+					>Portal reservations in the last 30 days, against each amenity's open-slot capacity</Card.Description
+				>
+			</Card.Header>
+			<Card.Content class="px-0">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Amenity</Table.Head>
+							<Table.Head>Kind</Table.Head>
+							<Table.Head class="text-right">Bookings</Table.Head>
+							<Table.Head class="text-right">Utilization</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.amenities as a (a.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{a.name}</Table.Cell>
+								<Table.Cell class="text-muted-foreground">{a.kind || '—'}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{a.bookings}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{a.util}%{a.util >= 90 ? ' · near capacity' : ''}</Table.Cell
+								>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Fill by weekday</Card.Title>
