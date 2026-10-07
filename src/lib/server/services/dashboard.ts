@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNotNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -144,6 +144,30 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
 
+	// Memberships whose term ends within the next 7 days — the same window the
+	// renewal-reminder email uses, visible to staff at a glance.
+	const renewalsThisWeek = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			planName: plan.name,
+			endsAt: membership.endsAt
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				isNotNull(membership.endsAt),
+				gt(membership.endsAt, new Date()),
+				lte(membership.endsAt, new Date(Date.now() + 7 * 86400_000))
+			)
+		)
+		.orderBy(asc(membership.endsAt))
+		.limit(10);
+
 	return {
 		timezone: tz,
 		currency: settings?.currency ?? 'usd',
@@ -157,7 +181,8 @@ export async function dashboard(orgId: string) {
 		todaySessions,
 		recentActivity,
 		recentMembers,
-		pendingRequests
+		pendingRequests,
+		renewalsThisWeek
 	};
 }
 

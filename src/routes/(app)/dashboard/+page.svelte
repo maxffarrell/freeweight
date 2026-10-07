@@ -130,6 +130,24 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.renewalsThisWeek.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Renewing this week</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.renewalsThisWeek as r (r.memberId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
+									>
+									<Badge variant="outline" class="shrink-0"
+										>{r.planName} · ends {formatDate(r.endsAt)}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			<Card.Root>
 				<Card.Header class="flex flex-row items-center justify-between">
 					<Card.Title class="text-base">Recent activity</Card.Title>
