@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "first_class_free" boolean DEFAULT false NOT NULL;

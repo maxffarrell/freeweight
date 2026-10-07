@@ -67,6 +67,8 @@ export const gymSettings = pgTable('gym_settings', {
 	portalNotice: text('portal_notice').notNull().default(''),
 	/** Daily morning briefing email to owner/admin staff; off skips the cron send. */
 	staffBriefing: boolean('staff_briefing').notNull().default(true),
+	/** "First class free" — a member's first-ever drop-in books without posting the charge. */
+	firstClassFree: boolean('first_class_free').notNull().default(false),
 	/** How far ahead portal members may book, in days; null = unlimited. */
 	bookingWindowDays: integer('booking_window_days'),
 	/** Members can't cancel a class within this many minutes of start; null = anytime. */

@@ -296,6 +296,7 @@ export const settingsInput = v.object({
 	waiver: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(20000))),
 	portalNotice: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 	staffBriefing: v.optional(v.boolean()),
+	firstClassFree: v.optional(v.boolean()),
 	bookingWindowDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	cancelCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
