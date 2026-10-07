@@ -145,4 +145,50 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">At-risk members</Card.Title>
+			<Card.Description>
+				{r.atRisk.length} active member{r.atRisk.length === 1 ? '' : 's'} with no check-in in 30+ days
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Member</Table.Head>
+						<Table.Head>Email</Table.Head>
+						<Table.Head class="text-right">Last visit</Table.Head>
+						<Table.Head class="text-right">Days away</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.atRisk as m (m.memberId)}
+						<Table.Row>
+							<Table.Cell>
+								<a
+									class="font-medium underline-offset-2 hover:underline"
+									href="/members/{m.memberId}">{m.name}</a
+								>
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground">{m.email ?? '—'}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">
+								{m.lastVisit ? formatDate(m.lastVisit) : 'Never'}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">
+								{m.daysSince ?? '30+'}
+							</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={4} class="text-muted-foreground"
+								>Everyone has checked in within the last 30 days.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
 </div>

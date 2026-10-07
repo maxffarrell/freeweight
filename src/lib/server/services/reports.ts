@@ -105,13 +105,44 @@ async function fillByClass(orgId: string) {
 		.orderBy(desc(sql`count(distinct ${classSession.id})`));
 }
 
+/**
+ * Active members whose last check-in was 30+ days ago (or who have never checked in).
+ * Churn signal — a follow-up list for the front desk, capped at 50.
+ */
+async function atRiskMembers(orgId: string) {
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			email: gymMember.email,
+			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+		})
+		.from(gymMember)
+		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.status, 'active')))
+		.groupBy(gymMember.id, gymMember.name, gymMember.email);
+	const cutoff = Date.now() - 30 * 86400_000;
+	return rows
+		.map((r) => ({
+			memberId: r.memberId,
+			name: r.name,
+			email: r.email,
+			lastVisit: r.lastVisit,
+			daysSince: r.lastVisit ? Math.floor((Date.now() - r.lastVisit.getTime()) / 86400_000) : null
+		}))
+		.filter((r) => r.lastVisit === null || r.lastVisit.getTime() < cutoff)
+		.sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
+		.slice(0, 50);
+}
+
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill] = await Promise.all([
+	const [checkIns, members, revenue, plans, fill, atRisk] = await Promise.all([
 		checkInsByDay(orgId),
 		newMembersByMonth(orgId),
 		revenueByMonth(orgId),
 		membershipsByPlan(orgId),
-		fillByClass(orgId)
+		fillByClass(orgId),
+		atRiskMembers(orgId)
 	]);
-	return { checkIns, members, revenue, plans, fill };
+	return { checkIns, members, revenue, plans, fill, atRisk };
 }
