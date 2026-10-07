@@ -19,7 +19,8 @@ import {
 import {
 	countAnnouncementAudience,
 	listRecentAnnouncements,
-	sendAnnouncement
+	sendAnnouncement,
+	sendAnnouncementTest
 } from '#lib/server/services/notifications.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
@@ -120,6 +121,12 @@ export const getAnnouncementAudience = query(
 	v.object({ tag: v.optional(v.string()) }),
 	async ({ tag }) => countAnnouncementAudience((await requireOrg()).orgId, tag || undefined)
 );
+
+/** Sends the draft to the staff user's own inbox — a render preview before blasting. */
+export const emailMeTest = command(announcementInput, async (input) => {
+	const ctx = await requireOrg();
+	return sendAnnouncementTest(ctx.orgId, ctx.userId, input.subject, input.message);
+});
 
 export const emailAllMembers = command(announcementInput, async (input) => {
 	const r = await sendAnnouncement(

@@ -18,6 +18,7 @@
 		getMembers,
 		createMember,
 		emailAllMembers,
+		emailMeTest,
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
@@ -170,6 +171,17 @@
 			toast.error(errMsg(err, 'Could not send — try again'));
 		}
 		emailPending = false;
+	}
+	let testPending = $state(false);
+	async function sendTest() {
+		testPending = true;
+		try {
+			await emailMeTest({ subject: emailSubject, message: emailBody });
+			toast.success('Test sent — check your inbox');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send test'));
+		}
+		testPending = false;
 	}
 </script>
 
@@ -423,13 +435,23 @@
 						? ''
 						: `Goes to ${audienceCount} member${audienceCount === 1 ? '' : 's'}`}
 				</span>
-				<Button type="submit" disabled={emailPending || audienceCount === 0}>
-					{emailPending
-						? 'Sending…'
-						: emailAudience === '__all'
-							? 'Send to all members'
-							: `Send to "${emailAudience}"`}
-				</Button></Dialog.Footer
+				<div class="flex items-center gap-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={sendTest}
+						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
+						>{testPending ? 'Sending…' : 'Send me a test'}</Button
+					>
+					<Button type="submit" disabled={emailPending || audienceCount === 0}>
+						{emailPending
+							? 'Sending…'
+							: emailAudience === '__all'
+								? 'Send to all members'
+								: `Send to "${emailAudience}"`}
+					</Button>
+				</div></Dialog.Footer
 			>
 		</form>
 	</Dialog.Content>
