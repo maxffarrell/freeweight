@@ -1098,3 +1098,27 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 		})
 	});
 }
+
+/** "You've hit N check-ins!" — retention nudge fired when a visit crosses a milestone. */
+export async function notifyCheckInMilestone(orgId: string, memberId: string, count: number) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email) return;
+	if (!(await logOnce(orgId, 'checkin_milestone', `${memberId}:${count}`, m.email))) return;
+	const name = await orgName(orgId);
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${count} check-ins at ${name} — nice work, ${m.name.split(' ')[0]}`,
+		...renderEmail({
+			orgName: name,
+			heading: `${count} check-ins. Keep it up.`,
+			lines: [
+				`Hi ${m.name} — you just hit ${count} check-ins at ${name}. That's real consistency.`,
+				'See you at the next one.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}

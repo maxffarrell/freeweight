@@ -15,9 +15,12 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { notifyCheckInMilestone } from './notifications.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
+
+const MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
 
 function sign(payload: string) {
 	return createHmac('sha256', BETTER_AUTH_SECRET).update(`checkin:${payload}`).digest('base64url');
@@ -149,6 +152,20 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		action: 'recorded',
 		summary: `${m.name} checked in`
 	});
+
+	// Milestone congrats when this visit crosses a check-in threshold.
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.memberId, memberId),
+				eq(checkIn.organizationId, ctx.orgId),
+				isNull(checkIn.guestName)
+			)
+		);
+	if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+
 	return { checkIn: row!, member: m, attended: attended.length };
 }
 
