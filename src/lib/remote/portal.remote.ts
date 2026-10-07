@@ -9,6 +9,7 @@ import * as svc from '#lib/server/services/portal.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
+import * as checkinSvc from '#lib/server/services/checkins.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
@@ -335,6 +336,23 @@ export const cancelEventReg = command(
 		const r = await evtSvc.cancelRegistration(m.organizationId, id, m.id);
 		void getPortalEvents(memberId).refresh();
 		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- Class check-in code ----------
+
+/** Member types the code the coach announced — marks their booking attended + logs a check-in. */
+export const checkInWithCode = command(
+	v.object({
+		memberId: idSchema,
+		code: v.pipe(v.string(), v.trim(), v.minLength(4), v.maxLength(8))
+	}),
+	async ({ memberId, code }) => {
+		const m = await myMember(memberId);
+		const r = await checkinSvc.checkInWithCode(m.organizationId, m.id, code);
+		void getPortalOverview(memberId).refresh();
+		void getBookable(memberId).refresh();
 		return r;
 	}
 );

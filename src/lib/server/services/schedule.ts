@@ -36,6 +36,14 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+/** 5-char unambiguous class check-in code (no 0/O/1/I/L). */
+export function sessionCode() {
+	const b = new Uint8Array(5);
+	crypto.getRandomValues(b);
+	return [...b].map((x) => CODE_ALPHABET[x % CODE_ALPHABET.length]).join('');
+}
 import {
 	notifyBookingCancelled,
 	notifyBookingConfirmed,
@@ -353,7 +361,8 @@ export async function createSession(
 				startsAt: d,
 				endsAt: new Date(d.getTime() + (end.getTime() - start.getTime())),
 				capacity: input.capacity ?? ct.capacity,
-				note: input.note ?? null
+				note: input.note ?? null,
+				checkinCode: sessionCode()
 			}))
 		)
 		.returning();
@@ -1441,7 +1450,8 @@ export async function copyWeek(
 			startsAt: new Date(s.startsAt.getTime() + shiftMs),
 			endsAt: new Date(s.endsAt.getTime() + shiftMs),
 			capacity: s.capacity,
-			note: s.note
+			note: s.note,
+			checkinCode: sessionCode()
 		}));
 	const inserted = rows.length
 		? await db.insert(classSession).values(rows).returning({ id: classSession.id })
@@ -1629,7 +1639,8 @@ export async function materializeTemplates(orgId: string) {
 				startsAt,
 				endsAt: new Date(startsAt.getTime() + ct.durationMin * 60_000),
 				capacity: tpl.capacity ?? ct.capacity,
-				coverRequestedAt: isOff(instructorId, day) ? new Date() : null
+				coverRequestedAt: isOff(instructorId, day) ? new Date() : null,
+				checkinCode: sessionCode()
 			});
 		}
 	}

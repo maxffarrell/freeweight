@@ -39,7 +39,8 @@
 		getReservations,
 		getPortalEvents,
 		registerEvent,
-		cancelEventReg
+		cancelEventReg,
+		checkInWithCode
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -123,6 +124,25 @@
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
 		}
+	}
+
+	// ------- class check-in code -------
+	let code = $state('');
+	let codeBusy = $state(false);
+	async function submitCode(e: SubmitEvent) {
+		e.preventDefault();
+		if (!code.trim()) return;
+		codeBusy = true;
+		try {
+			const r = await checkInWithCode({ memberId, code });
+			code = '';
+			toast.success(
+				r.already ? `Already checked in to ${r.className}` : `Checked in to ${r.className}`
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Invalid code'));
+		}
+		codeBusy = false;
 	}
 	const planFull = (p: (typeof joinablePlans)[number]) =>
 		!p.isPack && p.memberLimit !== null && p.activeMembers >= p.memberLimit;
@@ -690,6 +710,26 @@
 					{/if}
 				</div>
 			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Class check-in</Card.Title>
+			<Card.Description>At class? Enter the code your coach announces.</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<form class="flex gap-2" onsubmit={submitCode}>
+				<Input
+					class="w-28 text-center font-mono tracking-widest uppercase"
+					placeholder="CODE"
+					maxlength={8}
+					bind:value={code}
+				/>
+				<Button type="submit" size="sm" disabled={codeBusy || code.trim().length < 4}
+					>Check in</Button
+				>
+			</form>
 		</Card.Content>
 	</Card.Root>
 

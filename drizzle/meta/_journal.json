@@ -407,6 +407,13 @@
       "when": 1791391141678,
       "tag": "0057_events",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791391701216,
+      "tag": "0058_checkin_codes",
+      "breakpoints": true
     }
   ]
 }
