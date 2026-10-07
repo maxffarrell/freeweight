@@ -10,7 +10,8 @@
 		checkOut,
 		getMembers,
 		getUpNext,
-		createMember
+		createMember,
+		logGuestVisit
 	} from '#lib/remote/members.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
@@ -87,6 +88,31 @@
 	let wPhone = $state('');
 	let wEmail = $state('');
 	let wPending = $state(false);
+	let guestOpen = $state(false);
+	let guestFor = $state<{ id: string; name: string } | null>(null);
+	let guestName = $state('');
+	let gPending = $state(false);
+
+	function openGuest(m: { id: string; name: string }) {
+		guestFor = m;
+		guestName = '';
+		guestOpen = true;
+	}
+
+	async function saveGuest(e: SubmitEvent) {
+		e.preventDefault();
+		if (gPending || !guestFor || !guestName.trim()) return;
+		gPending = true;
+		try {
+			await logGuestVisit({ memberId: guestFor.id, guestName: guestName.trim() });
+			showFlash(true, `${guestName.trim()} (guest of ${guestFor.name}) checked in`);
+			guestOpen = false;
+			checkIns = await getTodayCheckIns();
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Guest check-in failed'));
+		}
+		gPending = false;
+	}
 
 	function onInput() {
 		clearTimeout(searchTimer);
@@ -231,44 +257,53 @@
 			{#if suggestions.length}
 				<div class="divide-y rounded-lg border">
 					{#each suggestions as m (m.id)}
-						<button
-							type="button"
-							class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
-							disabled={pending || m.status !== 'active'}
-							onclick={() => checkIn(m.id)}
-						>
-							<span class="flex min-w-0 items-center gap-3">
-								{#if m.photoDocumentId}
-									<img
-										src="/api/documents/{m.photoDocumentId}"
-										alt=""
-										class="size-9 shrink-0 rounded-full object-cover"
-									/>
-								{:else}
-									<span
-										class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
-										>{initials(m.name)}</span
-									>
-								{/if}
-								<span class="min-w-0">
-									<span class="block truncate font-medium">{m.name}</span>
-									{#if m.deskNote}
+						<div class="flex items-center">
+							<button
+								type="button"
+								class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
+								disabled={pending || m.status !== 'active'}
+								onclick={() => checkIn(m.id)}
+							>
+								<span class="flex min-w-0 items-center gap-3">
+									{#if m.photoDocumentId}
+										<img
+											src="/api/documents/{m.photoDocumentId}"
+											alt=""
+											class="size-9 shrink-0 rounded-full object-cover"
+										/>
+									{:else}
 										<span
-											class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
-											>{m.deskNote}</span
+											class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+											>{initials(m.name)}</span
+										>
+									{/if}
+									<span class="min-w-0">
+										<span class="block truncate font-medium">{m.name}</span>
+										{#if m.deskNote}
+											<span
+												class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+												>{m.deskNote}</span
+											>
+										{/if}
+									</span>
+								</span>
+								<span class="flex items-center gap-2">
+									{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
+									{#if m.openBalance > 0}
+										<Badge variant="destructive"
+											>owes {formatMoney(m.openBalance, settings.currency)}</Badge
 										>
 									{/if}
 								</span>
-							</span>
-							<span class="flex items-center gap-2">
-								{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
-								{#if m.openBalance > 0}
-									<Badge variant="destructive"
-										>owes {formatMoney(m.openBalance, settings.currency)}</Badge
-									>
-								{/if}
-							</span>
-						</button>
+							</button>
+							{#if m.status === 'active'}
+								<button
+									type="button"
+									class="shrink-0 border-l px-3 text-xs font-medium text-muted-foreground hover:bg-muted"
+									onclick={() => openGuest(m)}>+ Guest</button
+								>
+							{/if}
+						</div>
 					{/each}
 				</div>
 			{:else if searched}
@@ -392,6 +427,28 @@
 			<Dialog.Footer>
 				<Button type="submit" disabled={wPending || !wName.trim()}>
 					{wPending ? 'Saving…' : 'Add & check in'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={guestOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>{guestFor?.name}'s guest</Dialog.Title>
+			<Dialog.Description>
+				Logs a guest visit — counted against {guestFor?.name}'s monthly guest passes.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-3" onsubmit={saveGuest}>
+			<div class="space-y-1">
+				<Label for="g-name">Guest name</Label>
+				<Input id="g-name" bind:value={guestName} autocomplete="off" required />
+			</div>
+			<Dialog.Footer>
+				<Button type="submit" disabled={gPending || !guestName.trim()}>
+					{gPending ? 'Checking in…' : 'Check in guest'}
 				</Button>
 			</Dialog.Footer>
 		</form>
