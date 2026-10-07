@@ -10,11 +10,13 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getSessions,
 		getClassTypes,
 		createClassType,
+		updateClassType,
 		createSession,
 		updateSession,
 		getRoster,
@@ -202,32 +204,55 @@
 		}
 	}
 
-	// ------- new class type -------
+	// ------- class types -------
 	let typeOpen = $state(false);
+	let editTypeId = $state<string | null>(null);
 	let tName = $state('');
 	let tColor = $state('#6366f1');
 	let tDuration = $state(60);
 	let tCapacity = $state(20);
 	let tDropIn = $state('');
 	let tDescription = $state('');
+	let tActive = $state(true);
+	function editType(c: (typeof classTypes)[number]) {
+		editTypeId = c.id;
+		tName = c.name;
+		tDescription = c.description ?? '';
+		tColor = c.color || '#6366f1';
+		tDuration = c.durationMin;
+		tCapacity = c.capacity;
+		tDropIn = c.dropInPrice != null ? (c.dropInPrice / 100).toFixed(2) : '';
+		tActive = c.active;
+	}
+	function resetTypeForm() {
+		editTypeId = null;
+		tName = tDescription = '';
+		tColor = '#6366f1';
+		tDuration = 60;
+		tCapacity = 20;
+		tDropIn = '';
+		tActive = true;
+	}
 	async function submitType(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
-			await createClassType({
+			const body = {
 				name: tName,
 				color: tColor,
 				durationMin: tDuration,
 				capacity: tCapacity,
-				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : undefined,
-				description: tDescription || undefined
-			});
+				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : null,
+				description: tDescription || undefined,
+				active: tActive
+			};
+			if (editTypeId) await updateClassType({ id: editTypeId, ...body });
+			else await createClassType(body);
 			await getClassTypes().refresh();
-			toast.success('Class type created');
-			typeOpen = false;
-			tName = tDescription = '';
+			toast.success(editTypeId ? 'Class updated' : 'Class type created');
+			resetTypeForm();
 		} catch (err) {
-			toast.error(errMsg(err, 'Could not create'));
+			toast.error(errMsg(err, 'Could not save'));
 		}
 		pending = false;
 	}
@@ -587,8 +612,38 @@
 </Dialog.Root>
 
 <Dialog.Root bind:open={typeOpen}>
-	<Dialog.Content>
-		<Dialog.Header><Dialog.Title>New class type</Dialog.Title></Dialog.Header>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header><Dialog.Title>Class types</Dialog.Title></Dialog.Header>
+		{#if classTypes.length}
+			<div class="mb-4 divide-y rounded-lg border">
+				{#each classTypes as c (c.id)}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="flex min-w-0 items-center gap-2">
+							<span
+								class="h-2.5 w-2.5 shrink-0 rounded-full"
+								style:background={c.color || '#94a3b8'}
+							></span>
+							<span class="truncate">
+								{c.name}
+								<span class="text-muted-foreground"
+									>· {c.durationMin}m · {c.capacity} seats{c.dropInPrice
+										? ` · $${(c.dropInPrice / 100).toFixed(2)} drop-in`
+										: ''}</span
+								>
+							</span>
+							{#if !c.active}<Badge variant="outline">inactive</Badge>{/if}
+							{#if editTypeId === c.id}<Badge variant="secondary">editing</Badge>{/if}
+						</div>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-7 shrink-0 px-2 text-xs"
+							onclick={() => editType(c)}>Edit</Button
+						>
+					</div>
+				{/each}
+			</div>
+		{/if}
 		<form class="space-y-4" onsubmit={submitType}>
 			<Field.Field
 				><Field.Label for="t-name">Name</Field.Label><Input
@@ -635,7 +690,18 @@
 					Visitors can book single classes on your public page at this price.
 				</Field.Description>
 			</Field.Field>
-			<Dialog.Footer><Button type="submit" disabled={pending}>Create</Button></Dialog.Footer>
+			{#if editTypeId}
+				<div class="flex items-center justify-between rounded-lg border px-3 py-2">
+					<span class="text-sm">Active — shows in booking picks</span>
+					<Switch bind:checked={tActive} />
+				</div>
+			{/if}
+			<Dialog.Footer>
+				{#if editTypeId}
+					<Button type="button" variant="ghost" onclick={resetTypeForm}>Cancel edit</Button>
+				{/if}
+				<Button type="submit" disabled={pending}>{editTypeId ? 'Save' : 'Create'}</Button>
+			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
