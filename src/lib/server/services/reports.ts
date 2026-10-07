@@ -28,6 +28,7 @@ import {
 	gymEvent,
 	gymMember,
 	gymSettings,
+	location,
 	member,
 	membership,
 	payment,
@@ -711,6 +712,80 @@ async function amenityStats(orgId: string) {
 	});
 }
 
+/**
+ * Per-location breakdown for multi-branch gyms — member count, session
+ * volume, fill and check-ins over the last 30 days. Empty for single-site
+ * gyms (the card hides then).
+ */
+async function byLocation(orgId: string) {
+	const locs = await db
+		.select({ id: location.id, name: location.name })
+		.from(location)
+		.where(and(eq(location.organizationId, orgId), isNull(location.archivedAt)))
+		.orderBy(asc(location.name));
+	if (locs.length < 2) return [];
+	const since = new Date(Date.now() - 30 * 86_400_000);
+	return Promise.all(
+		locs.map(async (l) => {
+			const [[members], [sess], [checkins]] = await Promise.all([
+				db
+					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.from(gymMember)
+					.where(
+						and(
+							eq(gymMember.organizationId, orgId),
+							eq(gymMember.locationId, l.id),
+							eq(gymMember.status, 'active')
+						)
+					),
+				db
+					.select({
+						sessions: sql<number>`count(*)`.mapWith(Number),
+						booked:
+							sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','no_show'))), 0)`.mapWith(
+								Number
+							),
+						noShows:
+							sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'no_show')), 0)`.mapWith(
+								Number
+							),
+						capacity: sql<number>`coalesce(sum(${classSession.capacity}), 0)`.mapWith(Number)
+					})
+					.from(classSession)
+					.where(
+						and(
+							eq(classSession.organizationId, orgId),
+							eq(classSession.locationId, l.id),
+							gte(classSession.startsAt, since),
+							lt(classSession.startsAt, new Date()),
+							isNull(classSession.cancelledAt)
+						)
+					),
+				db
+					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.from(checkIn)
+					.where(
+						and(
+							eq(checkIn.organizationId, orgId),
+							eq(checkIn.locationId, l.id),
+							gte(checkIn.checkedAt, since)
+						)
+					)
+			]);
+			return {
+				id: l.id,
+				name: l.name,
+				members: members?.n ?? 0,
+				sessions: sess?.sessions ?? 0,
+				booked: sess?.booked ?? 0,
+				noShows: sess?.noShows ?? 0,
+				capacity: sess?.capacity ?? 0,
+				checkIns: checkins?.n ?? 0
+			};
+		})
+	);
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -738,7 +813,8 @@ export async function getReports(orgId: string) {
 		events,
 		leads,
 		amenities,
-		staffShifts
+		staffShifts,
+		locations
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -768,7 +844,8 @@ export async function getReports(orgId: string) {
 		shiftHours(orgId, {
 			from: new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10),
 			to: new Date().toISOString().slice(0, 10)
-		})
+		}),
+		byLocation(orgId)
 	]);
 	return {
 		checkIns,
@@ -796,6 +873,7 @@ export async function getReports(orgId: string) {
 		events,
 		leads,
 		amenities,
-		staffShifts
+		staffShifts,
+		locations
 	};
 }
