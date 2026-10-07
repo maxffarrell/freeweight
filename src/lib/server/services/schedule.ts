@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -275,6 +275,8 @@ async function creditsUsedIn(
 				eq(booking.organizationId, orgId),
 				eq(booking.memberId, memberId),
 				inArray(booking.status, [...CREDIT_STATUSES]),
+				// A cancelled class gives the credit back.
+				isNull(classSession.cancelledAt),
 				gte(classSession.startsAt, new Date(`${window.start}T00:00:00Z`)),
 				lt(classSession.startsAt, new Date(`${window.end}T00:00:00Z`))
 			)
