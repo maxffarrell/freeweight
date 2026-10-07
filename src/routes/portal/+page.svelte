@@ -13,6 +13,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
+	import Whiteboard from '#lib/components/app/whiteboard.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		getPortalOverview,
@@ -1542,6 +1543,7 @@
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{u.workout}
 							</p>
+							<Whiteboard entries={d.whiteboard[u.booking.sessionId] ?? []} {memberId} />
 						{/if}
 					</div>
 					<span class="flex items-center gap-1.5">
@@ -1580,6 +1582,7 @@
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{h.workout}
 							</p>
+							<Whiteboard entries={d.whiteboard[h.sessionId] ?? []} {memberId} />
 						{/if}
 					</div>
 					<div class="flex shrink-0 items-center gap-2">

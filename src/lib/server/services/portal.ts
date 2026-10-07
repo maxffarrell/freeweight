@@ -254,6 +254,34 @@ export async function portalOverview(memberId: string) {
 				)
 		: [];
 	const results = Object.fromEntries(resRows.map((r) => [r.sessionId, r]));
+
+	// The whiteboard: every logged score on sessions this member can see (ones
+	// they're booked into or attended), oldest first — like the gym's real one.
+	const wodSessionIds = [
+		...new Set(
+			[...upcomingWithPos, ...history].filter((u) => u.workout).map((u) => u.booking.sessionId)
+		)
+	];
+	const wbRows = wodSessionIds.length
+		? await db
+				.select({
+					sessionId: workoutResult.sessionId,
+					memberId: workoutResult.memberId,
+					name: gymMember.name,
+					score: workoutResult.score,
+					asRx: workoutResult.asRx
+				})
+				.from(workoutResult)
+				.innerJoin(gymMember, eq(workoutResult.memberId, gymMember.id))
+				.where(inArray(workoutResult.sessionId, wodSessionIds))
+				.orderBy(asc(workoutResult.createdAt))
+		: [];
+	const whiteboard: Record<
+		string,
+		{ memberId: string; name: string; score: string; asRx: boolean }[]
+	> = {};
+	for (const r of wbRows) (whiteboard[r.sessionId] ??= []).push(r);
+
 	return {
 		member: m,
 		settings,
@@ -265,6 +293,7 @@ export async function portalOverview(memberId: string) {
 		history,
 		feedback,
 		results,
+		whiteboard,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		calendarToken: calendarToken(memberId),
