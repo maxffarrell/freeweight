@@ -166,6 +166,26 @@ export const closureInput = v.object({
 /** Local wall-clock time (`YYYY-MM-DDTHH:mm`) in the workspace timezone. */
 const localDateTime = v.pipe(v.string(), v.isoDateTime('Use YYYY-MM-DDTHH:mm'));
 
+/** A one-off gym event — seminar, comp, bring-a-friend day. */
+export const eventInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name required'), v.maxLength(80)),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+	locationId: v.optional(v.nullable(idSchema)),
+	/** Local wall-clock start (`YYYY-MM-DDTHH:mm`) in the workspace timezone. */
+	startsAt: localDateTime,
+	durationMin: v.pipe(v.number(), v.integer(), v.minValue(15), v.maxValue(24 * 60)),
+	capacity: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)),
+	/** Signup price in cents; null/0 = free. */
+	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
+	memberBookable: v.optional(v.boolean(), true),
+	active: v.optional(v.boolean(), true)
+});
+/** Times aren't editable — recreate the event (registrations keep the old row). */
+export const eventUpdate = v.object({
+	id: idSchema,
+	...v.partial(v.omit(eventInput, ['startsAt', 'durationMin'])).entries
+});
+
 export const sessionInput = v.object({
 	classTypeId: idSchema,
 	locationId: v.optional(v.nullable(idSchema)),

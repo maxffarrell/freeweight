@@ -8,6 +8,7 @@ import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
+import * as evtSvc from '#lib/server/services/gym-events.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
@@ -304,6 +305,36 @@ export const cancelReservation = command(
 		const m = await myMember(memberId);
 		const r = await resSvc.cancelResourceBooking(m.organizationId, id, m.id);
 		void getReservations(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- Events (workshops, comps) ----------
+
+/** Upcoming member-bookable events with this member's registration status. */
+export const getPortalEvents = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return evtSvc.memberEvents(m.organizationId, m.id);
+});
+
+export const registerEvent = command(
+	v.object({ memberId: idSchema, eventId: idSchema }),
+	async ({ memberId, eventId }) => {
+		const m = await myMember(memberId);
+		const r = await evtSvc.registerForEvent(m.organizationId, m.id, eventId);
+		void getPortalEvents(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+export const cancelEventReg = command(
+	v.object({ memberId: idSchema, id: idSchema }),
+	async ({ memberId, id }) => {
+		const m = await myMember(memberId);
+		const r = await evtSvc.cancelRegistration(m.organizationId, id, m.id);
+		void getPortalEvents(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
 		return r;
 	}
 );
