@@ -124,7 +124,7 @@ export async function getMembership(orgId: string, id: string) {
  * and schedules the next recurring charge.
  */
 export async function createMembership(
-	ctx: OrgContext,
+	ctx: { orgId: string; userId?: string | null },
 	input: v.InferOutput<typeof s.membershipInput>
 ) {
 	const [m] = await db
@@ -162,7 +162,7 @@ export async function createMembership(
 	}
 	await emit({
 		orgId: ctx.orgId,
-		actorId: ctx.userId,
+		actorId: ctx.userId ?? null,
 		entityType: 'membership',
 		entityId: row!.id,
 		action: 'created',
@@ -283,7 +283,7 @@ export async function addCharge(ctx: OrgContext, input: v.InferOutput<typeof s.c
 		.returning();
 	await emit({
 		orgId: ctx.orgId,
-		actorId: ctx.userId,
+		actorId: ctx.userId ?? null,
 		entityType: 'charge',
 		entityId: row!.id,
 		action: 'created',
@@ -388,7 +388,7 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 	});
 	await emit({
 		orgId: ctx.orgId,
-		actorId: ctx.userId,
+		actorId: ctx.userId ?? null,
 		entityType: 'payment',
 		entityId: rows[0]!.id,
 		action: 'recorded',

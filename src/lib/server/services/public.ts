@@ -13,6 +13,7 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
+import { createMembership, getPlan } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -97,6 +98,11 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			joinedAt: new Date().toISOString().slice(0, 10)
 		})
 		.returning();
+	if (input.planId) {
+		const p = await getPlan(org.id, input.planId);
+		if (p.listed && p.active)
+			await createMembership({ orgId: org.id }, { memberId: m!.id, planId: input.planId });
+	}
 	await emit({
 		orgId: org.id,
 		entityType: 'member',
