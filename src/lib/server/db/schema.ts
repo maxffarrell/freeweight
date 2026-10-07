@@ -713,6 +713,54 @@ export const eventRegistration = pgTable(
 	]
 );
 
+/**
+ * A multi-week priced program — "6-week beginner lifting". Enrolling books the
+ * member into every upcoming session of the linked class type inside the window.
+ */
+export const course = pgTable(
+	'course',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		description: text('description').notNull().default(''),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		startsOn: date('starts_on', { mode: 'string' }).notNull(),
+		endsOn: date('ends_on', { mode: 'string' }).notNull(),
+		/** One-time price in minor units; 0 = free program. */
+		priceCents: integer('price_cents').notNull().default(0),
+		/** Max enrollees across the program; null = per-session capacities only. */
+		capacity: integer('capacity'),
+		/** false = staff enroll members; members can't self-register. */
+		memberBookable: boolean('member_bookable').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('course_org_idx').on(t.organizationId)]
+);
+
+/** One row per member enrolled in a course; the signup charge is linked for refunds. */
+export const courseEnrollment = pgTable(
+	'course_enrollment',
+	{
+		id: id(),
+		organizationId: orgId(),
+		courseId: text('course_id')
+			.notNull()
+			.references(() => course.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('course_enrollment_course_member_idx').on(t.courseId, t.memberId),
+		index('course_enrollment_member_idx').on(t.memberId)
+	]
+);
+
 export const checkInMethod = pgEnum('check_in_method', ['qr', 'manual']);
 
 /** A front-desk check-in, via the member's QR code or a staff search. */

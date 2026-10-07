@@ -375,3 +375,32 @@ export const setEventAttended = command(
 		return r;
 	}
 );
+
+// ---------- Courses (multi-week priced programs) ----------
+import * as crs from '#lib/server/services/courses.ts';
+import { courseInput } from '#lib/schemas.ts';
+
+export const getCourses = query(async () => crs.listCourses((await requireOrg()).orgId));
+export const getCourseRoster = query(idSchema, async (id) =>
+	crs.courseRoster((await requireOrg()).orgId, id)
+);
+export const createCourse = command(courseInput, async (input) => {
+	const r = await crs.createCourse(await requireOrg('admin'), input);
+	void getCourses().refresh();
+	return r;
+});
+export const removeCourse = command(idSchema, async (id) => {
+	await crs.removeCourse(await requireOrg('admin'), id);
+	void getCourses().refresh();
+});
+
+/** Staff enrolls a member into a course (paid courses post the signup charge). */
+export const enrollMemberInCourse = command(
+	v.object({ courseId: idSchema, memberId: idSchema }),
+	async ({ courseId, memberId }) => {
+		const r = await crs.enrollCourse((await requireOrg()).orgId, memberId, courseId);
+		void getCourseRoster(courseId).refresh();
+		void getCourses().refresh();
+		return r;
+	}
+);

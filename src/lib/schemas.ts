@@ -626,3 +626,17 @@ export const expenseInput = v.object({
 	/** Gym-local date the cost was incurred. */
 	expenseOn: isoDate
 });
+
+/** Multi-week priced program — enrolls the member into every session of a class type in the window. */
+export const courseInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name required'), v.maxLength(80)),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+	classTypeId: idSchema,
+	startsOn: isoDate,
+	endsOn: isoDate,
+	/** One-time signup price in cents; 0 = free. */
+	priceCents: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
+	/** Program-wide enrollment cap; null = per-session capacities only. */
+	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	memberBookable: v.optional(v.boolean(), true)
+});

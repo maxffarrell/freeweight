@@ -596,6 +596,13 @@
       "when": 1791414341121,
       "tag": "0084_save_offer",
       "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1791415042351,
+      "tag": "0085_courses",
+      "breakpoints": true
     }
   ]
 }

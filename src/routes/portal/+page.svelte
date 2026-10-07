@@ -47,6 +47,9 @@
 		getPortalEvents,
 		registerEvent,
 		cancelEventReg,
+		getPortalCourses,
+		enrollCourse,
+		leaveCourse,
 		checkInWithCode,
 		getPortalChallenges,
 		joinChallenge,
@@ -286,6 +289,34 @@
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
 		}
+	}
+
+	// ------- courses -------
+	const portalCourses = $derived(await getPortalCourses(memberId));
+	let cBusy = $state('');
+	async function joinCourse(courseId: string) {
+		cBusy = courseId;
+		try {
+			const r = await enrollCourse({ memberId, courseId });
+			toast.success(
+				r.charge
+					? `Enrolled — ${formatMoney(r.charge.amount, currency)} added to your balance`
+					: `Enrolled — booked into ${r.booked} session${r.booked === 1 ? '' : 's'}${r.waitlisted ? `, waitlisted on ${r.waitlisted}` : ''}`
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not enroll'));
+		}
+		cBusy = '';
+	}
+	async function quitCourse(courseId: string) {
+		cBusy = courseId;
+		try {
+			await leaveCourse({ memberId, courseId });
+			toast.success('Left the course — upcoming spots released');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not leave the course'));
+		}
+		cBusy = '';
 	}
 
 	// ------- challenges -------
@@ -1173,6 +1204,58 @@
 									: ev.event.price
 										? `Register — ${formatMoney(ev.event.price, currency)}`
 										: 'Register'}
+							</Button>
+						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if portalCourses.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Courses</Card.Title>
+				<Card.Description>
+					Multi-week programs — enroll once and you're booked into every session.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6 pb-4">
+				{#each portalCourses as c (c.course.id)}
+					<div class="flex items-center gap-3 py-3">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<span class="truncate font-medium">{c.course.name}</span>
+								{#if c.mine}
+									<Badge>Enrolled</Badge>
+								{:else if c.full}
+									<Badge variant="outline">Full</Badge>
+								{/if}
+							</div>
+							<p class="text-sm text-muted-foreground">
+								{c.className} · {formatDate(c.course.startsOn)}–{formatDate(c.course.endsOn)}
+								{#if c.course.capacity !== null}· {c.enrolled}/{c.course.capacity} enrolled{/if}
+							</p>
+							{#if c.course.description}
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">{c.course.description}</p>
+							{/if}
+						</div>
+						{#if c.mine}
+							<Button
+								variant="ghost"
+								size="sm"
+								disabled={cBusy === c.course.id}
+								onclick={() => quitCourse(c.course.id)}>Leave</Button
+							>
+						{:else if !c.full}
+							<Button
+								size="sm"
+								disabled={cBusy === c.course.id}
+								onclick={() => joinCourse(c.course.id)}
+							>
+								{c.course.priceCents
+									? `Enroll — ${formatMoney(c.course.priceCents, currency)}`
+									: 'Enroll'}
 							</Button>
 						{/if}
 					</div>
