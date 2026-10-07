@@ -1,0 +1,1 @@
+ALTER TABLE "class_type" ADD COLUMN "pay_rate" integer;

@@ -269,6 +269,8 @@ export const classType = pgTable(
 		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
 		/** Price in minor units for one drop-in booking; null = no online drop-in sales. */
 		dropInPrice: integer('drop_in_price'),
+		/** Instructor pay per session taught (minor units); null = unrated. Feeds the payroll report. */
+		payRate: integer('pay_rate'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

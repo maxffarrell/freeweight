@@ -324,6 +324,32 @@ async function instructorStats(orgId: string) {
 		.orderBy(desc(sql`count(distinct ${classSession.id})`));
 }
 
+/** Instructor pay owed for rated sessions taught this calendar month (class-type rate). */
+async function instructorPayroll(orgId: string) {
+	const rows = await db
+		.select({
+			instructor: user.name,
+			sessions: sql<number>`count(*)`.mapWith(Number),
+			pay: sql<number>`coalesce(sum(${classType.payRate}), 0)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				sql`${classSession.startsAt} >= date_trunc('month', now())`,
+				lt(classSession.startsAt, new Date()),
+				isNull(classSession.cancelledAt),
+				isNotNull(classType.payRate)
+			)
+		)
+		.groupBy(user.name)
+		.orderBy(desc(sql`sum(${classType.payRate})`));
+	return { rows, total: rows.reduce((a, r) => a + r.pay, 0) };
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -337,7 +363,8 @@ export async function getReports(orgId: string) {
 		top,
 		referrers,
 		hours,
-		weekdays
+		weekdays,
+		payroll
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -350,7 +377,8 @@ export async function getReports(orgId: string) {
 		topAttendees(orgId),
 		topReferrers(orgId),
 		checkInsByHour(orgId),
-		fillByWeekday(orgId)
+		fillByWeekday(orgId),
+		instructorPayroll(orgId)
 	]);
 	return {
 		checkIns,
@@ -364,6 +392,7 @@ export async function getReports(orgId: string) {
 		top,
 		referrers,
 		hours,
-		weekdays
+		weekdays,
+		payroll
 	};
 }
