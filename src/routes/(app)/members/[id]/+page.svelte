@@ -394,7 +394,11 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">No-shows</span>
-					<span class="tabular-nums">{m.attendance.noShows}</span>
+					<span class="tabular-nums"
+						>{m.attendance.noShows}{m.attendance.showRate != null
+							? ` · ${m.attendance.showRate}% show rate`
+							: ''}</span
+					>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>

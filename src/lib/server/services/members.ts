@@ -197,7 +197,7 @@ export async function getMember(orgId: string, id: string) {
 				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
 			)
 		);
-	const [[att], [noShows], referredBy, [referralCount], guardian, dependents, memberOptions] =
+	const [[att], [bs], referredBy, [referralCount], guardian, dependents, memberOptions] =
 		await Promise.all([
 			db
 				.select({
@@ -210,15 +210,16 @@ export async function getMember(orgId: string, id: string) {
 				.from(checkIn)
 				.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
 			db
-				.select({ n: sql<number>`count(*)`.mapWith(Number) })
-				.from(booking)
-				.where(
-					and(
-						eq(booking.organizationId, orgId),
-						eq(booking.memberId, id),
-						eq(booking.status, 'no_show')
+				.select({
+					attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(
+						Number
+					),
+					noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(
+						Number
 					)
-				),
+				})
+				.from(booking)
+				.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id))),
 			row.member.referredByMemberId
 				? db
 						.select({ id: gymMember.id, name: gymMember.name })
@@ -269,7 +270,12 @@ export async function getMember(orgId: string, id: string) {
 		attendance: {
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,
-			noShows: noShows?.n ?? 0
+			noShows: bs?.noShows ?? 0,
+			/** % of attended+no-show bookings the member showed up for; null when no history. */
+			showRate:
+				(bs?.attended ?? 0) + (bs?.noShows ?? 0) > 0
+					? Math.round((100 * (bs?.attended ?? 0)) / ((bs?.attended ?? 0) + (bs?.noShows ?? 0)))
+					: null
 		}
 	};
 }
