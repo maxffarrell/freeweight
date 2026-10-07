@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, sql, lt } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -108,6 +108,33 @@ export async function portalOverview(memberId: string) {
 		)
 		.orderBy(asc(classSession.startsAt));
 
+	// Waitlist position per waitlisted booking: FIFO rank among that session's waitlist.
+	const waitlisted = upcoming.filter((u) => u.booking.status === 'waitlisted');
+	const waitlistPos = new Map<string, number>();
+	if (waitlisted.length) {
+		const rows = await db
+			.select({ id: booking.id, sessionId: booking.sessionId })
+			.from(booking)
+			.where(
+				and(
+					eq(booking.organizationId, orgId),
+					eq(booking.status, 'waitlisted'),
+					inArray(booking.sessionId, [...new Set(waitlisted.map((u) => u.booking.sessionId))])
+				)
+			)
+			.orderBy(asc(booking.createdAt));
+		const counters = new Map<string, number>();
+		for (const r of rows) {
+			const n = (counters.get(r.sessionId) ?? 0) + 1;
+			counters.set(r.sessionId, n);
+			waitlistPos.set(r.id, n);
+		}
+	}
+	const upcomingWithPos = upcoming.map((u) => ({
+		...u,
+		waitlistPos: waitlistPos.get(u.booking.id) ?? null
+	}));
+
 	const balance = await memberBalance(orgId, memberId);
 
 	const openCharges = await db
@@ -131,7 +158,7 @@ export async function portalOverview(memberId: string) {
 		member: m,
 		settings,
 		memberships,
-		upcoming,
+		upcoming: upcomingWithPos,
 		balance,
 		openCharges,
 		credits: await creditUsage(orgId, memberId),

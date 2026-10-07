@@ -225,7 +225,11 @@
 							{localTime(u.startsAt, tz)}
 						</p>
 					</div>
-					<StatusBadge status={u.booking.status} />
+					<span class="flex items-center gap-1.5">
+						{#if u.waitlistPos}<span class="text-xs text-muted-foreground">#{u.waitlistPos}</span
+							>{/if}
+						<StatusBadge status={u.booking.status} />
+					</span>
 				</div>
 			{:else}
 				<p class="py-2 text-sm text-muted-foreground">Nothing booked — grab a spot below.</p>
