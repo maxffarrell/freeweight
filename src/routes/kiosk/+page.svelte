@@ -9,8 +9,12 @@
 		recordCheckIn,
 		checkOut,
 		getMembers,
-		getUpNext
+		getUpNext,
+		createMember
 	} from '#lib/remote/members.remote.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import { Label } from '#lib/components/ui/label/index.js';
+	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
@@ -77,9 +81,17 @@
 		flashTimer = setTimeout(() => (flash = null), 3000);
 	}
 
+	let searched = $state(false);
+	let walkInOpen = $state(false);
+	let wName = $state('');
+	let wPhone = $state('');
+	let wEmail = $state('');
+	let wPending = $state(false);
+
 	function onInput() {
 		clearTimeout(searchTimer);
 		const q = code.trim();
+		searched = false;
 		// fw1.* tokens and member ids aren't searchable text — skip the lookup.
 		if (q.length < 2 || q.startsWith('fw1.')) {
 			suggestions = [];
@@ -87,7 +99,32 @@
 		}
 		searchTimer = setTimeout(async () => {
 			suggestions = (await getMembers({ q })).slice(0, 5);
+			searched = true;
 		}, 150);
+	}
+
+	function openWalkIn() {
+		wName = code.trim();
+		walkInOpen = true;
+	}
+
+	async function saveWalkIn(e: SubmitEvent) {
+		e.preventDefault();
+		if (wPending || !wName.trim()) return;
+		wPending = true;
+		try {
+			const m = await createMember({
+				name: wName.trim(),
+				phone: wPhone.trim() || undefined,
+				email: wEmail.trim() || undefined
+			});
+			walkInOpen = false;
+			wName = wPhone = wEmail = '';
+			await checkIn(m!.id);
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Could not add walk-in'));
+		}
+		wPending = false;
 	}
 
 	async function checkIn(memberIdOrCode: string) {
@@ -234,8 +271,23 @@
 						</button>
 					{/each}
 				</div>
+			{:else if searched}
+				<button
+					type="button"
+					class="flex w-full items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-left hover:bg-muted"
+					onclick={openWalkIn}
+				>
+					<UserPlus class="size-5 shrink-0 text-muted-foreground" />
+					<span class="text-sm"
+						>No member found — <span class="font-medium">register "{code.trim()}"</span> as a walk-in</span
+					>
+				</button>
 			{/if}
 		</form>
+
+		<Button variant="outline" size="sm" class="self-start" onclick={openWalkIn}
+			><UserPlus class="mr-1 h-4 w-4" /> Register walk-in</Button
+		>
 
 		{#if liveLocations.length > 1}
 			<div class="flex items-center gap-3 text-sm">
@@ -314,3 +366,34 @@
 		{/if}
 	</main>
 </div>
+
+<Dialog.Root bind:open={walkInOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Register walk-in</Dialog.Title>
+			<Dialog.Description>
+				Creates a member record and checks them in. They can claim the portal later from their
+				member page.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-3" onsubmit={saveWalkIn}>
+			<div class="space-y-1">
+				<Label for="w-name">Name</Label>
+				<Input id="w-name" bind:value={wName} autocomplete="off" required />
+			</div>
+			<div class="space-y-1">
+				<Label for="w-phone">Phone</Label>
+				<Input id="w-phone" bind:value={wPhone} autocomplete="off" />
+			</div>
+			<div class="space-y-1">
+				<Label for="w-email">Email</Label>
+				<Input id="w-email" type="email" bind:value={wEmail} autocomplete="off" />
+			</div>
+			<Dialog.Footer>
+				<Button type="submit" disabled={wPending || !wName.trim()}>
+					{wPending ? 'Saving…' : 'Add & check in'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
