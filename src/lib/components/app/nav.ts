@@ -5,6 +5,7 @@ import Wallet from '@lucide/svelte/icons/wallet';
 import ScanLine from '@lucide/svelte/icons/scan-line';
 import CreditCard from '@lucide/svelte/icons/credit-card';
 import Settings from '@lucide/svelte/icons/settings';
+import ChartColumn from '@lucide/svelte/icons/chart-column';
 
 /** `key` is the second key of the `g <key>` keyboard shortcut. */
 export const mainNav = [
@@ -13,7 +14,8 @@ export const mainNav = [
 	{ href: '/schedule', label: 'Schedule', icon: CalendarDays, key: 's' },
 	{ href: '/checkins', label: 'Check-ins', icon: ScanLine, key: 'c' },
 	{ href: '/billing', label: 'Billing', icon: Wallet, key: 'b' },
-	{ href: '/plans', label: 'Plans', icon: CreditCard, key: 'p' }
+	{ href: '/plans', label: 'Plans', icon: CreditCard, key: 'p' },
+	{ href: '/reports', label: 'Reports', icon: ChartColumn, key: 'r' }
 ] as const;
 
 export const secondaryNav = [
