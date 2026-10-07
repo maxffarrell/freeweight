@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "staff_briefing" boolean DEFAULT true NOT NULL;

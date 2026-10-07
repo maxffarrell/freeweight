@@ -1,6 +1,20 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gt,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	lte,
+	or,
+	sql
+} from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -1547,6 +1561,155 @@ export async function sendWeeklyDigest(orgId: string) {
 					`<strong>${formatMoney(collected!.n, currency)}</strong> collected · <strong>${formatMoney(openBalance!.n, currency)}</strong> still open.`
 				],
 				action: { label: 'Open reports', url: `${appOrigin()}/reports` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
+ * Daily morning briefing to owner/admin staff: today's sessions with booked and
+ * waitlisted counts, pending cancel/pause requests, member birthdays, and
+ * yesterday's joins. One per gym-local day (logOnce keyed on the date);
+ * skipped entirely when the staffBriefing setting is off or there's nothing
+ * to report.
+ */
+export async function sendStaffBriefing(orgId: string) {
+	const [name, tz, st] = await Promise.all([
+		orgName(orgId),
+		orgTimezone(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	if (st[0] && !st[0].staffBriefing) return 0;
+	const today = localDate(new Date(), tz);
+	const yesterday = addDays(today, -1);
+
+	const [sessions, pending, birthdays, joins] = await Promise.all([
+		db
+			.select({
+				id: classSession.id,
+				className: classType.name,
+				startsAt: classSession.startsAt,
+				capacity: classSession.capacity,
+				instructorName: user.name
+			})
+			.from(classSession)
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.leftJoin(member, eq(classSession.instructorId, member.id))
+			.leftJoin(user, eq(member.userId, user.id))
+			.where(
+				and(
+					eq(classSession.organizationId, orgId),
+					isNull(classSession.cancelledAt),
+					sql`to_char(${classSession.startsAt} at time zone ${tz}, 'YYYY-MM-DD') = ${today}`
+				)
+			)
+			.orderBy(asc(classSession.startsAt)),
+		db
+			.select({
+				memberName: gymMember.name,
+				kind: sql<string>`case when ${membership.pauseRequestedAt} is not null then 'pause' else 'cancel' end`,
+				reason: membership.requestReason
+			})
+			.from(membership)
+			.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					or(isNotNull(membership.cancelRequestedAt), isNotNull(membership.pauseRequestedAt))
+				)
+			)
+			.orderBy(asc(gymMember.name)),
+		db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(
+				and(
+					eq(gymMember.organizationId, orgId),
+					eq(gymMember.status, 'active'),
+					sql`to_char(${gymMember.birthday}, 'MM-DD') = ${today.slice(5)}`
+				)
+			)
+			.orderBy(asc(gymMember.name)),
+		db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.joinedAt, yesterday)))
+			.orderBy(asc(gymMember.name))
+	]);
+	if (!sessions.length && !pending.length && !birthdays.length && !joins.length) return 0;
+
+	const counts = sessions.length
+		? await db
+				.select({
+					sessionId: booking.sessionId,
+					status: booking.status,
+					n: sql<number>`count(*)`.mapWith(Number)
+				})
+				.from(booking)
+				.where(
+					and(
+						eq(booking.organizationId, orgId),
+						inArray(
+							booking.sessionId,
+							sessions.map((s) => s.id)
+						)
+					)
+				)
+				.groupBy(booking.sessionId, booking.status)
+		: [];
+	const countsBySession = new Map<string, { booked: number; waitlisted: number }>();
+	for (const c of counts) {
+		const entry = countsBySession.get(c.sessionId) ?? { booked: 0, waitlisted: 0 };
+		if (c.status === 'waitlisted') entry.waitlisted = c.n;
+		else if (c.status === 'booked' || c.status === 'attended') entry.booked = c.n;
+		countsBySession.set(c.sessionId, entry);
+	}
+
+	const lines: string[] = [];
+	if (sessions.length) {
+		lines.push(
+			`<strong>${sessions.length} class${sessions.length === 1 ? '' : 'es'} today:</strong>`
+		);
+		for (const s of sessions) {
+			const c = countsBySession.get(s.id) ?? { booked: 0, waitlisted: 0 };
+			const who = s.instructorName ? ` — ${s.instructorName}` : '';
+			lines.push(
+				`${localTime(s.startsAt, tz)} ${s.className}${who} · ${c.booked}/${s.capacity} booked${c.waitlisted ? `, ${c.waitlisted} waitlisted` : ''}`
+			);
+		}
+	}
+	if (pending.length) {
+		lines.push(
+			`<strong>${pending.length} member request${pending.length === 1 ? '' : 's'} to review:</strong>`
+		);
+		for (const p of pending)
+			lines.push(`${p.memberName} wants to ${p.kind}${p.reason ? ` — “${p.reason}”` : ''}`);
+	}
+	if (birthdays.length)
+		lines.push(`<strong>Birthday today:</strong> ${birthdays.map((b) => b.name).join(', ')}`);
+	if (joins.length)
+		lines.push(
+			`<strong>${joins.length} new member${joins.length === 1 ? '' : 's'} yesterday:</strong> ${joins.map((j) => j.name).join(', ')}`
+		);
+
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	let sent = 0;
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'staff_briefing', today, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${name}: morning briefing — ${formatDate(today)}`,
+			...renderEmail({
+				orgName: name,
+				heading: `Today at ${name}`,
+				lines,
+				action: { label: 'Open dashboard', url: `${appOrigin()}/dashboard` }
 			})
 		});
 		sent++;

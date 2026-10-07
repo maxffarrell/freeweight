@@ -115,6 +115,7 @@
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let referralCredits = $state<number | null>(settings.referralCredits);
 	let publicPage = $state(settings.publicPage);
+	let staffBriefing = $state(settings.staffBriefing);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
 	async function saveSettings(e: SubmitEvent) {
@@ -139,7 +140,8 @@
 				lateCancelFee,
 				suspendAfterDays,
 				referralCredits,
-				publicPage
+				publicPage,
+				staffBriefing
 			});
 			toast.success('Settings saved');
 		} catch (err) {
@@ -441,6 +443,16 @@
 								</p>
 							</div>
 							<Switch bind:checked={publicPage} />
+						</div>
+						<div class="flex items-center justify-between gap-4">
+							<div>
+								<p class="font-medium">Daily staff briefing</p>
+								<p class="text-xs text-muted-foreground">
+									Morning email to owners/admins — today's classes, member requests, birthdays,
+									joins.
+								</p>
+							</div>
+							<Switch bind:checked={staffBriefing} />
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>

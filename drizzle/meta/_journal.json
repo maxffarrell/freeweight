@@ -267,6 +267,13 @@
       "when": 1791372741998,
       "tag": "0037_portal-notice",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791373252654,
+      "tag": "0038_staff-briefing",
+      "breakpoints": true
     }
   ]
 }
