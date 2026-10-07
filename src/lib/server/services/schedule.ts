@@ -89,6 +89,7 @@ export async function createClassType(
 			dropInPrice: input.dropInPrice ?? null,
 			payRate: input.payRate ?? null,
 			minEnrollment: input.minEnrollment ?? null,
+			waitlistLimit: input.waitlistLimit ?? null,
 			bookCutoffMin: input.bookCutoffMin ?? null,
 			memberBookable: input.memberBookable,
 			active: input.active
@@ -811,6 +812,7 @@ export async function bookSession(
 				cancelledAt: classSession.cancelledAt,
 				startsAt: classSession.startsAt,
 				dropInPrice: classType.dropInPrice,
+				waitlistLimit: classType.waitlistLimit,
 				className: classType.name
 			})
 			.from(classSession)
@@ -862,6 +864,13 @@ export async function bookSession(
 
 		if (input.dropIn && count >= s.capacity)
 			error(409, "This class is full — paid drop-ins can't join the waitlist");
+		if (count >= s.capacity && s.waitlistLimit != null) {
+			const [{ waiting }] = await tx
+				.select({ waiting: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.where(and(eq(booking.sessionId, input.sessionId), eq(booking.status, 'waitlisted')));
+			if (waiting >= s.waitlistLimit) error(409, 'This class and its waitlist are full');
+		}
 		const status = count >= s.capacity ? 'waitlisted' : 'booked';
 		if (existing) {
 			if (existing.status !== 'cancelled') error(409, 'Already booked');

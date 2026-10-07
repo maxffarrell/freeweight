@@ -293,6 +293,8 @@ export const classType = pgTable(
 		payRate: integer('pay_rate'),
 		/** Cron cancels sessions booked below this the day before; null = never auto-cancel. */
 		minEnrollment: integer('min_enrollment'),
+		/** Max members on a session's waitlist; null = unlimited, 0 = waitlist off. */
+		waitlistLimit: integer('waitlist_limit'),
 		/** Minutes before start that member booking closes; null = the gym-wide setting. */
 		bookCutoffMin: integer('book_cutoff_min'),
 		/** false = staff-only: members can't self-book in the portal (desk bookings still work). */

@@ -378,6 +378,7 @@
 	let tDropIn = $state('');
 	let tPayRate = $state('');
 	let tMinEnroll = $state<number | null>(null);
+	let tWaitlistCap = $state<number | null>(null);
 	let tBookCutoff = $state<number | null>(null);
 	let tDescription = $state('');
 	let tActive = $state(true);
@@ -392,6 +393,7 @@
 		tDropIn = c.dropInPrice != null ? (c.dropInPrice / 100).toFixed(2) : '';
 		tPayRate = c.payRate != null ? (c.payRate / 100).toFixed(2) : '';
 		tMinEnroll = c.minEnrollment;
+		tWaitlistCap = c.waitlistLimit;
 		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
 		tMemberBookable = c.memberBookable;
@@ -405,6 +407,7 @@
 		tDropIn = '';
 		tPayRate = '';
 		tMinEnroll = null;
+		tWaitlistCap = null;
 		tBookCutoff = null;
 		tActive = true;
 		tMemberBookable = true;
@@ -421,6 +424,7 @@
 				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : null,
 				payRate: tPayRate ? Math.round(parseFloat(tPayRate) * 100) : null,
 				minEnrollment: tMinEnroll,
+				waitlistLimit: tWaitlistCap,
 				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
 				memberBookable: tMemberBookable,
@@ -1059,6 +1063,21 @@
 				<Field.Description>
 					Member bookings close this many minutes before start — overrides the gym-wide cutoff for
 					this class (e.g. sauna needs 12h lead).
+				</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-waitlist-cap">
+					Waitlist limit <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-waitlist-cap"
+					type="number"
+					min={0}
+					bind:value={tWaitlistCap}
+					placeholder="Unlimited"
+				/>
+				<Field.Description>
+					How many members may queue when a session is full — 0 disables the waitlist.
 				</Field.Description>
 			</Field.Field>
 			<div class="flex items-center justify-between rounded-lg border px-3 py-2">

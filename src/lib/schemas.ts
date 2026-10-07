@@ -120,6 +120,8 @@ export const classTypeInput = v.object({
 	payRate: v.optional(v.nullable(cents)),
 	/** Cron cancels sessions below this enrollment the day before; null = never. */
 	minEnrollment: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Max waitlist depth per session; null = unlimited, 0 = no waitlist. */
+	waitlistLimit: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** Minutes before start that member booking closes; null = the gym-wide setting. */
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
