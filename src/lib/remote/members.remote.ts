@@ -8,6 +8,7 @@ import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
 	announcementInput,
+	bulkTagInput,
 	checkInInput,
 	guestVisitInput,
 	idSchema,
@@ -56,6 +57,13 @@ export const addMemberTag = command(memberTagInput, async ({ memberId, tag }) =>
 	await svc.addMemberTag(await requireOrg(), memberId, tag);
 	void getMember(memberId).refresh();
 	void getTags().refresh();
+});
+/** Bulk-tag members from the list's selection toolbar. Returns how many got the tag. */
+export const tagMembers = command(bulkTagInput, async ({ memberIds, tag }) => {
+	const n = await svc.addTagToMembers(await requireOrg(), memberIds, tag);
+	void getMembers().refresh();
+	void getTags().refresh();
+	return n;
 });
 export const removeMemberTag = command(memberTagInput, async ({ memberId, tag }) => {
 	await svc.removeMemberTag(await requireOrg(), memberId, tag);

@@ -122,6 +122,22 @@ export async function addMemberTag(ctx: OrgContext, memberId: string, tag: strin
 		.onConflictDoNothing();
 }
 
+/** Applies one tag to many members at once; ids outside the org are dropped. Returns tagged count. */
+export async function addTagToMembers(ctx: OrgContext, memberIds: string[], tag: string) {
+	const name = tag.trim().replace(/\s+/g, ' ');
+	if (!name) error(400, 'Tag is required');
+	const rows = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), inArray(gymMember.id, memberIds)));
+	if (!rows.length) return 0;
+	await db
+		.insert(memberTag)
+		.values(rows.map(({ id }) => ({ organizationId: ctx.orgId, memberId: id, tag: name })))
+		.onConflictDoNothing();
+	return rows.length;
+}
+
 export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: string) {
 	await db
 		.delete(memberTag)

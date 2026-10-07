@@ -24,7 +24,8 @@
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
-		importMembers
+		importMembers,
+		tagMembers
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
@@ -34,7 +35,9 @@
 	import Search from '@lucide/svelte/icons/search';
 	import Download from '@lucide/svelte/icons/download';
 	import Mail from '@lucide/svelte/icons/mail';
+	import TagIcon from '@lucide/svelte/icons/tag';
 	import Upload from '@lucide/svelte/icons/upload';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const currency = await getCurrency();
 	const announcements = $derived(await getRecentAnnouncements());
@@ -52,6 +55,37 @@
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let members = $state(await getMembers());
+
+	// ------- bulk selection + tag -------
+	const selected = new SvelteSet<string>();
+	let tagOpen = $state(false);
+	let bulkTag = $state('');
+	let tagPending = $state(false);
+	function toggleSelect(memberId: string) {
+		if (selected.has(memberId)) selected.delete(memberId);
+		else selected.add(memberId);
+	}
+	function toggleAll() {
+		if (selected.size === members.length) selected.clear();
+		else for (const m of members) selected.add(m.id);
+	}
+	async function applyBulkTag(e: SubmitEvent) {
+		e.preventDefault();
+		tagPending = true;
+		try {
+			const n = await tagMembers({ memberIds: [...selected], tag: bulkTag });
+			toast.success(n ? `Tagged ${n} member${n === 1 ? '' : 's'}` : 'Nobody matched');
+			if (n) {
+				selected.clear();
+				bulkTag = '';
+				tagOpen = false;
+				await refilter();
+			}
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not tag members'));
+		}
+		tagPending = false;
+	}
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
 		members = await getMembers({
@@ -299,11 +333,28 @@
 		</Select.Root>
 	</div>
 
+	{#if selected.size}
+		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+			<span class="font-medium tabular-nums">{selected.size} selected</span>
+			<Button size="sm" variant="outline" onclick={() => (tagOpen = true)}><TagIcon /> Tag</Button>
+			<Button size="sm" variant="ghost" onclick={() => selected.clear()}>Clear</Button>
+		</div>
+	{/if}
+
 	<Card.Root class="py-0">
 		<Card.Content class="px-0">
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
+						<Table.Head class="w-8">
+							<input
+								type="checkbox"
+								class="accent-primary"
+								aria-label="Select all"
+								checked={members.length > 0 && selected.size === members.length}
+								onchange={toggleAll}
+							/>
+						</Table.Head>
 						<Table.Head>Name</Table.Head>
 						<Table.Head class="hidden md:table-cell">Contact</Table.Head>
 						<Table.Head>Membership</Table.Head>
@@ -315,6 +366,15 @@
 				<Table.Body>
 					{#each members as m (m.id)}
 						<Table.Row class="cursor-pointer" onclick={() => goto(`/members/${m.id}`)}>
+							<Table.Cell onclick={(e) => e.stopPropagation()}>
+								<input
+									type="checkbox"
+									class="accent-primary"
+									aria-label={`Select ${m.name}`}
+									checked={selected.has(m.id)}
+									onchange={() => toggleSelect(m.id)}
+								/>
+							</Table.Cell>
 							<Table.Cell class="font-medium">
 								{m.name}
 								{#if m.tags.length}
@@ -344,7 +404,7 @@
 						</Table.Row>
 					{:else}
 						<Table.Row>
-							<Table.Cell colspan={6}>
+							<Table.Cell colspan={7}>
 								<Empty.Root class="border-0">
 									<Empty.Header>
 										<Empty.Media><Users /></Empty.Media>
@@ -365,6 +425,33 @@
 		</Card.Content>
 	</Card.Root>
 </div>
+
+<Dialog.Root bind:open={tagOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Tag {selected.size} member{selected.size === 1 ? '' : 's'}</Dialog.Title>
+			<Dialog.Description>
+				The tag is added to every selected member — existing tags are kept.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={applyBulkTag}>
+			<Field.Field>
+				<Field.Label for="bulk-tag">Tag</Field.Label>
+				<Input id="bulk-tag" bind:value={bulkTag} list="member-bulk-tags" required />
+				<datalist id="member-bulk-tags">
+					{#each allTags as t (t)}
+						<option value={t}></option>
+					{/each}
+				</datalist>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={tagPending}>
+					{tagPending ? 'Tagging…' : 'Add tag'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open>
 	<Dialog.Content>
