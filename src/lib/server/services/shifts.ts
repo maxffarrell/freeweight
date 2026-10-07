@@ -1,9 +1,18 @@
 import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { gymSettings, location, member, rota, shift, user } from '#lib/server/db/schema.ts';
+import {
+	deskTask,
+	deskTaskDone,
+	gymSettings,
+	location,
+	member,
+	rota,
+	shift,
+	user
+} from '#lib/server/db/schema.ts';
 import { emit } from '#lib/server/services/events.ts';
-import { localMinutes, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { localDate, localMinutes, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 
 async function staffRow(ctx: OrgContext) {
@@ -340,4 +349,104 @@ export async function scheduledNow(orgId: string) {
 			clockedInAt: r.clockedInAt,
 			late: !r.clockedInAt && mins > toMin(r.rota.startTime) + 15
 		}));
+}
+
+// ---------- Desk checklist ----------
+
+async function gymTz(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	return st?.timezone ?? 'UTC';
+}
+
+/** Today's desk checklist: every active task plus who completed it and when. */
+export async function deskChecklist(orgId: string) {
+	const tz = await gymTz(orgId);
+	const today = localDate(new Date(), tz);
+	const [tasks, done] = await Promise.all([
+		db
+			.select({ id: deskTask.id, label: deskTask.label })
+			.from(deskTask)
+			.where(and(eq(deskTask.organizationId, orgId), eq(deskTask.active, true)))
+			.orderBy(asc(deskTask.sortOrder), asc(deskTask.createdAt)),
+		db
+			.select({
+				taskId: deskTaskDone.taskId,
+				staffName: user.name,
+				at: deskTaskDone.createdAt
+			})
+			.from(deskTaskDone)
+			.innerJoin(member, eq(deskTaskDone.memberId, member.id))
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(and(eq(deskTaskDone.organizationId, orgId), eq(deskTaskDone.doneOn, today)))
+	]);
+	const byTask = new Map(done.map((d) => [d.taskId, { staffName: d.staffName, at: d.at }]));
+	return tasks.map((t) => ({ ...t, done: byTask.get(t.id) ?? null }));
+}
+
+/** Tick/untick a desk task for today (gym-local). Any staff member can tick. */
+export async function toggleDeskTask(ctx: OrgContext, taskId: string, done: boolean) {
+	const m = await staffRow(ctx);
+	const tz = await gymTz(ctx.orgId);
+	const today = localDate(new Date(), tz);
+	if (done) {
+		const [row] = await db
+			.insert(deskTaskDone)
+			.values({
+				organizationId: ctx.orgId,
+				taskId,
+				memberId: m.id,
+				doneOn: today
+			})
+			.onConflictDoNothing()
+			.returning();
+		if (row) {
+			const [t] = await db
+				.select({ label: deskTask.label })
+				.from(deskTask)
+				.where(eq(deskTask.id, taskId));
+			const [who] = await db
+				.select({ name: user.name })
+				.from(user)
+				.where(eq(user.id, ctx.userId))
+				.limit(1);
+			await emit({
+				orgId: ctx.orgId,
+				actorId: ctx.userId,
+				entityType: 'desk_task',
+				entityId: taskId,
+				action: 'done',
+				summary: `${who?.name ?? 'Staff'} completed "${t?.label ?? 'task'}"`
+			});
+		}
+	} else {
+		await db
+			.delete(deskTaskDone)
+			.where(and(eq(deskTaskDone.taskId, taskId), eq(deskTaskDone.doneOn, today)));
+	}
+}
+
+/** Admin: add a desk task to the daily checklist. */
+export async function createDeskTask(ctx: OrgContext, label: string) {
+	const [max] = await db
+		.select({ sort: sql<number>`coalesce(max(${deskTask.sortOrder}), -1)` })
+		.from(deskTask)
+		.where(eq(deskTask.organizationId, ctx.orgId));
+	const [row] = await db
+		.insert(deskTask)
+		.values({ organizationId: ctx.orgId, label, sortOrder: (max?.sort ?? -1) + 1 })
+		.returning();
+	return row;
+}
+
+/** Admin: remove a task (done history cascades with it). */
+export async function removeDeskTask(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(deskTask)
+		.where(and(eq(deskTask.id, id), eq(deskTask.organizationId, ctx.orgId)))
+		.returning({ id: deskTask.id });
+	if (!row) error(404, 'Task not found');
+	return row;
 }
