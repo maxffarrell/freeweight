@@ -176,6 +176,42 @@ export async function getRoster(orgId: string, sessionId: string) {
 		.orderBy(asc(booking.createdAt));
 }
 
+/** REST API listing: bookings across sessions, newest session first. */
+export async function listBookings(
+	orgId: string,
+	opts: {
+		sessionId?: string;
+		memberId?: string;
+		status?: string[];
+		from?: Date;
+		to?: Date;
+	} = {}
+) {
+	return db
+		.select({
+			booking,
+			memberName: gymMember.name,
+			startsAt: classSession.startsAt,
+			className: classType.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				opts.sessionId ? eq(booking.sessionId, opts.sessionId) : undefined,
+				opts.memberId ? eq(booking.memberId, opts.memberId) : undefined,
+				opts.status?.length ? inArray(booking.status, opts.status as never) : undefined,
+				opts.from ? gte(classSession.startsAt, opts.from) : undefined,
+				opts.to ? lt(classSession.startsAt, opts.to) : undefined
+			)
+		)
+		.orderBy(desc(classSession.startsAt))
+		.limit(200);
+}
+
 /**
  * Creates a session, plus weekly repeats through `repeatUntil` if given.
  * `startsAt` is a wall-clock time in the workspace timezone.

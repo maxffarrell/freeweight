@@ -579,7 +579,9 @@
 			</Card.Header>
 			<Card.Content class="space-y-2 text-sm">
 				{#if m.member.deskNote}
-					<div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-700 dark:text-amber-400">
+					<div
+						class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-700 dark:text-amber-400"
+					>
 						{m.member.deskNote}
 					</div>
 				{/if}
@@ -1262,8 +1264,7 @@
 					bind:value={deskNote}
 					maxlength={120}
 					placeholder="e.g. Owes $50 · Injury: no jumping"
-				/><Field.Description
-					>Shown at the kiosk when this member checks in.</Field.Description
+				/><Field.Description>Shown at the kiosk when this member checks in.</Field.Description
 				></Field.Field
 			>
 			<Field.Field>
