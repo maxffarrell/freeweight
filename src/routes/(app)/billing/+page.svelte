@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
@@ -34,11 +35,14 @@
 		getRecurring,
 		addRecurring,
 		updateRecurring,
-		removeRecurring
+		removeRecurring,
+		getExpenses,
+		addExpense,
+		removeExpense
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
-	import { chargeKinds, paymentMethods } from '#lib/schemas.ts';
+	import { chargeKinds, expenseCategories, paymentMethods } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import Download from '@lucide/svelte/icons/download';
@@ -55,6 +59,41 @@
 	let payments = $state(await getPayments());
 	let giftCards = $state(await getGiftCards());
 	let recurring = $state(await getRecurring());
+	let expenses = $state(await getExpenses());
+	let expLabel = $state('');
+	let expCategory = $state('rent');
+	let expAmount = $state<number | null>(null);
+	let expOn = $state(todayISO());
+	async function submitExpense(e: SubmitEvent) {
+		e.preventDefault();
+		if (!expLabel.trim() || !expAmount) return;
+		pending = true;
+		try {
+			expenses = [
+				await addExpense({
+					label: expLabel.trim(),
+					category: expCategory as never,
+					amountCents: expAmount,
+					expenseOn: expOn
+				}),
+				...expenses
+			];
+			expLabel = '';
+			expAmount = null;
+			toast.success('Expense logged');
+		} catch (e2) {
+			toast.error(errMsg(e2, 'Could not log expense'));
+		}
+		pending = false;
+	}
+	async function deleteExpense(id: string) {
+		try {
+			await removeExpense(id);
+			expenses = expenses.filter((e) => e.id !== id);
+		} catch (e2) {
+			toast.error(errMsg(e2, 'Could not remove expense'));
+		}
+	}
 	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
 
@@ -427,6 +466,7 @@
 			<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 			<Tabs.Trigger value="shop">Shop</Tabs.Trigger>
 			<Tabs.Trigger value="recurring">Recurring</Tabs.Trigger>
+			<Tabs.Trigger value="expenses">Expenses</Tabs.Trigger>
 		</Tabs.List>
 
 		<Tabs.Content value="charges">
@@ -957,6 +997,95 @@
 							</div>
 							<Button type="submit" disabled={pending || !rcAmount || !rcDesc.trim() || !rcMemberId}
 								>Add recurring</Button
+							>
+						</form>
+					</Card.Content>
+				</Card.Root>
+			</div>
+		</Tabs.Content>
+
+		<Tabs.Content value="expenses">
+			<div class="grid gap-4 lg:grid-cols-2">
+				<Card.Root class="py-0">
+					<Card.Content class="px-0">
+						<Table.Root>
+							<Table.Header>
+								<Table.Row>
+									<Table.Head>Date</Table.Head>
+									<Table.Head>Item</Table.Head>
+									<Table.Head>Category</Table.Head>
+									<Table.Head class="text-right">Amount</Table.Head>
+									<Table.Head></Table.Head>
+								</Table.Row>
+							</Table.Header>
+							<Table.Body>
+								{#each expenses as e (e.id)}
+									<Table.Row>
+										<Table.Cell class="tabular-nums">{e.expenseOn}</Table.Cell>
+										<Table.Cell class="font-medium">{e.label}</Table.Cell>
+										<Table.Cell
+											><Badge variant="outline" class="capitalize">{e.category}</Badge></Table.Cell
+										>
+										<Table.Cell class="text-right tabular-nums"
+											>{formatMoney(e.amountCents, currency)}</Table.Cell
+										>
+										<Table.Cell class="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => deleteExpense(e.id)}><Trash2 /></Button
+											>
+										</Table.Cell>
+									</Table.Row>
+								{:else}
+									<Table.Row
+										><Table.Cell colspan={5} class="text-muted-foreground"
+											>No expenses logged — rent, payroll and equipment buys feed the P&amp;L on
+											Reports.</Table.Cell
+										></Table.Row
+									>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</Card.Content>
+				</Card.Root>
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-base">Log an expense</Card.Title>
+						<Card.Description>
+							Operating costs — tracked against revenue on the Reports page.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<form class="space-y-3" onsubmit={submitExpense}>
+							<Field.Field>
+								<Field.Label for="exp-label">Item</Field.Label>
+								<Input id="exp-label" required bind:value={expLabel} placeholder="Monthly rent" />
+							</Field.Field>
+							<div class="grid grid-cols-3 gap-3">
+								<Field.Field>
+									<Field.Label>Category</Field.Label>
+									<Select.Root type="single" bind:value={expCategory}>
+										<Select.Trigger class="w-full capitalize">{expCategory}</Select.Trigger>
+										<Select.Content>
+											{#each expenseCategories as c (c)}
+												<Select.Item value={c} class="capitalize">{c}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Amount</Field.Label>
+									<MoneyInput bind:value={expAmount} />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="exp-on">Date</Field.Label>
+									<Input id="exp-on" type="date" required bind:value={expOn} />
+								</Field.Field>
+							</div>
+							<Button type="submit" disabled={pending || !expAmount || !expLabel.trim()}
+								>Log expense</Button
 							>
 						</form>
 					</Card.Content>

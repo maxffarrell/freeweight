@@ -24,6 +24,7 @@ import {
 	classSession,
 	classType,
 	eventRegistration,
+	expense,
 	facilityResource,
 	gymEvent,
 	gymMember,
@@ -860,6 +861,39 @@ export async function listSessionFeedback(orgId: string) {
 		.limit(500);
 }
 
+/** Expenses by month (YYYY-MM) over the last 12 months — feeds the P&L. */
+async function expensesByMonth(orgId: string) {
+	const since = new Date();
+	since.setUTCMonth(since.getUTCMonth() - 12);
+	return db
+		.select({
+			month: sql<string>`to_char(${expense.expenseOn}::date, 'YYYY-MM')`,
+			total: sql<number>`sum(${expense.amountCents})`.mapWith(Number)
+		})
+		.from(expense)
+		.where(
+			and(
+				eq(expense.organizationId, orgId),
+				gte(expense.expenseOn, since.toISOString().slice(0, 10))
+			)
+		)
+		.groupBy(sql`to_char(${expense.expenseOn}::date, 'YYYY-MM')`)
+		.orderBy(asc(sql`to_char(${expense.expenseOn}::date, 'YYYY-MM')`));
+}
+
+/** All-time expense totals by category. */
+async function expensesByCategory(orgId: string) {
+	return db
+		.select({
+			category: expense.category,
+			total: sql<number>`sum(${expense.amountCents})`.mapWith(Number)
+		})
+		.from(expense)
+		.where(eq(expense.organizationId, orgId))
+		.groupBy(expense.category)
+		.orderBy(desc(sql`sum(${expense.amountCents})`));
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -889,7 +923,9 @@ export async function getReports(orgId: string) {
 		amenities,
 		staffShifts,
 		locations,
-		ratings
+		ratings,
+		expenseMonths,
+		expenseCategories
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -921,8 +957,20 @@ export async function getReports(orgId: string) {
 			to: new Date().toISOString().slice(0, 10)
 		}),
 		byLocation(orgId),
-		classRatings(orgId)
+		classRatings(orgId),
+		expensesByMonth(orgId),
+		expensesByCategory(orgId)
 	]);
+	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
+	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
+	const pnl = {
+		months: [...months].sort().map((m) => {
+			const rev = revenue.find((r) => r.month === m)?.total ?? 0;
+			const exp = expByMonth[m] ?? 0;
+			return { month: m, revenue: rev, expenses: exp, net: rev - exp };
+		}),
+		byCategory: expenseCategories
+	};
 	return {
 		checkIns,
 		members,
@@ -951,6 +999,7 @@ export async function getReports(orgId: string) {
 		amenities,
 		staffShifts,
 		locations,
-		ratings
+		ratings,
+		pnl
 	};
 }

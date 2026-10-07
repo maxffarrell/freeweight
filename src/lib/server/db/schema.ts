@@ -1067,3 +1067,22 @@ export const userPref = pgTable(
 	},
 	(t) => [primaryKey({ columns: [t.userId, t.key] })]
 );
+
+/** Gym operating expense — rent, payroll, equipment buys; feeds the P&L on Reports. */
+export const expense = pgTable(
+	'expense',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		label: text('label').notNull(),
+		category: text('category').notNull().default('other'),
+		amountCents: integer('amount_cents').notNull(),
+		expenseOn: date('expense_on', { mode: 'string' }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [index('expense_org_date_idx').on(t.organizationId, t.expenseOn)]
+);

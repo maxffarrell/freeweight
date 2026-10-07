@@ -604,3 +604,19 @@ export const bulkTagInput = v.object({
 	memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)),
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
 });
+
+export const expenseCategories = [
+	'rent',
+	'payroll',
+	'equipment',
+	'utilities',
+	'marketing',
+	'other'
+] as const;
+export const expenseInput = v.object({
+	label: requiredText('Label'),
+	category: v.optional(v.picklist(expenseCategories), 'other'),
+	amountCents: cents,
+	/** Gym-local date the cost was incurred. */
+	expenseOn: isoDate
+});

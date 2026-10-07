@@ -561,6 +561,13 @@
       "when": 1791411720985,
       "tag": "0079_desk_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1791412275849,
+      "tag": "0080_expenses",
+      "breakpoints": true
     }
   ]
 }

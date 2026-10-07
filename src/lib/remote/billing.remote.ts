@@ -26,7 +26,8 @@ import {
 	promoCodeUpdate,
 	saleInput,
 	shopItemInput,
-	shopItemUpdate
+	shopItemUpdate,
+	expenseInput
 } from '#lib/schemas.ts';
 
 export const getPlans = query(async () => svc.listPlans((await requireOrg()).orgId));
@@ -197,4 +198,22 @@ export const getMemberBalance = query(idSchema, async (memberId) =>
 export const getCurrency = query(async () => {
 	const { orgId } = await requireOrg();
 	return (await getSettings(orgId)).currency;
+});
+
+// ---------- Expenses ----------
+
+export const getExpenses = query(async () => svc.listExpenses((await requireOrg()).orgId));
+
+/** Admin: log an operating expense (rent, payroll, equipment…). */
+export const addExpense = command(expenseInput, async (input) => {
+	const row = await svc.addExpense(await requireOrg('admin'), input);
+	void getExpenses().refresh();
+	return row;
+});
+
+/** Admin: remove an expense row. */
+export const removeExpense = command(idSchema, async (id) => {
+	const row = await svc.removeExpense(await requireOrg('admin'), id);
+	void getExpenses().refresh();
+	return row;
 });

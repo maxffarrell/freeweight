@@ -16,6 +16,7 @@ import {
 import { db } from '#lib/server/db/index.ts';
 import {
 	charge,
+	expense,
 	gymMember,
 	gymSettings,
 	membership,
@@ -1174,4 +1175,56 @@ export async function proratePlanChange(
 		);
 	}
 	return diff;
+}
+
+// ---------- Expenses ----------
+
+const EXPENSE_CATEGORIES = ['rent', 'payroll', 'equipment', 'utilities', 'marketing', 'other'];
+
+export async function listExpenses(orgId: string) {
+	return db
+		.select()
+		.from(expense)
+		.where(eq(expense.organizationId, orgId))
+		.orderBy(desc(expense.expenseOn), desc(expense.createdAt))
+		.limit(200);
+}
+
+export async function addExpense(ctx: OrgContext, input: v.InferOutput<typeof s.expenseInput>) {
+	const [row] = await db
+		.insert(expense)
+		.values({
+			organizationId: ctx.orgId,
+			label: input.label,
+			category: EXPENSE_CATEGORIES.includes(input.category) ? input.category : 'other',
+			amountCents: input.amountCents,
+			expenseOn: input.expenseOn
+		})
+		.returning();
+	emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'expense',
+		entityId: row.id,
+		action: 'create',
+		summary: `Expense logged: ${input.label} · ${formatMoney(input.amountCents)}`
+	});
+	return row;
+}
+
+export async function removeExpense(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(expense)
+		.where(and(eq(expense.id, id), eq(expense.organizationId, ctx.orgId)))
+		.returning();
+	if (!row) error(404, 'Expense not found');
+	emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'expense',
+		entityId: id,
+		action: 'delete',
+		summary: `Expense removed: ${row.label}`
+	});
+	return row;
 }
