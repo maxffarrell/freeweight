@@ -12,7 +12,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyChargePosted } from './notifications.ts';
+import { notifyChargePosted, notifyPaymentReceived } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
@@ -410,6 +410,12 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 		summary: `${formatMoney(input.amount)} from ${m.name}`,
 		data: { memberId: input.memberId, method: input.method }
 	});
+	notifyPaymentReceived(
+		ctx.orgId,
+		rows.map((r) => r.id),
+		input.amount,
+		input.method
+	).catch(() => {});
 	return rows[0];
 }
 

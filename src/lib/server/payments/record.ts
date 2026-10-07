@@ -4,6 +4,7 @@ import { charge, gymMember, gymSettings, payment } from '#lib/server/db/schema.t
 import { allocate } from '#lib/server/allocation.ts';
 import { formatMoney } from '#lib/format.ts';
 import { emit } from '#lib/server/services/events.ts';
+import { notifyPaymentReceived } from '#lib/server/services/notifications.ts';
 
 type OnlinePayment = {
 	orgId: string;
@@ -81,4 +82,10 @@ export async function recordOnlinePayment(p: OnlinePayment) {
 			payments: rows.map((r) => r.id)
 		}
 	});
+	notifyPaymentReceived(
+		p.orgId,
+		rows.map((r) => r.id),
+		p.amount,
+		p.method ?? 'card'
+	).catch(() => {});
 }

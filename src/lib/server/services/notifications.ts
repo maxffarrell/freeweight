@@ -10,7 +10,8 @@ import {
 	gymSettings,
 	location,
 	notificationLog,
-	organization
+	organization,
+	payment
 } from '#lib/server/db/schema.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
@@ -112,6 +113,48 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 						"We'll email you the moment a spot opens."
 					]
 				: [`${row.className} on ${when}.`, 'You can cancel any time from your member portal.'],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/**
+ * Receipt for a recorded payment — one email per recordPayment call.
+ * `paymentIds` covers the split rows a payment can allocate across; dedup on the first.
+ */
+export async function notifyPaymentReceived(
+	orgId: string,
+	paymentIds: string[],
+	amount: number,
+	method: string
+) {
+	if (paymentIds.length === 0) return;
+	const [row] = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			balanceMemberId: payment.memberId
+		})
+		.from(payment)
+		.innerJoin(gymMember, eq(payment.memberId, gymMember.id))
+		.where(eq(payment.id, paymentIds[0]!));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'payment_received', paymentIds[0]!, row.email))) return;
+	const [name, st] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const money = formatMoney(amount, st[0]?.currency ?? 'usd');
+	await sendEmail({
+		to: row.email,
+		subject: `Payment received: ${money} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: `Thanks, ${row.memberName} — ${money} received`,
+			lines: [
+				`${name} received your ${money} payment (${method}).`,
+				'Any remaining balance shows in your member portal.'
+			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
