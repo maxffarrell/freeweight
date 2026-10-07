@@ -649,3 +649,16 @@ export const courseInput = v.object({
 	instructorId: v.optional(v.nullable(idSchema)),
 	locationId: v.optional(v.nullable(idSchema))
 });
+
+/** Generate bookable slots inside an instructor's availability windows. */
+export const slotGenInput = v.object({
+	classTypeId: idSchema,
+	instructorId: idSchema,
+	from: isoDate,
+	to: isoDate,
+	/** Seats per slot; 1 = a private session. */
+	capacity: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50))),
+		1
+	)
+});
