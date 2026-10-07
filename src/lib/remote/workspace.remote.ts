@@ -23,6 +23,16 @@ import { appOrigin } from '#lib/server/email.ts';
 
 export const getDashboard = query(async () => dashboard((await requireOrg()).orgId));
 
+/** Launch checklist — null once dismissed or every item is done. */
+export const getChecklist = query(async () =>
+	dashboardSvc.setupChecklist((await requireOrg()).orgId)
+);
+
+export const dismissChecklist = command(async () => {
+	await dashboardSvc.dismissChecklist((await requireOrg()).orgId);
+	void getChecklist().refresh();
+});
+
 /** Audit-log page feed; `before` is the createdAt cursor of the previous page's last row. */
 export const getActivity = query(
 	v.object({

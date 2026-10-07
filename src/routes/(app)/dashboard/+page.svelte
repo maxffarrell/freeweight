@@ -4,7 +4,12 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
-	import { getDashboard, getStaff } from '#lib/remote/workspace.remote.ts';
+	import {
+		getDashboard,
+		getStaff,
+		getChecklist,
+		dismissChecklist
+	} from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import Users from '@lucide/svelte/icons/users';
@@ -39,6 +44,9 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { toast } from 'svelte-sonner';
 	import Timer from '@lucide/svelte/icons/timer';
+	import Check from '@lucide/svelte/icons/check';
+	import Circle from '@lucide/svelte/icons/circle';
+	import { Progress } from '#lib/components/ui/progress/index.js';
 
 	const d = await getDashboard();
 	const ai = await getAiStatus();
@@ -50,6 +58,7 @@
 	const rota = $derived(await getRota());
 	const staff = $derived(await getStaff());
 	const atRisk = $derived(await getAtRisk());
+	const checklist = $derived(await getChecklist());
 	const isAdmin = $derived(myShift.role === 'owner' || myShift.role === 'admin');
 	let logOpen = $state(false);
 	const tzName = $derived(d.timezone);
@@ -174,6 +183,39 @@
 <PageHeader title="Dashboard" />
 
 <div class="space-y-6 p-4 md:p-6">
+	{#if checklist}
+		{@const done = checklist.filter((i) => i.done).length}
+		<Card.Root>
+			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
+				<div>
+					<Card.Title class="text-base"
+						>Getting set up — {done} of {checklist.length} done</Card.Title
+					>
+					<Card.Description>A few steps before launch</Card.Description>
+				</div>
+				<Button size="sm" variant="ghost" onclick={() => dismissChecklist()}>Dismiss</Button>
+			</Card.Header>
+			<Card.Content class="px-6 pb-5">
+				<Progress value={done} max={checklist.length} class="mb-4" />
+				<ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					{#each checklist as item (item.key)}
+						<li>
+							<a href={item.href} class="flex items-center gap-2 text-sm hover:underline">
+								{#if item.done}
+									<Check class="size-4 shrink-0 text-green-600 dark:text-green-400" />
+									<span class="text-muted-foreground line-through">{item.label}</span>
+								{:else}
+									<Circle class="size-4 shrink-0 text-muted-foreground/50" />
+									{item.label}
+								{/if}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
 		{#each kpis as k (k.label)}
 			<Card.Root
