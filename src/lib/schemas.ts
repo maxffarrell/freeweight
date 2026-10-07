@@ -240,3 +240,8 @@ export const memberNoteInput = v.object({
 	memberId: idSchema,
 	body: v.pipe(requiredText('Note'), v.maxLength(2000))
 });
+
+export const memberTagInput = v.object({
+	memberId: idSchema,
+	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
+});

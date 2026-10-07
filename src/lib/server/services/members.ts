@@ -10,6 +10,7 @@ import {
 	gymMember,
 	location,
 	memberNote,
+	memberTag,
 	membership,
 	organization,
 	payment,
@@ -24,7 +25,7 @@ import { creditUsage } from './schedule.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
-export async function listMembers(orgId: string, q?: string) {
+export async function listMembers(orgId: string, q?: string, tag?: string) {
 	const term = q?.trim();
 	return db
 		.select({
@@ -35,6 +36,9 @@ export async function listMembers(orgId: string, q?: string) {
 			status: gymMember.status,
 			joinedAt: gymMember.joinedAt,
 			locationName: location.name,
+			tags: sql<
+				string[]
+			>`coalesce((select array_agg(t.tag order by t.tag) from ${memberTag} t where t.member_id = ${outer(gymMember.id)}), '{}')`,
 			openBalance:
 				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.status = 'open'), 0)`.mapWith(
 					Number
@@ -54,10 +58,59 @@ export async function listMembers(orgId: string, q?: string) {
 							ilike(gymMember.email, `%${term}%`),
 							ilike(gymMember.phone, `%${term}%`)
 						)
+					: undefined,
+				tag
+					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.tag = ${tag})`
 					: undefined
 			)
 		)
 		.orderBy(asc(gymMember.name));
+}
+
+/** Every tag in use in the workspace — feeds the list filter and member-page autocomplete. */
+export async function listTags(orgId: string) {
+	const rows = await db
+		.selectDistinct({ tag: memberTag.tag })
+		.from(memberTag)
+		.where(eq(memberTag.organizationId, orgId))
+		.orderBy(asc(memberTag.tag));
+	return rows.map((r) => r.tag);
+}
+
+/** Tag names on one member. */
+export async function memberTags(orgId: string, memberId: string) {
+	const rows = await db
+		.select({ tag: memberTag.tag })
+		.from(memberTag)
+		.where(and(eq(memberTag.organizationId, orgId), eq(memberTag.memberId, memberId)))
+		.orderBy(asc(memberTag.tag));
+	return rows.map((r) => r.tag);
+}
+
+export async function addMemberTag(ctx: OrgContext, memberId: string, tag: string) {
+	const name = tag.trim().replace(/\s+/g, ' ');
+	if (!name) error(400, 'Tag is required');
+	const [m] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	await db
+		.insert(memberTag)
+		.values({ organizationId: ctx.orgId, memberId, tag: name })
+		.onConflictDoNothing();
+}
+
+export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: string) {
+	await db
+		.delete(memberTag)
+		.where(
+			and(
+				eq(memberTag.organizationId, ctx.orgId),
+				eq(memberTag.memberId, memberId),
+				eq(memberTag.tag, tag)
+			)
+		);
 }
 
 export async function getMember(orgId: string, id: string) {
@@ -152,6 +205,7 @@ export async function getMember(orgId: string, id: string) {
 		checkIns,
 		credits,
 		signedWaiver,
+		tags: await memberTags(orgId, id),
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0
 	};

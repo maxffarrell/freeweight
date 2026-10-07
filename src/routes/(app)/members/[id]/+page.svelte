@@ -8,6 +8,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -21,7 +22,10 @@
 		logGuestVisit,
 		getMemberNotes,
 		addMemberNote,
-		deleteMemberNote
+		deleteMemberNote,
+		getTags,
+		addMemberTag,
+		removeMemberTag
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -64,6 +68,27 @@
 			await deleteMemberNote({ noteId, memberId: id });
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete note'));
+		}
+	}
+
+	// ------- tags -------
+	const allTags = $derived(await getTags());
+	let newTag = $state('');
+	async function addTag() {
+		const t = newTag.trim();
+		if (!t) return;
+		try {
+			await addMemberTag({ memberId: id, tag: t });
+			newTag = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add tag'));
+		}
+	}
+	async function removeTag(tag: string) {
+		try {
+			await removeMemberTag({ memberId: id, tag });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove tag'));
 		}
 	}
 	const plans = $derived(await getPlans());
@@ -316,6 +341,35 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
+				</div>
+				<div class="flex items-start justify-between gap-2">
+					<span class="pt-0.5 text-muted-foreground">Tags</span>
+					<span class="flex max-w-56 flex-wrap justify-end gap-1">
+						{#each m.tags as t (t)}
+							<Badge variant="secondary" class="gap-1">
+								{t}
+								<button
+									class="text-muted-foreground hover:text-foreground"
+									onclick={() => removeTag(t)}
+									aria-label="Remove tag {t}">×</button
+								>
+							</Badge>
+						{:else}
+							<span class="text-muted-foreground">—</span>
+						{/each}
+						<input
+							bind:value={newTag}
+							list="member-tag-options"
+							placeholder="+ tag"
+							class="w-16 border-0 bg-transparent p-0 text-right text-sm outline-none placeholder:text-muted-foreground"
+							onkeydown={(e) => e.key === 'Enter' && void addTag()}
+						/>
+						<datalist id="member-tag-options">
+							{#each allTags as t (t)}
+								<option value={t}></option>
+							{/each}
+						</datalist>
+					</span>
 				</div>
 			</Card.Content>
 			{#if balance > 0}

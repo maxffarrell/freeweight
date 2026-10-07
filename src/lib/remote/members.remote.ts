@@ -13,13 +13,27 @@ import {
 	memberImportInput,
 	memberInput,
 	memberNoteInput,
+	memberTagInput,
 	memberUpdate
 } from '#lib/schemas.ts';
 import { listRecentAnnouncements, sendAnnouncement } from '#lib/server/services/notifications.ts';
 
-export const getMembers = query(v.optional(v.object({ q: v.optional(v.string()) })), async (opts) =>
-	svc.listMembers((await requireOrg()).orgId, opts?.q)
+export const getMembers = query(
+	v.optional(v.object({ q: v.optional(v.string()), tag: v.optional(v.string()) })),
+	async (opts) => svc.listMembers((await requireOrg()).orgId, opts?.q, opts?.tag)
 );
+/** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
+export const getTags = query(async () => svc.listTags((await requireOrg()).orgId));
+export const addMemberTag = command(memberTagInput, async ({ memberId, tag }) => {
+	await svc.addMemberTag(await requireOrg(), memberId, tag);
+	void getMember(memberId).refresh();
+	void getTags().refresh();
+});
+export const removeMemberTag = command(memberTagInput, async ({ memberId, tag }) => {
+	await svc.removeMemberTag(await requireOrg(), memberId, tag);
+	void getMember(memberId).refresh();
+	void getTags().refresh();
+});
 export const getMember = query(idSchema, async (id) =>
 	svc.getMember((await requireOrg()).orgId, id)
 );

@@ -472,6 +472,25 @@ export const documentBlob = pgTable('document_blob', {
 	data: text('data').notNull()
 });
 
+/** Free-form staff labels on members — "VIP", "comp team", "6am crew". */
+export const memberTag = pgTable(
+	'member_tag',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		tag: text('tag').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('member_tag_member_idx').on(t.memberId),
+		index('member_tag_org_tag_idx').on(t.organizationId, t.tag),
+		uniqueIndex('member_tag_unique').on(t.memberId, t.tag)
+	]
+);
+
 /** Staff notes on a member — injuries, preferences, front-desk flags. */
 export const memberNote = pgTable(
 	'member_note',

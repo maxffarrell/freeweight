@@ -12,12 +12,14 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getMembers,
 		createMember,
 		emailAllMembers,
 		getRecentAnnouncements,
+		getTags,
 		importMembers
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
@@ -32,12 +34,17 @@
 
 	const currency = await getCurrency();
 	const announcements = $derived(await getRecentAnnouncements());
+	const allTags = $derived(await getTags());
 	let q = $state('');
+	let tag = $state('__all');
 	let members = $state(await getMembers());
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	async function refilter() {
+		members = await getMembers({ q, tag: tag === '__all' ? undefined : tag });
+	}
 	function search() {
 		clearTimeout(timer);
-		timer = setTimeout(async () => (members = await getMembers({ q })), 150);
+		timer = setTimeout(refilter, 150);
 	}
 
 	let open = $state(page.url.searchParams.get('new') === '1');
@@ -78,7 +85,7 @@
 			);
 			importOpen = false;
 			importText = '';
-			members = await getMembers({ q });
+			await refilter();
 		} catch (err) {
 			toast.error(errMsg(err, 'Import failed'));
 		}
@@ -119,7 +126,7 @@
 			toast.success('Member added');
 			open = false;
 			name = email = phone = '';
-			members = await getMembers({ q });
+			await refilter();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add member'));
 		}
@@ -157,9 +164,27 @@
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-6">
-	<div class="relative max-w-sm">
-		<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-		<Input placeholder="Search name, email, phone…" class="pl-9" bind:value={q} oninput={search} />
+	<div class="flex max-w-xl gap-2">
+		<div class="relative flex-1">
+			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Input
+				placeholder="Search name, email, phone…"
+				class="pl-9"
+				bind:value={q}
+				oninput={search}
+			/>
+		</div>
+		{#if allTags.length}
+			<Select.Root type="single" bind:value={tag} onValueChange={() => void refilter()}>
+				<Select.Trigger class="w-36">{tag === '__all' ? 'All tags' : tag}</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="__all">All tags</Select.Item>
+					{#each allTags as t (t)}
+						<Select.Item value={t}>{t}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+		{/if}
 	</div>
 
 	<Card.Root class="py-0">
@@ -177,7 +202,21 @@
 				<Table.Body>
 					{#each members as m (m.id)}
 						<Table.Row class="cursor-pointer" onclick={() => goto(`/members/${m.id}`)}>
-							<Table.Cell class="font-medium">{m.name}</Table.Cell>
+							<Table.Cell class="font-medium">
+								{m.name}
+								{#if m.tags.length}
+									<span class="ml-1.5 inline-flex gap-1">
+										{#each m.tags.slice(0, 3) as t (t)}
+											<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">{t}</Badge>
+										{/each}
+										{#if m.tags.length > 3}
+											<Badge variant="secondary" class="px-1.5 py-0 text-[10px]"
+												>+{m.tags.length - 3}</Badge
+											>
+										{/if}
+									</span>
+								{/if}
+							</Table.Cell>
 							<Table.Cell class="hidden text-muted-foreground md:table-cell">
 								{m.email ?? m.phone ?? '—'}
 							</Table.Cell>
