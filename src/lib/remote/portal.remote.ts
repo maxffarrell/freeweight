@@ -6,6 +6,7 @@ import { db } from '#lib/server/db/index.ts';
 import { document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
+import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
@@ -546,3 +547,37 @@ export const acceptSaveOffer = command(idSchema, async (memberId) => {
 	void getPortalOverview(memberId).refresh();
 	return r;
 });
+
+/** Courses the member can see + their enrollments. */
+export const getPortalCourses = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return crs.portalCourses(m.organizationId, m.id);
+});
+
+/** Member self-enrolls into a memberBookable course (charge posts to balance when priced). */
+export const enrollCourse = command(
+	v.object({ memberId: idSchema, courseId: idSchema }),
+	async ({ memberId, courseId }) => {
+		const m = await myMember(memberId);
+		const [c] = await crs
+			.portalCourses(m.organizationId, m.id)
+			.then((rows) => rows.filter((r) => r.course.id === courseId));
+		if (!c) error(404, 'Course not available');
+		const r = await crs.enrollCourse(m.organizationId, m.id, courseId);
+		void getPortalCourses(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+/** Member leaves a course — upcoming bookings cancelled, unpaid signup charge voided. */
+export const leaveCourse = command(
+	v.object({ memberId: idSchema, courseId: idSchema }),
+	async ({ memberId, courseId }) => {
+		const m = await myMember(memberId);
+		const r = await crs.unenrollCourse(m.organizationId, m.id, courseId);
+		void getPortalCourses(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);

@@ -43,6 +43,11 @@
 		getEvents,
 		createEvent,
 		getEventRoster,
+		getCourses,
+		createCourse,
+		getCourseRoster,
+		removeCourse,
+		enrollMemberInCourse,
 		registerMemberForEvent,
 		cancelEventRegistration,
 		setEventAttended,
@@ -426,6 +431,70 @@
 	let evRosterId = $state('');
 	const evRoster = $derived(evRosterId ? await getEventRoster(evRosterId) : null);
 	let evMemberId = $state('');
+	let coursesOpen = $state(false);
+	const courses = $derived(await getCourses());
+	let cRosterId = $state('');
+	const cRoster = $derived(cRosterId ? await getCourseRoster(cRosterId) : null);
+	let cMemberId = $state('');
+	let cName = $state('');
+	let cDesc = $state('');
+	let cType = $state('');
+	let cStart = $state('');
+	let cEnd = $state('');
+	let cPrice = $state('');
+	let cCap = $state('');
+	let cBookable = $state(true);
+
+	async function submitCourse(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await createCourse({
+				name: cName.trim(),
+				description: cDesc.trim() || undefined,
+				classTypeId: cType,
+				startsOn: cStart,
+				endsOn: cEnd,
+				priceCents: cPrice === '' ? 0 : Math.round(Number(cPrice) * 100),
+				capacity: cCap === '' ? null : Math.round(Number(cCap)),
+				memberBookable: cBookable
+			});
+			toast.success('Course created — members can enroll in the portal');
+			cName = cDesc = cStart = cEnd = cPrice = cCap = '';
+			await getCourses().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not create course'));
+		}
+		pending = false;
+	}
+
+	async function enrollCourseMember() {
+		if (!cRosterId || !cMemberId) return;
+		try {
+			const r = await enrollMemberInCourse({ courseId: cRosterId, memberId: cMemberId });
+			toast.success(
+				r.charge
+					? 'Enrolled — signup charge posted'
+					: `Enrolled (${r.booked} booked${r.waitlisted ? `, ${r.waitlisted} waitlisted` : ''})`
+			);
+			cMemberId = '';
+			await getCourseRoster(cRosterId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not enroll member'));
+		}
+	}
+
+	async function removeCourseRow(id: string) {
+		if (!confirm('Remove this course? (only possible with no enrollees)')) return;
+		try {
+			await removeCourse(id);
+			toast.success('Course removed');
+			await getCourses().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove course'));
+		}
+	}
+
 	let eName = $state('');
 	let eDesc = $state('');
 	let eDate = $state('');
@@ -738,6 +807,7 @@
 				>{/if}</Button
 		>
 		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
+		<Button variant="outline" size="sm" onclick={() => (coursesOpen = true)}>Courses</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 	{/snippet}
 </PageHeader>
@@ -1980,6 +2050,145 @@
 			</div>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>Create event</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={coursesOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Courses</Dialog.Title>
+			<Dialog.Description>
+				Multi-week programs ("6-week beginner lifting"). Enrolling books the member into every
+				session of the class type in the window — a paid course posts one signup charge.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if courses.length}
+			<div class="mb-4 divide-y rounded-lg border">
+				{#each courses as c (c.course.id)}
+					<div class="px-3 py-2 text-sm">
+						<button
+							class="flex w-full items-center justify-between gap-2 text-left"
+							onclick={() => (cRosterId = cRosterId === c.course.id ? '' : c.course.id)}
+						>
+							<div class="min-w-0">
+								<span class="font-medium">{c.course.name}</span>
+								{#if c.course.priceCents}
+									<span class="text-muted-foreground">
+										· {formatMoney(c.course.priceCents, currency)}</span
+									>
+								{/if}
+								{#if !c.course.memberBookable}
+									<Badge variant="outline" class="text-xs">staff enroll only</Badge>
+								{/if}
+								<p class="text-xs text-muted-foreground">
+									{c.className} · {formatDate(c.course.startsOn)}–{formatDate(c.course.endsOn)} ·
+									{c.sessionsLeft} sessions left
+								</p>
+							</div>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{c.enrolled}{c.course.capacity !== null ? `/${c.course.capacity}` : ''} enrolled
+							</span>
+						</button>
+						{#if cRosterId === c.course.id}
+							{#if !c.enrolled}
+								<div class="mb-1 flex justify-end">
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs text-destructive"
+										onclick={() => removeCourseRow(c.course.id)}>Remove course</Button
+									>
+								</div>
+							{/if}
+							<div class="mt-2 rounded-md border p-2">
+								{#if cRoster}
+									{#each cRoster as r (r.enrollment.id)}
+										<div class="flex items-center justify-between py-1 text-sm">
+											<span>{r.memberName}</span>
+											<span class="text-xs text-muted-foreground"
+												>{localDate(r.enrollment.createdAt, tz)}</span
+											>
+										</div>
+									{:else}
+										<p class="py-1 text-xs text-muted-foreground">Nobody enrolled yet.</p>
+									{/each}
+									{#if c.course.capacity === null || c.enrolled < c.course.capacity}
+										<div class="mt-2 flex gap-2">
+											<Select.Root type="single" bind:value={cMemberId}>
+												<Select.Trigger class="h-8 flex-1 text-sm">
+													{memberList.find((mm) => mm.id === cMemberId)?.name ?? 'Enroll a member…'}
+												</Select.Trigger>
+												<Select.Content>
+													{#each memberList.filter((mm) => !cRoster.some((r) => r.enrollment.memberId === mm.id)) as mm (mm.id)}
+														<Select.Item value={mm.id}>{mm.name}</Select.Item>
+													{/each}
+												</Select.Content>
+											</Select.Root>
+											<Button
+												size="sm"
+												class="h-8"
+												disabled={!cMemberId}
+												onclick={enrollCourseMember}>Enroll</Button
+											>
+										</div>
+									{/if}
+								{:else}
+									<p class="py-1 text-xs text-muted-foreground">Loading…</p>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<form class="space-y-4" onsubmit={submitCourse}>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="c-name">Name</Field.Label>
+					<Input id="c-name" required bind:value={cName} placeholder="6-week beginner lifting" />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-type">Class type</Field.Label>
+					<select
+						id="c-type"
+						required
+						bind:value={cType}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="" disabled>Pick…</option>
+						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
+					</select>
+				</Field.Field>
+			</div>
+			<Field.Field>
+				<Field.Label for="c-desc">Description (optional)</Field.Label>
+				<Input id="c-desc" bind:value={cDesc} maxlength={500} />
+			</Field.Field>
+			<div class="grid grid-cols-4 gap-3">
+				<Field.Field>
+					<Field.Label for="c-start">Starts</Field.Label>
+					<Input id="c-start" type="date" required bind:value={cStart} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-end">Ends</Field.Label>
+					<Input id="c-end" type="date" required bind:value={cEnd} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-price">Price (blank = free)</Field.Label>
+					<Input id="c-price" type="number" min={0} step="0.01" bind:value={cPrice} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-cap">Cap (optional)</Field.Label>
+					<Input id="c-cap" type="number" min={1} bind:value={cCap} />
+				</Field.Field>
+			</div>
+			<label class="flex items-center gap-2 text-sm">
+				<Switch bind:checked={cBookable} /> Members can enroll in the portal
+			</label>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>Create course</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
