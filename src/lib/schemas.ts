@@ -33,6 +33,8 @@ export const memberInput = v.object({
 	locationId: v.optional(v.nullable(idSchema)),
 	status: v.optional(v.picklist(memberStatuses), 'active'),
 	notes: optionalText,
+	/** Short front-desk flag — shown on the kiosk check-in screen. */
+	deskNote: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
 	joinedAt: v.optional(v.nullable(isoDate)),
 	birthday: v.optional(v.nullable(isoDate)),
 	/** Household payer — membership charges post under this member instead. */

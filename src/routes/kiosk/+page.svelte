@@ -38,9 +38,12 @@
 			openBalance: number;
 			planName: string | null;
 			photoDocumentId: string | null;
+			deskNote: string | null;
 		}[]
 	>([]);
-	let flash = $state<{ ok: boolean; text: string; photo?: string | null } | null>(null);
+	let flash = $state<{ ok: boolean; text: string; photo?: string | null; note?: string | null } | null>(
+		null
+	);
 	const initials = (name: string) =>
 		name
 			.split(/\s+/)
@@ -65,9 +68,9 @@
 		return () => clearInterval(t);
 	});
 
-	function showFlash(ok: boolean, text: string, photo?: string | null) {
+	function showFlash(ok: boolean, text: string, photo?: string | null, note?: string | null) {
 		clearTimeout(flashTimer);
-		flash = { ok, text, photo };
+		flash = { ok, text, photo, note };
 		flashTimer = setTimeout(() => (flash = null), 3000);
 	}
 
@@ -97,7 +100,8 @@
 					? `${r.member.name} checked out`
 					: `${r.member.name} checked in` +
 							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : ''),
-				r.member.photoDocumentId
+				r.member.photoDocumentId,
+				r.member.deskNote
 			);
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
@@ -160,7 +164,14 @@
 				{:else if flash.ok}<CircleCheck class="size-8 shrink-0" />{:else}<TriangleAlert
 						class="size-8 shrink-0"
 					/>{/if}
-				{flash.text}
+				<span>
+					{flash.text}
+					{#if flash.note}
+						<span class="ml-2 rounded-md bg-amber-500/25 px-2 py-0.5 text-base font-semibold"
+							>{flash.note}</span
+						>
+					{/if}
+				</span>
 			</div>
 		{/if}
 
@@ -199,7 +210,14 @@
 										>{initials(m.name)}</span
 									>
 								{/if}
-								<span class="truncate font-medium">{m.name}</span>
+								<span class="min-w-0">
+									<span class="block truncate font-medium">{m.name}</span>
+									{#if m.deskNote}
+										<span class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+											>{m.deskNote}</span
+										>
+									{/if}
+								</span>
 							</span>
 							<span class="flex items-center gap-2">
 								{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
