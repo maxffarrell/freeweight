@@ -60,6 +60,8 @@
 	let phone = $state(settings.phone);
 	let website = $state(settings.website);
 	let waiver = $state(settings.waiver);
+	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
+	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -75,6 +77,8 @@
 				phone,
 				website,
 				waiver,
+				bookingWindowDays,
+				cancelCutoffMin,
 				publicPage
 			});
 			toast.success('Settings saved');
@@ -265,6 +269,28 @@
 								placeholder="Leave blank to skip waivers. When set, joiners, drop-ins and portal members must agree before visiting."
 							/>
 						</Field.Field>
+						<div class="grid gap-4 sm:grid-cols-2">
+							<Field.Field>
+								<Field.Label for="bwindow">Booking window (days)</Field.Label>
+								<Input
+									id="bwindow"
+									type="number"
+									min={1}
+									bind:value={bookingWindowDays}
+									placeholder="Any time"
+								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="ccutoff">Cancel cutoff (minutes)</Field.Label>
+								<Input
+									id="ccutoff"
+									type="number"
+									min={0}
+									bind:value={cancelCutoffMin}
+									placeholder="Any time"
+								/>
+							</Field.Field>
+						</div>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
 								<p class="font-medium">Public join page</p>

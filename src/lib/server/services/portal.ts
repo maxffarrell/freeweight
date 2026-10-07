@@ -211,11 +211,44 @@ export async function memberBook(
 	sessionId: string,
 	memberId: string
 ) {
+	// Booking window: how far ahead members may book (staff bookings are unrestricted).
+	const [s] = await db
+		.select({ startsAt: classSession.startsAt })
+		.from(classSession)
+		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
+	if (!s) error(404, 'Session not found');
+	const { bookingWindowDays } = await bookingRules(orgId);
+	if (
+		bookingWindowDays != null &&
+		s.startsAt.getTime() > Date.now() + bookingWindowDays * 86400_000
+	)
+		error(409, `Bookings open ${bookingWindowDays} days ahead`);
 	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId);
 }
 
 export async function memberCancel(orgId: string, userId: string, bookingId: string) {
+	// Cancel cutoff: no last-minute member cancels (staff can still cancel from the roster).
+	const [b] = await db
+		.select({ startsAt: classSession.startsAt })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
+	if (!b) error(404, 'Booking not found');
+	const { cancelCutoffMin } = await bookingRules(orgId);
+	if (cancelCutoffMin != null && b.startsAt.getTime() - Date.now() < cancelCutoffMin * 60_000)
+		error(409, `Cancelling closes ${cancelCutoffMin} minutes before class`);
 	return cancelBooking(memberCtx(orgId, userId), bookingId, userId);
+}
+
+async function bookingRules(orgId: string) {
+	const [st] = await db
+		.select({
+			bookingWindowDays: gymSettings.bookingWindowDays,
+			cancelCutoffMin: gymSettings.cancelCutoffMin
+		})
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	return st ?? { bookingWindowDays: null, cancelCutoffMin: null };
 }
 
 /** Starts a provider checkout for the member's full open balance. */

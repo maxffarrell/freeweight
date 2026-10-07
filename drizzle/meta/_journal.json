@@ -29,6 +29,13 @@
       "when": 1791345429151,
       "tag": "0003_condemned_lucky_pierre",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791345795198,
+      "tag": "0004_lyrical_electro",
+      "breakpoints": true
     }
   ]
 }

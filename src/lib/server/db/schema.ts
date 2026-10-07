@@ -58,6 +58,10 @@ export const gymSettings = pgTable('gym_settings', {
 	website: text('website').notNull().default(''),
 	/** Liability waiver text; when non-empty, joiners and drop-ins must agree before signing up. */
 	waiver: text('waiver').notNull().default(''),
+	/** How far ahead portal members may book, in days; null = unlimited. */
+	bookingWindowDays: integer('booking_window_days'),
+	/** Members can't cancel a class within this many minutes of start; null = anytime. */
+	cancelCutoffMin: integer('cancel_cutoff_min'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
