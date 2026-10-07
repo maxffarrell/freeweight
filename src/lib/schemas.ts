@@ -163,6 +163,13 @@ export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema
 });
+/** Book a member into every upcoming session of a class type for N weeks. */
+export const seriesBookingInput = v.object({
+	memberId: idSchema,
+	classTypeId: idSchema,
+	weeks: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(12)), 4)
+});
+
 export const bookingUpdate = v.object({
 	id: idSchema,
 	status: v.picklist(bookingStatuses)

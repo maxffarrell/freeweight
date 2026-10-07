@@ -37,6 +37,7 @@
 		getCurrency,
 		grantCredits
 	} from '#lib/remote/billing.remote.ts';
+	import { getClassTypes, bookSeries } from '#lib/remote/schedule.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
@@ -339,6 +340,33 @@
 			toast.success(`${m.member.name} checked in`);
 		} catch (err) {
 			toast.error(errMsg(err, 'Check-in failed'));
+		}
+	}
+
+	// ------- book series -------
+	let seriesOpen = $state(false);
+	let seriesTypeId = $state('');
+	let seriesWeeks = $state(4);
+	let seriesPending = $state(false);
+	const classTypes = await getClassTypes();
+	async function submitSeries(e: SubmitEvent) {
+		e.preventDefault();
+		seriesPending = true;
+		try {
+			const r = await bookSeries({
+				memberId: id,
+				classTypeId: seriesTypeId,
+				weeks: seriesWeeks
+			});
+			seriesOpen = false;
+			await getMember(id).refresh();
+			toast.success(
+				`Booked ${r.booked}${r.waitlisted ? `, waitlisted ${r.waitlisted}` : ''}${r.skipped ? `, skipped ${r.skipped}` : ''} of ${r.total}`
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book'));
+		} finally {
+			seriesPending = false;
 		}
 	}
 
@@ -809,6 +837,11 @@
 					</Table.Root>
 				</Tabs.Content>
 				<Tabs.Content value="bookings">
+					<div class="mb-2 flex justify-end">
+						<Button size="sm" variant="outline" onclick={() => (seriesOpen = true)}
+							>Book into a series…</Button
+						>
+					</div>
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
@@ -1129,6 +1162,52 @@
 				><Printer class="mr-1 h-3.5 w-3.5" /> Print card</Button
 			>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={seriesOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Book into a series</Dialog.Title>
+			<Dialog.Description
+				>Book {m.member.name} into every upcoming session of a class — full sessions go to the waitlist,
+				ones they're already in are skipped.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitSeries}>
+			<Field.Field>
+				<Field.Label>Class</Field.Label>
+				<Select.Root type="single" bind:value={seriesTypeId}>
+					<Select.Trigger class="w-full"
+						>{classTypes.find((ct) => ct.id === seriesTypeId)?.name ??
+							'Pick a class…'}</Select.Trigger
+					>
+					<Select.Content>
+						{#each classTypes as ct (ct.id)}
+							<Select.Item value={ct.id}>{ct.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>For the next</Field.Label>
+				<Select.Root
+					type="single"
+					value={String(seriesWeeks)}
+					onValueChange={(v) => (seriesWeeks = Number(v))}
+				>
+					<Select.Trigger class="w-full">{seriesWeeks} weeks</Select.Trigger>
+					<Select.Content>
+						{#each [2, 4, 8, 12] as w (w)}
+							<Select.Item value={String(w)}>{w} weeks</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={!seriesTypeId || seriesPending}>Book series</Button>
+			</Dialog.Footer>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>
 

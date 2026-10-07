@@ -42,6 +42,7 @@ import {
 	notifyNoShow,
 	notifySessionChanged,
 	notifySessionCancelled,
+	notifySeriesBooked,
 	notifyWaitlistPromoted
 } from './notifications.ts';
 import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
@@ -466,7 +467,8 @@ async function assertCreditAvailable(orgId: string, memberId: string, ms: Active
 export async function bookSession(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.bookingInput>,
-	actorId?: string | null
+	actorId?: string | null,
+	opts?: { notify?: boolean }
 ) {
 	const [m] = await db
 		.select()
@@ -560,8 +562,72 @@ export async function bookSession(
 		summary: `${m.name} ${row.status === 'waitlisted' ? 'joined the waitlist' : 'booked a class'}`,
 		data: { sessionId: input.sessionId, memberId: input.memberId }
 	});
-	notifyBookingConfirmed(ctx.orgId, row.id).catch(() => {});
+	if (opts?.notify !== false) notifyBookingConfirmed(ctx.orgId, row.id).catch(() => {});
 	return row;
+}
+
+/**
+ * Books a member into every upcoming session of a class type for the next `weeks`
+ * weeks — "all Monday 6am Spins this month". Sessions they're already in, or that
+ * reject them (daily cap, credits), count as skipped; one summary email would be
+ * spam so booking confirmations are suppressed per session.
+ */
+export async function bookSeries(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.seriesBookingInput>
+) {
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
+	if (!m) error(404, 'Member not found');
+	const [ct] = await db
+		.select()
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, input.classTypeId)));
+	if (!ct) error(404, 'Class not found');
+
+	const sessions = await db
+		.select({ id: classSession.id })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.classTypeId, input.classTypeId),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, new Date(Date.now() + input.weeks * 7 * 86400_000))
+			)
+		)
+		.orderBy(asc(classSession.startsAt));
+
+	let booked = 0;
+	let waitlisted = 0;
+	let skipped = 0;
+	for (const s of sessions) {
+		try {
+			const b = await bookSession(ctx, { sessionId: s.id, memberId: input.memberId }, ctx.userId, {
+				notify: false
+			});
+			if (b.status === 'waitlisted') waitlisted++;
+			else booked++;
+		} catch {
+			skipped++;
+		}
+	}
+	if (booked + waitlisted)
+		notifySeriesBooked(ctx.orgId, m.id, ct.name, { booked, waitlisted }, input.weeks).catch(
+			() => {}
+		);
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: m.id,
+		action: 'series_booked',
+		summary: `${m.name} booked into ${ct.name} ×${booked}${waitlisted ? ` (+${waitlisted} waitlisted)` : ''}`
+	});
+	return { booked, waitlisted, skipped, total: sessions.length };
 }
 
 /** Cancels a booking and promotes the longest-waiting member, if any. */
