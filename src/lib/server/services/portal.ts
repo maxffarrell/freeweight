@@ -183,6 +183,22 @@ export async function portalOverview(memberId: string) {
 		.where(eq(payment.memberId, memberId))
 		.orderBy(desc(payment.paidAt))
 		.limit(10);
+
+	// Past bookings, most recent first — the member's class history.
+	const history = await db
+		.select({
+			booking,
+			startsAt: classSession.startsAt,
+			className: classType.name,
+			locationName: location.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(and(eq(booking.memberId, memberId), lt(classSession.startsAt, now)))
+		.orderBy(desc(classSession.startsAt))
+		.limit(10);
 	return {
 		member: m,
 		settings,
@@ -191,6 +207,7 @@ export async function portalOverview(memberId: string) {
 		balance,
 		openCharges,
 		payments,
+		history,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		calendarToken: calendarToken(memberId),

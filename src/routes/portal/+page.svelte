@@ -630,6 +630,28 @@
 			{/if}
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Class history</Card.Title>
+		</Card.Header>
+		<Card.Content class="px-4">
+			{#each d.history as h (h.booking.id)}
+				<div class="flex items-center justify-between py-2 text-sm">
+					<div class="min-w-0">
+						<p class="truncate font-medium">{h.className}</p>
+						<p class="text-xs text-muted-foreground">
+							{localDate(h.startsAt, tz)}{#if h.locationName}
+								· {h.locationName}{/if}
+						</p>
+					</div>
+					<StatusBadge status={h.booking.status} />
+				</div>
+			{:else}
+				<p class="py-2 text-sm text-muted-foreground">No classes yet.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
 </div>
 
 <Card.Root>
