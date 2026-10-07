@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -46,7 +47,8 @@
 		getPortalChallenges,
 		joinChallenge,
 		leaveChallenge,
-		getPortalAnnouncements
+		getPortalAnnouncements,
+		addDependent
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -485,6 +487,31 @@
 		d.upcoming.find((u) => u.booking.sessionId === b.session.id && u.booking.status !== 'cancelled')
 			?.booking.id;
 
+	// ------- family members -------
+	let depOpen = $state(false);
+	let depName = $state('');
+	let depBirthday = $state('');
+	let depPending = $state(false);
+	async function submitDependent(e: SubmitEvent) {
+		e.preventDefault();
+		depPending = true;
+		try {
+			const r = await addDependent({
+				memberId,
+				name: depName,
+				birthday: depBirthday || undefined
+			});
+			depOpen = false;
+			depName = '';
+			depBirthday = '';
+			toast.success(`${r.member.name} added — manage them from the member switcher`);
+			await goto(`/portal?m=${r.member.id}`, { invalidateAll: true });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+		depPending = false;
+	}
+
 	let resubscribing = $state(false);
 	async function reenableEmails() {
 		resubscribing = true;
@@ -504,16 +531,24 @@
 	<img src="/api/logo/{d.settings.logoDocumentId}" alt="" class="mb-4 h-10 w-auto object-contain" />
 {/if}
 
-{#if data.options.length > 1}
-	<select
-		class="h-9 rounded-md border bg-background px-3 text-sm"
-		onchange={(e) => goto(`/portal?m=${e.currentTarget.value}`, { invalidateAll: true })}
-	>
-		{#each data.options as o (o.memberId)}
-			<option value={o.memberId} selected={o.memberId === memberId}>{o.label}</option>
-		{/each}
-	</select>
-{/if}
+<div class="mb-4 flex items-center gap-3">
+	{#if data.options.length > 1}
+		<select
+			class="h-9 rounded-md border bg-background px-3 text-sm"
+			onchange={(e) => goto(`/portal?m=${e.currentTarget.value}`, { invalidateAll: true })}
+		>
+			{#each data.options as o (o.memberId)}
+				<option value={o.memberId} selected={o.memberId === memberId}>{o.label}</option>
+			{/each}
+		</select>
+	{/if}
+	{#if !data.options.find((o) => o.memberId === memberId)?.dependent}
+		<button
+			class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+			onclick={() => (depOpen = true)}>Add a family member</button
+		>
+	{/if}
+</div>
 
 {#if d.settings.portalNotice}
 	<div
@@ -1400,3 +1435,32 @@
 		</Table.Root>
 	</Card.Content>
 </Card.Root>
+
+<Dialog.Root bind:open={depOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Add a family member</Dialog.Title>
+			<Dialog.Description>
+				They'll show up in your member switcher — you can book classes and sign waivers for them,
+				and their charges bill under your account.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitDependent}>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium" for="dep-name">Name</label>
+				<Input id="dep-name" required bind:value={depName} placeholder="e.g. Sam Rivera" />
+			</div>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium" for="dep-bday">
+					Birthday <span class="font-normal text-muted-foreground">(optional)</span>
+				</label>
+				<Input id="dep-bday" type="date" bind:value={depBirthday} />
+			</div>
+			<Dialog.Footer>
+				<Button type="submit" disabled={depPending}
+					>{depPending ? 'Adding…' : 'Add family member'}</Button
+				>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>

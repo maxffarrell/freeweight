@@ -9,6 +9,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const options = gyms.map((g) => ({
 		memberId: g.member.id,
 		gymName: g.orgName,
+		dependent: g.dependent,
 		label: g.dependent ? `${g.member.name} · ${g.orgName}` : g.orgName
 	}));
 	const memberId = url.searchParams.get('m') ?? gyms[0]!.member.id;

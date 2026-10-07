@@ -13,6 +13,7 @@ import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
 import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
+import { emit } from '#lib/server/services/events.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
@@ -390,5 +391,40 @@ export const leaveChallenge = command(
 		const r = await chalSvc.leaveChallenge(m.organizationId, challengeId, m.id);
 		void getPortalChallenges(memberId).refresh();
 		return r;
+	}
+);
+
+/**
+ * Parent adds a family member (kid, partner) from the portal — the new record bills
+ * under them (`guardianId`) and shows up in the portal member switcher.
+ */
+export const addDependent = command(
+	v.object({
+		memberId: idSchema,
+		name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name is required'), v.maxLength(200)),
+		birthday: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
+	}),
+	async ({ memberId, name, birthday }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		if (m.portalUserId !== user.id) error(403, 'Only the account holder can add family members');
+		const [dep] = await db
+			.insert(gymMember)
+			.values({
+				organizationId: m.organizationId,
+				name,
+				birthday: birthday ?? null,
+				guardianId: m.id,
+				joinedAt: new Date().toISOString().slice(0, 10)
+			})
+			.returning();
+		await emit({
+			orgId: m.organizationId,
+			entityType: 'member',
+			entityId: dep.id,
+			action: 'created',
+			summary: `${name} added as a dependent of ${m.name}`
+		});
+		return { member: dep };
 	}
 );
