@@ -1,0 +1,1 @@
+ALTER TABLE "plan" ADD COLUMN "trial_days" integer DEFAULT 0 NOT NULL;

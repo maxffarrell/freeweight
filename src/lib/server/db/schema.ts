@@ -127,6 +127,8 @@ export const plan = pgTable(
 		isPack: boolean('is_pack').notNull().default(false),
 		/** Days a pack stays valid after purchase; null = never expires. */
 		packDays: integer('pack_days'),
+		/** Free days before the first recurring charge posts; 0 = bill from day one. */
+		trialDays: integer('trial_days').notNull().default(0),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),

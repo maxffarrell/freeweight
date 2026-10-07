@@ -144,7 +144,12 @@ export async function createMembership(
 			planId: input.planId,
 			startsAt: new Date(`${start}T00:00:00Z`),
 			// Packs bill once up front and expire packDays later; no recurring charge.
-			nextChargeAt: p.isPack ? null : new Date(`${nextPeriod(start, p.interval)}T00:00:00Z`),
+			// Trial: first recurring charge lands at the end of the free days.
+			nextChargeAt: p.isPack
+				? null
+				: new Date(
+						`${p.trialDays > 0 ? addDays(start, p.trialDays) : nextPeriod(start, p.interval)}T00:00:00Z`
+					),
 			endsAt:
 				p.isPack && p.packDays
 					? new Date(new Date(`${start}T00:00:00Z`).getTime() + p.packDays * 86400_000)
@@ -163,7 +168,8 @@ export async function createMembership(
 			amount: p.signupFee
 		});
 	}
-	if (p.amount > 0) {
+	// During a trial the first period charge is deferred to trial end.
+	if (p.amount > 0 && (!p.trialDays || p.isPack)) {
 		await postMembershipCharge(ctx.orgId, row!.id, start, p);
 	}
 	await emit({

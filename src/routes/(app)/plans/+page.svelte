@@ -33,6 +33,7 @@
 	let classCredits = $state<number | null>(null);
 	let isPack = $state(false);
 	let packDays = $state<number | null>(null);
+	let trialDays = $state(0);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -46,6 +47,7 @@
 		classCredits = p.classCredits;
 		isPack = p.isPack;
 		packDays = p.packDays;
+		trialDays = p.trialDays;
 		listed = p.listed;
 		active = p.active;
 		open = true;
@@ -59,6 +61,7 @@
 		classCredits = null;
 		isPack = false;
 		packDays = null;
+		trialDays = 0;
 		listed = active = true;
 	}
 
@@ -78,6 +81,7 @@
 					classCredits: classCredits || null,
 					isPack,
 					packDays: isPack ? packDays || null : null,
+					trialDays: trialDays || 0,
 					listed,
 					active
 				});
@@ -92,6 +96,7 @@
 					classCredits: classCredits || null,
 					isPack,
 					packDays: isPack ? packDays || null : null,
+					trialDays: trialDays || 0,
 					listed,
 					active
 				});
@@ -144,6 +149,7 @@
 								>pack{p.packDays ? ` · ${p.packDays} days` : ''}</Badge
 							>{/if}
 						{#if p.classCredits}<Badge variant="outline">{p.classCredits} credits</Badge>{/if}
+						{#if p.trialDays > 0}<Badge variant="outline">{p.trialDays}d free trial</Badge>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
@@ -213,6 +219,12 @@
 					</Field.Field>
 				{/if}
 			</div>
+			{#if !isPack}
+				<Field.Field>
+					<Field.Label for="p-trial">Free trial (days)</Field.Label>
+					<Input id="p-trial" type="number" min={0} bind:value={trialDays} placeholder="0" />
+				</Field.Field>
+			{/if}
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label>Signup fee</Field.Label>
