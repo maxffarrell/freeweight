@@ -54,6 +54,9 @@ export const getMembers = query(
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
 export const getTags = query(async () => svc.listTags((await requireOrg()).orgId));
+
+/** Groups of members who share an email or name — the members-list "possible duplicates" hint. */
+export const getDuplicates = query(async () => svc.findDuplicates((await requireOrg()).orgId));
 export const addMemberTag = command(memberTagInput, async ({ memberId, tag }) => {
 	await svc.addMemberTag(await requireOrg(), memberId, tag);
 	void getMember(memberId).refresh();
