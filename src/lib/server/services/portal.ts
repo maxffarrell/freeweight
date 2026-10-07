@@ -414,3 +414,8 @@ export async function withdrawCancellation(orgId: string, memberId: string, memb
 	if (!row) error(404, 'Membership not found');
 	return row;
 }
+
+/** Member re-enables gym emails after using the unsubscribe link. */
+export async function resubscribe(memberId: string) {
+	await db.update(gymMember).set({ unsubscribedAt: null }).where(eq(gymMember.id, memberId));
+}

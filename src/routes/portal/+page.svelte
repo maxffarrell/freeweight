@@ -18,7 +18,8 @@
 		getProviders,
 		startCheckout,
 		signWaiver,
-		getMyDocuments
+		getMyDocuments,
+		resubscribe
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -116,6 +117,18 @@
 	const myBookingId = (b: (typeof bookable)[number]) =>
 		d.upcoming.find((u) => u.booking.sessionId === b.session.id && u.booking.status !== 'cancelled')
 			?.booking.id;
+
+	let resubscribing = $state(false);
+	async function reenableEmails() {
+		resubscribing = true;
+		try {
+			await resubscribe(memberId);
+			toast.success("You're back on the email list");
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+		resubscribing = false;
+	}
 </script>
 
 <svelte:head><title>Member portal</title></svelte:head>
@@ -129,6 +142,17 @@
 			<option value={o.memberId} selected={o.memberId === memberId}>{o.gymName}</option>
 		{/each}
 	</select>
+{/if}
+
+{#if d.member.unsubscribedAt}
+	<div
+		class="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40"
+	>
+		<span>You're not receiving emails from the gym.</span>
+		<Button size="sm" variant="outline" disabled={resubscribing} onclick={reenableEmails}
+			>{resubscribing ? 'Turning on…' : 'Turn emails back on'}</Button
+		>
+	</div>
 {/if}
 
 <div class="grid gap-4 sm:grid-cols-2">

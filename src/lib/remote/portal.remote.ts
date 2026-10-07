@@ -109,3 +109,10 @@ export const getMyDocuments = query(idSchema, async (memberId) => {
 		.where(and(eq(document.entityType, 'member'), eq(document.entityId, m.id)))
 		.orderBy(desc(document.createdAt));
 });
+
+/** Member turns gym emails back on after unsubscribing. */
+export const resubscribe = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	await svc.resubscribe(m.id);
+	void getPortalOverview(memberId).refresh();
+});
