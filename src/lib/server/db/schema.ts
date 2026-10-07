@@ -103,6 +103,8 @@ export const gymMember = pgTable(
 		notes: text('notes'),
 		/** "How did you hear about us?" — set from the public join form. */
 		referralSource: text('referral_source'),
+		/** Set via the signed /unsubscribe link in member-facing emails. */
+		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		...timestamps
 	},

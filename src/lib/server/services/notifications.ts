@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { and, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -19,6 +20,8 @@ import {
 	user
 } from '#lib/server/db/schema.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
+import { BETTER_AUTH_SECRET } from '$app/env/private';
+import type { Email } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { addDays, localDate, localTime, localWeekday } from '#lib/tz.ts';
@@ -39,6 +42,51 @@ async function orgTimezone(orgId: string) {
 	return s?.timezone ?? 'UTC';
 }
 
+// ---------- Member opt-out ----------
+
+/** Signed token behind the Unsubscribe footer link in member-facing emails. */
+export function unsubscribeToken(memberId: string) {
+	return createHmac('sha256', BETTER_AUTH_SECRET)
+		.update(`unsub:${memberId}`)
+		.digest('hex')
+		.slice(0, 32);
+}
+
+export function validUnsubscribeToken(memberId: string, token: string) {
+	const a = Buffer.from(unsubscribeToken(memberId));
+	const b = Buffer.from(token);
+	return a.length === b.length && timingSafeEqual(a, b);
+}
+
+const unsubscribeUrl = (memberId: string) =>
+	`${appOrigin()}/unsubscribe?m=${memberId}&t=${unsubscribeToken(memberId)}`;
+
+/**
+ * sendEmail for member-facing mail: skips members who unsubscribed and appends
+ * the signed Unsubscribe footer every marketing/notification email needs.
+ */
+async function sendMemberEmail(memberId: string | null | undefined, args: Email) {
+	if (memberId) {
+		const [m] = await db
+			.select({ unsubscribedAt: gymMember.unsubscribedAt })
+			.from(gymMember)
+			.where(eq(gymMember.id, memberId));
+		if (m?.unsubscribedAt) return;
+	}
+	if (memberId) {
+		const url = unsubscribeUrl(memberId);
+		args = {
+			...args,
+			text: `${args.text}\n\nUnsubscribe: ${url}`,
+			html: args.html.replace(
+				'Sent by ',
+				`<a href="${url}" style="color:#a1a1aa">Unsubscribe</a> · Sent by `
+			)
+		};
+	}
+	await sendEmail(args);
+}
+
 /** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops. */
 async function logOnce(orgId: string, kind: string, entityId: string, recipient: string) {
 	const [row] = await db
@@ -53,6 +101,7 @@ async function logOnce(orgId: string, kind: string, entityId: string, recipient:
 export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 	const [row] = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			className: classType.name,
@@ -67,7 +116,7 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 	if (!(await logOnce(orgId, 'waitlist_promoted', bookingId, row.email))) return;
 	const [name, settings] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
 	const date = localDate(row.startsAt, settings);
-	await sendEmail({
+	await sendMemberEmail(row.memberId, {
 		to: row.email,
 		subject: `You're in: ${row.className} at ${name}`,
 		...renderEmail({
@@ -86,6 +135,7 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 	const [row] = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			className: classType.name,
@@ -102,7 +152,7 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 	if (!(await logOnce(orgId, 'booking_confirmed', bookingId, row.email))) return;
 	const [name, settings] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
 	const when = `${localDate(row.startsAt, settings)} at ${localTime(row.startsAt, settings)}`;
-	await sendEmail({
+	await sendMemberEmail(row.memberId, {
 		to: row.email,
 		subject: waitlisted
 			? `Waitlisted: ${row.className} at ${name}`
@@ -136,6 +186,7 @@ export async function notifyPaymentReceived(
 	if (paymentIds.length === 0) return;
 	const [row] = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			balanceMemberId: payment.memberId
@@ -150,7 +201,7 @@ export async function notifyPaymentReceived(
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const money = formatMoney(amount, st[0]?.currency ?? 'usd');
-	await sendEmail({
+	await sendMemberEmail(row.balanceMemberId, {
 		to: row.email,
 		subject: `Payment received: ${money} at ${name}`,
 		...renderEmail({
@@ -214,7 +265,7 @@ export async function sendPastDueNotices(orgId: string) {
 		if (!g.email) continue;
 		if (!(await logOnce(orgId, 'past_due', `${memberId}:${g.newest}`, g.email))) continue;
 		const total = formatMoney(g.total, currency);
-		await sendEmail({
+		await sendMemberEmail(memberId, {
 			to: g.email,
 			subject: `Payment due: ${total} at ${name}`,
 			...renderEmail({
@@ -236,6 +287,7 @@ export async function sendPastDueNotices(orgId: string) {
 export async function notifySessionCancelled(orgId: string, sessionId: string) {
 	const rows = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			className: classType.name,
@@ -254,7 +306,7 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 		if (!row.email) continue;
 		if (!(await logOnce(orgId, 'session_cancelled', sessionId, row.email))) continue;
 		const date = localDate(row.startsAt, tz);
-		await sendEmail({
+		await sendMemberEmail(row.memberId, {
 			to: row.email,
 			subject: `${row.className} on ${date} is cancelled`,
 			...renderEmail({
@@ -277,6 +329,7 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 export async function notifyBookingCancelled(orgId: string, bookingId: string) {
 	const [row] = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			className: classType.name,
@@ -293,7 +346,7 @@ export async function notifyBookingCancelled(orgId: string, bookingId: string) {
 	if (!(await logOnce(orgId, 'booking_cancelled', bookingId, row.email))) return;
 	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
 	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
-	await sendEmail({
+	await sendMemberEmail(row.memberId, {
 		to: row.email,
 		subject: `Cancelled: ${row.className} at ${name}`,
 		...renderEmail({
@@ -332,7 +385,7 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 				.limit(1)
 		: [undefined];
 	const rows = await db
-		.select({ email: gymMember.email, memberName: gymMember.name })
+		.select({ memberId: gymMember.id, email: gymMember.email, memberName: gymMember.name })
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.where(
@@ -353,7 +406,7 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 			))
 		)
 			continue;
-		await sendEmail({
+		await sendMemberEmail(row.memberId, {
 			to: row.email,
 			subject: `${sess.className} on ${localDate(sess.startsAt, tz)}: now taught by ${who}`,
 			...renderEmail({
@@ -387,7 +440,7 @@ export async function notifySessionChanged(orgId: string, sessionId: string) {
 		.where(eq(classSession.id, sessionId));
 	if (!sess) return;
 	const rows = await db
-		.select({ email: gymMember.email, memberName: gymMember.name })
+		.select({ memberId: gymMember.id, email: gymMember.email, memberName: gymMember.name })
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.where(
@@ -408,7 +461,7 @@ export async function notifySessionChanged(orgId: string, sessionId: string) {
 			))
 		)
 			continue;
-		await sendEmail({
+		await sendMemberEmail(row.memberId, {
 			to: row.email,
 			subject: `${sess.className} moved — now ${when}${where}`,
 			...renderEmail({
@@ -433,6 +486,7 @@ export async function sendClassReminders(orgId: string) {
 	const soon = new Date(Date.now() + 26 * 3600_000);
 	const rows = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			className: classType.name,
@@ -461,7 +515,7 @@ export async function sendClassReminders(orgId: string) {
 		if (!row.email) continue;
 		if (!(await logOnce(orgId, 'class_reminder', row.bookingId, row.email))) continue;
 		const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
-		await sendEmail({
+		await sendMemberEmail(row.memberId, {
 			to: row.email,
 			subject: `Tomorrow: ${row.className} at ${name}`,
 			...renderEmail({
@@ -493,13 +547,14 @@ export async function sendAnnouncement(
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
-		.select({ email: gymMember.email })
+		.select({ id: gymMember.id, email: gymMember.email })
 		.from(gymMember)
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
 				eq(gymMember.status, 'active'),
 				memberIds?.length ? inArray(gymMember.id, memberIds) : undefined,
+				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
 		)
@@ -516,7 +571,7 @@ export async function sendAnnouncement(
 	let sent = 0;
 	for (const m of members) {
 		if (!m.email || !(await logOnce(orgId, 'announcement', entityId, m.email))) continue;
-		await sendEmail({ to: m.email, subject: `${name}: ${subject}`, text, html });
+		await sendMemberEmail(m.id, { to: m.email, subject: `${name}: ${subject}`, text, html });
 		sent++;
 	}
 	return { sent, total: members.length };
@@ -526,6 +581,7 @@ export async function sendAnnouncement(
 export async function notifyChargePosted(orgId: string, chargeId: string) {
 	const [row] = await db
 		.select({
+			memberId: gymMember.id,
 			email: gymMember.email,
 			memberName: gymMember.name,
 			description: charge.description,
@@ -542,7 +598,7 @@ export async function notifyChargePosted(orgId: string, chargeId: string) {
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const amount = formatMoney(row.amount, settings[0]?.currency ?? 'usd');
-	await sendEmail({
+	await sendMemberEmail(row.memberId, {
 		to: row.email,
 		subject: `New charge from ${name}: ${amount}`,
 		...renderEmail({
@@ -573,7 +629,7 @@ export async function notifyMembershipSuspended(orgId: string, memberIds: string
 	for (const m of rows) {
 		if (!m.email) continue;
 		if (!(await logOnce(orgId, 'membership_suspended', `${m.id}:${today}`, m.email))) continue;
-		await sendEmail({
+		await sendMemberEmail(m.id, {
 			to: m.email,
 			subject: `Membership suspended — ${name}`,
 			...renderEmail({
@@ -596,6 +652,7 @@ export async function notifyMembershipSuspended(orgId: string, memberIds: string
 export async function notifyCancellationRequested(orgId: string, membershipId: string) {
 	const [row] = await db
 		.select({
+			memberId: membership.memberId,
 			memberName: gymMember.name,
 			memberEmail: gymMember.email,
 			planName: plan.name
@@ -633,7 +690,7 @@ export async function notifyCancellationRequested(orgId: string, membershipId: s
 	if (!row.memberEmail) return;
 	if (!(await logOnce(orgId, 'cancel_request', `${membershipId}:${today}`, row.memberEmail)))
 		return;
-	await sendEmail({
+	await sendMemberEmail(row.memberId, {
 		to: row.memberEmail,
 		subject: `Cancellation requested — ${name}`,
 		...renderEmail({
