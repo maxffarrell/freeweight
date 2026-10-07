@@ -12,7 +12,9 @@
 	import { localDate, localTime } from '#lib/tz.ts';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
+	import Download from '@lucide/svelte/icons/download';
 	import { errMsg } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 
 	const settings = await getSettings();
@@ -56,10 +58,31 @@
 		pending = false;
 		inputEl?.focus();
 	}
+
+	function exportCheckIns() {
+		const csv = toCsv([
+			['Member', 'Guest of', 'Checked at', 'Location', 'Method'],
+			...checkIns.map((c) => [
+				c.checkIn.guestName ?? c.memberName,
+				c.checkIn.guestName ? c.memberName : '',
+				c.checkIn.checkedAt.toISOString(),
+				c.locationName ?? '',
+				c.checkIn.method
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `check-ins-${viewDate}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
 </script>
 
 <PageHeader title="Check-ins">
 	{#snippet actions()}
+		<Button size="sm" variant="outline" onclick={exportCheckIns} disabled={!checkIns.length}
+			><Download /> Export</Button
+		>
 		<Button size="sm" variant="outline" href="/kiosk"><MonitorSmartphone /> Open kiosk</Button>
 	{/snippet}
 </PageHeader>
