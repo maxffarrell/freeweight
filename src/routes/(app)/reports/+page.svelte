@@ -179,6 +179,43 @@
 	</Card.Root>
 
 	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">Instructors — last 30 days</Card.Title>
+			<Card.Description>Sessions taught and attendance outcomes</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Instructor</Table.Head>
+						<Table.Head class="text-right">Sessions</Table.Head>
+						<Table.Head class="text-right">Booked</Table.Head>
+						<Table.Head class="text-right">Attended</Table.Head>
+						<Table.Head class="text-right">No-shows</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.instructors as t (t.instructor)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{t.instructor}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{t.sessions}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{t.booked}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{t.attended}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{t.noShow}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={5} class="text-muted-foreground"
+								>No instructor-assigned sessions in the last 30 days.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
 			{#if r.atRisk.length}

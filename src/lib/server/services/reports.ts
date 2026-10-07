@@ -6,9 +6,11 @@ import {
 	classSession,
 	classType,
 	gymMember,
+	member,
 	membership,
 	payment,
 	plan,
+	user,
 	outer
 } from '#lib/server/db/schema.ts';
 
@@ -135,14 +137,48 @@ async function atRiskMembers(orgId: string) {
 		.slice(0, 50);
 }
 
+/** Sessions taught per instructor over the last 30 days, with attendance outcomes. */
+async function instructorStats(orgId: string) {
+	return db
+		.select({
+			instructor: user.name,
+			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
+			attended:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'attended')), 0)`.mapWith(
+					Number
+				),
+			noShow:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'no_show')), 0)`.mapWith(
+					Number
+				),
+			booked:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','no_show'))), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, new Date(Date.now() - 30 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(user.name)
+		.orderBy(desc(sql`count(distinct ${classSession.id})`));
+}
+
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill, atRisk] = await Promise.all([
+	const [checkIns, members, revenue, plans, fill, atRisk, instructors] = await Promise.all([
 		checkInsByDay(orgId),
 		newMembersByMonth(orgId),
 		revenueByMonth(orgId),
 		membershipsByPlan(orgId),
 		fillByClass(orgId),
-		atRiskMembers(orgId)
+		atRiskMembers(orgId),
+		instructorStats(orgId)
 	]);
-	return { checkIns, members, revenue, plans, fill, atRisk };
+	return { checkIns, members, revenue, plans, fill, atRisk, instructors };
 }
