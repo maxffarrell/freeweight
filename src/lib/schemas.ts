@@ -191,6 +191,13 @@ export const instructorConflictInput = v.object({
 	excludeSessionId: v.optional(idSchema)
 });
 
+/** Instructor self-reported time-off window (inclusive org-local dates). */
+export const timeOffInput = v.object({
+	startDate: isoDate,
+	endDate: isoDate,
+	note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
+});
+
 export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema,

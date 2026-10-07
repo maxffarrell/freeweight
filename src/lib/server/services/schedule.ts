@@ -27,6 +27,7 @@ import {
 	closure,
 	gymMember,
 	gymSettings,
+	instructorTimeOff,
 	location,
 	member,
 	membership,
@@ -51,6 +52,7 @@ import {
 import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
+import { getSettings } from './settings.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -1583,6 +1585,26 @@ export async function materializeTemplates(orgId: string) {
 		).map((c) => c.date)
 	);
 
+	// Instructor time-off windows intersecting the horizon — a session generated
+	// while its instructor is off auto-flags "needs cover".
+	const offs = await db
+		.select({
+			instructorId: instructorTimeOff.instructorId,
+			startDate: instructorTimeOff.startDate,
+			endDate: instructorTimeOff.endDate
+		})
+		.from(instructorTimeOff)
+		.where(
+			and(
+				eq(instructorTimeOff.organizationId, orgId),
+				lte(instructorTimeOff.startDate, addDays(today, TEMPLATE_HORIZON_DAYS)),
+				gte(instructorTimeOff.endDate, today)
+			)
+		);
+	const isOff = (instructorId: string | null, day: string) =>
+		instructorId != null &&
+		offs.some((o) => o.instructorId === instructorId && day >= o.startDate && day <= o.endDate);
+
 	const now = Date.now();
 	const rows = [];
 	for (let i = 0; i <= TEMPLATE_HORIZON_DAYS; i++) {
@@ -1597,20 +1619,57 @@ export async function materializeTemplates(orgId: string) {
 			const startsAt = zonedToUtc(`${day}T${tpl.startTime}`, tz);
 			if (startsAt.getTime() < now || have.has(`${tpl.id}|${startsAt.getTime()}`)) continue;
 			have.add(`${tpl.id}|${startsAt.getTime()}`);
+			const instructorId = tpl.instructorId ?? ct.instructorId;
 			rows.push({
 				organizationId: orgId,
 				classTypeId: tpl.classTypeId,
 				locationId: tpl.locationId ?? ct.locationId,
-				instructorId: tpl.instructorId ?? ct.instructorId,
+				instructorId,
 				templateId: tpl.id,
 				startsAt,
 				endsAt: new Date(startsAt.getTime() + ct.durationMin * 60_000),
-				capacity: tpl.capacity ?? ct.capacity
+				capacity: tpl.capacity ?? ct.capacity,
+				coverRequestedAt: isOff(instructorId, day) ? new Date() : null
 			});
 		}
 	}
-	if (rows.length) await db.insert(classSession).values(rows);
-	return rows.length;
+	if (!rows.length) return 0;
+	const inserted = await db
+		.insert(classSession)
+		.values(rows)
+		.returning({ id: classSession.id, coverRequestedAt: classSession.coverRequestedAt });
+	for (const s of inserted)
+		if (s.coverRequestedAt) sendCoverRequests(orgId, s.id, s.coverRequestedAt).catch(() => {});
+	return inserted.length;
+}
+
+/** Instructor time-off windows overlapping any interval's org-local day. */
+export async function instructorTimeOffConflicts(
+	orgId: string,
+	instructorId: string,
+	intervals: { start: Date; end: Date }[],
+	tz: string
+) {
+	if (!intervals.length) return [] as { startDate: string; endDate: string; note: string }[];
+	const offs = await db
+		.select({
+			startDate: instructorTimeOff.startDate,
+			endDate: instructorTimeOff.endDate,
+			note: instructorTimeOff.note
+		})
+		.from(instructorTimeOff)
+		.where(
+			and(
+				eq(instructorTimeOff.organizationId, orgId),
+				eq(instructorTimeOff.instructorId, instructorId)
+			)
+		);
+	return offs.filter((o) =>
+		intervals.some((i) => {
+			const d = localDate(i.start, tz);
+			return d >= o.startDate && d <= o.endDate;
+		})
+	);
 }
 
 /** Non-cancelled sessions one instructor is already teaching that overlap any given interval. */
@@ -1645,4 +1704,80 @@ export async function instructorConflicts(
 		)
 		.orderBy(asc(classSession.startsAt))
 		.limit(6);
+}
+
+// ---------- Instructor time off ----------
+
+async function myMemberId(ctx: OrgContext) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	return me?.id ?? null;
+}
+
+export async function myTimeOff(ctx: OrgContext) {
+	const me = await myMemberId(ctx);
+	if (!me) return [];
+	return db
+		.select()
+		.from(instructorTimeOff)
+		.where(
+			and(eq(instructorTimeOff.organizationId, ctx.orgId), eq(instructorTimeOff.instructorId, me))
+		)
+		.orderBy(asc(instructorTimeOff.startDate));
+}
+
+export async function addTimeOff(ctx: OrgContext, input: v.InferOutput<typeof s.timeOffInput>) {
+	const me = await myMemberId(ctx);
+	if (!me) error(404, 'No staff record for you in this workspace');
+	if (input.endDate < input.startDate) error(400, 'End date must be on or after the start date');
+	const [row] = await db
+		.insert(instructorTimeOff)
+		.values({
+			organizationId: ctx.orgId,
+			instructorId: me,
+			startDate: input.startDate,
+			endDate: input.endDate,
+			note: input.note ?? ''
+		})
+		.returning();
+	// Flag already-scheduled sessions inside the window as needing cover.
+	const tz = (await getSettings(ctx.orgId)).timezone;
+	const upcoming = await db
+		.select({ id: classSession.id, startsAt: classSession.startsAt })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, me),
+				isNull(classSession.cancelledAt),
+				isNull(classSession.coverRequestedAt),
+				gte(classSession.startsAt, new Date())
+			)
+		);
+	for (const sess of upcoming) {
+		const d = localDate(sess.startsAt, tz);
+		if (d < input.startDate || d > input.endDate) continue;
+		await db
+			.update(classSession)
+			.set({ coverRequestedAt: new Date() })
+			.where(eq(classSession.id, sess.id));
+		sendCoverRequests(ctx.orgId, sess.id, new Date()).catch(() => {});
+	}
+	return row;
+}
+
+export async function removeTimeOff(ctx: OrgContext, id: string) {
+	const me = await myMemberId(ctx);
+	if (!me) error(404, 'No staff record for you in this workspace');
+	await db
+		.delete(instructorTimeOff)
+		.where(
+			and(
+				eq(instructorTimeOff.organizationId, ctx.orgId),
+				eq(instructorTimeOff.id, id),
+				eq(instructorTimeOff.instructorId, me)
+			)
+		);
 }
