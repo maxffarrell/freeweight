@@ -46,6 +46,8 @@
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
+	const planFull = (p: (typeof joinablePlans)[number]) =>
+		!p.isPack && p.memberLimit !== null && p.activeMembers >= p.memberLimit;
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
 	const buyablePacks = $derived(
 		joinablePlans.filter(
@@ -393,8 +395,9 @@
 									<Button
 										size="sm"
 										variant="outline"
-										disabled={joining === p.id}
-										onclick={() => join(p.id)}>{joining === p.id ? 'Joining…' : 'Join'}</Button
+										disabled={joining === p.id || planFull(p)}
+										onclick={() => join(p.id)}
+										>{planFull(p) ? 'Full' : joining === p.id ? 'Joining…' : 'Join'}</Button
 									>
 								</div>
 							{/each}
@@ -526,9 +529,9 @@
 									<Button
 										size="sm"
 										variant="outline"
-										disabled={joining === p.id}
+										disabled={joining === p.id || planFull(p)}
 										onclick={() => switchPlan(p.id)}
-										>{joining === p.id ? 'Switching…' : 'Switch'}</Button
+										>{planFull(p) ? 'Full' : joining === p.id ? 'Switching…' : 'Switch'}</Button
 									>
 								</div>
 							{/each}

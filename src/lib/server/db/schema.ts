@@ -169,6 +169,8 @@ export const plan = pgTable(
 		guestPasses: integer('guest_passes'),
 		/** Minimum contract term in months — members can't self-cancel before it ends. */
 		commitmentMonths: integer('commitment_months'),
+		/** Max active members on the plan; null = unlimited. Full plans can't be joined. */
+		memberLimit: integer('member_limit'),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),
