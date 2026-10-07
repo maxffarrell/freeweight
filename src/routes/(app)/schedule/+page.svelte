@@ -1162,7 +1162,7 @@
 				<Textarea
 					id="edit-wod"
 					bind:value={editWorkout}
-					placeholder={'3 rounds for time:\n12 deadlifts\n9 handstand push-ups\n400m run'}
+					placeholder="3 rounds for time:&#10;12 deadlifts&#10;9 handstand push-ups&#10;400m run"
 					rows={4}
 					maxlength={2000}
 				/>
