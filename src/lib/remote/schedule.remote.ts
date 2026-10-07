@@ -13,6 +13,7 @@ import {
 	closureInput,
 	emailRosterInput,
 	idSchema,
+	instructorConflictInput,
 	instructorHandoffInput,
 	seriesBookingInput,
 	sessionInput,
@@ -21,6 +22,7 @@ import {
 	templateUpdate
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
+import { addDays, zonedToUtc } from '#lib/tz.ts';
 
 const tz = async () => {
 	const { orgId } = await requireOrg();
@@ -70,6 +72,23 @@ export const emailSessionRoster = command(
 		return sendAnnouncement(orgId, subject, message, ids);
 	}
 );
+export const getInstructorConflicts = query(instructorConflictInput, async (input) => {
+	const { orgId } = await requireOrg();
+	const tzName = await tz();
+	const start = zonedToUtc(input.startsAt, tzName);
+	const dates = [start];
+	if (input.repeatUntil) {
+		let day = input.startsAt.slice(0, 10);
+		let guard = 0;
+		while ((day = addDays(day, 7)) <= input.repeatUntil && guard++ < 52)
+			dates.push(zonedToUtc(`${day}T${input.startsAt.slice(11, 16)}`, tzName));
+	}
+	const intervals = dates.map((d) => ({
+		start: d,
+		end: new Date(d.getTime() + input.durationMin * 60_000)
+	}));
+	return svc.instructorConflicts(orgId, input.instructorId, intervals, input.excludeSessionId);
+});
 export const createSession = command(sessionInput, async (input) => {
 	const s = await svc.createSession(await requireOrg(), await tz(), input);
 	void getSessions().refresh();

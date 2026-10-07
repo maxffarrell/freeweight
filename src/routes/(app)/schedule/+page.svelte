@@ -32,7 +32,8 @@
 		copyWeek,
 		getInstructorUpcoming,
 		handoffInstructor,
-		claimCover
+		claimCover,
+		getInstructorConflicts
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -287,6 +288,27 @@
 	);
 	let sessNote = $state('');
 	let pending = $state(false);
+	const noConflicts: { id: string; startsAt: Date; endsAt: Date; className: string }[] = [];
+	let sessConflicts = $derived(
+		await (sessInstructorId && sessStart && sessStartTime
+			? getInstructorConflicts({
+					instructorId: sessInstructorId,
+					startsAt: `${sessStart}T${sessStartTime}`,
+					durationMin: sessDuration ?? 60,
+					repeatUntil: sessRepeatUntil || null
+				})
+			: Promise.resolve(noConflicts))
+	);
+	let editConflicts = $derived(
+		await (editOpen && editInstructorId && editDate && editTime
+			? getInstructorConflicts({
+					instructorId: editInstructorId,
+					startsAt: `${editDate}T${editTime}`,
+					durationMin: editDuration ?? 60,
+					excludeSessionId: focusId
+				})
+			: Promise.resolve(noConflicts))
+	);
 	async function submitSession(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -826,6 +848,16 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if editConflicts.length}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{editConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
+						{editConflicts
+							.map(
+								(c) => `${c.className} ${localDate(c.startsAt, tz)} ${localTime(c.startsAt, tz)}`
+							)
+							.join(' · ')}
+					</p>
+				{/if}
 			</Field.Field>
 			<div class="flex items-center justify-between rounded-lg border px-3 py-2.5">
 				<div>
@@ -909,6 +941,16 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if sessConflicts.length}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{sessConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
+						{sessConflicts
+							.map(
+								(c) => `${c.className} ${localDate(c.startsAt, tz)} ${localTime(c.startsAt, tz)}`
+							)
+							.join(' · ')}
+					</p>
+				{/if}
 			</Field.Field>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>

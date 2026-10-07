@@ -181,6 +181,16 @@ export const sessionUpdate = v.object({
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 
+/** Live instructor double-booking check for the session dialogs. */
+export const instructorConflictInput = v.object({
+	instructorId: idSchema,
+	startsAt: localDateTime,
+	durationMin: v.pipe(v.number(), v.integer(), v.minValue(1)),
+	/** Also check weekly recurrences through this date (the create dialog's repeat). */
+	repeatUntil: v.optional(v.nullable(isoDate)),
+	excludeSessionId: v.optional(idSchema)
+});
+
 export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema,
