@@ -6,12 +6,14 @@ import * as checkins from '#lib/server/services/checkins.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
+	announcementInput,
 	checkInInput,
 	idSchema,
 	memberImportInput,
 	memberInput,
 	memberUpdate
 } from '#lib/schemas.ts';
+import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 
 export const getMembers = query(v.optional(v.object({ q: v.optional(v.string()) })), async (opts) =>
 	svc.listMembers((await requireOrg()).orgId, opts?.q)
@@ -60,3 +62,7 @@ export const getCheckInCode = query(idSchema, async (memberId) => {
 	await requireOrg();
 	return checkins.checkInToken(memberId);
 });
+
+export const emailAllMembers = command(announcementInput, async (input) =>
+	sendAnnouncement((await requireOrg()).orgId, input.subject, input.message)
+);

@@ -1,4 +1,5 @@
-import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
+import { error } from '@sveltejs/kit';
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -10,7 +11,7 @@ import {
 	notificationLog,
 	organization
 } from '#lib/server/db/schema.ts';
-import { appOrigin, sendEmail } from '#lib/server/email.ts';
+import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { localDate, localTime } from '#lib/tz.ts';
 
@@ -164,4 +165,41 @@ export async function sendClassReminders(orgId: string) {
 		sent++;
 	}
 	return sent;
+}
+
+/**
+ * Staff announcement to every active member with an email on file.
+ * Requires a real email provider — 409s when mail isn't configured so the
+ * front desk isn't misled by a logged-but-unsent batch. Resending the exact
+ * same subject+body is a no-op per member (notification_log 'announcement').
+ */
+export async function sendAnnouncement(orgId: string, subject: string, message: string) {
+	if (!emailProvider()) error(409, 'No email provider configured');
+	const members = await db
+		.select({ email: gymMember.email })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
+			)
+		)
+		.limit(1000);
+	if (!members.length) return { sent: 0, total: 0 };
+	const name = await orgName(orgId);
+	const entityId = `announcement:${subject}::${message}`;
+	const { text, html } = renderEmail({
+		orgName: name,
+		heading: subject,
+		lines: message.split(/\n+/).filter(Boolean),
+		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+	});
+	let sent = 0;
+	for (const m of members) {
+		if (!m.email || !(await logOnce(orgId, 'announcement', entityId, m.email))) continue;
+		await sendEmail({ to: m.email, subject: `${name}: ${subject}`, text, html });
+		sent++;
+	}
+	return { sent, total: members.length };
 }

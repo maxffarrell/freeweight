@@ -13,7 +13,12 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getMembers, createMember, importMembers } from '#lib/remote/members.remote.ts';
+	import {
+		getMembers,
+		createMember,
+		emailAllMembers,
+		importMembers
+	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
@@ -21,6 +26,7 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Search from '@lucide/svelte/icons/search';
 	import Download from '@lucide/svelte/icons/download';
+	import Mail from '@lucide/svelte/icons/mail';
 	import Upload from '@lucide/svelte/icons/upload';
 
 	const currency = await getCurrency();
@@ -117,6 +123,24 @@
 		}
 		pending = false;
 	}
+	// ------- email all -------
+	let emailOpen = $state(false);
+	let emailSubject = $state('');
+	let emailBody = $state('');
+	let emailPending = $state(false);
+	async function submitAnnouncement(e: SubmitEvent) {
+		e.preventDefault();
+		emailPending = true;
+		try {
+			const r = await emailAllMembers({ subject: emailSubject, message: emailBody });
+			toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
+			emailOpen = false;
+			emailSubject = emailBody = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send — try again'));
+		}
+		emailPending = false;
+	}
 </script>
 
 <PageHeader title="Members">
@@ -125,6 +149,7 @@
 			><Upload /> Import</Button
 		>
 		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
+		<Button size="sm" variant="outline" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
 </PageHeader>
@@ -251,5 +276,37 @@
 				{importPending ? 'Importing…' : `Import ${importRows.length || ''}`}
 			</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={emailOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Email all members</Dialog.Title>
+			<Dialog.Description>
+				Goes to every active member with an email on file — closures, schedule changes, news.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitAnnouncement}>
+			<Field.Field>
+				<Field.Label for="a-subject">Subject</Field.Label>
+				<Input id="a-subject" required bind:value={emailSubject} autofocus />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="a-body">Message</Field.Label>
+				<Textarea
+					id="a-body"
+					required
+					bind:value={emailBody}
+					rows={6}
+					placeholder="Hi everyone — we're closed this Thursday for maintenance…"
+				/>
+			</Field.Field>
+			<Dialog.Footer
+				><Button type="submit" disabled={emailPending}>
+					{emailPending ? 'Sending…' : 'Send to all members'}
+				</Button></Dialog.Footer
+			>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

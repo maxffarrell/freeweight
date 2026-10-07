@@ -186,3 +186,8 @@ export const dropInInput = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
 	phone: v.optional(optionalText)
 });
+
+export const announcementInput = v.object({
+	subject: requiredText('Subject'),
+	message: requiredText('Message')
+});
