@@ -29,7 +29,9 @@
 		updateTemplate,
 		deleteTemplate,
 		emailSessionRoster,
-		copyWeek
+		copyWeek,
+		getInstructorUpcoming,
+		handoffInstructor
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -43,6 +45,7 @@
 	import Mail from '@lucide/svelte/icons/mail';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -211,6 +214,45 @@
 			msgBody = '';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send'));
+		}
+		pending = false;
+	}
+
+	// Instructor handoff — "Kate is leaving": reassign or cancel every future
+	// session they teach (and their recurring templates so they don't regrow).
+	let hoOpen = $state(false);
+	let hoFrom = $state('');
+	let hoType = $state('');
+	let hoAction = $state<'reassign' | 'cancel'>('reassign');
+	let hoTo = $state('');
+	const hoCounts = $derived(
+		hoFrom
+			? await getInstructorUpcoming({
+					instructorId: hoFrom,
+					classTypeId: hoType || undefined
+				})
+			: null
+	);
+	async function submitHandoff(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await handoffInstructor({
+				fromId: hoFrom,
+				classTypeId: hoType || undefined,
+				toId: hoAction === 'reassign' ? hoTo : undefined,
+				cancel: hoAction === 'cancel'
+			});
+			toast.success(
+				`${r.sessions} session${r.sessions === 1 ? '' : 's'} ${
+					hoAction === 'cancel' ? 'cancelled' : 'reassigned'
+				}${r.templates ? `, ${r.templates} template${r.templates === 1 ? '' : 's'} ${hoAction === 'cancel' ? 'removed' : 'moved'}` : ''}`
+			);
+			hoOpen = false;
+			hoFrom = hoType = hoTo = '';
+			hoAction = 'reassign';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not complete handoff'));
 		}
 		pending = false;
 	}
@@ -385,6 +427,9 @@
 
 <PageHeader title="Schedule">
 	{#snippet actions()}
+		<Button variant="outline" size="sm" onclick={() => (hoOpen = true)}
+			><ArrowRightLeft /> Handoff</Button
+		>
 		<Button variant="outline" size="sm" onclick={() => (tplOpen = true)}
 			><Repeat /> Recurring</Button
 		>
@@ -1154,6 +1199,92 @@
 				<Textarea id="msg-body" required rows={4} bind:value={msgBody} />
 			</Field.Field>
 			<Button type="submit" class="w-full" disabled={pending}>Send to attendees</Button>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={hoOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Instructor handoff</Dialog.Title>
+			<Dialog.Description
+				>Reassign or cancel every upcoming session an instructor teaches — their recurring templates
+				are updated too, and attendees get the usual emails.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitHandoff}>
+			<Field.Field>
+				<Field.Label for="ho-from">Instructor</Field.Label>
+				<select
+					id="ho-from"
+					required
+					bind:value={hoFrom}
+					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+				>
+					<option value="" disabled>Pick an instructor</option>
+					{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
+				</select>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="ho-type">Only this class (optional)</Field.Label>
+				<select
+					id="ho-type"
+					bind:value={hoType}
+					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+				>
+					<option value="">All classes</option>
+					{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+				</select>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="ho-action">Do what with them</Field.Label>
+				<select
+					id="ho-action"
+					bind:value={hoAction}
+					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+				>
+					<option value="reassign">Reassign to another instructor</option>
+					<option value="cancel">Cancel them all</option>
+				</select>
+			</Field.Field>
+			{#if hoAction === 'reassign'}
+				<Field.Field>
+					<Field.Label for="ho-to">Taken over by</Field.Label>
+					<select
+						id="ho-to"
+						required
+						bind:value={hoTo}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="" disabled>Pick the new instructor</option>
+						{#each instructors.filter((i) => i.id !== hoFrom) as i (i.id)}<option value={i.id}
+								>{i.name}</option
+							>{/each}
+					</select>
+				</Field.Field>
+			{/if}
+			{#if hoCounts && (hoCounts.sessions || hoCounts.templates)}
+				<p class="text-xs text-muted-foreground">
+					This will {hoAction === 'cancel' ? 'cancel' : 'reassign'}
+					{hoCounts.sessions} upcoming session{hoCounts.sessions === 1
+						? ''
+						: 's'}{hoCounts.templates
+						? ` and ${hoAction === 'cancel' ? 'remove' : 'move'} ${hoCounts.templates} recurring template${hoCounts.templates === 1 ? '' : 's'}`
+						: ''}.
+				</p>
+			{:else if hoFrom && hoCounts}
+				<p class="text-xs text-muted-foreground">Nothing upcoming for them.</p>
+			{/if}
+			<Button
+				type="submit"
+				class="w-full"
+				disabled={pending ||
+					!hoFrom ||
+					(hoAction === 'reassign' && !hoTo) ||
+					(hoCounts != null && !hoCounts.sessions && !hoCounts.templates)}
+			>
+				{hoAction === 'cancel' ? 'Cancel sessions' : 'Reassign sessions'}
+			</Button>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
