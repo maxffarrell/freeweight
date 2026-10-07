@@ -19,7 +19,7 @@
 	const currency = await getCurrency();
 
 	const maxCheckIns = Math.max(1, ...r.checkIns.map((d) => d.count));
-	const maxMembers = Math.max(1, ...r.members.map((m) => m.count));
+	const maxMembers = Math.max(1, ...r.members.map((m) => m.joined));
 	const maxRevenue = Math.max(1, ...r.revenue.map((m) => m.total));
 	const maxMembersByPlan = Math.max(1, ...r.plans.map((p) => p.count));
 	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
@@ -108,18 +108,23 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="text-base">New members</Card.Title>
-			<Card.Description>Joined per month, last 12 months</Card.Description>
+			<Card.Title class="text-base">Member growth</Card.Title>
+			<Card.Description>Joined vs cancelled per month, last 12 months</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-1.5">
 			{#each r.members as m (m.month)}
 				<div class="flex items-center gap-2 text-sm">
 					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
-					<div
-						class="h-4 rounded bg-primary/70"
-						style="width: {(m.count / maxMembers) * 70}%"
-					></div>
-					<span class="tabular-nums">{m.count}</span>
+					<div class="relative h-4 flex-1">
+						<div
+							class="absolute inset-y-0 left-0 rounded bg-primary/70"
+							style="width: {(m.joined / maxMembers) * 70}%"
+						></div>
+					</div>
+					<span class="w-14 shrink-0 text-right tabular-nums">
+						{m.joined}
+						{#if m.cancelled > 0}<span class="text-destructive"> −{m.cancelled}</span>{/if}
+					</span>
 				</div>
 			{:else}
 				<p class="text-sm text-muted-foreground">No members yet.</p>

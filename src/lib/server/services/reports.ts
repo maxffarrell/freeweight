@@ -40,19 +40,47 @@ async function checkInsByDay(orgId: string) {
 	return out;
 }
 
-/** New members per month for the last 12 months (joined_at, falling back to created_at). */
-async function newMembersByMonth(orgId: string) {
+/**
+ * Member growth per month for the last 12 months: joins (member.createdAt) vs
+ * cancellations (membership.updatedAt where status='cancelled').
+ */
+async function memberGrowthByMonth(orgId: string) {
 	const since = new Date();
 	since.setUTCMonth(since.getUTCMonth() - 12);
-	return db
-		.select({
-			month: sql<string>`to_char(${gymMember.createdAt}, 'YYYY-MM')`,
-			count: sql<number>`count(*)`.mapWith(Number)
-		})
-		.from(gymMember)
-		.where(and(eq(gymMember.organizationId, orgId), gte(gymMember.createdAt, since)))
-		.groupBy(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`)
-		.orderBy(asc(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`));
+	const [joins, cancels] = await Promise.all([
+		db
+			.select({
+				month: sql<string>`to_char(${gymMember.createdAt}, 'YYYY-MM')`,
+				count: sql<number>`count(*)`.mapWith(Number)
+			})
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), gte(gymMember.createdAt, since)))
+			.groupBy(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`),
+		db
+			.select({
+				month: sql<string>`to_char(${membership.updatedAt}, 'YYYY-MM')`,
+				count: sql<number>`count(*)`.mapWith(Number)
+			})
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.status, 'cancelled'),
+					gte(membership.updatedAt, since)
+				)
+			)
+			.groupBy(sql`to_char(${membership.updatedAt}, 'YYYY-MM')`)
+	]);
+	const joinedBy = new Map(joins.map((r) => [r.month, r.count]));
+	const cancelledBy = new Map(cancels.map((r) => [r.month, r.count]));
+	const months = new Set([...joinedBy.keys(), ...cancelledBy.keys()]);
+	// Always show the current month even with no activity.
+	months.add(new Date().toISOString().slice(0, 7));
+	return [...months].sort().map((month) => ({
+		month,
+		joined: joinedBy.get(month) ?? 0,
+		cancelled: cancelledBy.get(month) ?? 0
+	}));
 }
 
 /** Collected revenue per month for the last 12 months. */
@@ -242,7 +270,7 @@ export async function getReports(orgId: string) {
 	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top, referrers, hours] =
 		await Promise.all([
 			checkInsByDay(orgId),
-			newMembersByMonth(orgId),
+			memberGrowthByMonth(orgId),
 			revenueByMonth(orgId),
 			membershipsByPlan(orgId),
 			fillByClass(orgId),
