@@ -9,12 +9,14 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		getCharges,
 		addCharge,
+		bulkCharge,
 		updateCharge,
 		getMemberships,
 		updateMembership,
@@ -117,25 +119,39 @@
 	// ------- new charge -------
 	let chargeOpen = $state(false);
 	let cMemberId = $state('');
+	let cAll = $state(false);
 	let cKind = $state<'membership' | 'signup' | 'dropin' | 'other'>('other');
 	let cDesc = $state('');
 	let cAmount = $state<number | null>(null);
 	let cDue = $state(todayISO());
+	const activeCount = $derived(
+		new Set(
+			memberships
+				.filter((mm) => mm.membership.status === 'active')
+				.map((mm) => mm.membership.memberId)
+		).size
+	);
 	async function submitCharge(e: SubmitEvent) {
 		e.preventDefault();
 		if (!cAmount) return;
 		pending = true;
 		try {
-			await addCharge({
-				memberId: cMemberId,
-				kind: cKind,
-				description: cDesc || undefined,
-				amount: cAmount,
-				dueDate: cDue
-			});
-			toast.success('Charge added');
+			if (cAll) {
+				const r = await bulkCharge({ description: cDesc, amount: cAmount, dueDate: cDue });
+				toast.success(`Charge posted to ${r.posted} member${r.posted === 1 ? '' : 's'}`);
+			} else {
+				await addCharge({
+					memberId: cMemberId,
+					kind: cKind,
+					description: cDesc || undefined,
+					amount: cAmount,
+					dueDate: cDue
+				});
+				toast.success('Charge added');
+			}
 			chargeOpen = false;
 			cMemberId = '';
+			cAll = false;
 			cDesc = '';
 			cAmount = null;
 			await refreshCharges();
@@ -510,19 +526,30 @@
 			<Dialog.Description>One-off charges for drop-ins, fees, or anything else.</Dialog.Description>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitCharge}>
-			<Field.Field>
-				<Field.Label>Member</Field.Label>
-				<Select.Root type="single" bind:value={cMemberId}>
-					<Select.Trigger class="w-full"
-						>{memberList.find((mm) => mm.id === cMemberId)?.name ?? 'Choose…'}</Select.Trigger
-					>
-					<Select.Content>
-						{#each memberList as mm (mm.id)}
-							<Select.Item value={mm.id}>{mm.name}</Select.Item>
-						{/each}
-					</Select.Content>
-				</Select.Root>
-			</Field.Field>
+			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+				<div>
+					<p class="font-medium">Every active member</p>
+					<p class="text-xs text-muted-foreground">
+						Posts this charge to all {activeCount} members at once.
+					</p>
+				</div>
+				<Switch bind:checked={cAll} />
+			</div>
+			{#if !cAll}
+				<Field.Field>
+					<Field.Label>Member</Field.Label>
+					<Select.Root type="single" bind:value={cMemberId}>
+						<Select.Trigger class="w-full"
+							>{memberList.find((mm) => mm.id === cMemberId)?.name ?? 'Choose…'}</Select.Trigger
+						>
+						<Select.Content>
+							{#each memberList as mm (mm.id)}
+								<Select.Item value={mm.id}>{mm.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</Field.Field>
+			{/if}
 			<Field.Field>
 				<Field.Label>Kind</Field.Label>
 				<Select.Root type="single" bind:value={cKind}>
@@ -552,7 +579,8 @@
 				</Field.Field>
 			</div>
 			<Dialog.Footer
-				><Button type="submit" disabled={pending || !cMemberId || !cAmount}>Add charge</Button
+				><Button type="submit" disabled={pending || !cAmount || (cAll ? !cDesc.trim() : !cMemberId)}
+					>{cAll ? `Post to ${activeCount} members` : 'Add charge'}</Button
 				></Dialog.Footer
 			>
 		</form>
