@@ -45,7 +45,8 @@ import {
 	notifySessionChanged,
 	notifySessionCancelled,
 	notifySeriesBooked,
-	notifyWaitlistPromoted
+	notifyWaitlistPromoted,
+	sendCoverRequests
 } from './notifications.ts';
 import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
@@ -358,7 +359,7 @@ export async function updateSession(
 	}
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
-	if (set.needsCover && !prev.coverRequestedAt)
+	if (set.needsCover && !prev.coverRequestedAt) {
 		await emit({
 			orgId: ctx.orgId,
 			actorId: ctx.userId,
@@ -367,6 +368,8 @@ export async function updateSession(
 			action: 'cover_requested',
 			summary: 'Cover requested'
 		});
+		sendCoverRequests(ctx.orgId, id, row.coverRequestedAt ?? new Date()).catch(() => {});
+	}
 	const moved =
 		(set.startsAt && zonedToUtc(set.startsAt, tz).getTime() !== prev.startsAt.getTime()) ||
 		(set.locationId !== undefined && set.locationId !== prev.locationId);

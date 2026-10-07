@@ -2228,3 +2228,51 @@ export async function sendBillingReminders(orgId: string) {
 	}
 	return sent;
 }
+
+/**
+ * Staff-wide "cover needed" email when a session gets flagged needsCover.
+ * Deduped per flag instance — clearing and re-flagging can re-mail.
+ */
+export async function sendCoverRequests(orgId: string, sessionId: string, flaggedAt: Date) {
+	const [row] = await db
+		.select({
+			startsAt: classSession.startsAt,
+			className: classType.name,
+			locationName: location.name,
+			instructorName: user.name,
+			booked: sql<number>`(select count(*)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
+	if (!row) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const day = localDate(row.startsAt, tz);
+	const time = localTime(row.startsAt, tz);
+
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(eq(member.organizationId, orgId));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'cover_request', `${sessionId}:${flaggedAt.getTime()}`, s.email)))
+			continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Cover needed: ${row.className} — ${formatDate(day)} ${time}`,
+			...renderEmail({
+				orgName: name,
+				heading: `${row.className} needs a sub`,
+				lines: [
+					`${row.instructorName ?? 'The assigned instructor'} can't make ${row.className} on ${formatDate(day)} at ${time}${row.locationName ? ` (${row.locationName})` : ''} — ${row.booked} booked.`,
+					'Claim it on the schedule — assigning a new instructor clears the flag and emails the booked members.'
+				],
+				action: { label: 'Open session', url: `${appOrigin()}/schedule?focus=${sessionId}` }
+			})
+		});
+	}
+}
