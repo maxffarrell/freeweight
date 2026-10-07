@@ -1444,3 +1444,136 @@ export async function sendInstructorRosters(orgId: string) {
 	}
 	return sent;
 }
+
+/**
+ * Heads-up billing emails, seven days out:
+ * - recurring members: "your plan renews on {date} — {amount}" (once per period)
+ * - pack members: "your class pack expires {date} — {n} credits left" (once per pack)
+ */
+export async function sendBillingReminders(orgId: string) {
+	const now = new Date();
+	const soon = new Date(now.getTime() + 7 * 86400_000);
+	const [name, tz, st] = await Promise.all([
+		orgName(orgId),
+		orgTimezone(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const currency = st[0]?.currency ?? 'usd';
+
+	// Recurring memberships renewing within 7 days.
+	const renewals = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			planName: plan.name,
+			amount: plan.amount,
+			price: membership.price,
+			interval: plan.interval,
+			when: membership.nextChargeAt,
+			membershipId: membership.id
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false),
+				gt(membership.nextChargeAt, now),
+				lte(membership.nextChargeAt, soon)
+			)
+		);
+
+	let sent = 0;
+	for (const r of renewals) {
+		const amount = r.price ?? r.amount;
+		if (!r.email || !r.when || amount <= 0) continue;
+		const key = `${r.membershipId}:${r.when.toISOString().slice(0, 10)}`;
+		if (!(await logOnce(orgId, 'renewal_reminder', key, r.email))) continue;
+		const date = localDate(r.when, tz);
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Your ${r.planName} membership renews ${date}`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Membership renewal coming up',
+				lines: [
+					`Hi ${r.memberName} — your ${r.planName} membership at ${name} renews on ${date} for ${formatMoney(amount, currency)}.`,
+					`Need to pause or cancel instead? You can request either in the member portal, or just reply to this email.`
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+
+	// Class packs expiring within 7 days.
+	const expiring = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			planName: plan.name,
+			classCredits: plan.classCredits,
+			bonusCredits: membership.bonusCredits,
+			startsAt: membership.startsAt,
+			when: membership.endsAt,
+			membershipId: membership.id
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(membership.endsAt),
+				gt(membership.endsAt, now),
+				lte(membership.endsAt, soon)
+			)
+		);
+	for (const r of expiring) {
+		if (!r.email || !r.when) continue;
+		const key = `${r.membershipId}:${r.when.toISOString().slice(0, 10)}`;
+		if (!(await logOnce(orgId, 'pack_expiry', key, r.email))) continue;
+		const date = localDate(r.when, tz);
+		let creditsLine = 'Any unused classes expire with it.';
+		if (r.classCredits != null) {
+			const [{ count: used }] = await db
+				.select({ count: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(booking.organizationId, orgId),
+						eq(booking.memberId, r.memberId),
+						inArray(booking.status, ['booked', 'attended', 'no_show']),
+						isNull(classSession.cancelledAt),
+						gte(classSession.startsAt, r.startsAt),
+						lt(classSession.startsAt, r.when)
+					)
+				);
+			const left = Math.max(0, r.classCredits + r.bonusCredits - used);
+			creditsLine = left
+				? `You still have ${left} class${left === 1 ? '' : 'es'} left — book them before they expire.`
+				: 'All your classes are used up.';
+		}
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Your ${r.planName} pack expires ${date}`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Class pack expiring soon',
+				lines: [
+					`Hi ${r.memberName} — your ${r.planName} class pack at ${name} expires on ${date}. ${creditsLine}`
+				],
+				action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}

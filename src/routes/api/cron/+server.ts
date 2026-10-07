@@ -7,6 +7,7 @@ import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billi
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import {
 	sendAnniversaryGreetings,
+	sendBillingReminders,
 	sendBirthdayGreetings,
 	sendClassReminders,
 	sendInstructorRosters,
@@ -46,6 +47,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let digests = 0;
 	let winbacks = 0;
 	let rosters = 0;
+	let billingReminders = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -120,6 +122,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`instructor-roster cron failed for ${o.id}`, err);
 		}
+		try {
+			billingReminders += await sendBillingReminders(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`billing-reminder cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
 	return json({
@@ -136,7 +144,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		generated,
 		digests,
 		winbacks,
-		rosters
+		rosters,
+		billingReminders
 	});
 };
 
