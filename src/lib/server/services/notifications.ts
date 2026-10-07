@@ -9,9 +9,11 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	member,
 	notificationLog,
 	organization,
-	payment
+	payment,
+	user
 } from '#lib/server/db/schema.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
@@ -258,6 +260,67 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 				lines: [
 					`Hi ${row.memberName} — ${row.className} at ${name} on ${date} at ${localTime(row.startsAt, tz)} has been cancelled.`,
 					'Check the member portal for the rest of this week’s schedule.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
+}
+
+/**
+ * "Your instructor changed" — one email per booked/waitlisted member when a session's
+ * instructor is swapped. Dedup key includes the new instructor id so a re-sub notifies again.
+ */
+export async function notifyInstructorChanged(orgId: string, sessionId: string) {
+	const [sess] = await db
+		.select({
+			instructorId: classSession.instructorId,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(eq(classSession.id, sessionId));
+	if (!sess) return;
+	const [instr] = sess.instructorId
+		? await db
+				.select({ name: user.name })
+				.from(member)
+				.innerJoin(user, eq(member.userId, user.id))
+				.where(eq(member.id, sess.instructorId))
+				.limit(1)
+		: [undefined];
+	const rows = await db
+		.select({ email: gymMember.email, memberName: gymMember.name })
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
+		);
+	if (!rows.length) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const date = `${localDate(sess.startsAt, tz)} at ${localTime(sess.startsAt, tz)}`;
+	const who = instr?.name ?? 'a new instructor';
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (
+			!(await logOnce(
+				orgId,
+				'instructor_changed',
+				`${sessionId}:${sess.instructorId ?? 'none'}`,
+				row.email
+			))
+		)
+			continue;
+		await sendEmail({
+			to: row.email,
+			subject: `${sess.className} on ${localDate(sess.startsAt, tz)}: now taught by ${who}`,
+			...renderEmail({
+				orgName: name,
+				heading: `Instructor change for ${sess.className}`,
+				lines: [
+					`Hi ${row.memberName} — your ${sess.className} at ${name} on ${date} is now taught by ${who}.`,
+					'Everything else about the class is unchanged.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})

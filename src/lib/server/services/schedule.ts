@@ -30,6 +30,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import {
 	notifyBookingConfirmed,
+	notifyInstructorChanged,
 	notifySessionCancelled,
 	notifyWaitlistPromoted
 } from './notifications.ts';
@@ -215,6 +216,11 @@ export async function updateSession(
 	input: v.InferOutput<typeof s.sessionUpdate>
 ) {
 	const { id, ...set } = input;
+	const [prev] = await db
+		.select({ instructorId: classSession.instructorId })
+		.from(classSession)
+		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)));
+	if (!prev) error(404, 'Session not found');
 	const [row] = await db
 		.update(classSession)
 		.set({
@@ -228,6 +234,8 @@ export async function updateSession(
 		.returning();
 	if (!row) error(404, 'Session not found');
 	if (set.cancelled) notifySessionCancelled(ctx.orgId, id).catch(() => {});
+	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
+		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
 	// Keep endsAt in step with the class duration when the start moves.
 	if (set.startsAt) {
 		const [ct] = await db

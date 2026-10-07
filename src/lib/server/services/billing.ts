@@ -227,7 +227,10 @@ export async function updateMembership(
 	// leaving nextChargeAt null on resume would bill the member never again.
 	let nextChargeAt: Date | null | undefined;
 	if (input.status === 'active' && current.status !== 'active') {
-		const [p] = await db.select({ interval: plan.interval }).from(plan).where(eq(plan.id, current.planId));
+		const [p] = await db
+			.select({ interval: plan.interval })
+			.from(plan)
+			.where(eq(plan.id, current.planId));
 		nextChargeAt = new Date(`${nextPeriod(todayISO(), p?.interval ?? 'month')}T00:00:00Z`);
 	} else if (input.status && input.status !== 'active') {
 		nextChargeAt = null;
