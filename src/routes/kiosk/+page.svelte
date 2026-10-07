@@ -166,7 +166,7 @@
 				<div class="divide-y rounded-lg border">
 					{#each checkIns.slice(0, 8) as c (c.checkIn.id)}
 						<div class="flex items-center justify-between px-4 py-2 text-sm">
-							<span>{c.memberName}</span>
+							<span>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span>
 							<span class="flex items-center gap-2 text-muted-foreground">
 								{c.locationName ?? ''}
 								<Badge variant="outline" class="text-xs">{c.checkIn.method}</Badge>

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gte, lt } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, isNull, lt, or, gt, sql } from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -9,7 +9,9 @@ import {
 	classSession,
 	gymMember,
 	gymSettings,
-	location
+	location,
+	membership,
+	plan
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
@@ -36,6 +38,69 @@ export function verifyCheckInToken(token: string) {
 }
 
 /** Records a check-in from a QR token or a member id typed by staff. */
+/**
+ * Logs a guest brought in by a member, capped by the plan's `guestPasses`
+ * per calendar month. The visit is a check_in row tagged with `guestName`
+ * so it shows in the front-desk feed like any other arrival.
+ */
+export async function recordGuestVisit(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.guestVisitInput>
+) {
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
+	if (!m) error(404, 'Member not found');
+	const [ms] = await db
+		.select({ guestPasses: plan.guestPasses })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.memberId, m.id),
+				eq(membership.status, 'active'),
+				or(isNull(membership.endsAt), gt(membership.endsAt, new Date()))
+			)
+		)
+		.orderBy(desc(membership.createdAt))
+		.limit(1);
+	const cap = ms?.guestPasses ?? 0;
+	if (cap <= 0) error(402, `${m.name}'s plan doesn't include guest passes`);
+	const [used] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				eq(checkIn.memberId, m.id),
+				isNotNull(checkIn.guestName),
+				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
+			)
+		);
+	if ((used?.n ?? 0) >= cap) error(402, `${m.name} has used all ${cap} guest passes this month`);
+	const [row] = await db
+		.insert(checkIn)
+		.values({
+			organizationId: ctx.orgId,
+			memberId: m.id,
+			locationId: input.locationId ?? m.locationId,
+			method: 'manual',
+			guestName: input.guestName
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'check_in',
+		entityId: row!.id,
+		action: 'recorded',
+		summary: `Guest ${input.guestName} checked in with ${m.name}`
+	});
+	return { checkIn: row!, member: m, used: (used?.n ?? 0) + 1, cap };
+}
+
 export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof s.checkInInput>) {
 	const memberId = verifyCheckInToken(input.code) ?? input.code;
 	const [m] = await db

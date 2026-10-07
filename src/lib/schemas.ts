@@ -58,6 +58,7 @@ export const planInput = v.object({
 	isPack: v.optional(v.boolean(), false),
 	packDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	trialDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 0),
+	guestPasses: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	listed: v.optional(v.boolean(), true),
 	active: v.optional(v.boolean(), true)
 });
@@ -130,6 +131,12 @@ export const bookingUpdate = v.object({
 export const checkInInput = v.object({
 	/** QR token from the member's portal code, or a member id for a manual check-in. */
 	code: requiredText('Code'),
+	locationId: v.optional(v.nullable(idSchema))
+});
+
+export const guestVisitInput = v.object({
+	memberId: idSchema,
+	guestName: requiredText('Guest name'),
 	locationId: v.optional(v.nullable(idSchema))
 });
 

@@ -34,6 +34,7 @@
 	let isPack = $state(false);
 	let packDays = $state<number | null>(null);
 	let trialDays = $state(0);
+	let guestPasses = $state<number | null>(null);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -48,6 +49,7 @@
 		isPack = p.isPack;
 		packDays = p.packDays;
 		trialDays = p.trialDays;
+		guestPasses = p.guestPasses;
 		listed = p.listed;
 		active = p.active;
 		open = true;
@@ -62,6 +64,7 @@
 		isPack = false;
 		packDays = null;
 		trialDays = 0;
+		guestPasses = null;
 		listed = active = true;
 	}
 
@@ -82,6 +85,7 @@
 					isPack,
 					packDays: isPack ? packDays || null : null,
 					trialDays: trialDays || 0,
+					guestPasses: guestPasses || null,
 					listed,
 					active
 				});
@@ -97,6 +101,7 @@
 					isPack,
 					packDays: isPack ? packDays || null : null,
 					trialDays: trialDays || 0,
+					guestPasses: guestPasses || null,
 					listed,
 					active
 				});
@@ -150,6 +155,7 @@
 							>{/if}
 						{#if p.classCredits}<Badge variant="outline">{p.classCredits} credits</Badge>{/if}
 						{#if p.trialDays > 0}<Badge variant="outline">{p.trialDays}d free trial</Badge>{/if}
+						{#if p.guestPasses}<Badge variant="outline">{p.guestPasses} guest passes/mo</Badge>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
@@ -241,6 +247,10 @@
 					/>
 				</Field.Field>
 			</div>
+			<Field.Field>
+				<Field.Label for="p-guests">Guest passes / month</Field.Label>
+				<Input id="p-guests" type="number" min={1} bind:value={guestPasses} placeholder="None" />
+			</Field.Field>
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<span>Class pack — one-time purchase, no recurring billing</span>
 				<Switch bind:checked={isPack} />

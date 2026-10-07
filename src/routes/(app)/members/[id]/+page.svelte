@@ -16,7 +16,8 @@
 		getMember,
 		updateMember,
 		getPortalInvite,
-		recordCheckIn
+		recordCheckIn,
+		logGuestVisit
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -31,6 +32,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
+	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
@@ -98,6 +100,23 @@
 		}
 	}
 
+	// ------- guest visit -------
+	let guestOpen = $state(false);
+	let guestName = $state('');
+	async function logGuest(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await logGuestVisit({ memberId: id, guestName });
+			toast.success(`${guestName} checked in as a guest (${r.used}/${r.cap} used)`);
+			guestOpen = false;
+			guestName = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log guest'));
+		}
+		pending = false;
+	}
+
 	// ------- payment -------
 	let payOpen = $state(false);
 	let payAmount = $state<number | null>(null);
@@ -143,6 +162,9 @@
 	{#snippet actions()}
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
 		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
+		<Button variant="outline" size="sm" onclick={() => (guestOpen = true)}
+			><UserPlus /> Guest</Button
+		>
 		<Button size="sm" variant="outline" onclick={() => (editOpen = true)}>Edit</Button>
 	{/snippet}
 </PageHeader>
@@ -175,6 +197,14 @@
 					<span class="text-muted-foreground">Waiver</span>
 					<span
 						>{m.signedWaiver ? `Signed ${formatDate(m.signedWaiver.signedAt)}` : 'Not signed'}</span
+					>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Guest passes</span>
+					<span
+						>{m.guestPasses
+							? `${m.guestsUsed}/${m.guestPasses} used this month`
+							: 'None on this plan'}</span
 					>
 				</div>
 				<div class="flex justify-between">
@@ -360,7 +390,7 @@
 								</Table.Row>
 							{:else}
 								<Table.Row
-									><Table.Cell colspan={2} class="text-muted-foreground">No check-ins.</Table.Cell
+									><Table.Cell colspan={3} class="text-muted-foreground">No check-ins.</Table.Cell
 									></Table.Row
 								>
 							{/each}
@@ -371,6 +401,33 @@
 		</Tabs.Root>
 	</Card.Root>
 </div>
+
+<Dialog.Root bind:open={guestOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Log a guest visit</Dialog.Title>
+			<Dialog.Description
+				>{m.guestPasses
+					? `${m.member.name} has ${m.guestPasses - m.guestsUsed} guest passes left this month.`
+					: `${m.member.name}'s plan doesn't include guest passes.`}</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={logGuest}>
+			<Field.Field
+				><Field.Label for="guest-name">Guest name</Field.Label><Input
+					id="guest-name"
+					required
+					bind:value={guestName}
+					autofocus
+				/></Field.Field
+			>
+			<Dialog.Footer
+				><Button type="submit" disabled={pending || !guestName.trim()}>Check in guest</Button
+				></Dialog.Footer
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={editOpen}>
 	<Dialog.Content>

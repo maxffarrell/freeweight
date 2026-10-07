@@ -129,6 +129,8 @@ export const plan = pgTable(
 		packDays: integer('pack_days'),
 		/** Free days before the first recurring charge posts; 0 = bill from day one. */
 		trialDays: integer('trial_days').notNull().default(0),
+		/** Guest check-ins a member on this plan may log per calendar month; null = none. */
+		guestPasses: integer('guest_passes'),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),
@@ -274,6 +276,8 @@ export const checkIn = pgTable(
 			.references(() => gymMember.id, { onDelete: 'cascade' }),
 		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
 		method: checkInMethod('method').notNull().default('manual'),
+		/** Set on guest visits — the check-in belongs to the member who brought them. */
+		guestName: text('guest_name'),
 		checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [

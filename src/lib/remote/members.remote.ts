@@ -8,6 +8,7 @@ import { appOrigin } from '#lib/server/email.ts';
 import {
 	announcementInput,
 	checkInInput,
+	guestVisitInput,
 	idSchema,
 	memberImportInput,
 	memberInput,
@@ -52,6 +53,13 @@ export const getTodayCheckIns = query(async () => {
 });
 export const recordCheckIn = command(checkInInput, async (input) => {
 	const r = await checkins.recordCheckIn(await requireOrg(), input);
+	void getTodayCheckIns().refresh();
+	void getMember(r.member.id).refresh();
+	return r;
+});
+
+export const logGuestVisit = command(guestVisitInput, async (input) => {
+	const r = await checkins.recordGuestVisit(await requireOrg(), input);
 	void getTodayCheckIns().refresh();
 	void getMember(r.member.id).refresh();
 	return r;

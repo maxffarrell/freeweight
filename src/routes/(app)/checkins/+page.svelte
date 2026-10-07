@@ -119,7 +119,11 @@
 				<Table.Body>
 					{#each checkIns as c (c.checkIn.id)}
 						<Table.Row>
-							<Table.Cell class="font-medium">{c.memberName}</Table.Cell>
+							<Table.Cell class="font-medium"
+								>{c.checkIn.guestName
+									? `${c.checkIn.guestName} (guest of ${c.memberName})`
+									: c.memberName}</Table.Cell
+							>
 							<Table.Cell class="text-muted-foreground"
 								>{localTime(c.checkIn.checkedAt, settings.timezone)}</Table.Cell
 							>

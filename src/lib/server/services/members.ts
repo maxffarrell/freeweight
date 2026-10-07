@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -72,7 +72,8 @@ export async function getMember(orgId: string, id: string) {
 			planName: plan.name,
 			amount: plan.amount,
 			interval: plan.interval,
-			isPack: plan.isPack
+			isPack: plan.isPack,
+			guestPasses: plan.guestPasses
 		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))
@@ -127,7 +128,31 @@ export async function getMember(orgId: string, id: string) {
 		.where(eq(waiver.memberId, id))
 		.orderBy(desc(waiver.signedAt))
 		.limit(1);
-	return { ...row, memberships, charges, payments, bookings, checkIns, credits, signedWaiver };
+
+	const activeMs = memberships.find((m) => m.membership.status === 'active');
+	const [guests] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, id),
+				isNotNull(checkIn.guestName),
+				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
+			)
+		);
+	return {
+		...row,
+		memberships,
+		charges,
+		payments,
+		bookings,
+		checkIns,
+		credits,
+		signedWaiver,
+		guestPasses: activeMs?.guestPasses ?? 0,
+		guestsUsed: guests?.n ?? 0
+	};
 }
 
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {
