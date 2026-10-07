@@ -324,6 +324,37 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Top referrers</Card.Title>
+			<Card.Description>Members whose referral links drove the most signups</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Body>
+					{#each r.referrers as m, i (m.memberId)}
+						<Table.Row>
+							<Table.Cell class="w-8 text-muted-foreground">{i + 1}</Table.Cell>
+							<Table.Cell>
+								<a
+									class="font-medium underline-offset-2 hover:underline"
+									href="/members/{m.memberId}">{m.name}</a
+								>
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{m.joins} joined</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell class="text-muted-foreground"
+								>No referred signups yet — members get their link in the portal.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
 </div>
 
 <Dialog.Root bind:open={emailOpen}>

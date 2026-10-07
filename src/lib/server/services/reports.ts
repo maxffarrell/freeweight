@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -162,6 +163,23 @@ async function topAttendees(orgId: string) {
 		.limit(10);
 }
 
+/** Members who brought in the most signups via their referral link (all time). */
+async function topReferrers(orgId: string) {
+	const referrer = alias(gymMember, 'referrer');
+	return db
+		.select({
+			memberId: referrer.id,
+			name: referrer.name,
+			joins: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(gymMember)
+		.innerJoin(referrer, eq(gymMember.referredByMemberId, referrer.id))
+		.where(and(eq(gymMember.organizationId, orgId), isNotNull(gymMember.referredByMemberId)))
+		.groupBy(referrer.id, referrer.name)
+		.orderBy(desc(sql`count(*)`), referrer.name)
+		.limit(10);
+}
+
 /** Check-ins by hour of day (gym timezone) over the last 90 days — staffing signal. */
 async function checkInsByHour(orgId: string) {
 	const [s] = await db
@@ -221,7 +239,7 @@ async function instructorStats(orgId: string) {
 }
 
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top, hours] =
+	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top, referrers, hours] =
 		await Promise.all([
 			checkInsByDay(orgId),
 			newMembersByMonth(orgId),
@@ -231,7 +249,19 @@ export async function getReports(orgId: string) {
 			atRiskMembers(orgId),
 			instructorStats(orgId),
 			topAttendees(orgId),
+			topReferrers(orgId),
 			checkInsByHour(orgId)
 		]);
-	return { checkIns, members, revenue, plans, fill, atRisk, instructors, top, hours };
+	return {
+		checkIns,
+		members,
+		revenue,
+		plans,
+		fill,
+		atRisk,
+		instructors,
+		top,
+		referrers,
+		hours
+	};
 }
