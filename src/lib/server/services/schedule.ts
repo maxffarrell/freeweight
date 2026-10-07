@@ -507,7 +507,7 @@ export async function updateSession(
 
 // ---------- Bookings ----------
 
-async function activeMembership(orgId: string, memberId: string) {
+export async function activeMembership(orgId: string, memberId: string) {
 	const [row] = await db
 		.select({
 			membership,
