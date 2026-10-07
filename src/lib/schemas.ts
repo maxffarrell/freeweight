@@ -302,6 +302,14 @@ export const availabilityInput = v.object({
 	)
 });
 
+/** Member's rating of a class they attended (portal). */
+export const sessionFeedbackInput = v.object({
+	sessionId: idSchema,
+	memberId: idSchema,
+	rating: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(5)),
+	comment: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)))
+});
+
 export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema,

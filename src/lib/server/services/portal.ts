@@ -9,6 +9,7 @@ import {
 	checkIn,
 	classSession,
 	classType,
+	sessionFeedback,
 	gymMember,
 	gymSettings,
 	location,
@@ -196,6 +197,7 @@ export async function portalOverview(memberId: string) {
 	const history = await db
 		.select({
 			booking,
+			sessionId: classSession.id,
 			startsAt: classSession.startsAt,
 			classTypeId: classSession.classTypeId,
 			className: classType.name,
@@ -208,6 +210,26 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(booking.memberId, memberId), lt(classSession.startsAt, now)))
 		.orderBy(desc(classSession.startsAt))
 		.limit(10);
+	// Ratings the member already gave on sessions in that history.
+	const fbRows = history.length
+		? await db
+				.select({
+					sessionId: sessionFeedback.sessionId,
+					rating: sessionFeedback.rating,
+					comment: sessionFeedback.comment
+				})
+				.from(sessionFeedback)
+				.where(
+					and(
+						eq(sessionFeedback.memberId, memberId),
+						inArray(
+							sessionFeedback.sessionId,
+							history.map((h) => h.sessionId)
+						)
+					)
+				)
+		: [];
+	const feedback = Object.fromEntries(fbRows.map((f) => [f.sessionId, f]));
 	return {
 		member: m,
 		settings,
@@ -217,6 +239,7 @@ export async function portalOverview(memberId: string) {
 		openCharges,
 		payments,
 		history,
+		feedback,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		calendarToken: calendarToken(memberId),
@@ -287,6 +310,45 @@ async function attendanceStats(orgId: string, memberId: string, tz: string) {
  * Records a member's signature for the workspace's current waiver text.
  * Re-signing replaces the stored snapshot (staff edits warrant a fresh agreement).
  */
+/** Portal: rate a class the member attended — upserts their one rating per session. */
+export async function submitSessionFeedback(
+	orgId: string,
+	memberId: string,
+	sessionId: string,
+	rating: number,
+	comment?: string
+) {
+	const [attended] = await db
+		.select({ id: booking.id })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				eq(booking.sessionId, sessionId),
+				eq(booking.status, 'attended')
+			)
+		)
+		.limit(1);
+	if (!attended) error(403, 'You can only rate classes you attended');
+	const [row] = await db
+		.insert(sessionFeedback)
+		.values({
+			organizationId: orgId,
+			sessionId,
+			memberId,
+			rating,
+			comment: comment ?? ''
+		})
+		.onConflictDoUpdate({
+			target: [sessionFeedback.sessionId, sessionFeedback.memberId],
+			set: { rating, comment: comment ?? '', updatedAt: new Date() }
+		})
+		.returning();
+	return row;
+}
+
 export async function signWaiver(orgId: string, memberId: string) {
 	const [settings] = await db
 		.select({ waiver: gymSettings.waiver })

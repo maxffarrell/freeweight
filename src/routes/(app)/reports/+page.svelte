@@ -701,6 +701,63 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.ratings.byClass.length || r.ratings.byInstructor.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Class ratings — last 90 days</Card.Title>
+				<Card.Description>Member star ratings submitted in the portal</Card.Description>
+			</Card.Header>
+			<Card.Content class="grid gap-6 sm:grid-cols-2">
+				<div>
+					<p class="mb-2 text-xs font-medium text-muted-foreground uppercase">By class</p>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Class</Table.Head>
+								<Table.Head class="text-right">Avg</Table.Head>
+								<Table.Head class="text-right">Ratings</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each r.ratings.byClass as c (c.name)}
+								<Table.Row>
+									<Table.Cell class="font-medium">{c.name}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{c.avg.toFixed(1)}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{c.ratings}</Table.Cell>
+								</Table.Row>
+							{:else}
+								<Table.Row><Table.Cell colspan={3}>—</Table.Cell></Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</div>
+				<div>
+					<p class="mb-2 text-xs font-medium text-muted-foreground uppercase">By instructor</p>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Instructor</Table.Head>
+								<Table.Head class="text-right">Avg</Table.Head>
+								<Table.Head class="text-right">Ratings</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each r.ratings.byInstructor as i (i.name)}
+								<Table.Row>
+									<Table.Cell class="font-medium">{i.name}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{i.avg.toFixed(1)}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{i.ratings}</Table.Cell>
+								</Table.Row>
+							{:else}
+								<Table.Row><Table.Cell colspan={3}>—</Table.Cell></Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>

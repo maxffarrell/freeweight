@@ -9,6 +9,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 	import Trophy from '@lucide/svelte/icons/trophy';
+	import Star from '@lucide/svelte/icons/star';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { toast } from 'svelte-sonner';
@@ -52,7 +53,8 @@
 		addDependent,
 		getPortalAi,
 		aiWorkoutPlan,
-		redeemGiftCard
+		redeemGiftCard,
+		rateSession
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -70,6 +72,36 @@
 
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
+
+	let rateFor = $state<{ sessionId: string; className: string } | null>(null);
+	let rateValue = $state(0);
+	let rateComment = $state('');
+	let rateBusy = $state(false);
+
+	function openRate(h: { sessionId: string; className: string }) {
+		rateFor = { sessionId: h.sessionId, className: h.className };
+		const fb = d.feedback[h.sessionId];
+		rateValue = fb?.rating ?? 0;
+		rateComment = fb?.comment ?? '';
+	}
+
+	async function submitRating() {
+		if (!rateFor || !rateValue) return;
+		rateBusy = true;
+		try {
+			await rateSession({
+				memberId,
+				sessionId: rateFor.sessionId,
+				rating: rateValue,
+				comment: rateComment.trim() || undefined
+			});
+			toast.success('Thanks for the feedback!');
+			rateFor = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save rating'));
+		}
+		rateBusy = false;
+	}
 	const d = $derived(await getPortalOverview(memberId));
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -1468,6 +1500,20 @@
 						</p>
 					</div>
 					<div class="flex shrink-0 items-center gap-2">
+						{#if h.booking.status === 'attended'}
+							{#if d.feedback[h.sessionId]}
+								<Button
+									size="sm"
+									variant="ghost"
+									title="Update your rating"
+									onclick={() => openRate(h)}
+									><Star class="size-3.5 fill-amber-400 text-amber-400" />{d.feedback[h.sessionId]
+										.rating}</Button
+								>
+							{:else}
+								<Button size="sm" variant="ghost" onclick={() => openRate(h)}>Rate</Button>
+							{/if}
+						{/if}
 						{#if nextOfType(h.classTypeId)}
 							<Button
 								size="sm"
@@ -1711,5 +1757,35 @@
 				No open sessions to move into — full classes only take waitlist joins.
 			</p>
 		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root open={!!rateFor} onOpenChange={(o) => !o && (rateFor = null)}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Rate {rateFor?.className}</Dialog.Title>
+			<Dialog.Description>How was the class?</Dialog.Description>
+		</Dialog.Header>
+		<div class="flex items-center gap-1.5 py-2">
+			{#each [1, 2, 3, 4, 5] as n (n)}
+				<button
+					type="button"
+					class="rounded p-0.5 hover:scale-110"
+					aria-label="{n} star{n === 1 ? '' : 's'}"
+					onclick={() => (rateValue = n)}
+				>
+					<Star
+						class="size-8 {n <= rateValue
+							? 'fill-amber-400 text-amber-400'
+							: 'text-muted-foreground'}"
+					/>
+				</button>
+			{/each}
+		</div>
+		<Textarea placeholder="Anything to add? (optional)" maxlength={500} bind:value={rateComment} />
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (rateFor = null)}>Cancel</Button>
+			<Button onclick={submitRating} disabled={rateBusy || !rateValue}>Submit</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

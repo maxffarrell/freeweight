@@ -34,6 +34,7 @@ import {
 	payment,
 	plan,
 	resourceBooking,
+	sessionFeedback,
 	user,
 	waiver,
 	outer
@@ -786,6 +787,58 @@ async function byLocation(orgId: string) {
 	);
 }
 
+/** Member star ratings over the last 90 days — per class and per instructor. */
+async function classRatings(orgId: string) {
+	const since = new Date(Date.now() - 90 * 86_400_000);
+	const [byClass, byInstructor] = await Promise.all([
+		db
+			.select({
+				name: classType.name,
+				ratings: sql<number>`count(*)`.mapWith(Number),
+				avg: sql<number>`round(avg(${sessionFeedback.rating})::numeric, 2)`.mapWith(Number)
+			})
+			.from(sessionFeedback)
+			.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(and(eq(sessionFeedback.organizationId, orgId), gte(sessionFeedback.createdAt, since)))
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`)),
+		db
+			.select({
+				name: user.name,
+				ratings: sql<number>`count(*)`.mapWith(Number),
+				avg: sql<number>`round(avg(${sessionFeedback.rating})::numeric, 2)`.mapWith(Number)
+			})
+			.from(sessionFeedback)
+			.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+			.innerJoin(member, eq(classSession.instructorId, member.id))
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(and(eq(sessionFeedback.organizationId, orgId), gte(sessionFeedback.createdAt, since)))
+			.groupBy(user.name)
+			.orderBy(desc(sql`count(*)`))
+	]);
+	return { byClass, byInstructor };
+}
+
+/** Raw member-rating rows for the REST API — newest first, last 90 days. */
+export async function listSessionFeedback(orgId: string) {
+	const since = new Date(Date.now() - 90 * 86_400_000);
+	return db
+		.select({
+			feedback: sessionFeedback,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(sessionFeedback)
+		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(sessionFeedback.organizationId, orgId), gte(sessionFeedback.createdAt, since)))
+		.orderBy(desc(sessionFeedback.createdAt))
+		.limit(500);
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -814,7 +867,8 @@ export async function getReports(orgId: string) {
 		leads,
 		amenities,
 		staffShifts,
-		locations
+		locations,
+		ratings
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -845,7 +899,8 @@ export async function getReports(orgId: string) {
 			from: new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10),
 			to: new Date().toISOString().slice(0, 10)
 		}),
-		byLocation(orgId)
+		byLocation(orgId),
+		classRatings(orgId)
 	]);
 	return {
 		checkIns,
@@ -874,6 +929,7 @@ export async function getReports(orgId: string) {
 		leads,
 		amenities,
 		staffShifts,
-		locations
+		locations,
+		ratings
 	};
 }
