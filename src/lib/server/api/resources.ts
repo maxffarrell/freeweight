@@ -78,17 +78,47 @@ export const resources: Record<string, Resource> = {
 		delete: (ctx, id) => schedule.deleteTemplate(ctx, id)
 	},
 	bookings: {
-		description: 'Book a member into a session; PATCH cancels or sets attended/no_show',
-		list: async () => error(405, 'List bookings via GET /sessions/{id} roster'),
+		description:
+			'Bookings filtered by `?session=`, `?member=`, `?status=` (repeatable), and session time `?from=`/`?to=` (ISO dates, default next 14 days; max 200). POST books a member; PATCH cancels or sets attended/no_show',
+		list: (ctx, url) => {
+			const from = url.searchParams.get('from')
+				? new Date(`${url.searchParams.get('from')}T00:00:00Z`)
+				: new Date();
+			const to = url.searchParams.get('to')
+				? new Date(`${url.searchParams.get('to')}T00:00:00Z`)
+				: new Date(from.getTime() + 14 * 86400_000);
+			return schedule.listBookings(ctx.orgId, {
+				sessionId: url.searchParams.get('session') ?? undefined,
+				memberId: url.searchParams.get('member') ?? undefined,
+				status: url.searchParams.getAll('status'),
+				from,
+				to
+			});
+		},
 		create: { schema: s.bookingInput, run: (ctx, input) => schedule.bookSession(ctx, input) },
 		update: { schema: s.bookingUpdate, run: schedule.updateBooking as never }
 	},
 	check_ins: {
-		description: 'Front-desk check-ins (QR token or member id as `code`)',
-		list: async (ctx) => {
-			const since = new Date();
-			since.setHours(0, 0, 0, 0);
-			return checkins.listCheckIns(ctx.orgId, { since });
+		description:
+			'Front-desk check-ins (QR token or member id as `code`). List: `?from=`/`?to=` ISO dates (default today), `?member=`, `?inside=1` (still inside), `?q=` name search',
+		list: (ctx, url) => {
+			const since = url.searchParams.get('from')
+				? new Date(`${url.searchParams.get('from')}T00:00:00Z`)
+				: (() => {
+						const d = new Date();
+						d.setHours(0, 0, 0, 0);
+						return d;
+					})();
+			const until = url.searchParams.get('to')
+				? new Date(`${url.searchParams.get('to')}T00:00:00Z`)
+				: undefined;
+			return checkins.listCheckIns(ctx.orgId, {
+				since,
+				until,
+				q: url.searchParams.get('q') ?? undefined,
+				memberId: url.searchParams.get('member') ?? undefined,
+				inside: url.searchParams.get('inside') === '1'
+			});
 		},
 		create: { schema: s.checkInInput, run: checkins.recordCheckIn as never }
 	},

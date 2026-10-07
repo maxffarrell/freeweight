@@ -41,9 +41,12 @@
 			deskNote: string | null;
 		}[]
 	>([]);
-	let flash = $state<{ ok: boolean; text: string; photo?: string | null; note?: string | null } | null>(
-		null
-	);
+	let flash = $state<{
+		ok: boolean;
+		text: string;
+		photo?: string | null;
+		note?: string | null;
+	} | null>(null);
 	const initials = (name: string) =>
 		name
 			.split(/\s+/)
@@ -213,7 +216,8 @@
 								<span class="min-w-0">
 									<span class="block truncate font-medium">{m.name}</span>
 									{#if m.deskNote}
-										<span class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+										<span
+											class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
 											>{m.deskNote}</span
 										>
 									{/if}
