@@ -314,6 +314,12 @@ export const announcementInput = v.object({
 	planId: v.optional(idSchema)
 });
 
+export const scheduledAnnouncementInput = v.object({
+	...announcementInput.entries,
+	/** ISO timestamp to send at (client converts their local pick). */
+	sendAt: v.pipe(v.string(), v.isoTimestamp('Use a full ISO timestamp'))
+});
+
 export const memberNoteInput = v.object({
 	memberId: idSchema,
 	body: v.pipe(requiredText('Note'), v.maxLength(2000))

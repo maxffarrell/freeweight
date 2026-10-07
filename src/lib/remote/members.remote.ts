@@ -14,11 +14,14 @@ import {
 	memberInput,
 	memberNoteInput,
 	memberTagInput,
-	memberUpdate
+	memberUpdate,
+	scheduledAnnouncementInput
 } from '#lib/schemas.ts';
 import {
+	cancelScheduledAnnouncement,
 	countAnnouncementAudience,
 	listRecentAnnouncements,
+	scheduleAnnouncement,
 	sendAnnouncement,
 	sendAnnouncementTest
 } from '#lib/server/services/notifications.ts';
@@ -142,6 +145,26 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 	);
 	void getRecentAnnouncements().refresh();
 	return r;
+});
+
+/** Queues the draft for a future send time — the cron delivers it. */
+export const scheduleEmail = command(scheduledAnnouncementInput, async (input) => {
+	const ctx = await requireOrg();
+	const r = await scheduleAnnouncement(ctx.orgId, ctx.userId, {
+		subject: input.subject,
+		message: input.message,
+		sendAt: new Date(input.sendAt),
+		tag: input.tag,
+		planId: input.planId
+	});
+	void getRecentAnnouncements().refresh();
+	return r;
+});
+
+/** Deletes a queued announcement before the cron sends it. */
+export const cancelScheduledEmail = command(idSchema, async (id) => {
+	await cancelScheduledAnnouncement((await requireOrg()).orgId, id);
+	void getRecentAnnouncements().refresh();
 });
 
 // ------- member notes -------
