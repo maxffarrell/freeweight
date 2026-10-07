@@ -394,6 +394,43 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">No-show rate by class</Card.Title>
+			<Card.Description>Bookings that flaked, sessions in the last 90 days</Card.Description>
+		</Card.Header>
+		<Card.Content class="px-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Class</Table.Head>
+						<Table.Head class="text-right">Attended</Table.Head>
+						<Table.Head class="text-right">No-shows</Table.Head>
+						<Table.Head class="text-right">Rate</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.noShows as c (c.className)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{c.className}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.attended}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.noShows}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums {c.rate >= 20 ? 'text-destructive' : ''}"
+								>{c.rate}%</Table.Cell
+							>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={4} class="text-muted-foreground"
+								>No concluded bookings in the last 90 days.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Fill by weekday</Card.Title>
 			<Card.Description>Booked vs capacity per day, sessions in the last 90 days</Card.Description>
 		</Card.Header>
