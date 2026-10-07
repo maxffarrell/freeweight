@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } 
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
+	activity,
 	booking,
 	charge,
 	checkIn,
@@ -85,6 +86,51 @@ async function memberGrowthByMonth(orgId: string) {
 		joined: joinedBy.get(month) ?? 0,
 		cancelled: cancelledBy.get(month) ?? 0
 	}));
+}
+
+/**
+ * Leads captured through the join-page lead form (`member.lead` activity events)
+ * over the last 6 months, and how many now hold an active membership.
+ */
+async function leadStats(orgId: string) {
+	const since = new Date();
+	since.setUTCMonth(since.getUTCMonth() - 6);
+	const rows = await db
+		.select({ memberId: activity.entityId, at: activity.createdAt })
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'member'),
+				eq(activity.action, 'lead'),
+				gte(activity.createdAt, since)
+			)
+		);
+	const memberIds = [...new Set(rows.map((r) => r.memberId))];
+	const converted = memberIds.length
+		? await db
+				.selectDistinct({ id: membership.memberId })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, orgId),
+						eq(membership.status, 'active'),
+						inArray(membership.memberId, memberIds)
+					)
+				)
+		: [];
+	const byMonth = new Map<string, number>();
+	for (const r of rows) {
+		const m = r.at.toISOString().slice(0, 7);
+		byMonth.set(m, (byMonth.get(m) ?? 0) + 1);
+	}
+	return {
+		total: memberIds.length,
+		converted: converted.length,
+		byMonth: [...byMonth]
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([month, leads]) => ({ month, leads }))
+	};
 }
 
 /** Collected revenue per month for the last 12 months. */
@@ -625,7 +671,8 @@ export async function getReports(orgId: string) {
 		payrollDetail,
 		churn,
 		noShows,
-		events
+		events,
+		leads
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -649,7 +696,8 @@ export async function getReports(orgId: string) {
 		instructorPayrollDetail(orgId),
 		churnReasons(orgId),
 		noShowByClass(orgId),
-		eventStats(orgId)
+		eventStats(orgId),
+		leadStats(orgId)
 	]);
 	return {
 		checkIns,
@@ -674,6 +722,7 @@ export async function getReports(orgId: string) {
 		payrollDetail,
 		churn,
 		noShows,
-		events
+		events,
+		leads
 	};
 }

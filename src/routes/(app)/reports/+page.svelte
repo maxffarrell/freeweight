@@ -27,6 +27,7 @@
 	const maxMethodTotal = Math.max(1, ...r.methods.map((m) => m.total));
 	const maxKindTotal = Math.max(1, ...r.kinds.map((k) => k.total));
 	const maxSourceJoins = Math.max(1, ...r.sources.map((s) => s.joins));
+	const maxLeadMonth = Math.max(1, ...r.leads.byMonth.map((x) => x.leads));
 	const KIND_LABELS: Record<string, string> = {
 		membership: 'Membership',
 		signup: 'Signup fee',
@@ -685,6 +686,34 @@
 				</div>
 			{:else}
 				<p class="text-sm text-muted-foreground">No signups yet.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Leads</Card.Title>
+			<Card.Description
+				>Join-page lead form captures — last 6 months, {r.leads.converted} of {r.leads.total}
+				joined ({r.leads.total
+					? Math.round((r.leads.converted / r.leads.total) * 100)
+					: 0}%)</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each r.leads.byMonth as m (m.month)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-20 shrink-0">{m.month}</span>
+					<div
+						class="h-4 rounded bg-emerald-500/70"
+						style="width: {(m.leads / maxLeadMonth) * 70}%"
+					></div>
+					<span class="tabular-nums">{m.leads}</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">
+					No leads captured yet — the "leave your info" form lives on the join page.
+				</p>
 			{/each}
 		</Card.Content>
 	</Card.Root>
