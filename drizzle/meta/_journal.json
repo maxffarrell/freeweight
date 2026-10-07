@@ -386,6 +386,13 @@
       "when": 1791389393363,
       "tag": "0054_first-class-free",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791389882731,
+      "tag": "0055_instructor-time-off",
+      "breakpoints": true
     }
   ]
 }

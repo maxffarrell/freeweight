@@ -325,6 +325,23 @@ export const closure = pgTable(
 	(t) => [uniqueIndex('closure_org_date_idx').on(t.organizationId, t.date)]
 );
 
+/** An instructor's approved time-off window (inclusive org-local dates). */
+export const instructorTimeOff = pgTable(
+	'instructor_time_off',
+	{
+		id: id(),
+		organizationId: orgId(),
+		instructorId: text('instructor_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		startDate: date('start_date', { mode: 'string' }).notNull(),
+		endDate: date('end_date', { mode: 'string' }).notNull(),
+		note: text('note').notNull().default(''),
+		...timestamps
+	},
+	(t) => [index('instructor_time_off_member_idx').on(t.instructorId)]
+);
+
 /** Recurring rule — "Tuesdays at 6pm". The cron materializes sessions ~2 weeks ahead. */
 export const classTemplate = pgTable(
 	'class_template',

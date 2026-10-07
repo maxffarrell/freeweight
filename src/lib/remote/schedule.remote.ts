@@ -19,7 +19,8 @@ import {
 	sessionInput,
 	sessionUpdate,
 	templateInput,
-	templateUpdate
+	templateUpdate,
+	timeOffInput
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
@@ -87,7 +88,23 @@ export const getInstructorConflicts = query(instructorConflictInput, async (inpu
 		start: d,
 		end: new Date(d.getTime() + input.durationMin * 60_000)
 	}));
-	return svc.instructorConflicts(orgId, input.instructorId, intervals, input.excludeSessionId);
+	const [sessions, offs] = await Promise.all([
+		svc.instructorConflicts(orgId, input.instructorId, intervals, input.excludeSessionId),
+		svc.instructorTimeOffConflicts(orgId, input.instructorId, intervals, tzName)
+	]);
+	return [
+		...sessions.map((s) => ({ ...s, kind: 'session' as const })),
+		...offs
+			.map((o) => ({
+				id: `off-${o.startDate}`,
+				startsAt: zonedToUtc(`${o.startDate}T00:00`, tzName),
+				endsAt: zonedToUtc(`${o.endDate}T00:00`, tzName),
+				className: `Time off${o.note ? ` — ${o.note}` : ''}`,
+				kind: 'off' as const
+			}))
+			.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+			.slice(0, 6)
+	];
 });
 export const createSession = command(sessionInput, async (input) => {
 	const s = await svc.createSession(await requireOrg(), await tz(), input);
@@ -192,6 +209,16 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 
 /** The instructor's own upcoming sessions — powers the "My classes" page. */
 export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));
+export const getTimeOff = query(async () => svc.myTimeOff(await requireOrg()));
+export const addTimeOff = command(timeOffInput, async (input) => {
+	const r = await svc.addTimeOff(await requireOrg(), input);
+	void Promise.all([getTimeOff().refresh(), getMyClasses().refresh()]);
+	return r;
+});
+export const removeTimeOff = command(idSchema, async (id) => {
+	await svc.removeTimeOff(await requireOrg(), id);
+	void getTimeOff().refresh();
+});
 
 /** Org-wide open cover requests — the "Needs cover" card on My classes. */
 export const getCoverNeeded = query(async () => svc.sessionsNeedingCover(await requireOrg()));

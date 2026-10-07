@@ -8,8 +8,12 @@
 		getMyClasses,
 		updateSession,
 		getCoverNeeded,
-		claimCover
+		claimCover,
+		getTimeOff,
+		addTimeOff,
+		removeTimeOff
 	} from '#lib/remote/schedule.remote.ts';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
@@ -18,6 +22,36 @@
 	const tz = settings.timezone;
 	const classes = await getMyClasses();
 	const cover = $derived(await getCoverNeeded());
+	const timeOff = $derived(await getTimeOff());
+	let offStart = $state('');
+	let offEnd = $state('');
+	let offNote = $state('');
+	let offBusy = $state(false);
+
+	async function addOff(e: SubmitEvent) {
+		e.preventDefault();
+		offBusy = true;
+		try {
+			await addTimeOff({
+				startDate: offStart,
+				endDate: offEnd || offStart,
+				note: offNote.trim() || undefined
+			});
+			toast.success('Time off added — conflicting sessions are flagged for cover');
+			offStart = offEnd = offNote = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+		offBusy = false;
+	}
+	async function removeOff(id: string) {
+		try {
+			await removeTimeOff(id);
+			toast.success('Removed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
+	}
 	let toggling = $state<string | null>(null);
 	let claiming = $state<string | null>(null);
 
@@ -98,6 +132,48 @@
 					</Button>
 				</div>
 			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Time off</Card.Title>
+			<Card.Description>
+				Dates you're away — your sessions then get flagged "needs cover" automatically.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3 px-6 pb-4">
+			{#if timeOff.length === 0}
+				<p class="text-sm text-muted-foreground">No time off planned.</p>
+			{/if}
+			{#each timeOff as o (o.id)}
+				<div class="flex items-center gap-3">
+					<span class="text-sm">
+						{o.startDate} → {o.endDate}{#if o.note}
+							· <span class="text-muted-foreground">{o.note}</span>{/if}
+					</span>
+					<Button variant="ghost" size="sm" class="ml-auto" onclick={() => removeOff(o.id)}
+						>Remove</Button
+					>
+				</div>
+			{/each}
+			<form class="flex flex-wrap items-end gap-3 pt-1" onsubmit={addOff}>
+				<div class="space-y-1">
+					<label for="off-start" class="text-xs text-muted-foreground">From</label>
+					<Input id="off-start" type="date" required bind:value={offStart} />
+				</div>
+				<div class="space-y-1">
+					<label for="off-end" class="text-xs text-muted-foreground">Until</label>
+					<Input id="off-end" type="date" min={offStart} bind:value={offEnd} />
+				</div>
+				<Input
+					class="min-w-36 flex-1"
+					placeholder="Note (optional)"
+					maxlength={120}
+					bind:value={offNote}
+				/>
+				<Button type="submit" disabled={offBusy}>Add</Button>
+			</form>
 		</Card.Content>
 	</Card.Root>
 
