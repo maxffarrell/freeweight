@@ -15,7 +15,8 @@ import {
 	seriesBookingInput,
 	sessionInput,
 	sessionUpdate,
-	templateInput
+	templateInput,
+	templateUpdate
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 
@@ -110,6 +111,9 @@ export const getInstructors = query(async () => svc.listInstructors((await requi
 export const getTemplates = query(async () => svc.listTemplates((await requireOrg()).orgId));
 export const createTemplate = command(templateInput, async (input) =>
 	svc.createTemplate(await requireOrg(), input)
+);
+export const updateTemplate = command(templateUpdate, async (input) =>
+	svc.updateTemplate(await requireOrg(), input)
 );
 export const deleteTemplate = command(idSchema, async (id) =>
 	svc.deleteTemplate(await requireOrg(), id)

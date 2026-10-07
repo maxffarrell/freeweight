@@ -26,6 +26,7 @@
 		getInstructors,
 		getTemplates,
 		createTemplate,
+		updateTemplate,
 		deleteTemplate,
 		emailSessionRoster,
 		copyWeek
@@ -41,6 +42,7 @@
 	import Printer from '@lucide/svelte/icons/printer';
 	import Mail from '@lucide/svelte/icons/mail';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -257,21 +259,41 @@
 	let tplWeekday = $state('1');
 	let tplTime = $state('06:00');
 	let tplCapacity = $state<number | null>(null);
+	let editTplId = $state<string | null>(null);
+	function editTemplate(t: (typeof templates)[number]) {
+		editTplId = t.template.id;
+		tplTypeId = t.template.classTypeId;
+		tplWeekday = String(t.template.weekday);
+		tplTime = t.template.startTime;
+		tplCapacity = t.template.capacity;
+	}
 	async function submitTemplate(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
-			await createTemplate({
-				classTypeId: tplTypeId,
-				weekday: Number(tplWeekday),
-				startTime: tplTime,
-				capacity: tplCapacity ?? null
-			});
-			toast.success('Recurring template added — sessions generated 2 weeks out');
+			if (editTplId) {
+				await updateTemplate({
+					id: editTplId,
+					classTypeId: tplTypeId,
+					weekday: Number(tplWeekday),
+					startTime: tplTime,
+					capacity: tplCapacity ?? null
+				});
+				toast.success('Template updated — applies to future sessions');
+				editTplId = null;
+			} else {
+				await createTemplate({
+					classTypeId: tplTypeId,
+					weekday: Number(tplWeekday),
+					startTime: tplTime,
+					capacity: tplCapacity ?? null
+				});
+				toast.success('Recurring template added — sessions generated 2 weeks out');
+			}
 			await getTemplates().refresh();
 			await reload();
 		} catch (err) {
-			toast.error(errMsg(err, 'Could not add'));
+			toast.error(errMsg(err, 'Could not save'));
 		}
 		pending = false;
 	}
@@ -979,7 +1001,20 @@
 					</Field.Label>
 					<Input id="tpl-cap" type="number" min={1} bind:value={tplCapacity} />
 				</Field.Field>
-				<Button type="submit" disabled={pending || !tplTypeId}>Add template</Button>
+				<Button type="submit" disabled={pending || !tplTypeId}>
+					{editTplId ? 'Save changes' : 'Add template'}
+				</Button>
+				{#if editTplId}
+					<Button
+						type="button"
+						variant="ghost"
+						onclick={() => {
+							editTplId = null;
+							tplTypeId = '';
+							tplCapacity = null;
+						}}>Cancel edit</Button
+					>
+				{/if}
 			</div>
 		</form>
 		{#if templates.length}
@@ -995,12 +1030,20 @@
 									: ''}{t.template.capacity ? ` · ${t.template.capacity} seats` : ''}
 							</span>
 						</div>
-						<Button
-							variant="ghost"
-							size="icon"
-							class="h-7 w-7 text-muted-foreground"
-							onclick={() => removeTemplate(t.template.id)}><Trash2 class="h-4 w-4" /></Button
-						>
+						<div class="flex gap-1">
+							<Button
+								variant="ghost"
+								size="icon"
+								class="h-7 w-7 text-muted-foreground"
+								onclick={() => editTemplate(t)}><Pencil class="h-4 w-4" /></Button
+							>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="h-7 w-7 text-muted-foreground"
+								onclick={() => removeTemplate(t.template.id)}><Trash2 class="h-4 w-4" /></Button
+							>
+						</div>
 					</div>
 				{/each}
 			</div>
