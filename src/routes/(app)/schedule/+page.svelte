@@ -319,6 +319,7 @@
 	let tDropIn = $state('');
 	let tPayRate = $state('');
 	let tMinEnroll = $state<number | null>(null);
+	let tBookCutoff = $state<number | null>(null);
 	let tDescription = $state('');
 	let tActive = $state(true);
 	function editType(c: (typeof classTypes)[number]) {
@@ -331,6 +332,7 @@
 		tDropIn = c.dropInPrice != null ? (c.dropInPrice / 100).toFixed(2) : '';
 		tPayRate = c.payRate != null ? (c.payRate / 100).toFixed(2) : '';
 		tMinEnroll = c.minEnrollment;
+		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
 	}
 	function resetTypeForm() {
@@ -342,6 +344,7 @@
 		tDropIn = '';
 		tPayRate = '';
 		tMinEnroll = null;
+		tBookCutoff = null;
 		tActive = true;
 	}
 	async function submitType(e: SubmitEvent) {
@@ -356,6 +359,7 @@
 				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : null,
 				payRate: tPayRate ? Math.round(parseFloat(tPayRate) * 100) : null,
 				minEnrollment: tMinEnroll,
+				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
 				active: tActive
 			};
@@ -973,6 +977,22 @@
 				/>
 				<Field.Description>
 					Sessions booked below this are cancelled the day before — booked members get an email.
+				</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-book-cutoff">
+					Booking cutoff (min) <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-book-cutoff"
+					type="number"
+					min={0}
+					bind:value={tBookCutoff}
+					placeholder="Gym-wide setting"
+				/>
+				<Field.Description>
+					Member bookings close this many minutes before start — overrides the gym-wide cutoff for
+					this class (e.g. sauna needs 12h lead).
 				</Field.Description>
 			</Field.Field>
 			{#if editTypeId}

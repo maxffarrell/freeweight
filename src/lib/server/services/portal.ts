@@ -347,8 +347,9 @@ export async function memberBook(
 ) {
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
-		.select({ startsAt: classSession.startsAt })
+		.select({ startsAt: classSession.startsAt, classCutoff: classType.bookCutoffMin })
 		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
@@ -357,8 +358,9 @@ export async function memberBook(
 		s.startsAt.getTime() > Date.now() + bookingWindowDays * 86400_000
 	)
 		error(409, `Bookings open ${bookingWindowDays} days ahead`);
-	if (bookCutoffMin != null && s.startsAt.getTime() - Date.now() < bookCutoffMin * 60_000)
-		error(409, `Booking closes ${bookCutoffMin} minutes before class`);
+	const cutoff = s.classCutoff ?? bookCutoffMin;
+	if (cutoff != null && s.startsAt.getTime() - Date.now() < cutoff * 60_000)
+		error(409, `Booking closes ${cutoff} minutes before class`);
 	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, opts);
 }
 

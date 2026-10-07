@@ -289,6 +289,8 @@ export const classType = pgTable(
 		payRate: integer('pay_rate'),
 		/** Cron cancels sessions booked below this the day before; null = never auto-cancel. */
 		minEnrollment: integer('min_enrollment'),
+		/** Minutes before start that member booking closes; null = the gym-wide setting. */
+		bookCutoffMin: integer('book_cutoff_min'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
