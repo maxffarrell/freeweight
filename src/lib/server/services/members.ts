@@ -237,7 +237,8 @@ export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			locationId: input.locationId ?? null,
 			status: input.status,
 			notes: input.notes ?? null,
-			joinedAt: input.joinedAt ?? null
+			joinedAt: input.joinedAt ?? null,
+			birthday: input.birthday ?? null
 		})
 		.returning();
 	await emit({
@@ -312,7 +313,8 @@ export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			locationId: set.locationId,
 			status: set.status,
 			notes: set.notes,
-			joinedAt: set.joinedAt
+			joinedAt: set.joinedAt,
+			birthday: set.birthday
 		})
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, id)))
 		.returning();

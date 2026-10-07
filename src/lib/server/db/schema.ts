@@ -110,6 +110,7 @@ export const gymMember = pgTable(
 		/** Set via the signed /unsubscribe link in member-facing emails. */
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		joinedAt: date('joined_at', { mode: 'string' }),
+		birthday: date('birthday', { mode: 'string' }),
 		...timestamps
 	},
 	(t) => [

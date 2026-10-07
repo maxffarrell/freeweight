@@ -155,6 +155,7 @@
 	let email = $state(m.member.email ?? '');
 	let phone = $state(m.member.phone ?? '');
 	let status = $state<'active' | 'inactive'>(m.member.status);
+	let birthday = $state(m.member.birthday ?? '');
 	let pending = $state(false);
 	async function saveMember(e: SubmitEvent) {
 		e.preventDefault();
@@ -165,7 +166,8 @@
 				name,
 				email: email || undefined,
 				phone: phone || undefined,
-				status
+				status,
+				birthday: birthday || null
 			});
 			toast.success('Member updated');
 			editOpen = false;
@@ -337,6 +339,11 @@
 						</span>
 					</div>
 				{/if}
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Birthday</span><span
+						>{m.member.birthday ? formatDate(m.member.birthday) : '—'}</span
+					>
+				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Waiver</span>
 					<span
@@ -771,6 +778,13 @@
 				><Field.Label for="e-phone">Phone</Field.Label><Input
 					id="e-phone"
 					bind:value={phone}
+				/></Field.Field
+			>
+			<Field.Field
+				><Field.Label for="e-birthday">Birthday (optional)</Field.Label><Input
+					id="e-birthday"
+					type="date"
+					bind:value={birthday}
 				/></Field.Field
 			>
 			<Field.Field>

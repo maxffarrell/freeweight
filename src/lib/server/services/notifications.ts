@@ -381,6 +381,48 @@ export async function sendTrialEndingNotices(orgId: string) {
 	return sent;
 }
 
+/**
+ * "Happy birthday" to members whose birthday is today in the gym's timezone.
+ * One email per member per year (logOnce 'birthday', memberId:year).
+ */
+export async function sendBirthdayGreetings(orgId: string) {
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	const mmdd = today.slice(5);
+	const year = today.slice(0, 4);
+	const rows = await db
+		.select({ memberId: gymMember.id, email: gymMember.email, memberName: gymMember.name })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`to_char(${gymMember.birthday}, 'MM-DD') = ${mmdd}`
+			)
+		);
+	if (!rows.length) return 0;
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email) continue;
+		if (!(await logOnce(orgId, 'birthday', `${r.memberId}:${year}`, r.email))) continue;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Happy birthday, ${r.memberName.split(' ')[0]}!`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Happy birthday!',
+				lines: [
+					`Hi ${r.memberName} — everyone at ${name} is wishing you a great birthday.`,
+					'See you at the gym — first workout of the year is on you.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
 /** "You just referred someone" to the member behind a ?ref= join. One email per referred member. */
 export async function notifyReferralJoin(orgId: string, referrerId: string, newMemberId: string) {
 	const [[referrer], [joined]] = await Promise.all([

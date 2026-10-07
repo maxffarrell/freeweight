@@ -53,6 +53,7 @@
 	let email = $state('');
 	let phone = $state('');
 	let status = $state<'active' | 'inactive'>('active');
+	let birthday = $state('');
 
 	// ------- csv import -------
 	let importOpen = $state(false);
@@ -121,11 +122,12 @@
 				name,
 				email: email || undefined,
 				phone: phone || undefined,
-				status
+				status,
+				birthday: birthday || null
 			});
 			toast.success('Member added');
 			open = false;
-			name = email = phone = '';
+			name = email = phone = birthday = '';
 			await refilter();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add member'));
@@ -286,6 +288,10 @@
 						<Select.Item value="inactive">inactive</Select.Item>
 					</Select.Content>
 				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="n-birthday">Birthday (optional)</Field.Label>
+				<Input id="n-birthday" type="date" bind:value={birthday} />
 			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Adding…' : 'Add member'}</Button>

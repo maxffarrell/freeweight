@@ -33,7 +33,8 @@ export const memberInput = v.object({
 	locationId: v.optional(v.nullable(idSchema)),
 	status: v.optional(v.picklist(memberStatuses), 'active'),
 	notes: optionalText,
-	joinedAt: v.optional(v.nullable(isoDate))
+	joinedAt: v.optional(v.nullable(isoDate)),
+	birthday: v.optional(v.nullable(isoDate))
 });
 export const memberImportRow = v.object({
 	name: requiredText('Name'),

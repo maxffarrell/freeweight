@@ -1,0 +1,1 @@
+ALTER TABLE "gym_member" ADD COLUMN "birthday" date;
