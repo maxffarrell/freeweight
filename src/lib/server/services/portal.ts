@@ -196,6 +196,7 @@ export async function portalOverview(memberId: string) {
 		.select({
 			booking,
 			startsAt: classSession.startsAt,
+			classTypeId: classSession.classTypeId,
 			className: classType.name,
 			locationName: location.name
 		})

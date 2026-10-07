@@ -228,6 +228,27 @@
 		}
 		busy = null;
 	}
+	async function rebook(classTypeId: string) {
+		const next = bookable.find((b) => b.session.classTypeId === classTypeId && !b.myStatus);
+		if (!next) {
+			toast.error('No upcoming sessions');
+			return;
+		}
+		busy = `rebook:${classTypeId}`;
+		try {
+			const b = await memberBook({ memberId, sessionId: next.session.id });
+			toast.success(
+				b.status === 'waitlisted'
+					? 'Class full — you are on the waitlist'
+					: `Booked ${next.className} ${localDate(next.session.startsAt, tz)}`
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book'));
+		}
+		busy = null;
+	}
+	const nextOfType = (classTypeId: string) =>
+		bookable.find((b) => b.session.classTypeId === classTypeId && !b.myStatus);
 	async function bookSeriesAll(classTypeId: string, className: string) {
 		if (!confirm(`Book into every upcoming ${className} session?`)) return;
 		busy = `series:${classTypeId}`;
@@ -848,7 +869,18 @@
 								· {h.locationName}{/if}
 						</p>
 					</div>
-					<StatusBadge status={h.booking.status} />
+					<div class="flex shrink-0 items-center gap-2">
+						{#if nextOfType(h.classTypeId)}
+							<Button
+								size="sm"
+								variant="ghost"
+								title={`Book the next ${h.className}`}
+								disabled={busy === `rebook:${h.classTypeId}`}
+								onclick={() => rebook(h.classTypeId)}>Again</Button
+							>
+						{/if}
+						<StatusBadge status={h.booking.status} />
+					</div>
 				</div>
 			{:else}
 				<p class="py-2 text-sm text-muted-foreground">No classes yet.</p>
