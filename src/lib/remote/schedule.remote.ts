@@ -251,6 +251,9 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));
 export const getTimeOff = query(async () => svc.myTimeOff(await requireOrg()));
 export const getAvailability = query(async () => svc.myAvailability(await requireOrg()));
+
+/** The instructor's own class ratings — "Your ratings" card on My classes. */
+export const getMyRatings = query(async () => svc.myRatings(await requireOrg()));
 export const setAvailability = command(availabilityInput, async (input) => {
 	const r = await svc.setAvailability(await requireOrg(), input);
 	void getAvailability().refresh();
