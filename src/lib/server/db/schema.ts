@@ -62,6 +62,8 @@ export const gymSettings = pgTable('gym_settings', {
 	bookingWindowDays: integer('booking_window_days'),
 	/** Members can't cancel a class within this many minutes of start; null = anytime. */
 	cancelCutoffMin: integer('cancel_cutoff_min'),
+	/** Portal bookings close this many minutes before start; null = bookable until start. */
+	bookCutoffMin: integer('book_cutoff_min'),
 	/** Stop promoting waitlisted members within this many minutes of start; null/0 = always promote. */
 	waitlistCutoffMin: integer('waitlist_cutoff_min'),
 	/** Max sessions a member may hold bookings for on a single local day; null = unlimited. */

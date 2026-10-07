@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "book_cutoff_min" integer;

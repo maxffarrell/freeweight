@@ -325,12 +325,14 @@ export async function memberBook(
 		.from(classSession)
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
-	const { bookingWindowDays } = await bookingRules(orgId);
+	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
 	if (
 		bookingWindowDays != null &&
 		s.startsAt.getTime() > Date.now() + bookingWindowDays * 86400_000
 	)
 		error(409, `Bookings open ${bookingWindowDays} days ahead`);
+	if (bookCutoffMin != null && s.startsAt.getTime() - Date.now() < bookCutoffMin * 60_000)
+		error(409, `Booking closes ${bookCutoffMin} minutes before class`);
 	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId);
 }
 
@@ -357,12 +359,20 @@ async function bookingRules(orgId: string) {
 	const [st] = await db
 		.select({
 			bookingWindowDays: gymSettings.bookingWindowDays,
+			bookCutoffMin: gymSettings.bookCutoffMin,
 			cancelCutoffMin: gymSettings.cancelCutoffMin,
 			lateCancelFee: gymSettings.lateCancelFee
 		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
-	return st ?? { bookingWindowDays: null, cancelCutoffMin: null, lateCancelFee: null };
+	return (
+		st ?? {
+			bookingWindowDays: null,
+			bookCutoffMin: null,
+			cancelCutoffMin: null,
+			lateCancelFee: null
+		}
+	);
 }
 
 /** Starts a provider checkout for the member's full open balance. */

@@ -204,6 +204,13 @@
       "when": 1791363834568,
       "tag": "0028_flashy_ezekiel_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791364432614,
+      "tag": "0029_cultured_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

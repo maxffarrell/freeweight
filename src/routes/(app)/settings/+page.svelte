@@ -63,6 +63,7 @@
 	let waiver = $state(settings.waiver);
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
+	let bookCutoffMin = $state<number | null>(settings.bookCutoffMin);
 	let waitlistCutoffMin = $state<number | null>(settings.waitlistCutoffMin);
 	let maxBookingsPerDay = $state<number | null>(settings.maxBookingsPerDay);
 	let noShowFee = $state<number | null>(settings.noShowFee);
@@ -85,6 +86,7 @@
 				waiver,
 				bookingWindowDays,
 				cancelCutoffMin,
+				bookCutoffMin,
 				waitlistCutoffMin,
 				maxBookingsPerDay,
 				noShowFee,
@@ -299,6 +301,16 @@
 									min={0}
 									bind:value={cancelCutoffMin}
 									placeholder="Any time"
+								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="bcutoff">Booking cutoff (minutes)</Field.Label>
+								<Input
+									id="bcutoff"
+									type="number"
+									min={0}
+									bind:value={bookCutoffMin}
+									placeholder="Bookable until class starts"
 								/>
 							</Field.Field>
 							<Field.Field>
