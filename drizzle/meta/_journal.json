@@ -547,6 +547,13 @@
       "when": 1791410634715,
       "tag": "0077_early_cancel_fee",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1791411271966,
+      "tag": "0078_low_stock_alerts",
+      "breakpoints": true
     }
   ]
 }

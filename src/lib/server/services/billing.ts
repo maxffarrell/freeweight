@@ -30,6 +30,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import {
 	notifyChargePosted,
+	notifyLowStock,
 	notifyMembershipCancelled,
 	notifyMembershipResumed,
 	notifyMembershipSuspended,
@@ -802,7 +803,8 @@ export async function createShopItem(
 			organizationId: ctx.orgId,
 			name: input.name,
 			price: input.price,
-			stock: input.stock ?? null
+			stock: input.stock ?? null,
+			lowStockAt: input.lowStockAt ?? null
 		})
 		.returning();
 	return row;
@@ -863,11 +865,15 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 			reference: null,
 			notes: `Shop sale: ${item.name}`
 		});
-	if (item.stock !== null)
+	if (item.stock !== null) {
 		await db
 			.update(shopItem)
 			.set({ stock: sql`${shopItem.stock} - ${input.qty}` })
 			.where(and(eq(shopItem.id, item.id), eq(shopItem.organizationId, ctx.orgId)));
+		const left = item.stock - input.qty;
+		if (item.lowStockAt !== null && left <= item.lowStockAt)
+			notifyLowStock(ctx.orgId, item.id, left).catch(() => {});
+	}
 	return { charge: c, paid: input.payNow };
 }
 
