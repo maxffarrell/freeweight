@@ -1,0 +1,1 @@
+ALTER TABLE "plan" ADD COLUMN "early_cancel_fee_cents" integer;

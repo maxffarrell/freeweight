@@ -2809,3 +2809,48 @@ export async function notifyLowRating(orgId: string, sessionId: string, memberId
 		});
 	}
 }
+
+/**
+ * "Your membership is cancelled" confirmation to the member on a staff cancel.
+ * Mentions the early-termination fee when one posted. Deduped per membership.
+ */
+export async function notifyMembershipCancelled(
+	orgId: string,
+	membershipId: string,
+	earlyFeeCents = 0
+) {
+	const [row] = await db
+		.select({
+			memberId: membership.memberId,
+			memberName: gymMember.name,
+			memberEmail: gymMember.email,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
+	if (!row?.memberEmail) return;
+	if (!(await logOnce(orgId, 'membership_cancelled', membershipId, row.memberEmail))) return;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(row.memberId, {
+		to: row.memberEmail,
+		subject: `Membership cancelled — ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: 'Your membership is cancelled',
+			lines: [
+				`Hi ${row.memberName} — your ${row.planName} membership at ${name.orgName} has been cancelled.`,
+				...(earlyFeeCents > 0
+					? [
+							`An early-cancellation fee of ${formatMoney(earlyFeeCents)} was posted to your account, payable from your member portal.`
+						]
+					: []),
+				'If this was a mistake, talk to the front desk — they can resume your membership.'
+			],
+			...(earlyFeeCents > 0
+				? { action: { label: 'Open member portal', url: `${appOrigin()}/portal` } }
+				: {})
+		})
+	});
+}

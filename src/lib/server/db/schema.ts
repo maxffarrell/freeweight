@@ -184,6 +184,8 @@ export const plan = pgTable(
 		guestPasses: integer('guest_passes'),
 		/** Minimum contract term in months — members can't self-cancel before it ends. */
 		commitmentMonths: integer('commitment_months'),
+		/** Fee (minor units) posted when staff cancels a membership inside its commitment window. */
+		earlyCancelFeeCents: integer('early_cancel_fee_cents'),
 		/** Max active members on the plan; null = unlimited. Full plans can't be joined. */
 		memberLimit: integer('member_limit'),
 		/** Days ahead members on this plan may book; null = the gym-wide window. */

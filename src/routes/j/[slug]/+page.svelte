@@ -260,7 +260,9 @@
 											>{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}</Badge
 										>{/if}
 									{#if p.commitmentMonths}<Badge variant="outline"
-											>{p.commitmentMonths}-mo minimum</Badge
+											>{p.commitmentMonths}-mo minimum{p.earlyCancelFeeCents
+												? ` · ${formatMoney(p.earlyCancelFeeCents, currency)} early cancel`
+												: ''}</Badge
 										>{/if}
 								</div>
 							</Card.Content>
