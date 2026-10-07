@@ -21,7 +21,8 @@ import {
 	user,
 	waiver,
 	plan,
-	outer
+	outer,
+	workoutResult
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
@@ -309,7 +310,8 @@ export async function getMember(orgId: string, id: string) {
 		dependents,
 		memberOptions,
 		emails,
-		measurements
+		measurements,
+		scores
 	] = await Promise.all([
 		db
 			.select({
@@ -377,6 +379,18 @@ export async function getMember(orgId: string, id: string) {
 			.from(memberMeasurement)
 			.where(and(eq(memberMeasurement.organizationId, orgId), eq(memberMeasurement.memberId, id)))
 			.orderBy(desc(memberMeasurement.recordedAt), desc(memberMeasurement.createdAt))
+			.limit(12),
+		db
+			.select({
+				result: workoutResult,
+				startsAt: classSession.startsAt,
+				className: classType.name
+			})
+			.from(workoutResult)
+			.innerJoin(classSession, eq(workoutResult.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(and(eq(workoutResult.organizationId, orgId), eq(workoutResult.memberId, id)))
+			.orderBy(desc(classSession.startsAt))
 			.limit(12)
 	]);
 	return {
@@ -396,6 +410,7 @@ export async function getMember(orgId: string, id: string) {
 		memberOptions,
 		emails,
 		measurements,
+		scores,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {

@@ -1026,6 +1026,28 @@
 			</Card.Content>
 		</Card.Root>
 
+		{#if m.scores.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Workout scores</Card.Title>
+					<Card.Description>Scores the member logged on workouts of the day</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.scores as s (s.result.id)}
+						<div class="flex items-baseline gap-2 py-1 text-sm">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground"
+								>{localDate(s.startsAt, tz)}</span
+							>
+							<span class="min-w-0 truncate">{s.className}</span>
+							<span class="ml-auto shrink-0 font-medium"
+								>{s.result.score}{s.result.asRx ? ' Rx' : ''}</span
+							>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Challenges</Card.Title>
