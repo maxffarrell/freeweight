@@ -28,6 +28,7 @@
 		toggleWebhook,
 		deleteWebhook,
 		getStaff,
+		getJoinInfo,
 		seedDemo
 	} from '#lib/remote/workspace.remote.ts';
 	import {
@@ -44,6 +45,7 @@
 	import Copy from '@lucide/svelte/icons/copy';
 	import Trash from '@lucide/svelte/icons/trash-2';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import Printer from '@lucide/svelte/icons/printer';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 
 	let settings = $state(await getSettings());
@@ -53,6 +55,18 @@
 	let providerList = $state(await getPaymentProviders());
 	let closures = $state(await getClosures());
 	const staff = await getStaff();
+	const joinInfo = await getJoinInfo();
+	let joinQr = $state('');
+	$effect(() => {
+		if (joinQr) return;
+		void import('qrcode').then((m) =>
+			m.default.toDataURL(joinInfo.url, { width: 280, margin: 1 }).then((u: string) => (joinQr = u))
+		);
+	});
+	async function copyJoinLink() {
+		await navigator.clipboard.writeText(joinInfo.url);
+		toast.success('Join link copied');
+	}
 	let pending = $state(false);
 	let cDate = $state('');
 	let cReason = $state('');
@@ -443,6 +457,48 @@
 					</ul>
 				</Card.Content>
 			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Join page</Card.Title>
+					<Card.Description>
+						The gym's public sign-up link — print the QR for the front desk or share it anywhere.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<div class="flex flex-wrap items-center gap-5">
+						{#if joinQr}
+							<img src={joinQr} alt="Join page QR" class="size-36 rounded-md border" />
+						{/if}
+						<div class="min-w-56 flex-1 space-y-3">
+							<p class="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-all">
+								{joinInfo.url}
+							</p>
+							{#if !publicPage}
+								<p class="text-xs text-muted-foreground">
+									The public join page is off — turn it on above before sharing this link.
+								</p>
+							{/if}
+							<div class="flex flex-wrap gap-2">
+								<Button size="sm" variant="outline" onclick={copyJoinLink}
+									><Copy /> Copy link</Button
+								>
+								<Button
+									size="sm"
+									variant="outline"
+									onclick={() => window.open(joinInfo.url, '_blank')}><ExternalLink /> Open</Button
+								>
+								<Button
+									size="sm"
+									variant="outline"
+									onclick={() => window.print()}
+									disabled={!joinQr}><Printer /> Print poster</Button
+								>
+							</div>
+						</div>
+					</div>
+				</Card.Content>
+			</Card.Root>
 		</Tabs.Content>
 
 		<Tabs.Content value="locations">
@@ -796,3 +852,33 @@
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
+
+<div id="join-poster-print" class="hidden print:block">
+	<div class="mx-auto max-w-sm p-8 text-center">
+		<p class="text-lg font-semibold tracking-wide uppercase">{joinInfo.name}</p>
+		<p class="mt-1 text-3xl font-bold">Join us</p>
+		{#if joinQr}<img src={joinQr} alt="Join page QR" class="mx-auto mt-6" />{/if}
+		<p class="mt-4 text-sm">Scan to see plans, this week's schedule, and sign up</p>
+		<p class="mt-1 font-mono text-xs">{joinInfo.url}</p>
+	</div>
+</div>
+
+<svelte:head>
+	<style>
+		@media print {
+			body * {
+				visibility: hidden;
+			}
+			#join-poster-print,
+			#join-poster-print * {
+				visibility: visible;
+			}
+			#join-poster-print {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+			}
+		}
+	</style>
+</svelte:head>

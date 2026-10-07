@@ -26,7 +26,7 @@
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
-	import { getCurrency } from '#lib/remote/billing.remote.ts';
+	import { getCurrency, getPlans } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Users from '@lucide/svelte/icons/users';
 	import Search from '@lucide/svelte/icons/search';
@@ -37,6 +37,7 @@
 	const currency = await getCurrency();
 	const announcements = $derived(await getRecentAnnouncements());
 	const allTags = $derived(await getTags());
+	const audiencePlans = $derived((await getPlans()).filter((p) => p.active));
 	let q = $state('');
 	let tag = $state('__all');
 	let statusFilter = $state('__all');
@@ -147,12 +148,20 @@
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
 	let emailPending = $state(false);
+	const audTag = $derived(emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined);
+	const audPlan = $derived(emailAudience.startsWith('plan:') ? emailAudience.slice(5) : undefined);
+	const audPlanName = $derived(
+		audPlan ? (audiencePlans.find((p) => p.id === audPlan)?.name ?? 'plan') : ''
+	);
+	const audLabel = $derived(
+		emailAudience === '__all'
+			? 'All active members'
+			: audTag
+				? `Tag: ${audTag}`
+				: `Plan: ${audPlanName}`
+	);
 	const audienceCount = $derived(
-		emailOpen
-			? await getAnnouncementAudience({
-					tag: emailAudience === '__all' ? undefined : emailAudience
-				})
-			: null
+		emailOpen ? await getAnnouncementAudience({ tag: audTag, planId: audPlan }) : null
 	);
 	async function submitAnnouncement(e: SubmitEvent) {
 		e.preventDefault();
@@ -161,7 +170,8 @@
 			const r = await emailAllMembers({
 				subject: emailSubject,
 				message: emailBody,
-				tag: emailAudience === '__all' ? undefined : emailAudience
+				tag: audTag,
+				planId: audPlan
 			});
 			toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
 			emailOpen = false;
@@ -391,7 +401,9 @@
 						<li class="flex items-baseline justify-between gap-3">
 							<span class="truncate">{a.subject}</span>
 							<span class="shrink-0 text-xs text-muted-foreground">
-								{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}
+								{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}{a.plan
+									? ` · plan: ${a.plan}`
+									: ''}
 							</span>
 						</li>
 					{/each}
@@ -399,17 +411,20 @@
 			</div>
 		{/if}
 		<form class="space-y-4" onsubmit={submitAnnouncement}>
-			{#if allTags.length}
+			{#if allTags.length || audiencePlans.length}
 				<Field.Field>
 					<Field.Label for="a-audience">Audience</Field.Label>
 					<Select.Root type="single" bind:value={emailAudience}>
 						<Select.Trigger id="a-audience" class="w-full">
-							{emailAudience === '__all' ? 'All active members' : `Tag: ${emailAudience}`}
+							{audLabel}
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="__all">All active members</Select.Item>
 							{#each allTags as t (t)}
-								<Select.Item value={t}>Tag: {t}</Select.Item>
+								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
+							{/each}
+							{#each audiencePlans as p (p.id)}
+								<Select.Item value="plan:{p.id}">Plan: {p.name}</Select.Item>
 							{/each}
 						</Select.Content>
 					</Select.Root>
@@ -449,7 +464,7 @@
 							? 'Sending…'
 							: emailAudience === '__all'
 								? 'Send to all members'
-								: `Send to "${emailAudience}"`}
+								: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
 					</Button>
 				</div></Dialog.Footer
 			>
