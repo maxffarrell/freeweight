@@ -767,6 +767,9 @@
 										: ''}{mm.membership.requestReason ? ` — “${mm.membership.requestReason}”` : ''}
 								</p>
 							{/if}
+							{#if mm.membership.endReason && mm.membership.status !== 'active'}
+								<p class="text-xs text-muted-foreground">“{mm.membership.endReason}”</p>
+							{/if}
 						</div>
 						<div class="flex items-center gap-2">
 							<StatusBadge status={mm.membership.status} />

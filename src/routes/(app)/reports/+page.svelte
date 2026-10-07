@@ -193,6 +193,40 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Why members leave</Card.Title>
+			<Card.Description>Stated reasons on current cancelled and paused memberships</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="px-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Reason</Table.Head>
+						<Table.Head class="text-right">Cancelled</Table.Head>
+						<Table.Head class="text-right">Paused</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.churn as c (c.reason)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{c.reason}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.cancelled}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.paused}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground"
+								>Nobody has left yet.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Revenue collected</Card.Title>
 			<Card.Description>Payments per month, last 12 months</Card.Description>
 		</Card.Header>
