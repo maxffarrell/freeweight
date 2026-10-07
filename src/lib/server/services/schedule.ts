@@ -34,6 +34,7 @@ import {
 	member,
 	membership,
 	plan,
+	sessionFeedback,
 	user,
 	workoutResult
 } from '#lib/server/db/schema.ts';
@@ -1960,6 +1961,41 @@ export async function myAvailability(ctx: OrgContext) {
 			)
 		)
 		.orderBy(asc(instructorAvailability.weekday), asc(instructorAvailability.startTime));
+}
+
+/** The instructor's own class ratings: average + count across all their sessions,
+ * plus recent member comments — powers the "Your ratings" card on My classes. */
+export async function myRatings(ctx: OrgContext) {
+	const me = await myMemberId(ctx);
+	if (!me) return { avg: null, count: 0, recent: [] };
+	const [agg] = await db
+		.select({
+			avg: sql<number>`round(avg(${sessionFeedback.rating})::numeric, 1)`.mapWith(Number),
+			count: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(sessionFeedback)
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.where(and(eq(sessionFeedback.organizationId, ctx.orgId), eq(classSession.instructorId, me)));
+	const recent = await db
+		.select({
+			rating: sessionFeedback.rating,
+			comment: sessionFeedback.comment,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(sessionFeedback)
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(sessionFeedback.organizationId, ctx.orgId),
+				eq(classSession.instructorId, me),
+				ne(sessionFeedback.comment, '')
+			)
+		)
+		.orderBy(desc(sessionFeedback.createdAt))
+		.limit(6);
+	return { avg: agg?.count ? agg.avg : null, count: agg?.count ?? 0, recent };
 }
 
 /** Replace the caller's whole weekly availability set (empty = always available). */

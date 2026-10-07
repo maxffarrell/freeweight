@@ -13,7 +13,8 @@
 		addTimeOff,
 		removeTimeOff,
 		getAvailability,
-		setAvailability
+		setAvailability,
+		getMyRatings
 	} from '#lib/remote/schedule.remote.ts';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -28,6 +29,7 @@
 	const cover = $derived(await getCoverNeeded());
 	const timeOff = $derived(await getTimeOff());
 	const availability = await getAvailability();
+	const ratings = await getMyRatings();
 	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	let windows = $state<{ weekday: string; startTime: string; endTime: string }[]>(
 		availability.map((w) => ({
@@ -253,6 +255,39 @@
 				>
 				<Button onclick={saveAvailability} disabled={availBusy}>Save</Button>
 			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Your ratings</Card.Title>
+			<Card.Description>What members gave your classes</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3 px-6 pb-4">
+			{#if ratings.count === 0}
+				<p class="text-sm text-muted-foreground">
+					No ratings yet — members are asked to rate after class.
+				</p>
+			{:else}
+				<p>
+					<span class="text-3xl font-semibold tabular-nums">{ratings.avg}</span>
+					<span class="text-amber-500">★</span>
+					<span class="ml-2 text-sm text-muted-foreground"
+						>from {ratings.count} rating{ratings.count === 1 ? '' : 's'}</span
+					>
+				</p>
+				{#if ratings.recent.length}
+					<div class="divide-y">
+						{#each ratings.recent as r (r.className + r.startsAt.toISOString() + r.comment)}
+							<div class="py-2 text-sm">
+								<span class="text-amber-500">{'★'.repeat(r.rating)}</span>
+								<span class="text-muted-foreground">{r.className} · {formatDate(r.startsAt)}</span>
+								<p class="mt-0.5">{r.comment}</p>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
