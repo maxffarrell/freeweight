@@ -933,6 +933,9 @@
 									disabled={busy === b.session.id}
 									onclick={() => cancel(myBookingId(b)!, b.session.id)}>Cancel</Button
 								>
+							{:else if !b.memberBookable}
+								<span class="text-xs whitespace-nowrap text-muted-foreground">Book at the desk</span
+								>
 							{:else}
 								<div class="flex justify-end gap-1">
 									<Button

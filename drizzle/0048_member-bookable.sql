@@ -1,0 +1,1 @@
+ALTER TABLE "class_type" ADD COLUMN "member_bookable" boolean DEFAULT true NOT NULL;

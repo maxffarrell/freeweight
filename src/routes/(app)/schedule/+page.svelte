@@ -322,6 +322,7 @@
 	let tBookCutoff = $state<number | null>(null);
 	let tDescription = $state('');
 	let tActive = $state(true);
+	let tMemberBookable = $state(true);
 	function editType(c: (typeof classTypes)[number]) {
 		editTypeId = c.id;
 		tName = c.name;
@@ -334,6 +335,7 @@
 		tMinEnroll = c.minEnrollment;
 		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
+		tMemberBookable = c.memberBookable;
 	}
 	function resetTypeForm() {
 		editTypeId = null;
@@ -346,6 +348,7 @@
 		tMinEnroll = null;
 		tBookCutoff = null;
 		tActive = true;
+		tMemberBookable = true;
 	}
 	async function submitType(e: SubmitEvent) {
 		e.preventDefault();
@@ -361,6 +364,7 @@
 				minEnrollment: tMinEnroll,
 				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
+				memberBookable: tMemberBookable,
 				active: tActive
 			};
 			if (editTypeId) await updateClassType({ id: editTypeId, ...body });
@@ -995,6 +999,10 @@
 					this class (e.g. sauna needs 12h lead).
 				</Field.Description>
 			</Field.Field>
+			<div class="flex items-center justify-between rounded-lg border px-3 py-2">
+				<span class="text-sm">Members can book online — off for front-desk-only classes</span>
+				<Switch bind:checked={tMemberBookable} />
+			</div>
 			{#if editTypeId}
 				<div class="flex items-center justify-between rounded-lg border px-3 py-2">
 					<span class="text-sm">Active — shows in booking picks</span>
