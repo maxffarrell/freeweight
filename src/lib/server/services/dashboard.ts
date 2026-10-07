@@ -167,6 +167,35 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(classSession.startsAt))
 		.limit(10);
 
+	// Active members whose birthday lands in the next 7 days — the same list the
+	// staff briefing emails.
+	const dobRows = await db
+		.select({ memberId: gymMember.id, memberName: gymMember.name, birthday: gymMember.birthday })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.birthday)
+			)
+		);
+	// Days until each member's next birthday from org-local `today`.
+	const daysUntil = (birthday: string) => {
+		const mmdd = birthday!.slice(5);
+		const year = Number(today.slice(0, 4));
+		const cand = `${year}-${mmdd}`;
+		const target = cand >= today ? cand : `${year + 1}-${mmdd}`;
+		return {
+			days: Math.round((Date.parse(target) - Date.parse(today)) / 86400_000),
+			when: target
+		};
+	};
+	const birthdaysThisWeek = dobRows
+		.map((r) => ({ ...r, ...daysUntil(r.birthday!) }))
+		.filter((r) => r.days < 7)
+		.sort((a, b) => a.days - b.days)
+		.slice(0, 10);
+
 	// Memberships whose term ends within the next 7 days — the same window the
 	// renewal-reminder email uses, visible to staff at a glance.
 	const renewalsThisWeek = await db
@@ -206,6 +235,7 @@ export async function dashboard(orgId: string) {
 		recentMembers,
 		pendingRequests,
 		coverNeeded,
+		birthdaysThisWeek,
 		renewalsThisWeek
 	};
 }
