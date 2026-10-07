@@ -60,6 +60,8 @@ export const gymSettings = pgTable('gym_settings', {
 	waiver: text('waiver').notNull().default(''),
 	/** Persistent notice shown at the top of every member's portal; empty = hidden. */
 	portalNotice: text('portal_notice').notNull().default(''),
+	/** Daily morning briefing email to owner/admin staff; off skips the cron send. */
+	staffBriefing: boolean('staff_briefing').notNull().default(true),
 	/** How far ahead portal members may book, in days; null = unlimited. */
 	bookingWindowDays: integer('booking_window_days'),
 	/** Members can't cancel a class within this many minutes of start; null = anytime. */

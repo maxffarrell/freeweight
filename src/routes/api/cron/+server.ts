@@ -13,6 +13,7 @@ import {
 	sendDueAnnouncements,
 	sendInstructorRosters,
 	sendPastDueNotices,
+	sendStaffBriefing,
 	sendTrialEndingNotices,
 	sendWaiverReminders,
 	sendWeeklyDigest,
@@ -50,6 +51,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let digests = 0;
 	let winbacks = 0;
 	let rosters = 0;
+	let briefings = 0;
 	let billingReminders = 0;
 	let announcements = 0;
 	let packNudges = 0;
@@ -147,6 +149,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`instructor-roster cron failed for ${o.id}`, err);
 		}
 		try {
+			briefings += await sendStaffBriefing(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`staff-briefing cron failed for ${o.id}`, err);
+		}
+		try {
 			billingReminders += await sendBillingReminders(o.id);
 		} catch (err) {
 			failed++;
@@ -169,6 +177,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		digests,
 		winbacks,
 		rosters,
+		briefings,
 		billingReminders,
 		announcements,
 		packNudges,
