@@ -21,7 +21,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { checkInToken } from './checkins.ts';
 import { bookSession, cancelBooking } from './schedule.ts';
-import { createMembership, getPlan, memberBalance } from './billing.ts';
+import { createMembership, getPlan, memberBalance, nextPeriod } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
@@ -32,6 +32,7 @@ import {
 	notifyPlanChanged
 } from './notifications.ts';
 import { addDays, localDate } from '#lib/tz.ts';
+import { todayISO } from '#lib/format.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -388,9 +389,10 @@ export async function availableProviders(orgId: string, currency: string) {
 
 /** Member asks to cancel a membership — staff confirm from the member page. */
 export async function requestCancellation(orgId: string, memberId: string, membershipId: string) {
-	const [row] = await db
-		.update(membership)
-		.set({ cancelRequestedAt: new Date() })
+	const [ms] = await db
+		.select({ membership, commitmentMonths: plan.commitmentMonths })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
@@ -398,7 +400,21 @@ export async function requestCancellation(orgId: string, memberId: string, membe
 				eq(membership.memberId, memberId),
 				eq(membership.status, 'active')
 			)
-		)
+		);
+	if (!ms) error(404, 'Membership not found');
+	if (ms.commitmentMonths) {
+		let end = ms.membership.createdAt.toISOString().slice(0, 10);
+		for (let i = 0; i < ms.commitmentMonths; i++) end = nextPeriod(end, 'month');
+		if (end > todayISO())
+			error(
+				409,
+				`Your plan has a ${ms.commitmentMonths}-month commitment through ${end} — talk to the front desk about cancelling early`
+			);
+	}
+	const [row] = await db
+		.update(membership)
+		.set({ cancelRequestedAt: new Date() })
+		.where(eq(membership.id, membershipId))
 		.returning();
 	if (!row) error(404, 'Membership not found');
 	await emit({

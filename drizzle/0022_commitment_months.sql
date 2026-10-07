@@ -1,0 +1,1 @@
+ALTER TABLE "plan" ADD COLUMN "commitment_months" integer;

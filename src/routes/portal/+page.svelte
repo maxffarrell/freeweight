@@ -309,7 +309,9 @@
 									<span class="text-muted-foreground">
 										— {formatMoney(p.amount, currency)}{p.isPack
 											? ` · ${p.classCredits} classes`
-											: `/${p.interval}`}{p.trialDays ? ` · ${p.trialDays}-day free trial` : ''}
+											: `/${p.interval}`}{p.trialDays
+											? ` · ${p.trialDays}-day free trial`
+											: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
 									</span>
 								</div>
 								<Button
@@ -387,7 +389,9 @@
 									<span class="text-muted-foreground">
 										— {formatMoney(p.amount, currency)}/{p.interval}{p.classCredits
 											? ` · ${p.classCredits} classes`
-											: ''}{p.trialDays ? ` · ${p.trialDays}-day free trial` : ''}
+											: ''}{p.trialDays
+											? ` · ${p.trialDays}-day free trial`
+											: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
 									</span>
 								</div>
 								<Button

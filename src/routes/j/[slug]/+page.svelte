@@ -181,6 +181,9 @@
 									{#if p.classCredits}<Badge variant="outline"
 											>{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}</Badge
 										>{/if}
+									{#if p.commitmentMonths}<Badge variant="outline"
+											>{p.commitmentMonths}-mo minimum</Badge
+										>{/if}
 								</div>
 							</Card.Content>
 						</Card.Root>

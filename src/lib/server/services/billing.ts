@@ -59,6 +59,11 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 			interval: input.interval,
 			signupFee: input.signupFee,
 			classCredits: input.classCredits ?? null,
+			isPack: input.isPack,
+			packDays: input.isPack ? (input.packDays ?? null) : null,
+			trialDays: input.trialDays,
+			guestPasses: input.guestPasses ?? null,
+			commitmentMonths: input.commitmentMonths ?? null,
 			listed: input.listed,
 			active: input.active
 		})

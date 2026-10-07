@@ -146,6 +146,8 @@ export const plan = pgTable(
 		trialDays: integer('trial_days').notNull().default(0),
 		/** Guest check-ins a member on this plan may log per calendar month; null = none. */
 		guestPasses: integer('guest_passes'),
+		/** Minimum contract term in months — members can't self-cancel before it ends. */
+		commitmentMonths: integer('commitment_months'),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),
