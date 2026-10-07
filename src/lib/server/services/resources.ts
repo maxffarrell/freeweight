@@ -1,7 +1,13 @@
 import { and, asc, eq, gt, gte, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { error } from '@sveltejs/kit';
-import { facilityResource, gymMember, location, resourceBooking } from '#lib/server/db/schema.ts';
+import {
+	equipment,
+	facilityResource,
+	gymMember,
+	location,
+	resourceBooking
+} from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 import { getSettings } from './settings.ts';
@@ -259,5 +265,59 @@ export async function cancelResourceBooking(orgId: string, id: string, forMember
 		)
 		.returning();
 	if (!row) error(404, 'Reservation not found');
+	return row;
+}
+
+// ---------- Equipment ----------
+
+export async function listEquipment(orgId: string) {
+	return db
+		.select({ equipment, locationName: location.name })
+		.from(equipment)
+		.leftJoin(location, eq(equipment.locationId, location.id))
+		.where(eq(equipment.organizationId, orgId))
+		.orderBy(asc(equipment.name));
+}
+
+export async function createEquipment(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.equipmentInput>
+) {
+	const [row] = await db
+		.insert(equipment)
+		.values({
+			organizationId: ctx.orgId,
+			name: input.name,
+			kind: input.kind ?? '',
+			locationId: input.locationId ?? null,
+			status: input.status ?? 'operational',
+			notes: input.notes ?? '',
+			servicedOn: input.servicedOn ?? null,
+			nextServiceOn: input.nextServiceOn ?? null
+		})
+		.returning();
+	return row;
+}
+
+export async function updateEquipment(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.equipmentUpdate>
+) {
+	const { id, ...set } = input;
+	const [row] = await db
+		.update(equipment)
+		.set({ ...set })
+		.where(and(eq(equipment.organizationId, ctx.orgId), eq(equipment.id, id)))
+		.returning();
+	if (!row) error(404, 'Equipment not found');
+	return row;
+}
+
+export async function deleteEquipment(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(equipment)
+		.where(and(eq(equipment.organizationId, ctx.orgId), eq(equipment.id, id)))
+		.returning();
+	if (!row) error(404, 'Equipment not found');
 	return row;
 }

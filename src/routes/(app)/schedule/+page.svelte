@@ -47,7 +47,11 @@
 		cancelEventRegistration,
 		setEventAttended,
 		cancelEvent,
-		getScheduleHints
+		getScheduleHints,
+		getEquipment,
+		createEquipment,
+		updateEquipment,
+		removeEquipment
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -63,6 +67,7 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import Flame from '@lucide/svelte/icons/flame';
+	import Wrench from '@lucide/svelte/icons/wrench';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -76,6 +81,7 @@
 	const resources = $derived(await getResources());
 	const amenityBookings = $derived(await getResourceBookings());
 	const hints = $derived(await getScheduleHints());
+	const equipment = $derived(await getEquipment());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
@@ -500,6 +506,50 @@
 	// ------- demand hints -------
 	let hintsOpen = $state(false);
 
+	// ------- equipment -------
+	let eqOpen = $state(false);
+	let eqName = $state('');
+	let eqKind = $state('');
+	let eqLoc = $state('');
+	let eqNext = $state('');
+	let eqNotes = $state('');
+	const today = $derived(localDate(new Date(), tz));
+	async function submitEquipment(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await createEquipment({
+				name: eqName.trim(),
+				kind: eqKind.trim() || undefined,
+				locationId: eqLoc || undefined,
+				nextServiceOn: eqNext || undefined,
+				notes: eqNotes.trim() || undefined
+			});
+			toast.success('Equipment added');
+			eqName = eqKind = eqNext = eqNotes = '';
+			await getEquipment().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add equipment'));
+		}
+		pending = false;
+	}
+	async function setEquipment(
+		id: string,
+		patch: {
+			status?: 'operational' | 'maintenance' | 'out_of_order';
+			servicedOn?: string;
+			nextServiceOn?: string | null;
+			notes?: string;
+		}
+	) {
+		try {
+			await updateEquipment({ id, ...patch });
+			await getEquipment().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
+
 	// ------- amenities (bookable resources) -------
 	let resOpen = $state(false);
 	let rName = $state('');
@@ -660,6 +710,8 @@
 			><Plus /> Class type</Button
 		>
 		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
+		<Button variant="outline" size="sm" onclick={() => (eqOpen = true)}><Wrench /> Equipment</Button
+		>
 		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}
 			><Flame /> Demand{#if hints.length}
 				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
@@ -1933,5 +1985,125 @@
 				No strong signals yet — hints appear once a class/weekday runs 3+ times in the last 6 weeks.
 			</p>
 		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={eqOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Equipment</Dialog.Title>
+			<Dialog.Description>
+				Machines and gear the gym tracks — status, notes, and service dates.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if equipment.length}
+			<div class="mb-4 max-h-72 divide-y overflow-y-auto rounded-lg border">
+				{#each equipment as row (row.equipment.id)}
+					{@const eq = row.equipment}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="min-w-0">
+							<span class="font-medium">{eq.name}</span>
+							{#if eq.kind}
+								<span class="text-muted-foreground"> · {eq.kind}</span>{/if}
+							<p class="text-xs text-muted-foreground">
+								{#if row.locationName}{row.locationName} ·
+								{/if}
+								{#if eq.servicedOn}serviced {eq.servicedOn}{:else}never serviced{/if}
+								{#if eq.notes}
+									· {eq.notes}{/if}
+							</p>
+						</div>
+						<div class="flex shrink-0 items-center gap-1.5">
+							{#if eq.nextServiceOn && eq.nextServiceOn <= today}
+								<span
+									class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+									>service due</span
+								>
+							{/if}
+							<select
+								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+								value={eq.status}
+								onchange={(e) =>
+									setEquipment(eq.id, {
+										status: e.currentTarget.value as 'operational' | 'maintenance' | 'out_of_order'
+									})}
+							>
+								<option value="operational">Operational</option>
+								<option value="maintenance">Maintenance</option>
+								<option value="out_of_order">Out of order</option>
+							</select>
+							<Button
+								size="xs"
+								variant="ghost"
+								title="Log a service today"
+								onclick={() => setEquipment(eq.id, { servicedOn: today, status: 'operational' })}
+								>Serviced</Button
+							>
+							<Button
+								size="xs"
+								variant="ghost"
+								class="text-muted-foreground"
+								title="Set next service date"
+								onclick={() => {
+									const d = prompt(
+										'Next service date (YYYY-MM-DD, blank to clear)',
+										eq.nextServiceOn ?? ''
+									);
+									if (d !== null) setEquipment(eq.id, { nextServiceOn: d.trim() || null });
+								}}><Pencil /></Button
+							>
+							<Button
+								size="xs"
+								variant="ghost"
+								class="text-muted-foreground"
+								title="Remove"
+								onclick={async () => {
+									if (!confirm(`Remove ${eq.name}?`)) return;
+									try {
+										await removeEquipment(eq.id);
+										toast.success('Removed');
+									} catch (err) {
+										toast.error(errMsg(err, 'Could not remove'));
+									}
+								}}><Trash2 /></Button
+							>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<form class="grid grid-cols-2 items-end gap-2" onsubmit={submitEquipment}>
+			<Field.Field>
+				<Field.Label for="eq-name">Name</Field.Label>
+				<Input id="eq-name" required bind:value={eqName} placeholder="Treadmill 3" />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="eq-kind">Kind (optional)</Field.Label>
+				<Input id="eq-kind" bind:value={eqKind} placeholder="Treadmill" />
+			</Field.Field>
+			{#if locations.filter((l) => !l.archivedAt).length}
+				<Field.Field>
+					<Field.Label>Location</Field.Label>
+					<select
+						bind:value={eqLoc}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="">—</option>
+						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+							<option value={l.id}>{l.name}</option>
+						{/each}
+					</select>
+				</Field.Field>
+			{/if}
+			<Field.Field>
+				<Field.Label for="eq-next">Next service (optional)</Field.Label>
+				<Input id="eq-next" type="date" bind:value={eqNext} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="eq-notes">Notes (optional)</Field.Label>
+				<Input id="eq-notes" bind:value={eqNotes} placeholder="Squeaks on incline" />
+			</Field.Field>
+			<Button type="submit" class="col-span-2" disabled={pending}>Add equipment</Button>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

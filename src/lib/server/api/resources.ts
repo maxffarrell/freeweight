@@ -224,6 +224,14 @@ export const resources: Record<string, Resource> = {
 		},
 		delete: (ctx, id) => amenities.cancelResourceBooking(ctx.orgId, id)
 	},
+	equipment: {
+		description:
+			'Tracked facility equipment (treadmill, rower): status (operational/maintenance/out_of_order) + service dates',
+		list: (ctx) => amenities.listEquipment(ctx.orgId),
+		create: { schema: s.equipmentInput, run: amenities.createEquipment as never },
+		update: { schema: s.equipmentUpdate, run: amenities.updateEquipment as never },
+		delete: (ctx, id) => amenities.deleteEquipment(ctx, id)
+	},
 	shop_items: {
 		description: 'Front-desk retail items (name, price, optional stock count)',
 		list: (ctx) => billing.listShopItems(ctx.orgId),

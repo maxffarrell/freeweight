@@ -155,6 +155,21 @@ export const resourceInput = v.object({
 });
 export const resourceUpdate = v.object({ id: idSchema, ...v.partial(resourceInput).entries });
 
+/** A tracked piece of facility equipment (treadmill, rower, cable machine). */
+export const equipmentInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name required'), v.maxLength(80)),
+	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40))),
+	locationId: v.optional(v.nullable(idSchema)),
+	status: v.optional(v.picklist(['operational', 'maintenance', 'out_of_order']), 'operational'),
+	notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
+	servicedOn: v.optional(v.nullable(isoDate)),
+	nextServiceOn: v.optional(v.nullable(isoDate))
+});
+export const equipmentUpdate = v.object({
+	id: idSchema,
+	...v.partial(equipmentInput).entries
+});
+
 /** Slot availability for one org-local date. */
 export const resourceDayInput = v.object({ resourceId: idSchema, day: isoDate });
 

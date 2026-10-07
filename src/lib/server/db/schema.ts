@@ -467,6 +467,27 @@ export const facilityResource = pgTable(
 
 export const resourceBookingStatus = pgEnum('resource_booking_status', ['booked', 'cancelled']);
 
+/** Tracked equipment/machines — status + service dates, separate from bookable amenities. */
+export const equipment = pgTable(
+	'equipment',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		/** Freeform label — "Treadmill", "Rower", "Cable machine". */
+		kind: text('kind').notNull().default(''),
+		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
+		/** 'operational' | 'maintenance' | 'out_of_order' — text like gymMember.status. */
+		status: text('status').notNull().default('operational'),
+		notes: text('notes').notNull().default(''),
+		/** Gym-local service dates, `YYYY-MM-DD`. */
+		servicedOn: text('serviced_on'),
+		nextServiceOn: text('next_service_on'),
+		...timestamps
+	},
+	(t) => [index('equipment_org_idx').on(t.organizationId)]
+);
+
 export const resourceBooking = pgTable(
 	'resource_booking',
 	{
