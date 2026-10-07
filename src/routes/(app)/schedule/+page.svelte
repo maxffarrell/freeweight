@@ -41,9 +41,11 @@
 	import Printer from '@lucide/svelte/icons/printer';
 	import Mail from '@lucide/svelte/icons/mail';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { errMsg, formatDate } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
-	const tz = (await getSettings()).timezone;
+	const settings = await getSettings();
+	const tz = settings.timezone;
+	const currency = settings.currency;
 	const locations = await getLocations();
 	const instructors = await getInstructors();
 	const memberList = await getMembers();
@@ -111,8 +113,16 @@
 	async function book() {
 		if (!bookMemberId) return;
 		try {
-			const b = await bookSession({ sessionId: focusId, memberId: bookMemberId });
-			toast.success(b.status === 'waitlisted' ? 'Class full — waitlisted' : 'Booked');
+			const m = memberList.find((mm) => mm.id === bookMemberId);
+			const dropIn = m ? !m.planName : false;
+			const b = await bookSession({ sessionId: focusId, memberId: bookMemberId, dropIn });
+			toast.success(
+				b.status === 'waitlisted'
+					? 'Class full — waitlisted'
+					: dropIn
+						? `Drop-in booked — ${formatMoney(focus?.dropInPrice ?? 0, currency)} charge posted`
+						: 'Booked'
+			);
 			bookMemberId = '';
 			await getRoster(focusId).refresh();
 			await reload();
@@ -505,12 +515,30 @@
 					</Select.Trigger>
 					<Select.Content>
 						{#each memberList.filter((mm) => mm.status === 'active') as mm (mm.id)}
-							<Select.Item value={mm.id}>{mm.name}</Select.Item>
+							<Select.Item value={mm.id}
+								>{mm.name}{#if !mm.planName}
+									(drop-in){/if}</Select.Item
+							>
 						{/each}
 					</Select.Content>
 				</Select.Root>
-				<Button onclick={book} disabled={!bookMemberId}>Book</Button>
+				<Button
+					onclick={book}
+					disabled={!bookMemberId ||
+						(!memberList.find((mm) => mm.id === bookMemberId)?.planName && !focus?.dropInPrice)}
+					>Book</Button
+				>
 			</div>
+			{#if bookMemberId && !memberList.find((mm) => mm.id === bookMemberId)?.planName}
+				<p class="text-xs text-amber-600 dark:text-amber-400">
+					{#if focus?.dropInPrice}
+						No active membership — booking posts a {formatMoney(focus.dropInPrice, currency)}
+						drop-in charge.
+					{:else}
+						No active membership and no drop-in price on this class — can't book.
+					{/if}
+				</p>
+			{/if}
 			{#if focus}
 				<Button variant="outline" class="w-full" onclick={openEdit}>Edit session</Button>
 				<Button
