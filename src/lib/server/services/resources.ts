@@ -5,6 +5,7 @@ import { facilityResource, gymMember, location, resourceBooking } from '#lib/ser
 import type { OrgContext } from '#lib/server/context.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 import { getSettings } from './settings.ts';
+import { emit } from './events.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -118,13 +119,20 @@ export async function bookResource(
 	tz: string
 ) {
 	const st = await getSettings(orgId);
-	return db.transaction(async (tx) => {
+	let resourceName = '';
+	const row = await db.transaction(async (tx) => {
 		const [r] = await tx
 			.select()
 			.from(facilityResource)
 			.where(and(eq(facilityResource.organizationId, orgId), eq(facilityResource.id, resourceId)))
 			.for('update');
 		if (!r || !r.active) error(404, 'Resource not found');
+		resourceName = r.name;
+		const [m] = await tx
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+		if (!m) error(404, 'Member not found');
 		const startsAt = zonedToUtc(`${day}T${time}`, tz);
 		const endsAt = new Date(startsAt.getTime() + r.slotMin * 60_000);
 		// Must sit inside the daily bookable window.
@@ -171,6 +179,14 @@ export async function bookResource(
 			.returning();
 		return row;
 	});
+	emit({
+		orgId,
+		entityType: 'resource_booking',
+		entityId: row.id,
+		action: 'created',
+		summary: `${resourceName} reservation booked for ${day} ${time}`
+	}).catch(() => {});
+	return row;
 }
 
 /** A member's upcoming reservations (portal + member page). */

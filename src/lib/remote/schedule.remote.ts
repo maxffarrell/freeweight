@@ -260,6 +260,30 @@ export const cancelAmenityBooking = command(idSchema, async (id) => {
 	void getResourceBookings().refresh();
 	return r;
 });
+/** Staff book an amenity slot for a member (desk reserves over the phone). */
+export const bookAmenityForMember = command(
+	v.object({
+		memberId: idSchema,
+		resourceId: idSchema,
+		day: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
+		time: v.pipe(v.string(), v.regex(/^\d{2}:\d{2}$/)),
+		note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)))
+	}),
+	async (input) => {
+		const orgId = (await requireOrg()).orgId;
+		const r = await res.bookResource(
+			orgId,
+			input.memberId,
+			input.resourceId,
+			input.day,
+			input.time,
+			input.note,
+			await tz()
+		);
+		void getResourceBookings().refresh();
+		return r;
+	}
+);
 
 // ---------- Events (workshops, comps, bring-a-friend days) ----------
 

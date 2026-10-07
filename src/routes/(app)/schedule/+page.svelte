@@ -39,6 +39,7 @@
 		updateResource,
 		getResourceBookings,
 		cancelAmenityBooking,
+		bookAmenityForMember,
 		getEvents,
 		createEvent,
 		getEventRoster,
@@ -521,6 +522,30 @@
 			await getResources().refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add amenity'));
+		}
+		pending = false;
+	}
+
+	// ------- staff amenity booking -------
+	let abMember = $state('');
+	let abResource = $state('');
+	let abDay = $state(localDate(new Date(), tz));
+	let abTime = $state('');
+	async function submitAmenityBooking(e: SubmitEvent) {
+		e.preventDefault();
+		if (!abMember || !abResource || !abDay || !abTime) return;
+		pending = true;
+		try {
+			await bookAmenityForMember({
+				memberId: abMember,
+				resourceId: abResource,
+				day: abDay,
+				time: abTime
+			});
+			toast.success('Reservation booked');
+			abMember = abTime = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book slot'));
 		}
 		pending = false;
 	}
@@ -1545,6 +1570,34 @@
 					</div>
 				{/each}
 			</div>
+		{/if}
+		{#if resources.some((r) => r.resource.active)}
+			<p class="mb-1 text-xs font-medium text-muted-foreground">Book for a member</p>
+			<form class="mb-4 grid grid-cols-2 items-end gap-2" onsubmit={submitAmenityBooking}>
+				<select
+					bind:value={abMember}
+					required
+					class="h-9 rounded-md border bg-transparent px-2 text-sm"
+				>
+					<option value="" disabled>Member…</option>
+					{#each memberList.filter((m) => m.status === 'active') as m (m.id)}
+						<option value={m.id}>{m.name}</option>
+					{/each}
+				</select>
+				<select
+					bind:value={abResource}
+					required
+					class="h-9 rounded-md border bg-transparent px-2 text-sm"
+				>
+					<option value="" disabled>Amenity…</option>
+					{#each resources.filter((r) => r.resource.active) as r (r.resource.id)}
+						<option value={r.resource.id}>{r.resource.name}</option>
+					{/each}
+				</select>
+				<Input type="date" required bind:value={abDay} />
+				<Input type="time" required bind:value={abTime} />
+				<Button type="submit" class="col-span-2" disabled={pending}>Book slot</Button>
+			</form>
 		{/if}
 		{#if amenityBookings.length}
 			<p class="mb-1 text-xs font-medium text-muted-foreground">Upcoming reservations</p>
