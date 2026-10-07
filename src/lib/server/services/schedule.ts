@@ -27,6 +27,7 @@ import {
 	closure,
 	gymMember,
 	gymSettings,
+	instructorAvailability,
 	instructorTimeOff,
 	location,
 	member,
@@ -57,7 +58,7 @@ import {
 	notifyWaitlistPromoted,
 	sendCoverRequests
 } from './notifications.ts';
-import { addDays, localDate, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
 import { getSettings } from './settings.ts';
@@ -1889,4 +1890,93 @@ export async function removeTimeOff(ctx: OrgContext, id: string) {
 				eq(instructorTimeOff.instructorId, me)
 			)
 		);
+}
+
+// ---------- Instructor availability ----------
+
+export async function myAvailability(ctx: OrgContext) {
+	const me = await myMemberId(ctx);
+	if (!me) return [];
+	return db
+		.select({
+			id: instructorAvailability.id,
+			weekday: instructorAvailability.weekday,
+			startTime: instructorAvailability.startTime,
+			endTime: instructorAvailability.endTime
+		})
+		.from(instructorAvailability)
+		.where(
+			and(
+				eq(instructorAvailability.organizationId, ctx.orgId),
+				eq(instructorAvailability.instructorId, me)
+			)
+		)
+		.orderBy(asc(instructorAvailability.weekday), asc(instructorAvailability.startTime));
+}
+
+/** Replace the caller's whole weekly availability set (empty = always available). */
+export async function setAvailability(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.availabilityInput>
+) {
+	const me = await myMemberId(ctx);
+	if (!me) error(404, 'No staff record for you in this workspace');
+	for (const w of input.windows)
+		if (w.endTime <= w.startTime) error(400, 'Each window must end after it starts');
+	return db.transaction(async (tx) => {
+		await tx
+			.delete(instructorAvailability)
+			.where(
+				and(
+					eq(instructorAvailability.organizationId, ctx.orgId),
+					eq(instructorAvailability.instructorId, me)
+				)
+			);
+		if (!input.windows.length) return [];
+		return tx
+			.insert(instructorAvailability)
+			.values(
+				input.windows.map((w) => ({
+					organizationId: ctx.orgId,
+					instructorId: me,
+					weekday: w.weekday,
+					startTime: w.startTime,
+					endTime: w.endTime
+				}))
+			)
+			.returning();
+	});
+}
+
+/** Intervals that fall outside every configured weekly window; [] when the instructor set none. */
+export async function instructorAvailabilityConflicts(
+	orgId: string,
+	instructorId: string,
+	intervals: { start: Date; end: Date }[],
+	tz: string
+) {
+	if (!intervals.length) return [] as { start: Date; end: Date }[];
+	const windows = await db
+		.select({
+			weekday: instructorAvailability.weekday,
+			startTime: instructorAvailability.startTime,
+			endTime: instructorAvailability.endTime
+		})
+		.from(instructorAvailability)
+		.where(
+			and(
+				eq(instructorAvailability.organizationId, orgId),
+				eq(instructorAvailability.instructorId, instructorId)
+			)
+		);
+	if (!windows.length) return [];
+	const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+	return intervals.filter((i) => {
+		const wd = localWeekday(i.start, tz);
+		const s = localMinutes(i.start, tz);
+		const e = localMinutes(i.end, tz);
+		return !windows.some(
+			(w) => w.weekday === wd && s >= toMin(w.startTime) && e <= toMin(w.endTime)
+		);
+	});
 }

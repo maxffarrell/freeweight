@@ -27,7 +27,8 @@ import {
 	resourceUpdate,
 	templateInput,
 	templateUpdate,
-	timeOffInput
+	timeOffInput,
+	availabilityInput
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
@@ -118,12 +119,21 @@ export const getInstructorConflicts = query(instructorConflictInput, async (inpu
 		start: d,
 		end: new Date(d.getTime() + input.durationMin * 60_000)
 	}));
-	const [sessions, offs] = await Promise.all([
+	const [sessions, offs, outside] = await Promise.all([
 		svc.instructorConflicts(orgId, input.instructorId, intervals, input.excludeSessionId),
-		svc.instructorTimeOffConflicts(orgId, input.instructorId, intervals, tzName)
+		svc.instructorTimeOffConflicts(orgId, input.instructorId, intervals, tzName),
+		svc.instructorAvailabilityConflicts(orgId, input.instructorId, intervals, tzName)
 	]);
 	return [
 		...sessions.map((s) => ({ ...s, kind: 'session' as const })),
+		// Cap availability hints so they don't crowd out real session clashes on repeats.
+		...outside.slice(0, 3).map((i, n) => ({
+			id: `avail-${n}`,
+			startsAt: i.start,
+			endsAt: i.end,
+			className: 'Outside availability',
+			kind: 'availability' as const
+		})),
 		...offs
 			.map((o) => ({
 				id: `off-${o.startDate}`,
@@ -240,6 +250,12 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 /** The instructor's own upcoming sessions — powers the "My classes" page. */
 export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));
 export const getTimeOff = query(async () => svc.myTimeOff(await requireOrg()));
+export const getAvailability = query(async () => svc.myAvailability(await requireOrg()));
+export const setAvailability = command(availabilityInput, async (input) => {
+	const r = await svc.setAvailability(await requireOrg(), input);
+	void getAvailability().refresh();
+	return r;
+});
 export const addTimeOff = command(timeOffInput, async (input) => {
 	const r = await svc.addTimeOff(await requireOrg(), input);
 	void Promise.all([getTimeOff().refresh(), getMyClasses().refresh()]);
