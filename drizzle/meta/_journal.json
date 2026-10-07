@@ -288,6 +288,13 @@
       "when": 1791374682134,
       "tag": "0040_member-photo",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791375526116,
+      "tag": "0041_plan-cap",
+      "breakpoints": true
     }
   ]
 }

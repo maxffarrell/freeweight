@@ -82,6 +82,7 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 			trialDays: input.trialDays,
 			guestPasses: input.guestPasses ?? null,
 			commitmentMonths: input.commitmentMonths ?? null,
+			memberLimit: input.memberLimit ?? null,
 			listed: input.listed,
 			active: input.active
 		})
@@ -281,6 +282,7 @@ export async function createMembership(
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
 	const p = await getPlan(ctx.orgId, input.planId);
+	await assertPlanCapacity(ctx.orgId, p);
 
 	const start = input.startsAt ?? todayISO();
 	const [row] = await db
@@ -334,6 +336,22 @@ export async function createMembership(
 		summary: `${m.name} → ${p.name}`
 	});
 	return row;
+}
+
+/** Rejects joining a capped plan that's already at its member limit. Packs are never capped. */
+export async function assertPlanCapacity(orgId: string, p: typeof plan.$inferSelect) {
+	if (p.isPack || p.memberLimit === null) return;
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.planId, p.id),
+				eq(membership.status, 'active')
+			)
+		);
+	if (n >= p.memberLimit) error(409, `${p.name} is full`);
 }
 
 /** Posts the recurring charge for one period. Idempotent via the period unique index. */

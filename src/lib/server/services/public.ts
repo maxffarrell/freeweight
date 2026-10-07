@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, isNull, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -8,6 +8,7 @@ import {
 	classType,
 	gymMember,
 	gymSettings,
+	membership,
 	waiver,
 	location,
 	organization,
@@ -40,7 +41,13 @@ export async function getPublicGym(slug: string) {
 	if (!settings?.publicPage) error(404, 'Not found');
 
 	const plans = await db
-		.select()
+		.select({
+			...getTableColumns(plan),
+			activeMembers:
+				sql<number>`(select count(*) from ${membership} m where m.plan_id = ${outer(plan.id)} and m.status = 'active')`.mapWith(
+					Number
+				)
+		})
 		.from(plan)
 		.where(and(eq(plan.organizationId, org.id), eq(plan.active, true), eq(plan.listed, true)))
 		.orderBy(asc(plan.amount));

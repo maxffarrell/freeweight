@@ -22,7 +22,13 @@ import {
 import { checkInToken } from './checkins.ts';
 import { bookSession, cancelBooking } from './schedule.ts';
 import { notifySeriesBooked } from './notifications.ts';
-import { createMembership, getPlan, memberBalance, nextPeriod } from './billing.ts';
+import {
+	assertPlanCapacity,
+	createMembership,
+	getPlan,
+	memberBalance,
+	nextPeriod
+} from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
@@ -708,6 +714,7 @@ export async function memberChangePlan(orgId: string, memberId: string, planId: 
 	const p = await getPlan(orgId, planId);
 	if (!p.active || !p.listed || p.isPack) error(404, 'Plan not available');
 	if (ms.plan.id === planId) error(409, 'Already on this plan');
+	await assertPlanCapacity(orgId, p);
 	const [row] = await db
 		.update(membership)
 		.set({ planId })

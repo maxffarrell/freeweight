@@ -29,8 +29,10 @@
 	let phone = $state('');
 	let referralSource = $state<(typeof referralSources)[number] | ''>('');
 	/** `?plan=<id>` preselects a plan (ads/campaign links); ignored when it isn't a listed plan. */
+	const planFull = (p: (typeof plans)[number]) =>
+		!p.isPack && p.memberLimit !== null && p.activeMembers >= p.memberLimit;
 	let planId = $state(
-		plans.some((p) => p.id === page.url.searchParams.get('plan'))
+		plans.some((p) => p.id === page.url.searchParams.get('plan') && !planFull(p))
 			? page.url.searchParams.get('plan')!
 			: ''
 	);
@@ -182,6 +184,11 @@
 										>{/if}
 								</p>
 								<div class="flex flex-wrap gap-1.5">
+									{#if p.memberLimit !== null && !p.isPack}
+										<Badge variant={planFull(p) ? 'destructive' : 'secondary'}
+											>{planFull(p) ? 'Full' : `${p.activeMembers}/${p.memberLimit} spots`}</Badge
+										>
+									{/if}
 									{#if p.signupFee > 0}<Badge variant="outline"
 											>{formatMoney(p.signupFee, currency)} signup</Badge
 										>{/if}
@@ -317,10 +324,10 @@
 											<Select.Content>
 												<Select.Item value="">Choose later</Select.Item>
 												{#each plans as p (p.id)}
-													<Select.Item value={p.id}
+													<Select.Item value={p.id} disabled={planFull(p)}
 														>{p.name} — {formatMoney(p.amount, currency)}{p.isPack
 															? ' one-time'
-															: `/${p.interval}`}</Select.Item
+															: `/${p.interval}`}{planFull(p) ? ' · FULL' : ''}</Select.Item
 													>
 												{/each}
 											</Select.Content>

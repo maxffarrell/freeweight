@@ -54,6 +54,7 @@
 	let trialDays = $state(0);
 	let guestPasses = $state<number | null>(null);
 	let commitmentMonths = $state<number | null>(null);
+	let memberLimit = $state<number | null>(null);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -70,6 +71,7 @@
 		trialDays = p.trialDays;
 		guestPasses = p.guestPasses;
 		commitmentMonths = p.commitmentMonths;
+		memberLimit = p.memberLimit;
 		listed = p.listed;
 		active = p.active;
 		open = true;
@@ -86,6 +88,7 @@
 		trialDays = 0;
 		guestPasses = null;
 		commitmentMonths = null;
+		memberLimit = null;
 		listed = active = true;
 	}
 
@@ -108,6 +111,7 @@
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
+					memberLimit: isPack ? null : memberLimit || null,
 					listed,
 					active
 				});
@@ -125,6 +129,7 @@
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
+					memberLimit: isPack ? null : memberLimit || null,
 					listed,
 					active
 				});
@@ -235,8 +240,16 @@
 								>{p.commitmentMonths}-mo commitment</Badge
 							>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
-						{#if p.activeMembers > 0}<Badge variant="outline"
-								>{p.activeMembers} member{p.activeMembers === 1 ? '' : 's'}</Badge
+						{#if p.activeMembers > 0 || p.memberLimit}<Badge
+								variant={p.memberLimit !== null && p.activeMembers >= p.memberLimit
+									? 'destructive'
+									: 'outline'}
+								>{p.activeMembers}{p.memberLimit !== null ? `/${p.memberLimit}` : ''} member{p.activeMembers ===
+									1 && !p.memberLimit
+									? ''
+									: 's'}{p.memberLimit !== null && p.activeMembers >= p.memberLimit
+									? ' · full'
+									: ''}</Badge
 							>{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
@@ -459,6 +472,18 @@
 					/>
 				</Field.Field>
 			</div>
+			<Field.Field>
+				<Field.Label for="p-limit">Member cap</Field.Label>
+				<Input
+					id="p-limit"
+					type="number"
+					min={1}
+					bind:value={memberLimit}
+					placeholder="Unlimited"
+					disabled={isPack}
+				/>
+				<Field.Description>Max active members — full plans can't be joined</Field.Description>
+			</Field.Field>
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<span>Class pack — one-time purchase, no recurring billing</span>
 				<Switch bind:checked={isPack} />
