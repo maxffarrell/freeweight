@@ -242,6 +242,8 @@ export const membership = pgTable(
 		bonusCredits: integer('bonus_credits').notNull().default(0),
 		/** The member's stated reason on a pending cancel/pause request. */
 		requestReason: text('request_reason'),
+		/** Staff price override (minor units) — recurring charges bill this instead of the plan price. */
+		price: integer('price'),
 		...timestamps
 	},
 	(t) => [

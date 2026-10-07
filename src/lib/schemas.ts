@@ -83,7 +83,9 @@ export const membershipUpdate = v.object({
 	/** Staff: clear a member's pause request. */
 	clearPauseRequest: v.optional(v.boolean()),
 	/** Staff: move the membership to another plan; new price applies from the next charge. */
-	planId: v.optional(v.nullable(idSchema))
+	planId: v.optional(v.nullable(idSchema)),
+	/** Staff: custom recurring price in minor units; null clears the override. */
+	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0))))
 });
 
 export const grantCreditsInput = v.object({
