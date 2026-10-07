@@ -30,7 +30,12 @@
 		pending = true;
 		try {
 			const r = await recordCheckIn({ code: code.trim(), locationId: locationId || undefined });
-			toast.success(`${r.member.name} checked in`);
+			toast.success(
+				`${r.member.name} checked in` +
+					(r.attended
+						? ` — marked attended for ${r.attended} class${r.attended > 1 ? 'es' : ''}`
+						: '')
+			);
 			code = '';
 			checkIns = await getTodayCheckIns();
 		} catch (err) {

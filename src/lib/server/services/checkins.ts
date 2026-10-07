@@ -1,11 +1,19 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
-import { checkIn, gymMember, location } from '#lib/server/db/schema.ts';
+import {
+	booking,
+	checkIn,
+	classSession,
+	gymMember,
+	gymSettings,
+	location
+} from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -44,6 +52,30 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			method: verifyCheckInToken(input.code) ? 'qr' : 'manual'
 		})
 		.returning();
+	// A check-in marks that member's already-started bookings today as attended.
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const today = localDate(new Date(), tz);
+	const attended = await db
+		.update(booking)
+		.set({ status: 'attended' })
+		.from(classSession)
+		.where(
+			and(
+				eq(booking.sessionId, classSession.id),
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.memberId, memberId),
+				eq(booking.status, 'booked'),
+				gte(classSession.startsAt, zonedToUtc(`${today}T00:00`, tz)),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(today, 1)}T00:00`, tz)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.returning({ id: booking.id });
+
 	await emit({
 		orgId: ctx.orgId,
 		actorId: ctx.userId,
@@ -52,7 +84,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		action: 'recorded',
 		summary: `${m.name} checked in`
 	});
-	return { checkIn: row!, member: m };
+	return { checkIn: row!, member: m, attended: attended.length };
 }
 
 export async function listTodayCheckIns(orgId: string, since: Date) {

@@ -63,7 +63,11 @@
 				code: memberIdOrCode,
 				locationId: locationId || undefined
 			});
-			showFlash(true, `${r.member.name} checked in`);
+			showFlash(
+				true,
+				`${r.member.name} checked in` +
+					(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '')
+			);
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
 			showFlash(false, errMsg(err, 'Check-in failed'));
