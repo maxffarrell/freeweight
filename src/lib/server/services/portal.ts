@@ -355,7 +355,7 @@ export async function memberBook(
 	userId: string,
 	sessionId: string,
 	memberId: string,
-	opts?: { notify?: boolean }
+	opts?: { notify?: boolean; skipDailyLimit?: boolean }
 ) {
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
@@ -444,6 +444,53 @@ export async function memberCancel(orgId: string, userId: string, bookingId: str
 	)
 		error(409, `Cancelling closes ${cancelCutoffMin} minutes before class`);
 	return cancelBooking(memberCtx(orgId, userId), bookingId, userId);
+}
+
+/**
+ * Moves an upcoming booking to a different session — the portal's one-tap "swap
+ * class". The old session's cancel cutoff still applies (a move is a cancel),
+ * minus the late-fee escape: inside the cutoff a move is refused outright since
+ * the late fee was designed for no-shows, not swaps. The new booking runs through
+ * memberBook, so booking window/cutoff/memberBookable/drop-in rules all hold;
+ * the daily limit is skipped because the move is count-neutral. If the new class
+ * is full the swap is refused (joining the waitlist stays a separate choice) so
+ * the member never trades a held spot for a queue position.
+ */
+export async function memberMoveBooking(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	bookingId: string,
+	newSessionId: string
+) {
+	const [b] = await db
+		.select({
+			memberId: booking.memberId,
+			status: booking.status,
+			sessionId: booking.sessionId,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
+	if (!b || b.memberId !== memberId) error(404, 'Booking not found');
+	if (b.sessionId === newSessionId) error(400, 'You are already in that session');
+	if (b.status !== 'booked' && b.status !== 'waitlisted') error(409, 'That booking already ended');
+	if (b.startsAt.getTime() <= Date.now()) error(409, 'That class already started');
+	const { cancelCutoffMin } = await bookingRules(orgId);
+	if (cancelCutoffMin != null && b.startsAt.getTime() - Date.now() < cancelCutoffMin * 60_000)
+		error(409, `Moving closes ${cancelCutoffMin} minutes before class`);
+	const n = await memberBook(orgId, userId, newSessionId, memberId, {
+		skipDailyLimit: true
+	});
+	if (n.status === 'waitlisted') {
+		await cancelBooking(memberCtx(orgId, userId), n.id, userId, { notify: false });
+		error(409, 'That class is full — join its waitlist from the class list instead');
+	}
+	// The new spot is held before the old one frees — cancel without the
+	// "cancelled" email so the only mail is the new booking's confirmation.
+	await cancelBooking(memberCtx(orgId, userId), bookingId, userId, { notify: false });
+	return n;
 }
 
 async function bookingRules(orgId: string) {
