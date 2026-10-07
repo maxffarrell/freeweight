@@ -14,6 +14,7 @@ import {
 	sendClassReminders,
 	sendDueAnnouncements,
 	sendEventReminders,
+	sendResourceReminders,
 	sendInstructorRosters,
 	sendPastDueNotices,
 	sendStaffBriefing,
@@ -46,6 +47,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let failed = 0;
 	let reminders = 0;
 	let eventReminders = 0;
+	let amenityReminders = 0;
 	let pastDue = 0;
 	let trials = 0;
 	let birthdays = 0;
@@ -82,6 +84,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 		try {
 			eventReminders += await sendEventReminders(o.id);
+			amenityReminders += await sendResourceReminders(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`event-reminder cron failed for ${o.id}`, err);
@@ -202,6 +205,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		failed,
 		reminders,
 		eventReminders,
+		amenityReminders,
 		challengeInvites,
 		challengeResults,
 		pastDue,

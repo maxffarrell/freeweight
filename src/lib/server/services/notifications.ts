@@ -25,6 +25,7 @@ import {
 	classSession,
 	classType,
 	eventRegistration,
+	facilityResource,
 	gymEvent,
 	gymMember,
 	gymSettings,
@@ -36,6 +37,7 @@ import {
 	organization,
 	payment,
 	plan,
+	resourceBooking,
 	user,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -1041,6 +1043,56 @@ export async function sendEventReminders(orgId: string) {
 				lines: [
 					`You're registered for ${row.eventName} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
 					'Can’t make it? Cancel in the member portal so someone else gets the spot.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/** Day-before reminder for amenity reservations (sauna, court, child care). */
+export async function sendResourceReminders(orgId: string) {
+	const soon = new Date(Date.now() + 26 * 3600_000);
+	const rows = await db
+		.select({
+			bookingId: resourceBooking.id,
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			resourceName: facilityResource.name,
+			startsAt: resourceBooking.startsAt,
+			locationName: location.name
+		})
+		.from(resourceBooking)
+		.innerJoin(gymMember, eq(resourceBooking.memberId, gymMember.id))
+		.innerJoin(facilityResource, eq(resourceBooking.resourceId, facilityResource.id))
+		.leftJoin(location, eq(facilityResource.locationId, location.id))
+		.where(
+			and(
+				eq(resourceBooking.organizationId, orgId),
+				eq(resourceBooking.status, 'booked'),
+				gte(resourceBooking.startsAt, new Date()),
+				lte(resourceBooking.startsAt, soon)
+			)
+		);
+	if (!rows.length) return 0;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	let sent = 0;
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (!(await logOnce(orgId, 'amenity_reminder', row.bookingId, row.email))) continue;
+		const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+		await sendMemberEmail(row.memberId, {
+			to: row.email,
+			subject: `Tomorrow: ${row.resourceName} at ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `Your ${row.resourceName} slot is tomorrow`,
+				lines: [
+					`Hi ${row.memberName.split(' ')[0] ?? row.memberName} — you're booked for ${row.resourceName} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
+					'Can’t make it? Cancel in the member portal so someone else gets the slot.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})
