@@ -9,6 +9,7 @@ import {
 	sendAnniversaryGreetings,
 	sendBillingReminders,
 	sendBirthdayGreetings,
+	sendChallengeInvites,
 	sendClassReminders,
 	sendDueAnnouncements,
 	sendEventReminders,
@@ -60,6 +61,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let announcements = 0;
 	let packNudges = 0;
 	let waiverNudges = 0;
+	let challengeInvites = 0;
 	let underEnrolled = 0;
 	let autoCheckouts = 0;
 	for (const o of orgs) {
@@ -81,6 +83,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`event-reminder cron failed for ${o.id}`, err);
+		}
+		try {
+			challengeInvites += await sendChallengeInvites(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`challenge-invite cron failed for ${o.id}`, err);
 		}
 		try {
 			pastDue += await sendPastDueNotices(o.id);
@@ -191,6 +199,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		failed,
 		reminders,
 		eventReminders,
+		challengeInvites,
 		pastDue,
 		trials,
 		birthdays,
