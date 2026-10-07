@@ -110,6 +110,8 @@
 	let bookCutoffMin = $state<number | null>(settings.bookCutoffMin);
 	let waitlistCutoffMin = $state<number | null>(settings.waitlistCutoffMin);
 	let maxBookingsPerDay = $state<number | null>(settings.maxBookingsPerDay);
+	// svelte-ignore state_referenced_locally
+	let occupancyCap = $state<number | null>(settings.occupancyCap);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
@@ -136,6 +138,7 @@
 				bookCutoffMin,
 				waitlistCutoffMin,
 				maxBookingsPerDay,
+				occupancyCap,
 				noShowFee,
 				lateCancelFee,
 				suspendAfterDays,
@@ -390,6 +393,19 @@
 									bind:value={maxBookingsPerDay}
 									placeholder="Unlimited"
 								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="occ-cap">Occupancy cap</Field.Label>
+								<Input
+									id="occ-cap"
+									type="number"
+									min={1}
+									bind:value={occupancyCap}
+									placeholder="No cap"
+								/>
+								<Field.Description
+									>Max people inside at once — the kiosk warns past this.</Field.Description
+								>
 							</Field.Field>
 						</div>
 						<Field.Field>

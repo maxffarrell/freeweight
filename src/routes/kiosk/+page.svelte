@@ -33,6 +33,7 @@
 	const liveLocations = $derived(locations);
 
 	let checkIns = $state(await getTodayCheckIns());
+	const inside = $derived(checkIns.filter((c) => !c.checkIn.checkedOutAt).length);
 	let upNext = $state(await getUpNext());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
@@ -246,9 +247,15 @@
 		</div>
 		<div class="flex items-center gap-4 text-sm">
 			<span class="tabular-nums">{localTime(now, tz)}</span>
-			<Badge variant="secondary">
-				{checkIns.length} today · {checkIns.filter((c) => !c.checkIn.checkedOutAt).length}
-				inside
+			<Badge
+				variant="secondary"
+				class={settings.occupancyCap != null && inside >= settings.occupancyCap
+					? 'border-amber-500 text-amber-600'
+					: ''}
+			>
+				{checkIns.length} today · {inside} inside{#if settings.occupancyCap != null}
+					/ {settings.occupancyCap}{/if}{#if settings.occupancyCap != null && inside >= settings.occupancyCap}
+					— at capacity{/if}
 			</Badge>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
