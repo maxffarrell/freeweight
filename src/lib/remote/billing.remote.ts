@@ -17,7 +17,10 @@ import {
 	planInput,
 	planUpdate,
 	promoCodeInput,
-	promoCodeUpdate
+	promoCodeUpdate,
+	saleInput,
+	shopItemInput,
+	shopItemUpdate
 } from '#lib/schemas.ts';
 
 export const getPlans = query(async () => svc.listPlans((await requireOrg()).orgId));
@@ -96,6 +99,31 @@ export const updateCharge = command(chargeUpdate, async (input) => {
 	void getCharges().refresh();
 	void getMember(c.memberId).refresh();
 	return c;
+});
+
+// ------- shop -------
+
+export const getShopItems = query(async () => svc.listShopItems((await requireOrg()).orgId));
+
+export const createShopItem = command(shopItemInput, async (input) => {
+	const r = await svc.createShopItem(await requireOrg('admin'), input);
+	void getShopItems().refresh();
+	return r;
+});
+
+export const updateShopItem = command(shopItemUpdate, async (input) => {
+	const r = await svc.updateShopItem(await requireOrg('admin'), input);
+	void getShopItems().refresh();
+	return r;
+});
+
+/** Front-desk sale — charge (or charge+payment) for a shop item. */
+export const sellItem = command(saleInput, async (input) => {
+	const r = await svc.sellItem(await requireOrg(), input);
+	void getCharges().refresh();
+	void getPayments().refresh();
+	void getMember(input.memberId).refresh();
+	return r;
 });
 
 export const getPayments = query(async () => svc.listPayments((await requireOrg()).orgId));

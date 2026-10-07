@@ -218,6 +218,27 @@ export const paymentInput = v.object({
 	notes: optionalText
 });
 
+export const shopItemInput = v.object({
+	name: requiredText('Item name'),
+	price: cents
+});
+
+export const shopItemUpdate = v.object({
+	id: idSchema,
+	name: v.optional(requiredText('Item name')),
+	price: v.optional(cents),
+	active: v.optional(v.boolean())
+});
+
+/** A front-desk sale — posts a charge (or charge + payment when paid now). */
+export const saleInput = v.object({
+	itemId: idSchema,
+	memberId: idSchema,
+	qty: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50)),
+	payNow: v.optional(v.boolean(), false),
+	method: v.optional(v.picklist(paymentMethods), 'card')
+});
+
 export const settingsInput = v.object({
 	timezone: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 	currency: v.optional(v.pipe(v.string(), v.trim(), v.toLowerCase(), v.length(3))),

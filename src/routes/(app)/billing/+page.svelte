@@ -23,7 +23,11 @@
 		getPayments,
 		recordPayment,
 		refundPayment,
-		getCurrency
+		getCurrency,
+		getShopItems,
+		createShopItem,
+		updateShopItem,
+		sellItem
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
@@ -216,6 +220,63 @@
 			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
+
+	// ------- shop -------
+	let shopItems = $state(await getShopItems());
+	let itemName = $state('');
+	let itemPrice = $state<number | null>(null);
+	async function addItem(e: SubmitEvent) {
+		e.preventDefault();
+		if (itemPrice == null) return;
+		pending = true;
+		try {
+			await createShopItem({ name: itemName, price: itemPrice });
+			itemName = '';
+			itemPrice = null;
+			shopItems = await getShopItems();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add item'));
+		}
+		pending = false;
+	}
+	async function toggleItem(item: { id: string; active: boolean }) {
+		try {
+			await updateShopItem({ id: item.id, active: !item.active });
+			shopItems = await getShopItems();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update item'));
+		}
+	}
+
+	let sellOpen = $state(false);
+	let sellItemId = $state('');
+	let sellMemberId = $state('');
+	let sellQty = $state(1);
+	let sellPayNow = $state(true);
+	let sellMethod = $state<'card' | 'cash' | 'bank' | 'other'>('cash');
+	const sellItemRow = $derived(shopItems.find((i) => i.id === sellItemId));
+	async function submitSale(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await sellItem({
+				itemId: sellItemId,
+				memberId: sellMemberId,
+				qty: sellQty,
+				payNow: sellPayNow,
+				method: sellMethod
+			});
+			toast.success(sellPayNow ? 'Sale recorded' : 'Charge posted');
+			sellOpen = false;
+			sellMemberId = '';
+			sellQty = 1;
+			await refreshCharges();
+			payments = await getPayments();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not record sale'));
+		}
+		pending = false;
+	}
 </script>
 
 <PageHeader title="Billing">
@@ -231,6 +292,7 @@
 			<Tabs.Trigger value="charges">Charges</Tabs.Trigger>
 			<Tabs.Trigger value="memberships">Memberships</Tabs.Trigger>
 			<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
+			<Tabs.Trigger value="shop">Shop</Tabs.Trigger>
 		</Tabs.List>
 
 		<Tabs.Content value="charges">
@@ -467,8 +529,141 @@
 				</Card.Content>
 			</Card.Root>
 		</Tabs.Content>
+
+		<Tabs.Content value="shop">
+			<div class="grid gap-4 lg:grid-cols-2">
+				<Card.Root class="py-0">
+					<Card.Content class="px-0">
+						<Table.Root>
+							<Table.Header>
+								<Table.Row>
+									<Table.Head>Item</Table.Head>
+									<Table.Head class="text-right">Price</Table.Head>
+									<Table.Head>Selling</Table.Head>
+									<Table.Head></Table.Head>
+								</Table.Row>
+							</Table.Header>
+							<Table.Body>
+								{#each shopItems as i (i.id)}
+									<Table.Row class={i.active ? '' : 'opacity-50'}>
+										<Table.Cell class="font-medium">{i.name}</Table.Cell>
+										<Table.Cell class="text-right tabular-nums"
+											>{formatMoney(i.price, currency)}</Table.Cell
+										>
+										<Table.Cell
+											><Switch
+												checked={i.active}
+												onCheckedChange={() => toggleItem(i)}
+											/></Table.Cell
+										>
+										<Table.Cell class="text-right">
+											{#if i.active}
+												<Button
+													variant="ghost"
+													size="sm"
+													class="h-7 px-2 text-xs"
+													onclick={() => {
+														sellItemId = i.id;
+														sellOpen = true;
+													}}>Sell</Button
+												>
+											{/if}
+										</Table.Cell>
+									</Table.Row>
+								{:else}
+									<Table.Row
+										><Table.Cell colspan={4} class="text-muted-foreground"
+											>No items yet — add one on the right.</Table.Cell
+										></Table.Row
+									>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</Card.Content>
+				</Card.Root>
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-base">New item</Card.Title>
+						<Card.Description>
+							Water, wraps, shirts — anything the front desk sells.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<form class="space-y-3" onsubmit={addItem}>
+							<Field.Field>
+								<Field.Label for="i-name">Name</Field.Label>
+								<Input id="i-name" required bind:value={itemName} placeholder="Water bottle" />
+							</Field.Field>
+							<Field.Field>
+								<Field.Label>Price</Field.Label>
+								<MoneyInput bind:value={itemPrice} />
+							</Field.Field>
+							<Button type="submit" disabled={pending || itemPrice == null || !itemName.trim()}
+								>Add item</Button
+							>
+						</form>
+					</Card.Content>
+				</Card.Root>
+			</div>
+		</Tabs.Content>
 	</Tabs.Root>
 </div>
+
+<Dialog.Root bind:open={sellOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Sell {sellItemRow?.name ?? 'item'}</Dialog.Title>
+			<Dialog.Description>
+				{#if sellItemRow}{formatMoney(sellItemRow.price, currency)} each.{/if}
+				Posts a charge to the member — or mark it paid now.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitSale}>
+			<Field.Field>
+				<Field.Label>Member</Field.Label>
+				<Select.Root type="single" bind:value={sellMemberId}>
+					<Select.Trigger class="w-full">
+						{memberList.find((m) => m.id === sellMemberId)?.name ?? 'Pick a member'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each memberList as m (m.id)}
+							<Select.Item value={m.id}>{m.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="s-qty">Quantity</Field.Label>
+				<Input id="s-qty" type="number" min={1} max={50} required bind:value={sellQty} />
+			</Field.Field>
+			<label class="flex items-center gap-2 text-sm">
+				<Switch bind:checked={sellPayNow} /> Paid now
+			</label>
+			{#if sellPayNow}
+				<Field.Field>
+					<Field.Label>Method</Field.Label>
+					<Select.Root type="single" bind:value={sellMethod}>
+						<Select.Trigger class="w-full capitalize">{sellMethod}</Select.Trigger>
+						<Select.Content>
+							{#each paymentMethods.filter((m) => m !== 'stripe') as m (m)}
+								<Select.Item value={m} class="capitalize">{m}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</Field.Field>
+			{/if}
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending || !sellMemberId || !sellItemId}>
+					{sellItemRow && sellQty
+						? sellPayNow
+							? `Take ${formatMoney(sellItemRow.price * sellQty, currency)}`
+							: `Charge ${formatMoney(sellItemRow.price * sellQty, currency)}`
+						: 'Sell'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={payOpen}>
 	<Dialog.Content>
