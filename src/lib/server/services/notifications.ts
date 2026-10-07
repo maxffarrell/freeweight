@@ -14,6 +14,7 @@ import {
 	location,
 	member,
 	membership,
+	memberTag,
 	notificationLog,
 	organization,
 	payment,
@@ -579,7 +580,8 @@ export async function sendAnnouncement(
 	orgId: string,
 	subject: string,
 	message: string,
-	memberIds?: string[]
+	memberIds?: string[],
+	tag?: string
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
@@ -590,6 +592,9 @@ export async function sendAnnouncement(
 				eq(gymMember.organizationId, orgId),
 				eq(gymMember.status, 'active'),
 				memberIds?.length ? inArray(gymMember.id, memberIds) : undefined,
+				tag
+					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
+					: undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -617,7 +622,7 @@ export async function sendAnnouncement(
 		entityId,
 		action: 'sent',
 		summary: `Announcement sent to ${sent} member${sent === 1 ? '' : 's'}: ${subject}`,
-		data: { subject, message, sent, total: members.length }
+		data: { subject, message, sent, total: members.length, tag: tag ?? null }
 	});
 	return { sent, total: members.length };
 }
@@ -631,7 +636,8 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 			subject: sql<string>`${activity.data}->>'subject'`,
 			message: sql<string>`${activity.data}->>'message'`,
 			sent: sql<number>`(${activity.data}->>'sent')::int`,
-			total: sql<number>`(${activity.data}->>'total')::int`
+			total: sql<number>`(${activity.data}->>'total')::int`,
+			tag: sql<string | null>`${activity.data}->>'tag'`
 		})
 		.from(activity)
 		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'announcement')))

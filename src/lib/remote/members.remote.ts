@@ -96,7 +96,8 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 		(await requireOrg()).orgId,
 		input.subject,
 		input.message,
-		input.memberIds
+		input.memberIds,
+		input.tag
 	);
 	void getRecentAnnouncements().refresh();
 	return r;

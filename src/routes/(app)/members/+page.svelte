@@ -136,15 +136,21 @@
 	let emailOpen = $state(false);
 	let emailSubject = $state('');
 	let emailBody = $state('');
+	let emailAudience = $state('__all');
 	let emailPending = $state(false);
 	async function submitAnnouncement(e: SubmitEvent) {
 		e.preventDefault();
 		emailPending = true;
 		try {
-			const r = await emailAllMembers({ subject: emailSubject, message: emailBody });
+			const r = await emailAllMembers({
+				subject: emailSubject,
+				message: emailBody,
+				tag: emailAudience === '__all' ? undefined : emailAudience
+			});
 			toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
 			emailOpen = false;
 			emailSubject = emailBody = '';
+			emailAudience = '__all';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send — try again'));
 		}
@@ -323,9 +329,9 @@
 <Dialog.Root bind:open={emailOpen}>
 	<Dialog.Content>
 		<Dialog.Header>
-			<Dialog.Title>Email all members</Dialog.Title>
+			<Dialog.Title>Email members</Dialog.Title>
 			<Dialog.Description>
-				Goes to every active member with an email on file — closures, schedule changes, news.
+				Goes to active members with an email on file — closures, schedule changes, news.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if announcements.length}
@@ -336,7 +342,7 @@
 						<li class="flex items-baseline justify-between gap-3">
 							<span class="truncate">{a.subject}</span>
 							<span class="shrink-0 text-xs text-muted-foreground">
-								{formatDate(a.createdAt)} · {a.sent} sent
+								{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}
 							</span>
 						</li>
 					{/each}
@@ -344,6 +350,22 @@
 			</div>
 		{/if}
 		<form class="space-y-4" onsubmit={submitAnnouncement}>
+			{#if allTags.length}
+				<Field.Field>
+					<Field.Label for="a-audience">Audience</Field.Label>
+					<Select.Root type="single" bind:value={emailAudience}>
+						<Select.Trigger id="a-audience" class="w-full">
+							{emailAudience === '__all' ? 'All active members' : `Tag: ${emailAudience}`}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="__all">All active members</Select.Item>
+							{#each allTags as t (t)}
+								<Select.Item value={t}>Tag: {t}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</Field.Field>
+			{/if}
 			<Field.Field>
 				<Field.Label for="a-subject">Subject</Field.Label>
 				<Input id="a-subject" required bind:value={emailSubject} autofocus />
@@ -360,7 +382,11 @@
 			</Field.Field>
 			<Dialog.Footer
 				><Button type="submit" disabled={emailPending}>
-					{emailPending ? 'Sending…' : 'Send to all members'}
+					{emailPending
+						? 'Sending…'
+						: emailAudience === '__all'
+							? 'Send to all members'
+							: `Send to "${emailAudience}"`}
 				</Button></Dialog.Footer
 			>
 		</form>
