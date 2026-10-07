@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -144,6 +144,29 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
 
+	// Upcoming sessions flagged as needing a substitute instructor.
+	const coverNeeded = await db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			className: classType.name,
+			instructorName: user.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNotNull(classSession.coverRequestedAt),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date())
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(10);
+
 	// Memberships whose term ends within the next 7 days — the same window the
 	// renewal-reminder email uses, visible to staff at a glance.
 	const renewalsThisWeek = await db
@@ -182,6 +205,7 @@ export async function dashboard(orgId: string) {
 		recentActivity,
 		recentMembers,
 		pendingRequests,
+		coverNeeded,
 		renewalsThisWeek
 	};
 }

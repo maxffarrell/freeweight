@@ -130,6 +130,25 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.coverNeeded.length}
+				<Card.Root class="border-amber-500/50">
+					<Card.Header><Card.Title class="text-base">Needs cover</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.coverNeeded as s (s.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/schedule" class="truncate hover:underline">{s.className}</a>
+									<Badge variant="outline" class="shrink-0">
+										{formatDate(s.startsAt)} · {localTime(s.startsAt, d.timezone)}{s.instructorName
+											? ` · ${s.instructorName}`
+											: ''}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.renewalsThisWeek.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Renewing this week</Card.Title></Card.Header>

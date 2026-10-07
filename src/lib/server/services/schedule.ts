@@ -275,7 +275,8 @@ export async function updateSession(
 			instructorId: classSession.instructorId,
 			startsAt: classSession.startsAt,
 			locationId: classSession.locationId,
-			capacity: classSession.capacity
+			capacity: classSession.capacity,
+			coverRequestedAt: classSession.coverRequestedAt
 		})
 		.from(classSession)
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)));
@@ -288,7 +289,16 @@ export async function updateSession(
 			locationId: set.locationId,
 			instructorId: set.instructorId,
 			note: set.note,
-			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null
+			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null,
+			// A new instructor means the cover is filled; otherwise honor the flag.
+			coverRequestedAt:
+				set.instructorId !== undefined && set.instructorId !== prev.instructorId
+					? null
+					: set.needsCover === undefined
+						? undefined
+						: set.needsCover
+							? new Date()
+							: null
 		})
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)))
 		.returning();
@@ -311,6 +321,15 @@ export async function updateSession(
 	}
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
+	if (set.needsCover && !prev.coverRequestedAt)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'session',
+			entityId: id,
+			action: 'cover_requested',
+			summary: 'Cover requested'
+		});
 	const moved =
 		(set.startsAt && zonedToUtc(set.startsAt, tz).getTime() !== prev.startsAt.getTime()) ||
 		(set.locationId !== undefined && set.locationId !== prev.locationId);
