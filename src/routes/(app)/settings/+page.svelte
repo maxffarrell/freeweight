@@ -63,6 +63,7 @@
 	let waiver = $state(settings.waiver);
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
+	let waitlistCutoffMin = $state<number | null>(settings.waitlistCutoffMin);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let publicPage = $state(settings.publicPage);
@@ -82,6 +83,7 @@
 				waiver,
 				bookingWindowDays,
 				cancelCutoffMin,
+				waitlistCutoffMin,
 				noShowFee,
 				suspendAfterDays,
 				publicPage
@@ -293,6 +295,16 @@
 									min={0}
 									bind:value={cancelCutoffMin}
 									placeholder="Any time"
+								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="wcutoff">Waitlist cutoff (minutes)</Field.Label>
+								<Input
+									id="wcutoff"
+									type="number"
+									min={0}
+									bind:value={waitlistCutoffMin}
+									placeholder="Always promote"
 								/>
 							</Field.Field>
 						</div>

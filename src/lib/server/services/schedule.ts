@@ -514,6 +514,21 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 			.returning();
 		if (prev.status !== 'booked') return null;
 
+		// Don't promote when the class is about to start — the member can't
+		// realistically make it. The spot just opens for walk-in booking.
+		const [[sess], [st]] = await Promise.all([
+			tx
+				.select({ startsAt: classSession.startsAt })
+				.from(classSession)
+				.where(eq(classSession.id, b.sessionId)),
+			tx
+				.select({ cutoff: gymSettings.waitlistCutoffMin })
+				.from(gymSettings)
+				.where(eq(gymSettings.organizationId, ctx.orgId))
+		]);
+		if (st?.cutoff && sess && sess.startsAt.getTime() - Date.now() < st.cutoff * 60_000)
+			return null;
+
 		const [next] = await tx
 			.select()
 			.from(booking)

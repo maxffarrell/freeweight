@@ -148,6 +148,13 @@
       "when": 1791355028260,
       "tag": "0020_blue_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791355630732,
+      "tag": "0021_special_black_queen",
+      "breakpoints": true
     }
   ]
 }
