@@ -41,6 +41,7 @@ import {
 	resourceBooking,
 	rota,
 	sessionFeedback,
+	shopItem,
 	user,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -2873,4 +2874,41 @@ export async function notifyMembershipCancelled(
 				: {})
 		})
 	});
+}
+
+/**
+ * "Running low" to owner/admin staff when a sale drops a tracked shop item to
+ * its alert level. Dedup key carries the new count, so each lower level (and a
+ * dip after restock) emails once.
+ */
+export async function notifyLowStock(orgId: string, itemId: string, newStock: number) {
+	const [item] = await db
+		.select({ name: shopItem.name })
+		.from(shopItem)
+		.where(and(eq(shopItem.organizationId, orgId), eq(shopItem.id, itemId)));
+	if (!item) return;
+	const name = await orgBrand(orgId);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'low_stock', `${itemId}:${newStock}`, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${newStock === 0 ? 'Out of stock' : 'Low stock'}: ${item.name} — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `${item.name} ${newStock === 0 ? 'is out of stock' : 'is running low'}`,
+				lines: [
+					newStock === 0
+						? `${item.name} just sold out — the front desk can no longer sell it.`
+						: `${item.name} is down to ${newStock} left in stock.`,
+					'Update the count after restocking from Billing → Shop.'
+				],
+				action: { label: 'Open shop', url: `${appOrigin()}/billing` }
+			})
+		});
+	}
 }

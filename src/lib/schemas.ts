@@ -419,7 +419,11 @@ export const shopItemInput = v.object({
 	name: requiredText('Item name'),
 	price: cents,
 	/** Units on hand; omit/null = untracked. */
-	stock: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999))))
+	stock: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))),
+	/** Staff alert when stock drops to this level; null = never. */
+	lowStockAt: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
+	)
 });
 
 export const shopItemUpdate = v.object({
@@ -427,6 +431,9 @@ export const shopItemUpdate = v.object({
 	name: v.optional(requiredText('Item name')),
 	price: v.optional(cents),
 	stock: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))),
+	lowStockAt: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
+	),
 	active: v.optional(v.boolean())
 });
 

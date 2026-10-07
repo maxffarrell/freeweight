@@ -322,23 +322,35 @@
 	let itemName = $state('');
 	let itemPrice = $state<number | null>(null);
 	let itemStock = $state<number | null>(null);
+	let itemLowStock = $state<number | null>(null);
 	async function addItem(e: SubmitEvent) {
 		e.preventDefault();
 		if (itemPrice == null) return;
 		pending = true;
 		try {
-			await createShopItem({ name: itemName, price: itemPrice, stock: itemStock });
+			await createShopItem({
+				name: itemName,
+				price: itemPrice,
+				stock: itemStock,
+				lowStockAt: itemLowStock
+			});
 			itemName = '';
 			itemPrice = null;
 			itemStock = null;
+			itemLowStock = null;
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add item'));
 		}
 		pending = false;
 	}
-	/** Prompt for a new count; '' or 'x' clears tracking (unlimited). */
-	async function setStock(item: { id: string; name: string; stock: number | null }) {
+	/** Prompts for a new count and alert level; blank stock = untracked. */
+	async function setStock(item: {
+		id: string;
+		name: string;
+		stock: number | null;
+		lowStockAt: number | null;
+	}) {
 		const raw = prompt(
 			`${item.name} — units on hand (blank = unlimited)`,
 			String(item.stock ?? '')
@@ -346,8 +358,15 @@
 		if (raw === null) return;
 		const n = raw.trim() === '' ? null : Math.max(0, Math.floor(Number(raw)));
 		if (n !== null && !Number.isFinite(n)) return toast.error('Not a number');
+		const rawLow = prompt(
+			`${item.name} — alert staff when stock drops to (blank = never)`,
+			String(item.lowStockAt ?? '')
+		);
+		if (rawLow === null) return;
+		const low = rawLow.trim() === '' ? null : Math.max(0, Math.floor(Number(rawLow)));
+		if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
 		try {
-			await updateShopItem({ id: item.id, stock: n });
+			await updateShopItem({ id: item.id, stock: n, lowStockAt: low });
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update stock'));
@@ -675,8 +694,15 @@
 										>
 										<Table.Cell class="text-right tabular-nums">
 											{#if i.stock === null}—{:else}<span
-													class={i.stock === 0 ? 'text-destructive' : ''}>{i.stock}</span
-												>{/if}
+													class={i.stock === 0
+														? 'text-destructive'
+														: i.lowStockAt !== null && i.stock <= i.lowStockAt
+															? 'font-medium text-amber-600 dark:text-amber-400'
+															: ''}>{i.stock}</span
+												>{#if i.lowStockAt !== null}<span
+														class="ml-1 text-xs text-muted-foreground"
+														title="Alert level">≤{i.lowStockAt}</span
+													>{/if}{/if}
 											<Button
 												variant="ghost"
 												size="sm"
@@ -744,6 +770,16 @@
 									min={0}
 									bind:value={itemStock}
 									placeholder="Leave blank for unlimited"
+								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="i-low">Low-stock alert — optional</Field.Label>
+								<Input
+									id="i-low"
+									type="number"
+									min={0}
+									bind:value={itemLowStock}
+									placeholder="Email staff at this count"
 								/>
 							</Field.Field>
 							<Button type="submit" disabled={pending || itemPrice == null || !itemName.trim()}

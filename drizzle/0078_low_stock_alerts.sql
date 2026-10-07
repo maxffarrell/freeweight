@@ -1,0 +1,1 @@
+ALTER TABLE "shop_item" ADD COLUMN "low_stock_at" integer;

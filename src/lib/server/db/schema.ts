@@ -816,6 +816,8 @@ export const shopItem = pgTable(
 		price: integer('price').notNull(),
 		/** Units on hand — null = untracked/unlimited. Decremented on each sale. */
 		stock: integer('stock'),
+		/** Alert staff when stock falls to or below this; null = never alert. */
+		lowStockAt: integer('low_stock_at'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
