@@ -37,7 +37,9 @@ export async function createResource(
 			openFrom: input.openFrom,
 			openTo: input.openTo,
 			locationId: input.locationId ?? null,
-			active: input.active
+			active: input.active,
+			status: input.status ?? 'open',
+			statusNote: input.statusNote ?? ''
 		})
 		.returning();
 	return row;
@@ -75,6 +77,8 @@ export async function resourceAvailability(
 			)
 		);
 	if (!r) error(404, 'Resource not found');
+	// Down for maintenance/closed — no slots, portal shows the status note.
+	if (r.status !== 'open') return { resource: r, slots: [] };
 	// Slots are local-clock times: "sauna at 6pm" keeps its meaning across DST.
 	const slots: { startsAt: Date; endsAt: Date; taken: number }[] = [];
 	let cur = zonedToUtc(`${day}T${r.openFrom}`, tz);
@@ -128,6 +132,11 @@ export async function bookResource(
 			.where(and(eq(facilityResource.organizationId, orgId), eq(facilityResource.id, resourceId)))
 			.for('update');
 		if (!r || !r.active) error(404, 'Resource not found');
+		if (r.status !== 'open')
+			error(
+				409,
+				`${r.status === 'maintenance' ? 'Down for maintenance' : 'Closed'}${r.statusNote ? ` — ${r.statusNote}` : ''}`
+			);
 		resourceName = r.name;
 		const [m] = await tx
 			.select({ id: gymMember.id })

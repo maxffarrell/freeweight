@@ -891,7 +891,11 @@
 									class="h-9 rounded-md border bg-transparent px-2 text-sm"
 								>
 									{#each amenities as a (a.resource.id)}
-										<option value={a.resource.id}>{a.resource.name}</option>
+										<option value={a.resource.id}
+											>{a.resource.name}{a.resource.status !== 'open'
+												? ` (${a.resource.status === 'maintenance' ? 'maintenance' : 'closed'})`
+												: ''}</option
+										>
 									{/each}
 								</select>
 							{/if}
@@ -906,7 +910,15 @@
 							/>
 						</div>
 					</div>
-					{#if amenity && amenityDay}
+					{#if amenity && amenity.resource.status !== 'open'}
+						<p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+							{amenity.resource.status === 'maintenance'
+								? 'Down for maintenance'
+								: 'Closed right now'}{amenity.resource.statusNote
+								? ` — ${amenity.resource.statusNote}`
+								: ''}
+						</p>
+					{:else if amenity && amenityDay}
 						{#if amenitySlots?.slots.length}
 							<div class="flex flex-wrap gap-2">
 								{#each amenitySlots.slots as s (s.startsAt.getTime())}

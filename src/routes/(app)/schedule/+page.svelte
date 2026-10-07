@@ -558,6 +558,18 @@
 			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
+
+	async function setResourceStatus(id: string, status: 'open' | 'maintenance' | 'closed') {
+		const statusNote =
+			status === 'open' ? '' : String(prompt('Why? (shown to members, optional)') ?? '').trim();
+		try {
+			await updateResource({ id, status, statusNote });
+			await getResources().refresh();
+			toast.success(status === 'open' ? 'Reopened' : 'Marked — new bookings blocked');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 	let editTypeId = $state<string | null>(null);
 	let tName = $state('');
 	let tColor = $state('#6366f1');
@@ -1562,16 +1574,39 @@
 								{#if r.locationName}
 									· {r.locationName}{/if}
 							</p>
+							{#if r.resource.status !== 'open'}
+								<p class="text-xs font-medium text-amber-600 dark:text-amber-400">
+									{r.resource.status === 'maintenance' ? 'Maintenance' : 'Closed'}{r.resource
+										.statusNote
+										? ` — ${r.resource.statusNote}`
+										: ''} · new bookings blocked
+								</p>
+							{/if}
 						</div>
-						<Switch
-							checked={r.resource.active}
-							onCheckedChange={(v) => toggleResource(r.resource.id, v)}
-						/>
+						<div class="flex shrink-0 items-center gap-2">
+							<select
+								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+								value={r.resource.status}
+								onchange={(e) =>
+									setResourceStatus(
+										r.resource.id,
+										e.currentTarget.value as 'open' | 'maintenance' | 'closed'
+									)}
+							>
+								<option value="open">Open</option>
+								<option value="maintenance">Maintenance</option>
+								<option value="closed">Closed</option>
+							</select>
+							<Switch
+								checked={r.resource.active}
+								onCheckedChange={(v) => toggleResource(r.resource.id, v)}
+							/>
+						</div>
 					</div>
 				{/each}
 			</div>
 		{/if}
-		{#if resources.some((r) => r.resource.active)}
+		{#if resources.some((r) => r.resource.active && r.resource.status === 'open')}
 			<p class="mb-1 text-xs font-medium text-muted-foreground">Book for a member</p>
 			<form class="mb-4 grid grid-cols-2 items-end gap-2" onsubmit={submitAmenityBooking}>
 				<select
@@ -1590,7 +1625,7 @@
 					class="h-9 rounded-md border bg-transparent px-2 text-sm"
 				>
 					<option value="" disabled>Amenity…</option>
-					{#each resources.filter((r) => r.resource.active) as r (r.resource.id)}
+					{#each resources.filter((r) => r.resource.active && r.resource.status === 'open') as r (r.resource.id)}
 						<option value={r.resource.id}>{r.resource.name}</option>
 					{/each}
 				</select>

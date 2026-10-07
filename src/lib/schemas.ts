@@ -147,7 +147,11 @@ export const resourceInput = v.object({
 	openFrom: timeHM,
 	openTo: timeHM,
 	locationId: v.optional(v.nullable(idSchema)),
-	active: v.optional(v.boolean(), true)
+	active: v.optional(v.boolean(), true),
+	/** 'open' | 'maintenance' | 'closed' — non-open blocks every new booking. */
+	status: v.optional(v.picklist(['open', 'maintenance', 'closed']), 'open'),
+	/** Short "why" shown to members while the amenity isn't open. */
+	statusNote: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
 });
 export const resourceUpdate = v.object({ id: idSchema, ...v.partial(resourceInput).entries });
 

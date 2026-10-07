@@ -463,6 +463,13 @@
       "when": 1791401557615,
       "tag": "0065_user-pref",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791402573963,
+      "tag": "0066_resource-status",
+      "breakpoints": true
     }
   ]
 }
