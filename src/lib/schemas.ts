@@ -473,6 +473,13 @@ export const emailRosterInput = v.object({
 	message: requiredText('Message')
 });
 
+/** Email everyone registered for an event — same treatment as a session roster. */
+export const emailEventRosterInput = v.object({
+	eventId: idSchema,
+	subject: requiredText('Subject'),
+	message: requiredText('Message')
+});
+
 export const announcementInput = v.object({
 	subject: requiredText('Subject'),
 	message: requiredText('Message'),

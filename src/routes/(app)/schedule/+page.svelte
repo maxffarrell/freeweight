@@ -29,6 +29,7 @@
 		updateTemplate,
 		deleteTemplate,
 		emailSessionRoster,
+		emailEventRoster,
 		copyWeek,
 		getInstructorUpcoming,
 		handoffInstructor,
@@ -226,21 +227,26 @@
 	let msgOpen = $state(false);
 	let msgSubject = $state('');
 	let msgBody = $state('');
+	/** Non-empty when the mail dialog targets an event roster instead of the focused session. */
+	let msgEventId = $state('');
 	async function submitMsg(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
-			const r = await emailSessionRoster({
-				sessionId: focusId,
-				subject: msgSubject,
-				message: msgBody
-			});
+			const r = msgEventId
+				? await emailEventRoster({ eventId: msgEventId, subject: msgSubject, message: msgBody })
+				: await emailSessionRoster({
+						sessionId: focusId,
+						subject: msgSubject,
+						message: msgBody
+					});
 			toast.success(
 				r.sent ? `Sent to ${r.sent} member${r.sent === 1 ? '' : 's'}` : 'Nobody to email'
 			);
 			msgOpen = false;
 			msgSubject = '';
 			msgBody = '';
+			msgEventId = '';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send'));
 		}
@@ -830,8 +836,14 @@
 				</Table.Body>
 			</Table.Root>
 			<div class="flex justify-end gap-1">
-				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => (msgOpen = true)}
-					><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-7 px-2 text-xs"
+					onclick={() => {
+						msgEventId = '';
+						msgOpen = true;
+					}}><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
 				>
 				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
 					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
@@ -1429,10 +1441,11 @@
 <Dialog.Root bind:open={msgOpen}>
 	<Dialog.Content>
 		<Dialog.Header>
-			<Dialog.Title>Message attendees</Dialog.Title>
+			<Dialog.Title>{msgEventId ? 'Message registrants' : 'Message attendees'}</Dialog.Title>
 			<Dialog.Description
-				>Emails everyone booked or waitlisted on {focus?.className ??
-					'this session'}.</Dialog.Description
+				>Emails {msgEventId
+					? `everyone registered for ${events.find((e) => e.event.id === msgEventId)?.event.name ?? 'this event'}`
+					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.</Dialog.Description
 			>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitMsg}>
@@ -1718,7 +1731,16 @@
 						</button>
 						{#if evRosterId === ev.event.id && evRoster}
 							{#if !ev.event.cancelledAt}
-								<div class="mb-1 flex justify-end">
+								<div class="mb-1 flex justify-end gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs"
+										onclick={() => {
+											msgEventId = ev.event.id;
+											msgOpen = true;
+										}}><Mail class="mr-1 h-3 w-3" /> Message</Button
+									>
 									<Button
 										variant="ghost"
 										size="sm"

@@ -13,6 +13,7 @@ import {
 	classTypeInput,
 	classTypeUpdate,
 	closureInput,
+	emailEventRosterInput,
 	emailRosterInput,
 	idSchema,
 	instructorConflictInput,
@@ -74,6 +75,17 @@ export const emailSessionRoster = command(
 		const ids = roster
 			.filter((r) => r.booking.status === 'booked' || r.booking.status === 'waitlisted')
 			.map((r) => r.booking.memberId);
+		if (!ids.length) return { sent: 0, total: 0 };
+		return sendAnnouncement(orgId, subject, message, ids);
+	}
+);
+/** Email everyone registered or waitlisted for an event — "venue moved" notes. */
+export const emailEventRoster = command(
+	emailEventRosterInput,
+	async ({ eventId, subject, message }) => {
+		const { orgId } = await requireOrg();
+		const { rows } = await evt.eventRoster(orgId, eventId);
+		const ids = rows.map((r) => r.registration.memberId);
 		if (!ids.length) return { sent: 0, total: 0 };
 		return sendAnnouncement(orgId, subject, message, ids);
 	}
