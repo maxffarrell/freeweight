@@ -289,6 +289,8 @@ export const classSession = pgTable(
 		endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
 		capacity: integer('capacity').notNull(),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+		/** Staff note on this session ("pool closed — bring mats"); shown on the roster. */
+		note: text('note'),
 		...timestamps
 	},
 	(t) => [

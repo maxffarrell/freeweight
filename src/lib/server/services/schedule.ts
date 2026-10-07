@@ -204,7 +204,8 @@ export async function createSession(
 				instructorId: input.instructorId ?? ct.instructorId,
 				startsAt: d,
 				endsAt: new Date(d.getTime() + (end.getTime() - start.getTime())),
-				capacity: input.capacity ?? ct.capacity
+				capacity: input.capacity ?? ct.capacity,
+				note: input.note ?? null
 			}))
 		)
 		.returning();
@@ -241,6 +242,7 @@ export async function updateSession(
 			capacity: set.capacity,
 			locationId: set.locationId,
 			instructorId: set.instructorId,
+			note: set.note,
 			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null
 		})
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)))

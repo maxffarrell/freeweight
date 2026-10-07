@@ -1,0 +1,1 @@
+ALTER TABLE "class_session" ADD COLUMN "note" text;

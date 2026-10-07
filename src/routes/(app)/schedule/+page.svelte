@@ -128,6 +128,7 @@
 	let editCapacity = $state<number | null>(null);
 	let editLocationId = $state('');
 	let editInstructorId = $state('');
+	let editNote = $state('');
 	function openEdit() {
 		if (!focus) return;
 		editDate = localDate(focus.session.startsAt, tz);
@@ -135,6 +136,7 @@
 		editCapacity = focus.session.capacity;
 		editLocationId = focus.session.locationId ?? '';
 		editInstructorId = focus.session.instructorId ?? '';
+		editNote = focus.session.note ?? '';
 		editOpen = true;
 	}
 	async function submitEdit(e: SubmitEvent) {
@@ -146,7 +148,8 @@
 				startsAt: `${editDate}T${editTime}`,
 				capacity: editCapacity ?? undefined,
 				locationId: editLocationId || null,
-				instructorId: editInstructorId || null
+				instructorId: editInstructorId || null,
+				note: editNote.trim() || null
 			});
 			toast.success('Session updated');
 			editOpen = false;
@@ -190,6 +193,7 @@
 	let sessStart = $state(localDate(new Date(), tz));
 	let sessStartTime = $state('17:30');
 	let sessRepeatUntil = $state('');
+	let sessNote = $state('');
 	let pending = $state(false);
 	async function submitSession(e: SubmitEvent) {
 		e.preventDefault();
@@ -200,7 +204,8 @@
 				locationId: sessLocationId || undefined,
 				instructorId: sessInstructorId || undefined,
 				startsAt: `${sessStart}T${sessStartTime}`,
-				repeatUntil: sessRepeatUntil || undefined
+				repeatUntil: sessRepeatUntil || undefined,
+				note: sessNote.trim() || undefined
 			});
 			toast.success('Session scheduled');
 			sessOpen = false;
@@ -402,6 +407,11 @@
 			</Sheet.Title>
 			<Sheet.Description>Roster — booked first, waitlist below.</Sheet.Description>
 		</Sheet.Header>
+		{#if focus?.session.note}
+			<p class="border-b px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
+				{focus.session.note}
+			</p>
+		{/if}
 		<div class="space-y-4 overflow-y-auto p-4">
 			<Table.Root>
 				<Table.Body>
@@ -508,6 +518,7 @@
 				· {focus.locationName}{/if}
 			· {focus.session.capacity} spots
 		</p>
+		{#if focus.session.note}<p class="mt-1 text-sm italic">{focus.session.note}</p>{/if}
 		<table class="mt-6 w-full border-collapse text-left text-sm">
 			<thead>
 				<tr class="border-b-2 border-black">
@@ -608,6 +619,15 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
+			<Field.Field>
+				<Field.Label for="edit-note">Note (optional)</Field.Label>
+				<Input
+					id="edit-note"
+					bind:value={editNote}
+					placeholder="Shown on the roster — e.g. pool closed, bring mats"
+					maxlength={500}
+				/>
+			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save changes'}</Button>
 			</Dialog.Footer>
@@ -676,6 +696,15 @@
 			<Field.Field>
 				<Field.Label for="sess-repeat">Repeat weekly until (optional)</Field.Label>
 				<Input id="sess-repeat" type="date" bind:value={sessRepeatUntil} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="sess-note">Note (optional)</Field.Label>
+				<Input
+					id="sess-note"
+					bind:value={sessNote}
+					placeholder="Shown on the roster"
+					maxlength={500}
+				/>
 			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending || !sessTypeId}

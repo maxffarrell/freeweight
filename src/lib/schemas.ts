@@ -123,7 +123,8 @@ export const sessionInput = v.object({
 	startsAt: localDateTime,
 	capacity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	/** Repeat weekly until this ISO date (inclusive). */
-	repeatUntil: v.optional(v.nullable(isoDate))
+	repeatUntil: v.optional(v.nullable(isoDate)),
+	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 export const templateInput = v.object({
 	classTypeId: idSchema,
@@ -142,7 +143,8 @@ export const sessionUpdate = v.object({
 	capacity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
-	cancelled: v.optional(v.boolean())
+	cancelled: v.optional(v.boolean()),
+	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 
 export const bookingInput = v.object({
