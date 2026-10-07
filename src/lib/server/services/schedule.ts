@@ -273,7 +273,8 @@ export async function updateSession(
 		.select({
 			instructorId: classSession.instructorId,
 			startsAt: classSession.startsAt,
-			locationId: classSession.locationId
+			locationId: classSession.locationId,
+			capacity: classSession.capacity
 		})
 		.from(classSession)
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)));
@@ -298,6 +299,55 @@ export async function updateSession(
 		(set.startsAt && zonedToUtc(set.startsAt, tz).getTime() !== prev.startsAt.getTime()) ||
 		(set.locationId !== undefined && set.locationId !== prev.locationId);
 	if (moved && !set.cancelled) notifySessionChanged(ctx.orgId, id).catch(() => {});
+	// More seats than before — promote waitlisted members FIFO into them.
+	// Skipped near class start (same cutoff as spot-freeing promotions) and on
+	// cancelled sessions.
+	if (set.capacity != null && set.capacity > prev.capacity && !row.cancelledAt) {
+		const [st] = await db
+			.select({ cutoff: gymSettings.waitlistCutoffMin })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, ctx.orgId));
+		const cutoffHit = st?.cutoff && row.startsAt.getTime() - Date.now() < st.cutoff * 60_000;
+		if (!cutoffHit) {
+			const promotedIds = await db.transaction(async (tx) => {
+				const [{ n: booked }] = await tx
+					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.from(booking)
+					.where(and(eq(booking.sessionId, id), eq(booking.status, 'booked')));
+				const free = row.capacity - booked;
+				if (free <= 0) return [] as string[];
+				const waiters = await tx
+					.select({ id: booking.id })
+					.from(booking)
+					.where(and(eq(booking.sessionId, id), eq(booking.status, 'waitlisted')))
+					.orderBy(asc(booking.createdAt))
+					.limit(free)
+					.for('update');
+				if (!waiters.length) return [] as string[];
+				await tx
+					.update(booking)
+					.set({ status: 'booked' })
+					.where(
+						inArray(
+							booking.id,
+							waiters.map((w) => w.id)
+						)
+					);
+				return waiters.map((w) => w.id);
+			});
+			for (const bid of promotedIds) await notifyWaitlistPromoted(ctx.orgId, bid).catch(() => {});
+			if (promotedIds.length)
+				await emit({
+					orgId: ctx.orgId,
+					actorId: ctx.userId,
+					entityType: 'class_session',
+					entityId: id,
+					action: 'waitlist_promoted',
+					summary: `${promotedIds.length} member${promotedIds.length > 1 ? 's' : ''} promoted off the waitlist`,
+					data: { bookingIds: promotedIds }
+				});
+		}
+	}
 	// Keep endsAt in step with the class duration when the start moves.
 	if (set.startsAt) {
 		const [ct] = await db
