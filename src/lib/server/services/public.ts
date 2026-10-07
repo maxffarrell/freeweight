@@ -15,7 +15,14 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
-import { createMembership, getPlan } from './billing.ts';
+import {
+	createMembership,
+	getPlan,
+	markPromoUsed,
+	promoApply,
+	promoState,
+	redeemablePromo
+} from './billing.ts';
 import { notifyReferralJoin } from './notifications.ts';
 import { providers } from '../payments/index.ts';
 import { providerRow } from '../payments/settings.ts';
@@ -131,12 +138,22 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			joinedAt: new Date().toISOString().slice(0, 10)
 		})
 		.returning();
+	// Promo code — validated before the membership is created so a bad code fails the join.
+	const promo = input.promoCode?.trim()
+		? await redeemablePromo(org.id, input.promoCode)
+		: null;
+
 	let checkoutUrl: string | null = null;
 	if (input.planId) {
 		const p = await getPlan(org.id, input.planId);
 		if (p.listed && p.active) {
-			await createMembership({ orgId: org.id }, { memberId: m!.id, planId: input.planId });
-			checkoutUrl = await signupCheckout(org.id, slug, settings, p, m!.id, input.email);
+			await createMembership(
+				{ orgId: org.id },
+				{ memberId: m!.id, planId: input.planId },
+				promo ?? undefined
+			);
+			if (promo) await markPromoUsed(org.id, promo.id);
+			checkoutUrl = await signupCheckout(org.id, slug, settings, p, m!.id, input.email, promo);
 		}
 	}
 	if (settings?.waiver) await recordWaiver(org.id, m!.id, settings.waiver);
@@ -198,16 +215,22 @@ async function signupCheckout(
 	settings: { currency: string } | undefined,
 	p: { name: string; signupFee: number; isPack: boolean; amount: number },
 	memberId: string,
-	email: string | null
+	email: string | null,
+	promo?: { code: string; percentOff: number | null; amountOff: number | null } | null
 ) {
-	// A pack's whole price is paid up front alongside any signup fee.
-	const amount = p.signupFee + (p.isPack ? p.amount : 0);
+	// A pack's whole price is paid up front alongside any signup fee; a promo
+	// discounts the same total the membership charges were reduced by.
+	const state = promo ? promoState(promo) : null;
+	const amount = promo
+		? promoApply(promo, state!, p.signupFee) +
+			(p.isPack ? promoApply(promo, state!, p.amount) : 0)
+		: p.signupFee + (p.isPack ? p.amount : 0);
 	return onlineCheckout(
 		orgId,
 		settings,
 		{
 			amount,
-			description: `${p.isPack ? 'Class pack' : 'Signup fee'} — ${p.name}`,
+			description: `${p.isPack ? 'Class pack' : 'Signup fee'} — ${p.name}${promo ? ` (${promo.code})` : ''}`,
 			memberId,
 			email
 		},

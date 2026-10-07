@@ -29,6 +29,7 @@
 	let phone = $state('');
 	let referralSource = $state<(typeof referralSources)[number] | ''>('');
 	let planId = $state('');
+	let promoCode = $state('');
 	let website = $state(''); // honeypot — must stay empty
 	let agreedWaiver = $state(false);
 	let pending = $state(false);
@@ -51,6 +52,7 @@
 					referralSource: referralSource || null,
 					referredById: refId || undefined,
 					planId: planId || undefined,
+					promoCode: promoCode || undefined,
 					agreedWaiver,
 					website
 				}
@@ -319,6 +321,17 @@
 											</Select.Content>
 										</Select.Root>
 									</Field.Field>
+									{#if planId}
+										<Field.Field>
+											<Field.Label for="j-promo">Promo code (optional)</Field.Label>
+											<Input
+												id="j-promo"
+												bind:value={promoCode}
+												placeholder="LAUNCH20"
+												class="uppercase"
+											/>
+										</Field.Field>
+									{/if}
 								{/if}
 							</div>
 							{#if settings.waiver}

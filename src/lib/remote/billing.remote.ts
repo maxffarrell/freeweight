@@ -13,7 +13,9 @@ import {
 	membershipUpdate,
 	paymentInput,
 	planInput,
-	planUpdate
+	planUpdate,
+	promoCodeInput,
+	promoCodeUpdate
 } from '#lib/schemas.ts';
 
 export const getPlans = query(async () => svc.listPlans((await requireOrg()).orgId));
@@ -25,6 +27,20 @@ export const createPlan = command(planInput, async (input) => {
 export const updatePlan = command(planUpdate, async (input) => {
 	const p = await svc.updatePlan(await requireOrg('admin'), input);
 	void getPlans().refresh();
+	return p;
+});
+
+export const getPromoCodes = query(async () =>
+	svc.listPromoCodes((await requireOrg()).orgId)
+);
+export const createPromoCode = command(promoCodeInput, async (input) => {
+	const p = await svc.createPromoCode(await requireOrg('admin'), input);
+	void getPromoCodes().refresh();
+	return p;
+});
+export const updatePromoCode = command(promoCodeUpdate, async (input) => {
+	const p = await svc.updatePromoCode(await requireOrg('admin'), input);
+	void getPromoCodes().refresh();
 	return p;
 });
 
