@@ -431,6 +431,51 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Events</Card.Title>
+			<Card.Description
+				>Signups, show rate and signup revenue per event, last 90 days + upcoming</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="px-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Event</Table.Head>
+						<Table.Head>Date</Table.Head>
+						<Table.Head class="text-right">Registered</Table.Head>
+						<Table.Head class="text-right">Attended</Table.Head>
+						<Table.Head class="text-right">Show rate</Table.Head>
+						<Table.Head class="text-right">Revenue</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.events as e (e.event.id)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{e.event.name}</Table.Cell>
+							<Table.Cell>{formatDate(e.event.startsAt)}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{e.registered}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{e.past ? e.attended : '—'}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums"
+								>{e.past ? `${e.showRate}%` : '—'}</Table.Cell
+							>
+							<Table.Cell class="text-right tabular-nums"
+								>{e.revenue ? formatMoney(e.revenue, currency) : '—'}</Table.Cell
+							>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={6} class="text-muted-foreground"
+								>No events in the last 90 days.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Fill by weekday</Card.Title>
 			<Card.Description>Booked vs capacity per day, sessions in the last 90 days</Card.Description>
 		</Card.Header>

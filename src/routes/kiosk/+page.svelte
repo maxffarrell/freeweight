@@ -114,7 +114,8 @@
 			showFlash(
 				true,
 				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : '') + visitNote(r.visits),
-				r.member.photoDocumentId
+				r.member.photoDocumentId,
+				r.waiverMissing ? 'waiver unsigned' : null
 			);
 			await getRoster(rosterSess!.session.id).refresh();
 		} catch (err) {
@@ -225,7 +226,8 @@
 							(r.birthday ? ' — happy birthday!' : '') +
 							visitNote(r.visits),
 				r.member.photoDocumentId,
-				r.member.deskNote
+				[r.waiverMissing ? 'waiver unsigned' : '', r.member.deskNote].filter(Boolean).join(' · ') ||
+					null
 			);
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
