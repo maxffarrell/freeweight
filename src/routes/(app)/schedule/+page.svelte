@@ -213,6 +213,10 @@
 	let sessStart = $state(localDate(new Date(), tz));
 	let sessStartTime = $state('17:30');
 	let sessRepeatUntil = $state('');
+	// Prefill seats from the chosen class type; staff can still override per session.
+	let sessCapacity = $derived<number | null>(
+		classTypes.find((c) => c.id === sessTypeId)?.capacity ?? null
+	);
 	let sessNote = $state('');
 	let pending = $state(false);
 	async function submitSession(e: SubmitEvent) {
@@ -224,6 +228,7 @@
 				locationId: sessLocationId || undefined,
 				instructorId: sessInstructorId || undefined,
 				startsAt: `${sessStart}T${sessStartTime}`,
+				capacity: sessCapacity ?? undefined,
 				repeatUntil: sessRepeatUntil || undefined,
 				note: sessNote.trim() || undefined
 			});
@@ -770,6 +775,10 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="sess-cap">Capacity</Field.Label>
+				<Input id="sess-cap" type="number" min={1} required bind:value={sessCapacity} />
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="sess-repeat">Repeat weekly until (optional)</Field.Label>
