@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -11,7 +11,9 @@ import {
 	gymSettings,
 	location,
 	member,
+	membership,
 	payment,
+	plan,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -115,6 +117,29 @@ export async function dashboard(orgId: string) {
 		.orderBy(desc(gymMember.createdAt))
 		.limit(6);
 
+	// Member-requested cancel/pause actions waiting on staff.
+	const pendingRequests = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			planName: plan.name,
+			kind: sql<
+				'cancel' | 'pause'
+			>`case when ${membership.cancelRequestedAt} is not null then 'cancel' else 'pause' end`,
+			requestedAt: sql<Date>`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`,
+			pauseUntil: membership.pauseUntil
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				or(isNotNull(membership.cancelRequestedAt), isNotNull(membership.pauseRequestedAt))
+			)
+		)
+		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
+
 	return {
 		timezone: tz,
 		currency: settings?.currency ?? 'usd',
@@ -126,6 +151,7 @@ export async function dashboard(orgId: string) {
 		mrr,
 		todaySessions,
 		recentActivity,
-		recentMembers
+		recentMembers,
+		pendingRequests
 	};
 }

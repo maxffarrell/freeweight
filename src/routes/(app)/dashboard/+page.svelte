@@ -5,7 +5,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { getDashboard } from '#lib/remote/workspace.remote.ts';
-	import { formatMoney, formatRelative } from '#lib/format.ts';
+	import { formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
 	import Users from '@lucide/svelte/icons/users';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
@@ -100,6 +100,26 @@
 		</Card.Root>
 
 		<div class="space-y-6">
+			{#if d.pendingRequests.length}
+				<Card.Root class="border-amber-500/50">
+					<Card.Header><Card.Title class="text-base">Needs attention</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.pendingRequests as r (r.memberId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
+									>
+									<Badge variant="outline" class="shrink-0">
+										{r.kind === 'cancel'
+											? `cancel ${r.planName}`
+											: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			<Card.Root>
 				<Card.Header><Card.Title class="text-base">Recent activity</Card.Title></Card.Header>
 				<Card.Content class="px-4">
