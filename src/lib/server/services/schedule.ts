@@ -33,7 +33,8 @@ import {
 	member,
 	membership,
 	plan,
-	user
+	user,
+	workoutResult
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
@@ -377,9 +378,22 @@ export async function getSession(orgId: string, id: string) {
 export async function getRoster(orgId: string, sessionId: string) {
 	await getSession(orgId, sessionId);
 	return db
-		.select({ booking, memberName: gymMember.name, memberEmail: gymMember.email })
+		.select({
+			booking,
+			memberName: gymMember.name,
+			memberEmail: gymMember.email,
+			resultScore: workoutResult.score,
+			resultRx: workoutResult.asRx
+		})
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.leftJoin(
+			workoutResult,
+			and(
+				eq(workoutResult.sessionId, booking.sessionId),
+				eq(workoutResult.memberId, booking.memberId)
+			)
+		)
 		.where(and(eq(booking.organizationId, orgId), eq(booking.sessionId, sessionId)))
 		.orderBy(asc(booking.createdAt));
 }

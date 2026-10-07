@@ -10,6 +10,7 @@ import {
 	classSession,
 	classType,
 	sessionFeedback,
+	workoutResult,
 	gymMember,
 	gymSettings,
 	location,
@@ -233,6 +234,26 @@ export async function portalOverview(memberId: string) {
 				)
 		: [];
 	const feedback = Object.fromEntries(fbRows.map((f) => [f.sessionId, f]));
+	// Workout scores the member logged on sessions in that history.
+	const resRows = history.length
+		? await db
+				.select({
+					sessionId: workoutResult.sessionId,
+					score: workoutResult.score,
+					asRx: workoutResult.asRx
+				})
+				.from(workoutResult)
+				.where(
+					and(
+						eq(workoutResult.memberId, memberId),
+						inArray(
+							workoutResult.sessionId,
+							history.map((h) => h.sessionId)
+						)
+					)
+				)
+		: [];
+	const results = Object.fromEntries(resRows.map((r) => [r.sessionId, r]));
 	return {
 		member: m,
 		settings,
@@ -243,6 +264,7 @@ export async function portalOverview(memberId: string) {
 		payments,
 		history,
 		feedback,
+		results,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		calendarToken: calendarToken(memberId),
@@ -889,4 +911,47 @@ export async function memberChangePlan(orgId: string, memberId: string, planId: 
 	});
 	notifyPlanChanged(orgId, ms.membership.id, ms.plan.name).catch(() => {});
 	return { row, prorated };
+}
+
+/**
+ * Logs (or updates) the member's score on a session's workout of the day.
+ * Requires the member to have attended and the session to actually have a WOD.
+ */
+export async function logWorkoutResult(
+	orgId: string,
+	memberId: string,
+	sessionId: string,
+	score: string,
+	asRx: boolean
+) {
+	const trimmed = score.trim();
+	if (!trimmed || trimmed.length > 120) error(400, 'Score must be 1-120 characters');
+	const [sess] = await db
+		.select({ workout: classSession.workout })
+		.from(classSession)
+		.where(and(eq(classSession.id, sessionId), eq(classSession.organizationId, orgId)))
+		.limit(1);
+	if (!sess?.workout) error(404, 'No workout logged for that session');
+	const [attended] = await db
+		.select({ id: booking.id })
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				eq(booking.sessionId, sessionId),
+				eq(booking.status, 'attended')
+			)
+		)
+		.limit(1);
+	if (!attended) error(403, 'You can only log a score on classes you attended');
+	const [row] = await db
+		.insert(workoutResult)
+		.values({ organizationId: orgId, sessionId, memberId, score: trimmed, asRx })
+		.onConflictDoUpdate({
+			target: [workoutResult.sessionId, workoutResult.memberId],
+			set: { score: trimmed, asRx, updatedAt: new Date() }
+		})
+		.returning();
+	return row;
 }
