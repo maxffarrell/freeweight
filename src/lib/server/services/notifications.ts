@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -313,6 +313,67 @@ export async function sendPastDueNotices(orgId: string) {
 					'You can pay online from the member portal.'
 				],
 				action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
+ * "Your trial ends soon" to members whose first billing is within 2 days —
+ * a still-trialing membership has a trialDays plan and no charge posted yet.
+ * One email per membership (logOnce 'trial_ending').
+ */
+export async function sendTrialEndingNotices(orgId: string) {
+	const soon = new Date(Date.now() + 2 * 86400_000);
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			planName: plan.name,
+			amount: plan.amount,
+			interval: plan.interval,
+			nextChargeAt: membership.nextChargeAt,
+			membershipId: membership.id
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				gt(plan.trialDays, 0),
+				lte(membership.nextChargeAt, soon),
+				sql`not exists (select 1 from ${charge} c where c.membership_id = ${membership.id})`
+			)
+		);
+	if (!rows.length) return 0;
+	const [name, tz, st] = await Promise.all([
+		orgName(orgId),
+		orgTimezone(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const currency = st[0]?.currency ?? 'usd';
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email || !r.nextChargeAt) continue;
+		if (!(await logOnce(orgId, 'trial_ending', r.membershipId, r.email))) continue;
+		const amount = formatMoney(r.amount, currency);
+		const date = localDate(r.nextChargeAt, tz);
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Your free trial at ${name} ends ${date}`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Your trial is almost up',
+				lines: [
+					`Hi ${r.memberName} — your free trial of ${r.planName} at ${name} ends ${date}.`,
+					`Your first payment of ${amount}/${r.interval} posts that day. Questions about your plan? Just reply to this email or stop by the front desk.`
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})
 		});
 		sent++;

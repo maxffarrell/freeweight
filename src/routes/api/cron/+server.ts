@@ -8,6 +8,7 @@ import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import {
 	sendClassReminders,
 	sendPastDueNotices,
+	sendTrialEndingNotices,
 	sendWeeklyDigest
 } from '#lib/server/services/notifications.ts';
 import { markPastNoShows, materializeTemplates } from '#lib/server/services/schedule.ts';
@@ -27,6 +28,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let failed = 0;
 	let reminders = 0;
 	let pastDue = 0;
+	let trials = 0;
 	let noShows = 0;
 	let suspended = 0;
 	let generated = 0;
@@ -50,6 +52,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`past-due cron failed for ${o.id}`, err);
+		}
+		try {
+			trials += await sendTrialEndingNotices(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`trial-ending cron failed for ${o.id}`, err);
 		}
 		try {
 			noShows += await markPastNoShows(o.id);
@@ -76,6 +84,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		failed,
 		reminders,
 		pastDue,
+		trials,
 		noShows,
 		suspended,
 		generated,
