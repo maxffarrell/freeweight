@@ -109,6 +109,11 @@
 							>
 							{#if needsCover}<Badge variant="secondary" class="text-amber-600">needs cover</Badge
 								>{/if}
+							{#if row.session.checkinCode}
+								<Badge variant="outline" class="font-mono tracking-widest"
+									>code {row.session.checkinCode}</Badge
+								>
+							{/if}
 						</div>
 						<div class="text-sm text-muted-foreground">
 							{formatDate(row.session.startsAt)} · {localTime(
