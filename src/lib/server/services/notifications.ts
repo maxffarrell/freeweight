@@ -1075,6 +1075,26 @@ export async function requestPaymentNotice(orgId: string, memberId: string) {
 	return true;
 }
 
+/**
+ * Billing "Email all" — runs the payment-request notice for every member with
+ * an unpaid open charge. requestPaymentNotice re-checks the net balance, the
+ * once-per-day cap, and the unsubscribe list per member. Returns how many of
+ * the debtors actually got an email.
+ */
+export async function requestAllPaymentNotices(orgId: string) {
+	const debtors = await db
+		.select({ memberId: charge.memberId })
+		.from(charge)
+		.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'open')))
+		.groupBy(charge.memberId)
+		.having(
+			sql`sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0)) > 0`
+		);
+	let sent = 0;
+	for (const d of debtors) if (await requestPaymentNotice(orgId, d.memberId)) sent++;
+	return { debtors: debtors.length, sent };
+}
+
 /** Replaces {name} and {first_name} merge tags in an announcement draft. */
 export function mergeTags(t: string, memberName: string) {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;

@@ -23,6 +23,7 @@
 		getPayments,
 		recordPayment,
 		refundPayment,
+		requestAllPayments,
 		getCurrency,
 		getShopItems,
 		createShopItem,
@@ -75,6 +76,19 @@
 	async function refreshCharges() {
 		charges = await getCharges({ status: chargeFilter || undefined });
 		openCharges = await getCharges({ status: 'open' });
+	}
+
+	let remindingAll = $state(false);
+	async function emailAllDebtors() {
+		if (!confirm(`Email a payment request to all ${aging.debtors} members owing?`)) return;
+		remindingAll = true;
+		try {
+			const r = await requestAllPayments();
+			toast.success(`Sent ${r.sent} payment request${r.sent === 1 ? '' : 's'}`);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		remindingAll = false;
 	}
 
 	async function refund(paymentId: string, amount: number) {
@@ -349,6 +363,13 @@
 								<span class="text-xs font-normal">({aging.d60plus.n})</span>
 							</p>
 						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							class="ml-auto"
+							disabled={remindingAll}
+							onclick={emailAllDebtors}>Email all</Button
+						>
 					</Card.Content>
 				</Card.Root>
 			{/if}
