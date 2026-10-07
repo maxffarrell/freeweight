@@ -24,6 +24,7 @@
 	const maxMembersByPlan = Math.max(1, ...r.plans.map((p) => p.count));
 	const maxMethodTotal = Math.max(1, ...r.methods.map((m) => m.total));
 	const maxKindTotal = Math.max(1, ...r.kinds.map((k) => k.total));
+	const maxSourceJoins = Math.max(1, ...r.sources.map((s) => s.joins));
 	const KIND_LABELS: Record<string, string> = {
 		membership: 'Membership',
 		signup: 'Signup fee',
@@ -521,6 +522,27 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Lead sources</Card.Title>
+			<Card.Description>Signups by "How did you hear about us?" — all time</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each r.sources as s (s.source)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-24 shrink-0 truncate">{s.source}</span>
+					<div
+						class="h-4 rounded bg-indigo-500/70"
+						style="width: {(s.joins / maxSourceJoins) * 70}%"
+					></div>
+					<span class="tabular-nums">{s.joins}</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No signups yet.</p>
+			{/each}
 		</Card.Content>
 	</Card.Root>
 
