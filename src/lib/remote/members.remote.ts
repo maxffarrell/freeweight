@@ -14,6 +14,7 @@ import {
 	idSchema,
 	memberImportInput,
 	memberInput,
+	memberMergeInput,
 	memberNoteInput,
 	memberTagInput,
 	memberUpdate,
@@ -64,6 +65,12 @@ export const tagMembers = command(bulkTagInput, async ({ memberIds, tag }) => {
 	void getMembers().refresh();
 	void getTags().refresh();
 	return n;
+});
+/** Merge a duplicate member into the survivor (admin-only — the loser is deleted). */
+export const mergeMembers = command(memberMergeInput, async ({ keepId, dropId }) => {
+	await svc.mergeMembers(await requireOrg('admin'), keepId, dropId);
+	void getMembers().refresh();
+	void getMember(keepId).refresh();
 });
 export const removeMemberTag = command(memberTagInput, async ({ memberId, tag }) => {
 	await svc.removeMemberTag(await requireOrg(), memberId, tag);

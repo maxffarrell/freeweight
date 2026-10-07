@@ -352,6 +352,11 @@ export const memberTagInput = v.object({
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
 });
 
+export const memberMergeInput = v.object({
+	keepId: idSchema,
+	dropId: idSchema
+});
+
 export const bulkTagInput = v.object({
 	memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)),
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))

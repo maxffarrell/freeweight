@@ -2,11 +2,13 @@ import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	activity,
 	booking,
 	charge,
 	checkIn,
 	classSession,
 	classType,
+	document,
 	gymMember,
 	location,
 	memberNote,
@@ -392,6 +394,115 @@ export async function importMembers(
 		data: { skipped: rows.length - toInsert.length }
 	});
 	return { created: toInsert.length, skipped: rows.length - toInsert.length };
+}
+
+/**
+ * Merges duplicate member `dropId` into `keepId`: every member-scoped row is
+ * repointed, the survivor keeps its own profile fields and inherits the
+ * loser's email/phone/portal login/etc. only where its own is empty, then the
+ * loser row is deleted. Bookings/tags that would collide on a unique key are
+ * dropped first; the loser's remaining rows cascade away with the delete.
+ */
+export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: string) {
+	if (keepId === dropId) error(400, 'Pick two different members');
+	const rows = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), inArray(gymMember.id, [keepId, dropId])));
+	const keep = rows.find((r) => r.id === keepId);
+	const drop = rows.find((r) => r.id === dropId);
+	if (!keep || !drop) error(404, 'Member not found');
+	await db.transaction(async (tx) => {
+		// Tags collide on unique(memberId, tag) — drop the loser's shared tags before repointing.
+		await tx.execute(sql`
+			delete from ${memberTag} t
+			where t.organization_id = ${ctx.orgId} and t.member_id = ${dropId}
+				and exists (
+					select 1 from ${memberTag} k
+					where k.organization_id = ${ctx.orgId}
+						and k.member_id = ${keepId} and k.tag = t.tag)`);
+		for (const t of [waiver, membership, checkIn, charge, payment, memberNote, memberTag]) {
+			await tx
+				.update(t)
+				.set({ memberId: keepId })
+				.where(and(eq(t.organizationId, ctx.orgId), eq(t.memberId, dropId)));
+		}
+		// Bookings collide on unique(sessionId, memberId) — remove the loser's dup rows first.
+		await tx.execute(sql`
+			delete from ${booking} b
+			where b.organization_id = ${ctx.orgId} and b.member_id = ${dropId}
+				and exists (
+					select 1 from ${booking} k
+					where k.organization_id = ${ctx.orgId}
+						and k.member_id = ${keepId} and k.session_id = b.session_id)`);
+		await tx
+			.update(booking)
+			.set({ memberId: keepId })
+			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.memberId, dropId)));
+		// Documents are entity-typed, not FK'd.
+		await tx
+			.update(document)
+			.set({ entityId: keepId })
+			.where(
+				and(
+					eq(document.organizationId, ctx.orgId),
+					eq(document.entityType, 'member'),
+					eq(document.entityId, dropId)
+				)
+			);
+		// Audit-feed history follows the survivor.
+		await tx
+			.update(activity)
+			.set({ entityId: keepId })
+			.where(
+				and(
+					eq(activity.organizationId, ctx.orgId),
+					eq(activity.entityType, 'member'),
+					eq(activity.entityId, dropId)
+				)
+			);
+		// Self-FKs from other members (referrer, household guardian) repoint to the survivor.
+		await tx
+			.update(gymMember)
+			.set({ referredByMemberId: keepId })
+			.where(
+				and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.referredByMemberId, dropId))
+			);
+		await tx
+			.update(gymMember)
+			.set({ guardianId: keepId })
+			.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.guardianId, dropId)));
+		// Survivor inherits the loser's values only for fields it doesn't have.
+		const patch: Partial<typeof gymMember.$inferSelect> = {};
+		for (const f of [
+			'email',
+			'phone',
+			'birthday',
+			'notes',
+			'locationId',
+			'portalUserId',
+			'referralSource',
+			'unsubscribedAt'
+		] as const) {
+			if (keep[f] == null && drop[f] != null) Object.assign(patch, { [f]: drop[f] });
+		}
+		// Referral credit chain: keep the loser's referrer unless that's the survivor itself.
+		if (keep.referredByMemberId == null && drop.referredByMemberId !== keepId)
+			patch.referredByMemberId = drop.referredByMemberId;
+		if (keep.joinedAt == null || (drop.joinedAt && drop.joinedAt < keep.joinedAt))
+			patch.joinedAt = drop.joinedAt;
+		if (Object.keys(patch).length)
+			await tx.update(gymMember).set(patch).where(eq(gymMember.id, keepId));
+		await tx.delete(gymMember).where(eq(gymMember.id, dropId));
+	});
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: keepId,
+		action: 'merged',
+		summary: `Merged ${drop.name} into ${keep.name}`
+	});
 }
 
 export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberUpdate>) {
