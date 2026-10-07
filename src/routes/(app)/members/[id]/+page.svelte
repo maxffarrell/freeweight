@@ -254,17 +254,26 @@
 	let planChangeId = $state('');
 	let planChangePlanId = $state('');
 	let planChangeCurrent = $state('');
+	// Custom recurring price override (cents); null field + prior override = clear.
+	let planChangePrice = $state<number | null>(null);
+	let planChangeHadPrice = $state(false);
 	async function submitPlanChange(e: SubmitEvent) {
 		e.preventDefault();
-		if (!planChangePlanId) return;
+		const price =
+			planChangePrice != null ? planChangePrice : planChangeHadPrice ? null : undefined;
+		if (!planChangePlanId && price === undefined) return;
 		pending = true;
 		try {
-			await updateMembership({ id: planChangeId, planId: planChangePlanId });
-			toast.success('Plan changed');
+			await updateMembership({
+				id: planChangeId,
+				planId: planChangePlanId || undefined,
+				price
+			});
+			toast.success('Membership updated');
 			planOpen = false;
 			planChangePlanId = '';
 		} catch (err) {
-			toast.error(errMsg(err, 'Could not change plan'));
+			toast.error(errMsg(err, 'Could not update membership'));
 		}
 		pending = false;
 	}
@@ -508,7 +517,9 @@
 						<div class="min-w-0">
 							<p class="truncate font-medium">{mm.planName}</p>
 							<p class="text-xs text-muted-foreground">
-								{formatMoney(mm.amount, currency)}{mm.isPack ? ' pack' : `/${mm.interval}`} · from {formatDate(
+								{formatMoney(mm.membership.price ?? mm.amount, currency)}{mm.isPack
+								? ' pack'
+								: `/${mm.interval}`}{mm.membership.price != null ? ' (custom)' : ''} · from {formatDate(
 									mm.membership.startsAt
 								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}{mm
 									.membership.frozenUntil
@@ -543,6 +554,8 @@
 											(planChangeId = mm.membership.id),
 											(planChangeCurrent = mm.membership.planId),
 											(planChangePlanId = ''),
+											(planChangePrice = mm.membership.price),
+											(planChangeHadPrice = mm.membership.price != null),
 											(planOpen = true)
 										)}>Plan</Button
 									>
@@ -879,9 +892,10 @@
 <Dialog.Root bind:open={planOpen}>
 	<Dialog.Content>
 		<Dialog.Header>
-			<Dialog.Title>Change plan</Dialog.Title>
+			<Dialog.Title>Change plan or price</Dialog.Title>
 			<Dialog.Description>
-				The new price applies from the next charge — no proration.
+				Changes apply from the next charge — no proration. Set a custom price to bill this
+				member something other than the plan's list price.
 			</Dialog.Description>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitPlanChange}>
@@ -900,8 +914,20 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
+			<Field.Field>
+				<Field.Label>Custom price (optional)</Field.Label>
+				<MoneyInput bind:value={planChangePrice} placeholder="Plan price" />
+				{#if planChangeHadPrice && planChangePrice == null}
+					<p class="text-xs text-muted-foreground">Saving clears the custom price.</p>
+				{/if}
+			</Field.Field>
 			<Dialog.Footer>
-				<Button type="submit" disabled={pending || !planChangePlanId}>Change plan</Button>
+				<Button
+					type="submit"
+					disabled={pending ||
+						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}
+					>Save</Button
+				>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

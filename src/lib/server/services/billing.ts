@@ -314,6 +314,7 @@ async function postMembershipCharge(
 	const [ms] = await db
 		.select({
 			memberId: membership.memberId,
+			price: membership.price,
 			guardianId: gymMember.guardianId,
 			memberName: gymMember.name
 		})
@@ -321,7 +322,8 @@ async function postMembershipCharge(
 		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
 		.where(eq(membership.id, membershipId));
 	const payerId = ms!.guardianId ?? ms!.memberId;
-	const chargeAmount = amount ?? p.amount;
+	// A staff price override bills instead of the plan's list price.
+	const chargeAmount = amount ?? ms!.price ?? p.amount;
 	if (chargeAmount <= 0) return;
 	const [row] = await db
 		.insert(charge)
@@ -393,6 +395,7 @@ export async function updateMembership(
 		set.requestReason = null;
 	}
 	if (newPlan) set.planId = newPlan.id;
+	if (input.price !== undefined) set.price = input.price;
 	const [row] = await db
 		.update(membership)
 		.set(set)
@@ -412,6 +415,16 @@ export async function updateMembership(
 			summary: `Plan changed from ${oldPlan?.name ?? '?'} to ${newPlan.name}`
 		});
 		notifyPlanChanged(ctx.orgId, row.id, oldPlan?.name ?? '?').catch(() => {});
+	}
+	if (input.price !== undefined) {
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'membership',
+			entityId: row.id,
+			action: 'updated',
+			summary: input.price == null ? 'Custom price cleared' : `Custom price set to ${input.price}`
+		});
 	}
 	return row;
 }

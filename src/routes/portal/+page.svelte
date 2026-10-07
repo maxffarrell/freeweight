@@ -285,7 +285,11 @@
 				<div class="mt-3 flex flex-wrap gap-1.5">
 					{#each d.memberships as mm (mm.membership.id)}
 						{#if mm.membership.status === 'active'}
-							<Badge>{mm.plan.name} · {mm.membership.status}</Badge>
+							<Badge
+								>{mm.plan.name}{mm.plan.isPack
+									? ''
+									: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
+							>
 						{/if}
 					{/each}
 					{#if !d.memberships.some((mm) => mm.membership.status === 'active')}
