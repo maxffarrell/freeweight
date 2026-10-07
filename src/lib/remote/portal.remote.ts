@@ -70,6 +70,30 @@ export const requestMembershipCancel = command(
 	}
 );
 
+export const requestMembershipPause = command(
+	v.object({
+		memberId: idSchema,
+		membershipId: idSchema,
+		resumeOn: v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD'))
+	}),
+	async ({ memberId, membershipId, resumeOn }) => {
+		const m = await myMember(memberId);
+		const r = await svc.requestPause(m.organizationId, m.id, membershipId, resumeOn);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+export const withdrawMembershipPause = command(
+	v.object({ memberId: idSchema, membershipId: idSchema }),
+	async ({ memberId, membershipId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.withdrawPause(m.organizationId, m.id, membershipId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
 export const withdrawMembershipCancel = command(
 	v.object({ memberId: idSchema, membershipId: idSchema }),
 	async ({ memberId, membershipId }) => {

@@ -76,7 +76,9 @@ export const membershipUpdate = v.object({
 	/** With status 'paused': auto-resume on this date. */
 	resumeAt: v.optional(v.nullable(isoDate)),
 	/** Staff: clear a member's cancellation request. */
-	clearCancelRequest: v.optional(v.boolean())
+	clearCancelRequest: v.optional(v.boolean()),
+	/** Staff: clear a member's pause request. */
+	clearPauseRequest: v.optional(v.boolean())
 });
 
 export const locationInput = v.object({

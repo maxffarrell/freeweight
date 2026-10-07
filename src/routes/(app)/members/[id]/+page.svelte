@@ -216,6 +216,15 @@
 		}
 	}
 
+	async function dismissPauseRequest(membershipId: string) {
+		try {
+			await updateMembership({ id: membershipId, clearPauseRequest: true });
+			toast.success('Request dismissed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not dismiss'));
+		}
+	}
+
 	let pauseOpen = $state(false);
 	let pauseId = $state('');
 	let pauseResumeAt = $state('');
@@ -424,6 +433,13 @@
 									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}
 								</p>
 							{/if}
+							{#if mm.membership.pauseRequestedAt}
+								<p class="text-xs text-amber-600 dark:text-amber-400">
+									Pause requested{mm.membership.pauseUntil
+										? ` — resume ${formatDate(mm.membership.pauseUntil)}`
+										: ''}
+								</p>
+							{/if}
 						</div>
 						<div class="flex items-center gap-2">
 							<StatusBadge status={mm.membership.status} />
@@ -446,7 +462,25 @@
 									class="h-7 px-2 text-xs text-destructive"
 									onclick={() => setMembership(mm.membership.id, 'cancelled')}>Cancel</Button
 								>
-								{#if mm.membership.cancelRequestedAt}
+								{#if mm.membership.pauseRequestedAt}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() =>
+											setMembership(
+												mm.membership.id,
+												'paused',
+												mm.membership.pauseUntil ?? undefined
+											)}>Approve pause</Button
+									>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() => dismissPauseRequest(mm.membership.id)}>Dismiss</Button
+									>
+								{:else if mm.membership.cancelRequestedAt}
 									<Button
 										variant="ghost"
 										size="sm"

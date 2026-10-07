@@ -246,8 +246,15 @@ export async function updateMembership(
 		set.cancelledAt = input.status === 'cancelled' ? new Date() : null;
 		set.nextChargeAt = nextChargeAt ?? null;
 		set.frozenUntil = input.status === 'paused' ? (input.resumeAt ?? null) : null;
+		// Any status change resolves (or supersedes) a pending pause request.
+		set.pauseRequestedAt = null;
+		set.pauseUntil = null;
 	}
 	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
+	if (input.clearPauseRequest) {
+		set.pauseRequestedAt = null;
+		set.pauseUntil = null;
+	}
 	const [row] = await db
 		.update(membership)
 		.set(set)

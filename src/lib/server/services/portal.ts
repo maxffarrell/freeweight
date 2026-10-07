@@ -26,8 +26,12 @@ import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
 import { emit } from './events.ts';
-import { notifyCancellationRequested, notifyPlanChanged } from './notifications.ts';
-import { localDate } from '#lib/tz.ts';
+import {
+	notifyCancellationRequested,
+	notifyPauseRequested,
+	notifyPlanChanged
+} from './notifications.ts';
+import { addDays, localDate } from '#lib/tz.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -407,6 +411,67 @@ export async function requestCancellation(orgId: string, memberId: string, membe
 		data: { memberId }
 	});
 	notifyCancellationRequested(orgId, membershipId).catch(() => {});
+	return row;
+}
+
+/**
+ * Member asks to pause a membership, picking the date it should resume.
+ * Staff approve from the member page — the request never pauses billing by
+ * itself. `resumeOn` is a YYYY-MM-DD date in the gym's timezone.
+ */
+export async function requestPause(
+	orgId: string,
+	memberId: string,
+	membershipId: string,
+	resumeOn: string
+) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const today = localDate(new Date(), st?.timezone ?? 'UTC');
+	if (resumeOn <= today) error(400, 'Pick a resume date after today');
+	if (resumeOn > addDays(today, 366)) error(400, 'Pick a resume date within a year');
+	const [row] = await db
+		.update(membership)
+		.set({ pauseRequestedAt: new Date(), pauseUntil: resumeOn })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active')
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Membership not found');
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'membership',
+		entityId: membershipId,
+		action: 'pause_requested',
+		summary: `Member requested a pause until ${resumeOn}`,
+		data: { memberId, resumeOn }
+	});
+	notifyPauseRequested(orgId, membershipId).catch(() => {});
+	return row;
+}
+
+/** Member changes their mind on a pending pause request. */
+export async function withdrawPause(orgId: string, memberId: string, membershipId: string) {
+	const [row] = await db
+		.update(membership)
+		.set({ pauseRequestedAt: null, pauseUntil: null })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Membership not found');
 	return row;
 }
 

@@ -6,6 +6,7 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -14,6 +15,8 @@
 		memberBook,
 		memberCancel,
 		requestMembershipCancel,
+		requestMembershipPause,
+		withdrawMembershipPause,
 		withdrawMembershipCancel,
 		getProviders,
 		startCheckout,
@@ -24,7 +27,7 @@
 		joinPlan,
 		changePlan
 	} from '#lib/remote/portal.remote.ts';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
@@ -149,6 +152,31 @@
 			toast.error(errMsg(err, 'Could not withdraw'));
 		}
 	}
+	let pauseReqId = $state('');
+	let pauseResumeOn = $state('');
+	async function requestPause(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await requestMembershipPause({
+				memberId,
+				membershipId: pauseReqId,
+				resumeOn: pauseResumeOn
+			});
+			toast.success('Pause requested — staff will confirm');
+			pauseReqId = '';
+			pauseResumeOn = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not request'));
+		}
+	}
+	async function withdrawPause(membershipId: string) {
+		try {
+			await withdrawMembershipPause({ memberId, membershipId });
+			toast.success('Request withdrawn');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not withdraw'));
+		}
+	}
 	const myBookingId = (b: (typeof bookable)[number]) =>
 		d.upcoming.find((u) => u.booking.sessionId === b.session.id && u.booking.status !== 'cancelled')
 			?.booking.id;
@@ -249,10 +277,26 @@
 								<button class="underline" onclick={() => withdrawCancel(mm.membership.id)}
 									>Withdraw request</button
 								>
+							{:else if mm.membership.pauseRequestedAt}
+								{mm.plan.name}: pause requested{mm.membership.pauseUntil
+									? ` until ${formatDate(mm.membership.pauseUntil)}`
+									: ''} — staff will confirm shortly.
+								<button class="underline" onclick={() => withdrawPause(mm.membership.id)}
+									>Withdraw request</button
+								>
 							{:else}
 								{#if !mm.plan.isPack && joinablePlans.some((p) => !p.isPack && p.id !== mm.plan.id)}
 									<button class="underline" onclick={() => (changeOpen = !changeOpen)}
 										>Change plan</button
+									>
+									·
+								{/if}
+								{#if !mm.plan.isPack}
+									<button
+										class="underline"
+										onclick={() =>
+											(pauseReqId = pauseReqId === mm.membership.id ? '' : mm.membership.id)}
+										>Request pause</button
 									>
 									·
 								{/if}
@@ -261,6 +305,21 @@
 								>
 							{/if}
 						</p>
+						{#if pauseReqId === mm.membership.id}
+							<form class="mt-1 flex items-center gap-2" onsubmit={requestPause}>
+								<label class="text-xs text-muted-foreground" for="pause-date">Resume on</label>
+								<Input
+									id="pause-date"
+									type="date"
+									required
+									class="h-7 w-auto text-xs"
+									bind:value={pauseResumeOn}
+								/>
+								<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
+									>Request pause</Button
+								>
+							</form>
+						{/if}
 					{/if}
 				{/each}
 				{#if changeOpen}

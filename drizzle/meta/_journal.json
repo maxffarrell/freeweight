@@ -141,6 +141,13 @@
       "when": 1791354170341,
       "tag": "0019_cool_speed",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791355028260,
+      "tag": "0020_blue_killmonger",
+      "breakpoints": true
     }
   ]
 }

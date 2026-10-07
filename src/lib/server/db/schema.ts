@@ -198,6 +198,10 @@ export const membership = pgTable(
 		frozenUntil: date('frozen_until', { mode: 'string' }),
 		/** Member asked to cancel in the portal; staff confirm from the member page. */
 		cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
+		/** Member asked to pause in the portal; staff approve from the member page. */
+		pauseRequestedAt: timestamp('pause_requested_at', { withTimezone: true }),
+		/** The auto-resume date the member asked for with their pause request. */
+		pauseUntil: date('pause_until', { mode: 'string' }),
 		...timestamps
 	},
 	(t) => [

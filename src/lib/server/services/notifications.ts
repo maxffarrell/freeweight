@@ -1038,3 +1038,63 @@ export async function notifyPlanChanged(orgId: string, membershipId: string, old
 		})
 	});
 }
+
+/**
+ * Member asked to pause — staff get a heads-up and the member gets a
+ * confirmation, same shape as notifyCancellationRequested. Deduped per day.
+ */
+export async function notifyPauseRequested(orgId: string, membershipId: string) {
+	const [row] = await db
+		.select({
+			memberId: membership.memberId,
+			memberName: gymMember.name,
+			memberEmail: gymMember.email,
+			planName: plan.name,
+			pauseUntil: membership.pauseUntil
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
+	if (!row) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	const resume = row.pauseUntil ? formatDate(row.pauseUntil) : 'a future date';
+
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'pause_request_staff', `${membershipId}:${today}`, s.email)))
+			continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Pause request — ${row.memberName}`,
+			...renderEmail({
+				orgName: name,
+				heading: `${row.memberName} wants to pause`,
+				lines: [
+					`${row.memberName} asked to pause their ${row.planName} membership until ${resume}.`,
+					'Approve it from their member page — billing and bookings stop until the resume date.'
+				]
+			})
+		});
+	}
+
+	if (!row.memberEmail) return;
+	if (!(await logOnce(orgId, 'pause_request', `${membershipId}:${today}`, row.memberEmail))) return;
+	await sendMemberEmail(row.memberId, {
+		to: row.memberEmail,
+		subject: `Pause requested — ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: 'We received your request',
+			lines: [
+				`Hi ${row.memberName} — we got your request to pause your ${row.planName} membership at ${name} until ${resume}.`,
+				'A staff member will confirm your pause shortly. Changed your mind? You can withdraw the request from the member portal until then.'
+			]
+		})
+	});
+}
