@@ -21,6 +21,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { checkInToken } from './checkins.ts';
 import { bookSession, cancelBooking } from './schedule.ts';
+import { notifySeriesBooked } from './notifications.ts';
 import { createMembership, getPlan, memberBalance, nextPeriod } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
@@ -334,7 +335,8 @@ export async function memberBook(
 	orgId: string,
 	userId: string,
 	sessionId: string,
-	memberId: string
+	memberId: string,
+	opts?: { notify?: boolean }
 ) {
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
@@ -350,7 +352,47 @@ export async function memberBook(
 		error(409, `Bookings open ${bookingWindowDays} days ahead`);
 	if (bookCutoffMin != null && s.startsAt.getTime() - Date.now() < bookCutoffMin * 60_000)
 		error(409, `Booking closes ${bookCutoffMin} minutes before class`);
-	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId);
+	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, opts);
+}
+
+/**
+ * Books the member into every upcoming bookable session of one class — the
+ * portal version of staff series booking, so the member booking window and
+ * cutoff still apply per session. Sessions they already hold or that fail
+ * any rule are skipped; one summary email goes out at the end.
+ */
+export async function memberBookSeries(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	classTypeId: string
+) {
+	const sessions = (await bookableSessions(memberId)).filter(
+		(b) => b.session.classTypeId === classTypeId
+	);
+	if (!sessions.length) error(404, 'No upcoming sessions for that class');
+	let booked = 0;
+	let waitlisted = 0;
+	let skipped = 0;
+	for (const b of sessions) {
+		if (b.myStatus && b.myStatus !== 'cancelled') {
+			skipped++;
+			continue;
+		}
+		try {
+			const r = await memberBook(orgId, userId, b.session.id, memberId, { notify: false });
+			if (r.status === 'waitlisted') waitlisted++;
+			else booked++;
+		} catch {
+			skipped++;
+		}
+	}
+	if (!booked && !waitlisted)
+		error(409, 'Nothing to book — you are already in every upcoming session of that class');
+	notifySeriesBooked(orgId, memberId, sessions[0]!.className, { booked, waitlisted }, 2).catch(
+		() => {}
+	);
+	return { booked, waitlisted, skipped };
 }
 
 export async function memberCancel(orgId: string, userId: string, bookingId: string) {

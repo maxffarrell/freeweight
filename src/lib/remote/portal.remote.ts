@@ -48,6 +48,19 @@ export const memberBook = command(
 	}
 );
 
+/** Books the member into every upcoming session of one class (the 2-week bookable window). */
+export const memberBookSeries = command(
+	v.object({ memberId: idSchema, classTypeId: idSchema }),
+	async ({ memberId, classTypeId }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const r = await svc.memberBookSeries(m.organizationId, user.id, m.id, classTypeId);
+		void getBookable(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
 export const signWaiver = command(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	const w = await svc.signWaiver(m.organizationId, m.id);
