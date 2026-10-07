@@ -472,11 +472,20 @@
 		bookSessions = await getSessions();
 		bookOpen = true;
 	}
-	async function bookInto(sessionId: string) {
+	/** No active membership → the dialog sells paid drop-ins instead of booking. */
+	const hasActiveMembership = m.memberships.some((mm) => mm.membership.status === 'active');
+	async function bookInto(sessionId: string, dropInPrice?: number | null) {
 		bookPending = sessionId;
 		try {
-			const b = await bookSession({ sessionId, memberId: id });
-			toast.success(b.status === 'waitlisted' ? 'Class full — waitlisted' : 'Booked');
+			const dropIn = !hasActiveMembership;
+			const b = await bookSession({ sessionId, memberId: id, dropIn });
+			toast.success(
+				dropIn
+					? `Drop-in booked — ${formatMoney(dropInPrice ?? 0, currency)} charge posted`
+					: b.status === 'waitlisted'
+						? 'Class full — waitlisted'
+						: 'Booked'
+			);
 			bookOpen = false;
 			await getMember(id).refresh();
 		} catch (err) {
@@ -1496,8 +1505,8 @@
 				<button
 					type="button"
 					class="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
-					disabled={bookPending !== null}
-					onclick={() => bookInto(s.session.id)}
+					disabled={bookPending !== null || (!hasActiveMembership && !s.dropInPrice)}
+					onclick={() => bookInto(s.session.id, s.dropInPrice)}
 				>
 					<span class="min-w-0">
 						<span class="block truncate font-medium">{s.className}</span>
@@ -1508,8 +1517,15 @@
 								: ''}</span
 						>
 					</span>
-					<span class="shrink-0 text-xs text-muted-foreground tabular-nums"
-						>{s.booked}/{s.session.capacity}{s.waitlisted ? ` (+${s.waitlisted} wl)` : ''}</span
+					<span class="shrink-0 text-right text-xs text-muted-foreground tabular-nums"
+						>{s.booked}/{s.session.capacity}{s.waitlisted ? ` (+${s.waitlisted} wl)` : ''}
+						{#if !hasActiveMembership}
+							<span class="block font-medium text-amber-600 dark:text-amber-400"
+								>{s.dropInPrice
+									? `drop-in ${formatMoney(s.dropInPrice, currency)}`
+									: 'no drop-in price'}</span
+							>
+						{/if}</span
 					>
 				</button>
 			{:else}

@@ -48,7 +48,7 @@ import {
 	notifyWaitlistPromoted
 } from './notifications.ts';
 import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
-import { todayISO } from '#lib/format.ts';
+import { formatMoney, todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -125,6 +125,7 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 			className: classType.name,
 			color: classType.color,
 			durationMin: classType.durationMin,
+			dropInPrice: classType.dropInPrice,
 			locationName: location.name,
 			instructorName: user.name,
 			booked: bookedCount(classSession.id),
@@ -548,26 +549,36 @@ export async function bookSession(
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
 	const ms = await activeMembership(ctx.orgId, input.memberId);
-	if (!ms) error(402, 'An active membership is required to book');
-	await assertCreditAvailable(ctx.orgId, input.memberId, ms);
+	// Staff-side drop-in: no membership required, the class's drop-in
+	// charge posts to the member's balance instead.
+	if (!ms && !input.dropIn) error(402, 'An active membership is required to book');
+	if (ms) await assertCreditAvailable(ctx.orgId, input.memberId, ms);
 
 	const [st] = await db
 		.select({ tz: gymSettings.timezone, maxPerDay: gymSettings.maxBookingsPerDay })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 
-	const row = await db.transaction(async (tx) => {
+	const { row, dropInInfo } = await db.transaction(async (tx) => {
 		const [s] = await tx
 			.select({
 				capacity: classSession.capacity,
 				cancelledAt: classSession.cancelledAt,
-				startsAt: classSession.startsAt
+				startsAt: classSession.startsAt,
+				dropInPrice: classType.dropInPrice,
+				className: classType.name
 			})
 			.from(classSession)
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 			.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, input.sessionId)))
 			.for('update');
 		if (!s) error(404, 'Session not found');
 		if (s.cancelledAt) error(409, 'This session is cancelled');
+		const dropInInfo =
+			input.dropIn && s.dropInPrice != null && s.dropInPrice > 0
+				? { className: s.className, price: s.dropInPrice }
+				: null;
+		if (input.dropIn && !dropInInfo) error(409, `No drop-in price set on ${s.className}`);
 
 		const [{ count }] = await tx
 			.select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -604,6 +615,8 @@ export async function bookSession(
 				error(409, `Daily booking limit reached (${st.maxPerDay} per day)`);
 		}
 
+		if (input.dropIn && count >= s.capacity)
+			error(409, "This class is full — paid drop-ins can't join the waitlist");
 		const status = count >= s.capacity ? 'waitlisted' : 'booked';
 		if (existing) {
 			if (existing.status !== 'cancelled') error(409, 'Already booked');
@@ -612,7 +625,7 @@ export async function bookSession(
 				.set({ status, cancelledAt: null, createdAt: new Date() })
 				.where(eq(booking.id, existing.id))
 				.returning();
-			return row!;
+			return { row: row!, dropInInfo };
 		}
 		const [row] = await tx
 			.insert(booking)
@@ -623,8 +636,30 @@ export async function bookSession(
 				status
 			})
 			.returning();
-		return row!;
+		return { row: row!, dropInInfo };
 	});
+	if (dropInInfo) {
+		const [c] = await db
+			.insert(charge)
+			.values({
+				organizationId: ctx.orgId,
+				memberId: input.memberId,
+				kind: 'dropin',
+				description: `${dropInInfo.className} drop-in`,
+				amount: dropInInfo.price,
+				dueDate: todayISO()
+			})
+			.returning({ id: charge.id });
+		await emit({
+			orgId: ctx.orgId,
+			actorId: actorId ?? ctx.userId,
+			entityType: 'charge',
+			entityId: c!.id,
+			action: 'created',
+			summary: `Drop-in charge of ${formatMoney(dropInInfo.price)} posted`
+		});
+		notifyChargePosted(ctx.orgId, c!.id).catch(() => {});
+	}
 	await emit({
 		orgId: ctx.orgId,
 		actorId: actorId ?? ctx.userId,
