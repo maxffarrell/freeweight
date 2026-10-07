@@ -50,6 +50,8 @@
 		getPortalCourses,
 		enrollCourse,
 		leaveCourse,
+		dropCourseSession,
+		rebookCourseSession,
 		checkInWithCode,
 		getPortalChallenges,
 		joinChallenge,
@@ -316,6 +318,28 @@
 			toast.success('Left the course — upcoming spots released');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not leave the course'));
+		}
+		cBusy = '';
+	}
+	async function dropSess(bookingId: string) {
+		cBusy = bookingId;
+		try {
+			await dropCourseSession({ memberId, bookingId });
+			toast.success('Dropped — you can re-book that session anytime');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not drop the session'));
+		}
+		cBusy = '';
+	}
+	async function rebookSess(bookingId: string) {
+		cBusy = bookingId;
+		try {
+			const b = await rebookCourseSession({ memberId, bookingId });
+			toast.success(
+				b.status === 'waitlisted' ? 'Session filled — you are waitlisted' : 'Re-booked'
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not re-book'));
 		}
 		cBusy = '';
 	}
@@ -1278,6 +1302,50 @@
 							</p>
 							{#if c.course.description}
 								<p class="mt-0.5 truncate text-xs text-muted-foreground">{c.course.description}</p>
+							{/if}
+							{#if c.mine && c.mySessions.length}
+								<details class="mt-1.5">
+									<summary
+										class="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
+									>
+										My sessions ({c.mySessions.filter((s) => s.status !== 'cancelled').length}
+										upcoming)
+									</summary>
+									<div class="mt-1.5 space-y-1">
+										{#each c.mySessions as s (s.bookingId)}
+											<div class="flex items-center gap-2 text-xs">
+												<span class="min-w-28 text-muted-foreground"
+													>{localDate(s.startsAt, tz)} {localTime(s.startsAt, tz)}</span
+												>
+												{#if s.status === 'booked'}
+													<Badge variant="secondary">Booked</Badge>
+													<Button
+														variant="ghost"
+														size="xs"
+														disabled={cBusy === s.bookingId}
+														onclick={() => dropSess(s.bookingId)}>Can't make it</Button
+													>
+												{:else if s.status === 'waitlisted'}
+													<Badge variant="outline">Waitlisted</Badge>
+													<Button
+														variant="ghost"
+														size="xs"
+														disabled={cBusy === s.bookingId}
+														onclick={() => dropSess(s.bookingId)}>Drop</Button
+													>
+												{:else}
+													<Badge variant="outline" class="text-muted-foreground">Dropped</Badge>
+													<Button
+														variant="ghost"
+														size="xs"
+														disabled={cBusy === s.bookingId}
+														onclick={() => rebookSess(s.bookingId)}>Re-book</Button
+													>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								</details>
 							{/if}
 						</div>
 						{#if c.mine}
