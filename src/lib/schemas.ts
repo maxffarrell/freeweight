@@ -248,6 +248,7 @@ export const settingsInput = v.object({
 	phone: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50))),
 	website: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
 	waiver: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(20000))),
+	portalNotice: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 	bookingWindowDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	cancelCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),

@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "portal_notice" text DEFAULT '' NOT NULL;

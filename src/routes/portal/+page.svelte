@@ -291,6 +291,14 @@
 	</select>
 {/if}
 
+{#if d.settings.portalNotice}
+	<div
+		class="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm dark:border-sky-900 dark:bg-sky-950/40"
+	>
+		{d.settings.portalNotice}
+	</div>
+{/if}
+
 {#if d.member.unsubscribedAt}
 	<div
 		class="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950/40"
