@@ -886,7 +886,8 @@ export async function sendAnnouncement(
 	subject: string,
 	message: string,
 	memberIds?: string[],
-	tag?: string
+	tag?: string,
+	planId?: string
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
@@ -900,6 +901,7 @@ export async function sendAnnouncement(
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
+				planId ? membersOnPlan(orgId, planId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -907,6 +909,13 @@ export async function sendAnnouncement(
 		.limit(1000);
 	if (!members.length) return { sent: 0, total: 0 };
 	const name = await orgName(orgId);
+	const planName = planId
+		? await db
+				.select({ name: plan.name })
+				.from(plan)
+				.where(and(eq(plan.id, planId), eq(plan.organizationId, orgId)))
+				.then((r) => r[0]?.name ?? null)
+		: null;
 	const entityId = `announcement:${subject}::${message}`;
 	const { text, html } = renderEmail({
 		orgName: name,
@@ -927,13 +936,17 @@ export async function sendAnnouncement(
 		entityId,
 		action: 'sent',
 		summary: `Announcement sent to ${sent} member${sent === 1 ? '' : 's'}: ${subject}`,
-		data: { subject, message, sent, total: members.length, tag: tag ?? null }
+		data: { subject, message, sent, total: members.length, tag: tag ?? null, plan: planName }
 	});
 	return { sent, total: members.length };
 }
 
+/** EXISTS clause: the member holds an active membership on this plan. */
+const membersOnPlan = (orgId: string, planId: string) =>
+	sql`exists (select 1 from ${membership} mm where mm.member_id = ${gymMember.id} and mm.organization_id = ${orgId} and mm.status = 'active' and mm.plan_id = ${planId})`;
+
 /** Recipients an announcement would reach — same filter as sendAnnouncement, count only. */
-export async function countAnnouncementAudience(orgId: string, tag?: string) {
+export async function countAnnouncementAudience(orgId: string, tag?: string, planId?: string) {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(gymMember)
@@ -944,6 +957,7 @@ export async function countAnnouncementAudience(orgId: string, tag?: string) {
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
+				planId ? membersOnPlan(orgId, planId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -961,7 +975,8 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 			message: sql<string>`${activity.data}->>'message'`,
 			sent: sql<number>`(${activity.data}->>'sent')::int`,
 			total: sql<number>`(${activity.data}->>'total')::int`,
-			tag: sql<string | null>`${activity.data}->>'tag'`
+			tag: sql<string | null>`${activity.data}->>'tag'`,
+			plan: sql<string | null>`${activity.data}->>'plan'`
 		})
 		.from(activity)
 		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'announcement')))

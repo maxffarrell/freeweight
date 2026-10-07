@@ -118,8 +118,9 @@ export const getRecentAnnouncements = query(async () =>
 
 /** How many members the current audience selection would reach — live preview in the send dialog. */
 export const getAnnouncementAudience = query(
-	v.object({ tag: v.optional(v.string()) }),
-	async ({ tag }) => countAnnouncementAudience((await requireOrg()).orgId, tag || undefined)
+	v.object({ tag: v.optional(v.string()), planId: v.optional(v.string()) }),
+	async ({ tag, planId }) =>
+		countAnnouncementAudience((await requireOrg()).orgId, tag || undefined, planId || undefined)
 );
 
 /** Sends the draft to the staff user's own inbox — a render preview before blasting. */
@@ -134,7 +135,8 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 		input.subject,
 		input.message,
 		input.memberIds,
-		input.tag
+		input.tag,
+		input.planId
 	);
 	void getRecentAnnouncements().refresh();
 	return r;

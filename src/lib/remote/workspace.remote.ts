@@ -18,6 +18,7 @@ import {
 	webhookInput
 } from '#lib/schemas.ts';
 import { assertNotDemo } from '#lib/server/demo-mode.ts';
+import { appOrigin } from '#lib/server/email.ts';
 
 export const getDashboard = query(async () => dashboard((await requireOrg()).orgId));
 export const searchAll = query(v.pipe(v.string(), v.maxLength(100)), async (q) =>
@@ -25,6 +26,13 @@ export const searchAll = query(v.pipe(v.string(), v.maxLength(100)), async (q) =
 );
 
 export const getSettings = query(async () => settingsSvc.getSettings((await requireOrg()).orgId));
+
+/** The gym's public join page — URL, on/off state, and org name for the printable QR poster. */
+export const getJoinInfo = query(async () => {
+	const ctx = await requireOrg();
+	const s = await settingsSvc.getSettings(ctx.orgId);
+	return { url: `${appOrigin()}/j/${ctx.org.slug}`, name: ctx.org.name, enabled: s.publicPage };
+});
 export const updateSettings = command(settingsInput, async (input) => {
 	const s = await settingsSvc.updateSettings(await requireOrg('admin'), input);
 	void getSettings().refresh();
