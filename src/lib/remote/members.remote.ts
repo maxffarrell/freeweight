@@ -16,7 +16,11 @@ import {
 	memberTagInput,
 	memberUpdate
 } from '#lib/schemas.ts';
-import { listRecentAnnouncements, sendAnnouncement } from '#lib/server/services/notifications.ts';
+import {
+	countAnnouncementAudience,
+	listRecentAnnouncements,
+	sendAnnouncement
+} from '#lib/server/services/notifications.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 
@@ -109,6 +113,12 @@ export const getCheckInCode = query(idSchema, async (memberId) => {
 /** Last few staff announcements — shown under the Members table and in the send dialog. */
 export const getRecentAnnouncements = query(async () =>
 	listRecentAnnouncements((await requireOrg()).orgId)
+);
+
+/** How many members the current audience selection would reach — live preview in the send dialog. */
+export const getAnnouncementAudience = query(
+	v.object({ tag: v.optional(v.string()) }),
+	async ({ tag }) => countAnnouncementAudience((await requireOrg()).orgId, tag || undefined)
 );
 
 export const emailAllMembers = command(announcementInput, async (input) => {

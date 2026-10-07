@@ -824,6 +824,25 @@ export async function sendAnnouncement(
 	return { sent, total: members.length };
 }
 
+/** Recipients an announcement would reach — same filter as sendAnnouncement, count only. */
+export async function countAnnouncementAudience(orgId: string, tag?: string) {
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				tag
+					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
+					: undefined,
+				isNull(gymMember.unsubscribedAt),
+				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
+			)
+		);
+	return n;
+}
+
 /** Recent staff announcements, most recent first — surfaced on the Members page. */
 export async function listRecentAnnouncements(orgId: string, limit = 5) {
 	const rows = await db

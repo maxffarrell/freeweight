@@ -18,6 +18,7 @@
 		getMembers,
 		createMember,
 		emailAllMembers,
+		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
 		importMembers
@@ -145,6 +146,13 @@
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
 	let emailPending = $state(false);
+	const audienceCount = $derived(
+		emailOpen
+			? await getAnnouncementAudience({
+					tag: emailAudience === '__all' ? undefined : emailAudience
+				})
+			: null
+	);
 	async function submitAnnouncement(e: SubmitEvent) {
 		e.preventDefault();
 		emailPending = true;
@@ -409,8 +417,13 @@
 					placeholder="Hi everyone — we're closed this Thursday for maintenance…"
 				/>
 			</Field.Field>
-			<Dialog.Footer
-				><Button type="submit" disabled={emailPending}>
+			<Dialog.Footer class="items-center justify-between sm:justify-between">
+				<span class="text-xs text-muted-foreground">
+					{audienceCount == null
+						? ''
+						: `Goes to ${audienceCount} member${audienceCount === 1 ? '' : 's'}`}
+				</span>
+				<Button type="submit" disabled={emailPending || audienceCount === 0}>
 					{emailPending
 						? 'Sending…'
 						: emailAudience === '__all'
