@@ -19,7 +19,12 @@
 	const kpis = [
 		{ label: 'Active members', value: String(d.activeMembers), icon: Users, href: '/members' },
 		{ label: 'New this month', value: String(d.newThisMonth), icon: TrendingUp, href: '/members' },
-		{ label: 'Check-ins today', value: String(d.checkInsToday), icon: ScanLine, href: '/checkins' },
+		{
+			label: 'Check-ins today',
+			value: `${d.checkInsToday} · ${d.inGymNow} inside`,
+			icon: ScanLine,
+			href: '/checkins'
+		},
 		{
 			label: 'Monthly recurring',
 			value: formatMoney(d.mrr, d.currency, true),

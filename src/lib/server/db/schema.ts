@@ -389,7 +389,9 @@ export const checkIn = pgTable(
 		method: checkInMethod('method').notNull().default('manual'),
 		/** Set on guest visits — the check-in belongs to the member who brought them. */
 		guestName: text('guest_name'),
-		checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow()
+		checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+		/** When they left — null while they're still in the gym. */
+		checkedOutAt: timestamp('checked_out_at', { withTimezone: true })
 	},
 	(t) => [
 		index('check_in_org_time_idx').on(t.organizationId, t.checkedAt),

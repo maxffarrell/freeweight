@@ -104,6 +104,34 @@ export async function recordGuestVisit(
 	return { checkIn: row!, member: m, used: (used?.n ?? 0) + 1, cap };
 }
 
+/** Checks a member out — sets checked_out_at on their open check-in row. */
+export async function checkOut(ctx: OrgContext, checkInId: string) {
+	const [row] = await db
+		.update(checkIn)
+		.set({ checkedOutAt: new Date() })
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				eq(checkIn.id, checkInId),
+				isNull(checkIn.checkedOutAt)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Open check-in not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'check_in',
+		entityId: row.id,
+		action: 'checked-out',
+		summary: 'Member checked out'
+	});
+	return row;
+}
+
+/** Minutes a fresh check-in must be open before a repeat QR scan means "check out" instead of a duplicate. */
+const TOGGLE_GRACE_MS = 15 * 60_000;
+
 export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof s.checkInInput>) {
 	const memberId = verifyCheckInToken(input.code) ?? input.code;
 	const [m] = await db
@@ -111,6 +139,38 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
 	if (!m) error(404, 'No member for that code — check the QR or search by name');
+
+	// Re-scanning while already inside toggles to a check-out instead of
+	// logging a second arrival.
+	const [open] = await db
+		.select()
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.checkedOutAt),
+				lt(checkIn.checkedAt, new Date(Date.now() - TOGGLE_GRACE_MS))
+			)
+		)
+		.orderBy(desc(checkIn.checkedAt))
+		.limit(1);
+	if (open) {
+		const [row] = await db
+			.update(checkIn)
+			.set({ checkedOutAt: new Date() })
+			.where(eq(checkIn.id, open.id))
+			.returning();
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'check_in',
+			entityId: row!.id,
+			action: 'checked-out',
+			summary: `${m.name} checked out`
+		});
+		return { checkIn: row!, member: m, attended: 0, checkedOut: true };
+	}
 	const [row] = await db
 		.insert(checkIn)
 		.values({

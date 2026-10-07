@@ -4,7 +4,12 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import Logo from '#lib/components/app/logo.svelte';
-	import { getTodayCheckIns, recordCheckIn, getMembers } from '#lib/remote/members.remote.ts';
+	import {
+		getTodayCheckIns,
+		recordCheckIn,
+		checkOut,
+		getMembers
+	} from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
@@ -67,8 +72,10 @@
 			});
 			showFlash(
 				true,
-				`${r.member.name} checked in` +
-					(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '')
+				r.checkedOut
+					? `${r.member.name} checked out`
+					: `${r.member.name} checked in` +
+							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '')
 			);
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
@@ -78,6 +85,15 @@
 		suggestions = [];
 		pending = false;
 		inputEl?.focus();
+	}
+
+	async function checkOutRow(id: string) {
+		try {
+			await checkOut(id);
+			checkIns = await getTodayCheckIns();
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Check-out failed'));
+		}
 	}
 
 	function submit(e: SubmitEvent) {
@@ -98,7 +114,10 @@
 		</div>
 		<div class="flex items-center gap-4 text-sm">
 			<span class="tabular-nums">{localTime(now, tz)}</span>
-			<Badge variant="secondary">{checkIns.length} today</Badge>
+			<Badge variant="secondary">
+				{checkIns.length} today · {checkIns.filter((c) => !c.checkIn.checkedOutAt).length}
+				inside
+			</Badge>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
 	</header>
@@ -180,6 +199,16 @@
 								{c.locationName ?? ''}
 								<Badge variant="outline" class="text-xs">{c.checkIn.method}</Badge>
 								<span class="tabular-nums">{localTime(c.checkIn.checkedAt, tz)}</span>
+								{#if c.checkIn.checkedOutAt}
+									<span class="tabular-nums">out {localTime(c.checkIn.checkedOutAt, tz)}</span>
+								{:else}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs"
+										onclick={() => checkOutRow(c.checkIn.id)}>Check out</Button
+									>
+								{/if}
 							</span>
 						</div>
 					{/each}
