@@ -120,6 +120,35 @@
 	const docs = $derived(await getMemberDocuments(id));
 	let uploading = $state(false);
 	let fileInput = $state<HTMLInputElement>();
+	let avatarInput = $state<HTMLInputElement>();
+	/** Initials fallback when the member has no photo. */
+	const initials = $derived(
+		m.member.name
+			.split(/\s+/)
+			.map((w) => w[0])
+			.filter(Boolean)
+			.slice(0, 2)
+			.join('')
+			.toUpperCase()
+	);
+	async function uploadAvatar(file: File | null | undefined) {
+		if (!file) return;
+		uploading = true;
+		const body = new FormData();
+		body.append('file', file);
+		body.append('entityType', 'member');
+		body.append('entityId', id);
+		body.append('avatar', '1');
+		const res = await fetch('/api/documents', { method: 'POST', body });
+		uploading = false;
+		if (!res.ok) {
+			toast.error((await res.json().catch(() => null))?.message ?? 'Upload failed');
+			return;
+		}
+		toast.success('Photo updated');
+		await getMember(id).refresh();
+		if (avatarInput) avatarInput.value = '';
+	}
 	const fileSize = (n: number) =>
 		n < 1024
 			? `${n} B`
@@ -516,7 +545,36 @@
 <div class="grid gap-6 p-4 md:p-6 lg:grid-cols-3">
 	<div class="space-y-6 lg:col-span-1">
 		<Card.Root>
-			<Card.Header><Card.Title class="text-base">Details</Card.Title></Card.Header>
+			<Card.Header class="flex-row items-center gap-3">
+				<button
+					type="button"
+					class="relative shrink-0"
+					title="Change photo"
+					disabled={uploading}
+					onclick={() => avatarInput?.click()}
+				>
+					{#if m.member.photoDocumentId}
+						<img
+							src="/api/documents/{m.member.photoDocumentId}"
+							alt={m.member.name}
+							class="size-12 rounded-full object-cover"
+						/>
+					{:else}
+						<span
+							class="flex size-12 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
+							>{initials}</span
+						>
+					{/if}
+				</button>
+				<input
+					bind:this={avatarInput}
+					type="file"
+					accept="image/*"
+					class="hidden"
+					onchange={(e) => uploadAvatar(e.currentTarget.files?.[0])}
+				/>
+				<Card.Title class="text-base">Details</Card.Title>
+			</Card.Header>
 			<Card.Content class="space-y-2 text-sm">
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Status</span><StatusBadge status={m.member.status} />

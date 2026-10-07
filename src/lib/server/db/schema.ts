@@ -125,6 +125,11 @@ export const gymMember = pgTable(
 		guardianId: text('guardian_id').references((): AnyPgColumn => gymMember.id, {
 			onDelete: 'set null'
 		}),
+		/** Staff-uploaded photo — the document row is tagged entityType 'member_avatar'.
+		 * Null = no photo; the member page shows initials instead. */
+		photoDocumentId: text('photo_document_id').references((): AnyPgColumn => document.id, {
+			onDelete: 'set null'
+		}),
 		/** Set via the signed /unsubscribe link in member-facing emails. */
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		joinedAt: date('joined_at', { mode: 'string' }),
