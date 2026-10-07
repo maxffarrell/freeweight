@@ -631,7 +631,12 @@ export async function bookSeries(
 }
 
 /** Cancels a booking and promotes the longest-waiting member, if any. */
-export async function cancelBooking(ctx: OrgContext, id: string, actorId?: string | null) {
+export async function cancelBooking(
+	ctx: OrgContext,
+	id: string,
+	actorId?: string | null,
+	opts?: { notify?: boolean; lateFee?: boolean }
+) {
 	const { promoted, lateCancel } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
@@ -707,9 +712,9 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 		summary: 'Booking cancelled',
 		data: { sessionId: b!.sessionId, memberId: b!.memberId, promotedId: promoted?.memberId }
 	});
-	notifyBookingCancelled(ctx.orgId, id).catch(() => {});
+	if (opts?.notify !== false) notifyBookingCancelled(ctx.orgId, id).catch(() => {});
 	if (promoted) await notifyWaitlistPromoted(ctx.orgId, promoted.id).catch(() => {});
-	if (lateCancel) {
+	if (lateCancel && opts?.lateFee !== false) {
 		const [c] = await db
 			.insert(charge)
 			.values({
@@ -724,6 +729,30 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 		if (c) notifyChargePosted(ctx.orgId, c.id).catch(() => {});
 	}
 	return { ...b, lateFeeApplied: lateCancel != null };
+}
+
+/**
+ * Cancels every upcoming booking a member holds — called when their membership
+ * is cancelled so their spots free up (and waitlists promote). Member-facing
+ * cancel emails and late fees are suppressed; the membership-cancel email
+ * covers it.
+ */
+export async function cancelUpcomingBookings(ctx: OrgContext, memberId: string) {
+	const rows = await db
+		.select({ id: booking.id })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.memberId, memberId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				gt(classSession.startsAt, new Date())
+			)
+		);
+	for (const r of rows)
+		await cancelBooking(ctx, r.id, ctx.userId, { notify: false, lateFee: false });
+	return rows.length;
 }
 
 export async function updateBooking(ctx: OrgContext, input: v.InferOutput<typeof s.bookingUpdate>) {
