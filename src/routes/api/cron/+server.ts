@@ -26,6 +26,7 @@ import {
 	materializeTemplates,
 	sendPackLowCreditNudges
 } from '#lib/server/services/schedule.ts';
+import { closeStaleCheckIns } from '#lib/server/services/checkins.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -58,6 +59,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let packNudges = 0;
 	let waiverNudges = 0;
 	let underEnrolled = 0;
+	let autoCheckouts = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -133,6 +135,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`under-enrollment cron failed for ${o.id}`, err);
 		}
 		try {
+			autoCheckouts += await closeStaleCheckIns(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`auto-checkout cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -190,7 +198,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		announcements,
 		packNudges,
 		waiverNudges,
-		underEnrolled
+		underEnrolled,
+		autoCheckouts
 	});
 };
 
