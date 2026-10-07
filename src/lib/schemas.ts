@@ -137,6 +137,8 @@ export const sessionInput = v.object({
 	instructorId: v.optional(v.nullable(idSchema)),
 	startsAt: localDateTime,
 	capacity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+	/** Per-session duration override; defaults to the class type's durationMin. */
+	durationMin: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	/** Repeat weekly until this ISO date (inclusive). */
 	repeatUntil: v.optional(v.nullable(isoDate)),
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
@@ -156,6 +158,8 @@ export const sessionUpdate = v.object({
 	id: idSchema,
 	startsAt: v.optional(localDateTime),
 	capacity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+	/** Recomputes endsAt from the session's start time. */
+	durationMin: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
 	cancelled: v.optional(v.boolean()),
