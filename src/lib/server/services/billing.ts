@@ -21,6 +21,7 @@ import {
 	payment,
 	plan,
 	promoCode,
+	shopItem,
 	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -694,6 +695,82 @@ export async function bulkCharge(ctx: OrgContext, input: v.InferOutput<typeof s.
 		summary: `"${input.description}" posted to ${rows.length} member${rows.length === 1 ? '' : 's'}`
 	});
 	return { posted: rows.length };
+}
+
+// ---------- Shop (front-desk sales) ----------
+
+export async function listShopItems(orgId: string) {
+	return db
+		.select()
+		.from(shopItem)
+		.where(eq(shopItem.organizationId, orgId))
+		.orderBy(asc(shopItem.name));
+}
+
+export async function createShopItem(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.shopItemInput>
+) {
+	const [row] = await db
+		.insert(shopItem)
+		.values({ organizationId: ctx.orgId, name: input.name, price: input.price })
+		.returning();
+	return row;
+}
+
+export async function updateShopItem(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.shopItemUpdate>
+) {
+	const { id, ...set } = input;
+	const [row] = await db
+		.update(shopItem)
+		.set(set)
+		.where(and(eq(shopItem.organizationId, ctx.orgId), eq(shopItem.id, id)))
+		.returning();
+	if (!row) error(404, 'Item not found');
+	return row;
+}
+
+/**
+ * Sells a shop item to a member: posts an 'other' charge for price×qty due
+ * today, and when `payNow` is set, immediately records a payment against it.
+ */
+export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.saleInput>) {
+	const [item] = await db
+		.select()
+		.from(shopItem)
+		.where(
+			and(
+				eq(shopItem.organizationId, ctx.orgId),
+				eq(shopItem.id, input.itemId),
+				eq(shopItem.active, true)
+			)
+		);
+	if (!item) error(404, 'Item not found');
+	const [m] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
+	if (!m) error(404, 'Member not found');
+	const amount = item.price * input.qty;
+	const c = await addCharge(ctx, {
+		memberId: input.memberId,
+		kind: 'other',
+		description: `${item.name}${input.qty > 1 ? ` ×${input.qty}` : ''}`,
+		amount,
+		dueDate: todayISO()
+	});
+	if (input.payNow)
+		await recordPayment(ctx, {
+			memberId: input.memberId,
+			chargeId: c!.id,
+			amount,
+			method: input.method,
+			reference: null,
+			notes: `Shop sale: ${item.name}`
+		});
+	return { charge: c, paid: input.payNow };
 }
 
 export async function updateCharge(ctx: OrgContext, input: v.InferOutput<typeof s.chargeUpdate>) {

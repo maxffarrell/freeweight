@@ -463,6 +463,20 @@ export const payment = pgTable(
 	]
 );
 
+/** A front-desk retail item — water, wraps, shirts — sold into a charge or paid on the spot. */
+export const shopItem = pgTable(
+	'shop_item',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		price: integer('price').notNull(),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('shop_item_org_idx').on(t.organizationId)]
+);
+
 /** A workspace's settings for one online payment provider (`stripe`, …). */
 export const paymentProvider = pgTable(
 	'payment_provider',
