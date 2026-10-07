@@ -13,6 +13,7 @@ import {
 	closureInput,
 	emailRosterInput,
 	idSchema,
+	instructorHandoffInput,
 	seriesBookingInput,
 	sessionInput,
 	sessionUpdate,
@@ -93,6 +94,21 @@ export const copyWeek = command(
 		return r;
 	}
 );
+
+/** Preview counts for the instructor-handoff dialog. */
+export const getInstructorUpcoming = query(
+	v.object({ instructorId: idSchema, classTypeId: v.optional(v.string()) }),
+	async (input) => svc.instructorUpcoming((await requireOrg()).orgId, input)
+);
+
+/** Reassign or cancel every future session an instructor teaches, templates
+ * included so they don't regenerate under the departed instructor. */
+export const handoffInstructor = command(instructorHandoffInput, async (input) => {
+	const r = await svc.instructorHandoff(await requireOrg(), await tz(), input);
+	void getSessions().refresh();
+	void getTemplates().refresh();
+	return r;
+});
 
 export const getClosures = query(async () => svc.listClosures((await requireOrg()).orgId));
 export const addClosure = command(closureInput, async (input) => {

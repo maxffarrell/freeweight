@@ -192,6 +192,15 @@ export const seriesBookingInput = v.object({
 	weeks: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(12)), 4)
 });
 
+/** "Kate is leaving" — reassign (toId) or cancel every future session an
+ * instructor teaches; optional classTypeId scopes it to one class. */
+export const instructorHandoffInput = v.object({
+	fromId: idSchema,
+	classTypeId: v.optional(v.string()),
+	toId: v.optional(v.string()),
+	cancel: v.optional(v.boolean(), false)
+});
+
 export const bookingUpdate = v.object({
 	id: idSchema,
 	status: v.picklist(bookingStatuses)

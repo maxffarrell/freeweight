@@ -1098,6 +1098,102 @@ export async function listInstructors(orgId: string) {
 		.orderBy(asc(user.name));
 }
 
+/** Preview counts for the instructor-handoff dialog. */
+export async function instructorUpcoming(
+	orgId: string,
+	input: { instructorId: string; classTypeId?: string }
+) {
+	const [s] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.instructorId, input.instructorId),
+				gt(classSession.startsAt, new Date()),
+				isNull(classSession.cancelledAt),
+				input.classTypeId ? eq(classSession.classTypeId, input.classTypeId) : undefined
+			)
+		);
+	const [t] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(classTemplate)
+		.where(
+			and(
+				eq(classTemplate.organizationId, orgId),
+				eq(classTemplate.instructorId, input.instructorId),
+				eq(classTemplate.active, true),
+				input.classTypeId ? eq(classTemplate.classTypeId, input.classTypeId) : undefined
+			)
+		);
+	return { sessions: s?.n ?? 0, templates: t?.n ?? 0 };
+}
+
+/**
+ * "Kate is leaving" — reassign or cancel every future session an instructor
+ * teaches, and move (or remove) their recurring templates so new sessions don't
+ * keep materializing under them. Each session goes through updateSession so the
+ * usual attendee emails, credit refunds and drop-in voids still fire.
+ */
+export async function instructorHandoff(
+	ctx: OrgContext,
+	tz: string,
+	input: v.InferOutput<typeof s.instructorHandoffInput>
+) {
+	if (!input.cancel && (!input.toId || input.toId === input.fromId))
+		error(400, 'Pick a different instructor to take over');
+	const rows = await db
+		.select({ id: classSession.id })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, input.fromId),
+				gt(classSession.startsAt, new Date()),
+				isNull(classSession.cancelledAt),
+				input.classTypeId ? eq(classSession.classTypeId, input.classTypeId) : undefined
+			)
+		);
+	for (const r of rows) {
+		await updateSession(
+			ctx,
+			tz,
+			input.cancel ? { id: r.id, cancelled: true } : { id: r.id, instructorId: input.toId! }
+		);
+	}
+	const tplWhere = and(
+		eq(classTemplate.organizationId, ctx.orgId),
+		eq(classTemplate.instructorId, input.fromId),
+		eq(classTemplate.active, true),
+		input.classTypeId ? eq(classTemplate.classTypeId, input.classTypeId) : undefined
+	);
+	// Sessions beyond the materialize window regenerate from templates, so the
+	// handoff has to touch them too — reassign keeps the class running; cancel
+	// removes the rule entirely.
+	const tplRows = input.cancel
+		? await db.delete(classTemplate).where(tplWhere).returning({ id: classTemplate.id })
+		: await db
+				.update(classTemplate)
+				.set({ instructorId: input.toId! })
+				.where(tplWhere)
+				.returning({ id: classTemplate.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'instructor',
+		entityId: input.fromId,
+		action: input.cancel ? 'sessions_cancelled' : 'instructor_handoff',
+		summary: `${rows.length} upcoming session${rows.length === 1 ? '' : 's'} ${input.cancel ? 'cancelled' : 'reassigned'}`,
+		data: {
+			fromId: input.fromId,
+			toId: input.toId,
+			classTypeId: input.classTypeId,
+			templates: tplRows.length
+		}
+	});
+	return { sessions: rows.length, templates: tplRows.length };
+}
+
 // ---------- Recurring templates ----------
 
 export async function listTemplates(orgId: string) {
