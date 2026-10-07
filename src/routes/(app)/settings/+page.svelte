@@ -64,6 +64,7 @@
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
 	let noShowFee = $state<number | null>(settings.noShowFee);
+	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -82,6 +83,7 @@
 				bookingWindowDays,
 				cancelCutoffMin,
 				noShowFee,
+				suspendAfterDays,
 				publicPage
 			});
 			toast.success('Settings saved');
@@ -299,6 +301,20 @@
 							<MoneyInput bind:value={noShowFee} />
 							<Field.Description
 								>Charged to the member for every class they skip without checking in.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-suspend">Suspend membership after days overdue</Field.Label>
+							<Input
+								id="s-suspend"
+								type="number"
+								min={1}
+								bind:value={suspendAfterDays}
+								placeholder="Never"
+							/>
+							<Field.Description
+								>Members this many days behind on a charge lose class bookings until they pay up;
+								billing keeps accruing meanwhile.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

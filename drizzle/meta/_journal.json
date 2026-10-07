@@ -71,6 +71,13 @@
       "when": 1791348883044,
       "tag": "0009_minor_sauron",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791349270057,
+      "tag": "0010_mysterious_machine_man",
+      "breakpoints": true
     }
   ]
 }

@@ -554,3 +554,34 @@ export async function notifyChargePosted(orgId: string, chargeId: string) {
 		})
 	});
 }
+
+/**
+ * "Membership suspended" to each member whose membership just flipped for non-payment.
+ * Dedup key includes today's date so a second suspension later still emails.
+ */
+export async function notifyMembershipSuspended(orgId: string, memberIds: string[]) {
+	const rows = await db
+		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), inArray(gymMember.id, memberIds)));
+	if (!rows.length) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	for (const m of rows) {
+		if (!m.email) continue;
+		if (!(await logOnce(orgId, 'membership_suspended', `${m.id}:${today}`, m.email))) continue;
+		await sendEmail({
+			to: m.email,
+			subject: `Membership suspended — ${name}`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Your membership is suspended',
+				lines: [
+					`Hi ${m.name} — your membership at ${name} was suspended because of an overdue balance.`,
+					'Class bookings are paused until the balance is paid; your membership resumes automatically once it clears.'
+				],
+				action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
+}

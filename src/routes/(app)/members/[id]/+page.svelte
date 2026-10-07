@@ -93,7 +93,7 @@
 
 	async function setMembership(
 		membershipId: string,
-		status: 'paused' | 'cancelled' | 'active',
+		status: 'paused' | 'cancelled' | 'suspended' | 'active',
 		resumeAt?: string
 	) {
 		try {
@@ -274,9 +274,15 @@
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs text-destructive"
+									onclick={() => setMembership(mm.membership.id, 'suspended')}>Suspend</Button
+								>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
 									onclick={() => setMembership(mm.membership.id, 'cancelled')}>Cancel</Button
 								>
-							{:else if mm.membership.status === 'paused'}
+							{:else if mm.membership.status === 'paused' || mm.membership.status === 'suspended'}
 								<Button
 									variant="ghost"
 									size="sm"

@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	charge,
@@ -12,7 +12,11 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyChargePosted, notifyPaymentReceived } from './notifications.ts';
+import {
+	notifyChargePosted,
+	notifyMembershipSuspended,
+	notifyPaymentReceived
+} from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
@@ -262,7 +266,7 @@ export async function runBilling(orgId: string) {
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
-				eq(membership.status, 'active'),
+				inArray(membership.status, ['active', 'suspended']),
 				lt(membership.nextChargeAt, now)
 			)
 		);
@@ -283,6 +287,77 @@ export async function runBilling(orgId: string) {
 	}
 	await resumeFrozenMemberships(orgId);
 	return posted;
+}
+
+/**
+ * Dunning: active memberships with an open charge older than `suspendAfterDays`
+ * (gym setting; unset = off) become 'suspended' — booking requires an active
+ * membership, so this cuts class access while billing keeps accruing. Runs in
+ * the daily cron; `recordPayment` flips them back once nothing is overdue.
+ */
+export async function suspendDelinquentMembers(orgId: string) {
+	const [st] = await db
+		.select({ days: gymSettings.suspendAfterDays })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (!st?.days) return 0;
+	const cutoff = addDays(todayISO(), -st.days);
+	const rows = await db
+		.select({ id: membership.id, memberId: membership.memberId })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				sql`exists (select 1 from ${charge} c
+					where c.member_id = ${membership.memberId} and c.organization_id = ${orgId}
+					and c.status = 'open' and c.due_date < ${cutoff})`
+			)
+		);
+	for (const r of rows) {
+		await db.update(membership).set({ status: 'suspended' }).where(eq(membership.id, r.id));
+		await emit({
+			orgId,
+			entityType: 'membership',
+			entityId: r.id,
+			action: 'suspended',
+			summary: 'Membership suspended for non-payment',
+			data: { memberId: r.memberId }
+		});
+	}
+	if (rows.length)
+		notifyMembershipSuspended(
+			orgId,
+			rows.map((r) => r.memberId)
+		).catch(() => {});
+	return rows.length;
+}
+
+/** After a payment, a suspended membership with nothing left overdue reactivates. */
+async function unsuspendPaidUp(orgId: string, memberId: string) {
+	const [overdue] = await db
+		.select({ id: charge.id })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.memberId, memberId),
+				eq(charge.status, 'open'),
+				lt(charge.dueDate, todayISO())
+			)
+		)
+		.limit(1);
+	if (overdue) return;
+	await db
+		.update(membership)
+		.set({ status: 'active' })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'suspended')
+			)
+		);
 }
 
 /**
@@ -465,6 +540,7 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 		input.amount,
 		input.method
 	).catch(() => {});
+	unsuspendPaidUp(ctx.orgId, input.memberId).catch(() => {});
 	return rows[0];
 }
 

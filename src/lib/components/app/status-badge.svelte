@@ -21,6 +21,7 @@
 		in_progress: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
 		vacant: 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
 		overdue: 'bg-red-500/10 text-red-700 dark:text-red-400',
+		suspended: 'bg-red-500/10 text-red-700 dark:text-red-400',
 		urgent: 'bg-red-500/10 text-red-700 dark:text-red-400',
 		terminated: 'bg-red-500/10 text-red-700 dark:text-red-400',
 		published: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',

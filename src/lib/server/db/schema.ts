@@ -64,6 +64,8 @@ export const gymSettings = pgTable('gym_settings', {
 	cancelCutoffMin: integer('cancel_cutoff_min'),
 	/** Open charge posted per auto-marked no-show, in minor units; null/0 = no fee. */
 	noShowFee: integer('no_show_fee'),
+	/** Auto-suspend a membership once a charge is this many days overdue; null = off. */
+	suspendAfterDays: integer('suspend_after_days'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -159,7 +161,12 @@ export const waiver = pgTable(
 	(t) => [index('waiver_member_idx').on(t.memberId)]
 );
 
-export const membershipStatus = pgEnum('membership_status', ['active', 'paused', 'cancelled']);
+export const membershipStatus = pgEnum('membership_status', [
+	'active',
+	'paused',
+	'suspended',
+	'cancelled'
+]);
 
 /** A member's subscription to a plan; drives recurring charges. */
 export const membership = pgTable(

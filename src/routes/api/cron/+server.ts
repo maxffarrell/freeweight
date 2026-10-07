@@ -3,7 +3,7 @@ import { error, json } from '@sveltejs/kit';
 import { CRON_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
-import { runBilling } from '#lib/server/services/billing.ts';
+import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { sendClassReminders, sendPastDueNotices } from '#lib/server/services/notifications.ts';
 import { markPastNoShows } from '#lib/server/services/schedule.ts';
@@ -24,9 +24,11 @@ export const GET: RequestHandler = async ({ request }) => {
 	let reminders = 0;
 	let pastDue = 0;
 	let noShows = 0;
+	let suspended = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
+			suspended += await suspendDelinquentMembers(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);
@@ -51,7 +53,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 	}
 	await purgeExpiredDemos();
-	return json({ workspaces: orgs.length, failed, reminders, pastDue, noShows });
+	return json({ workspaces: orgs.length, failed, reminders, pastDue, noShows, suspended });
 };
 
 export const POST = GET;
