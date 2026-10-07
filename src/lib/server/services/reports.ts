@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -7,6 +7,8 @@ import {
 	checkIn,
 	classSession,
 	classType,
+	eventRegistration,
+	gymEvent,
 	gymMember,
 	gymSettings,
 	member,
@@ -209,6 +211,56 @@ async function noShowByClass(orgId: string) {
 		...r,
 		rate: r.attended + r.noShows ? Math.round((r.noShows / (r.attended + r.noShows)) * 100) : 0
 	}));
+}
+
+/**
+ * Per-event signups and show rate over the last 90 days + upcoming —
+ * waitlisted/cancelled registrations excluded; revenue = non-void signup charges.
+ */
+async function eventStats(orgId: string) {
+	const evs = await db
+		.select()
+		.from(gymEvent)
+		.where(
+			and(
+				eq(gymEvent.organizationId, orgId),
+				isNull(gymEvent.cancelledAt),
+				gte(gymEvent.startsAt, new Date(Date.now() - 90 * 86400_000))
+			)
+		)
+		.orderBy(desc(gymEvent.startsAt))
+		.limit(20);
+	const regs = await db
+		.select({
+			eventId: eventRegistration.eventId,
+			status: eventRegistration.status,
+			waitlisted: eventRegistration.waitlisted,
+			amount: charge.amount,
+			chargeStatus: charge.status
+		})
+		.from(eventRegistration)
+		.leftJoin(charge, eq(eventRegistration.chargeId, charge.id))
+		.where(
+			and(eq(eventRegistration.organizationId, orgId), ne(eventRegistration.status, 'cancelled'))
+		);
+	const byEvent = new Map<string, { registered: number; attended: number; revenue: number }>();
+	for (const r of regs) {
+		if (r.waitlisted) continue;
+		const e = byEvent.get(r.eventId) ?? { registered: 0, attended: 0, revenue: 0 };
+		e.registered++;
+		if (r.status === 'attended') e.attended++;
+		if (r.chargeStatus !== 'void' && r.amount) e.revenue += r.amount;
+		byEvent.set(r.eventId, e);
+	}
+	return evs.map((ev) => {
+		const s = byEvent.get(ev.id) ?? { registered: 0, attended: 0, revenue: 0 };
+		return {
+			event: ev,
+			...s,
+			showRate: s.registered ? Math.round((s.attended / s.registered) * 100) : 0,
+			past: ev.endsAt.getTime() < Date.now()
+		};
+	});
 }
 
 /** Fill rate by weekday (gym timezone) over the last 90 days — which days actually fill. */
@@ -572,7 +624,8 @@ export async function getReports(orgId: string) {
 		sources,
 		payrollDetail,
 		churn,
-		noShows
+		noShows,
+		events
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -595,7 +648,8 @@ export async function getReports(orgId: string) {
 		leadSources(orgId),
 		instructorPayrollDetail(orgId),
 		churnReasons(orgId),
-		noShowByClass(orgId)
+		noShowByClass(orgId),
+		eventStats(orgId)
 	]);
 	return {
 		checkIns,
@@ -619,6 +673,7 @@ export async function getReports(orgId: string) {
 		sources,
 		payrollDetail,
 		churn,
-		noShows
+		noShows,
+		events
 	};
 }

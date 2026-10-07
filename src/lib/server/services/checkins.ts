@@ -27,7 +27,8 @@ import {
 	gymSettings,
 	location,
 	membership,
-	plan
+	plan,
+	waiver
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
@@ -248,7 +249,15 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			action: 'checked-out',
 			summary: `${m.name} checked out`
 		});
-		return { checkIn: row!, member: m, attended: 0, checkedOut: true, birthday: false, visits: 0 };
+		return {
+			checkIn: row!,
+			member: m,
+			attended: 0,
+			checkedOut: true,
+			birthday: false,
+			visits: 0,
+			waiverMissing: false
+		};
 	}
 	const [row] = await db
 		.insert(checkIn)
@@ -261,7 +270,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		.returning();
 	// A check-in marks that member's already-started bookings today as attended.
 	const [st] = await db
-		.select({ timezone: gymSettings.timezone })
+		.select({ timezone: gymSettings.timezone, waiverText: gymSettings.waiver })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 	const tz = st?.timezone ?? 'UTC';
@@ -308,7 +317,24 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
-	return { checkIn: row!, member: m, attended: attended.length, birthday, visits: n };
+	// Same heads-up when the gym requires a waiver and theirs is missing or stale.
+	const waiverMissing =
+		!!st?.waiverText &&
+		!(
+			await db
+				.select({ id: waiver.id })
+				.from(waiver)
+				.where(and(eq(waiver.memberId, memberId), eq(waiver.text, st.waiverText)))
+				.limit(1)
+		).length;
+	return {
+		checkIn: row!,
+		member: m,
+		attended: attended.length,
+		birthday,
+		visits: n,
+		waiverMissing
+	};
 }
 
 export async function listCheckIns(
