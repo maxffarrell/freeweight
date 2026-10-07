@@ -100,6 +100,26 @@ async function revenueByMonth(orgId: string) {
 		.orderBy(asc(sql`to_char(${payment.paidAt}, 'YYYY-MM')`));
 }
 
+/** Collected payments by method over the last 90 days (refunds excluded). */
+async function paymentsByMethod(orgId: string) {
+	return db
+		.select({
+			method: payment.method,
+			count: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
+		})
+		.from(payment)
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
+				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
+			)
+		)
+		.groupBy(payment.method)
+		.orderBy(desc(sql`sum(${payment.amount})`));
+}
+
 /** Active membership count per plan. */
 async function membershipsByPlan(orgId: string) {
 	return db
@@ -267,23 +287,36 @@ async function instructorStats(orgId: string) {
 }
 
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top, referrers, hours] =
-		await Promise.all([
-			checkInsByDay(orgId),
-			memberGrowthByMonth(orgId),
-			revenueByMonth(orgId),
-			membershipsByPlan(orgId),
-			fillByClass(orgId),
-			atRiskMembers(orgId),
-			instructorStats(orgId),
-			topAttendees(orgId),
-			topReferrers(orgId),
-			checkInsByHour(orgId)
-		]);
+	const [
+		checkIns,
+		members,
+		revenue,
+		methods,
+		plans,
+		fill,
+		atRisk,
+		instructors,
+		top,
+		referrers,
+		hours
+	] = await Promise.all([
+		checkInsByDay(orgId),
+		memberGrowthByMonth(orgId),
+		revenueByMonth(orgId),
+		paymentsByMethod(orgId),
+		membershipsByPlan(orgId),
+		fillByClass(orgId),
+		atRiskMembers(orgId),
+		instructorStats(orgId),
+		topAttendees(orgId),
+		topReferrers(orgId),
+		checkInsByHour(orgId)
+	]);
 	return {
 		checkIns,
 		members,
 		revenue,
+		methods,
 		plans,
 		fill,
 		atRisk,

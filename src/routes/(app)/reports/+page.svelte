@@ -22,6 +22,7 @@
 	const maxMembers = Math.max(1, ...r.members.map((m) => m.joined));
 	const maxRevenue = Math.max(1, ...r.revenue.map((m) => m.total));
 	const maxMembersByPlan = Math.max(1, ...r.plans.map((p) => p.count));
+	const maxMethodTotal = Math.max(1, ...r.methods.map((m) => m.total));
 	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
 	const hourLabel = (h: number) =>
 		h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
@@ -170,6 +171,30 @@
 				</div>
 			{:else}
 				<p class="text-sm text-muted-foreground">No active memberships.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Payments by method</Card.Title>
+			<Card.Description>Collected (excl. refunds), last 90 days</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each r.methods as m (m.method)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-16 shrink-0 capitalize">{m.method}</span>
+					<div
+						class="h-4 rounded bg-green-500/70"
+						style="width: {(m.total / maxMethodTotal) * 70}%"
+					></div>
+					<span class="tabular-nums"
+						>{formatMoney(m.total, currency, true)}
+						<span class="text-xs text-muted-foreground">· {m.count}</span></span
+					>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No payments in the last 90 days.</p>
 			{/each}
 		</Card.Content>
 	</Card.Root>
