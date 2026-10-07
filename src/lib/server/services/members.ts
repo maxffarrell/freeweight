@@ -14,6 +14,7 @@ import {
 	memberNote,
 	memberTag,
 	membership,
+	notificationLog,
 	organization,
 	payment,
 	user,
@@ -274,7 +275,7 @@ export async function getMember(orgId: string, id: string) {
 				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
 			)
 		);
-	const [[att], [bs], referredBy, [referralCount], guardian, dependents, memberOptions] =
+	const [[att], [bs], referredBy, [referralCount], guardian, dependents, memberOptions, emails] =
 		await Promise.all([
 			db
 				.select({
@@ -325,7 +326,20 @@ export async function getMember(orgId: string, id: string) {
 				.from(gymMember)
 				.where(and(eq(gymMember.organizationId, orgId), ne(gymMember.id, id)))
 				.orderBy(asc(gymMember.name))
-				.limit(500)
+				.limit(500),
+			row.member.email
+				? db
+						.select({ kind: notificationLog.kind, createdAt: notificationLog.createdAt })
+						.from(notificationLog)
+						.where(
+							and(
+								eq(notificationLog.organizationId, orgId),
+								eq(notificationLog.recipient, row.member.email)
+							)
+						)
+						.orderBy(desc(notificationLog.createdAt))
+						.limit(20)
+				: Promise.resolve([])
 		]);
 	return {
 		...row,
@@ -342,6 +356,7 @@ export async function getMember(orgId: string, id: string) {
 		guardian: guardian[0] ?? null,
 		dependents,
 		memberOptions,
+		emails,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {
