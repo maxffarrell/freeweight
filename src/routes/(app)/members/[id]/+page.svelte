@@ -368,6 +368,16 @@
 					>
 				</div>
 				<div class="flex justify-between">
+					<span class="text-muted-foreground">Visits</span>
+					<span class="tabular-nums"
+						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
+					>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">No-shows</span>
+					<span class="tabular-nums">{m.attendance.noShows}</span>
+				</div>
+				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
 				</div>
