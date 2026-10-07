@@ -28,7 +28,12 @@
 	let email = $state('');
 	let phone = $state('');
 	let referralSource = $state<(typeof referralSources)[number] | ''>('');
-	let planId = $state('');
+	/** `?plan=<id>` preselects a plan (ads/campaign links); ignored when it isn't a listed plan. */
+	let planId = $state(
+		plans.some((p) => p.id === page.url.searchParams.get('plan'))
+			? page.url.searchParams.get('plan')!
+			: ''
+	);
 	let promoCode = $state('');
 	let website = $state(''); // honeypot — must stay empty
 	let agreedWaiver = $state(false);
