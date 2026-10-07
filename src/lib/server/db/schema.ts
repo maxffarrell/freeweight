@@ -546,6 +546,24 @@ export const shift = pgTable(
 	(t) => [index('shift_org_idx').on(t.organizationId), index('shift_member_idx').on(t.memberId)]
 );
 
+/** Weekly staff rota — who is *scheduled* to work (vs `shift`, actual clock events). */
+export const rota = pgTable(
+	'rota',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+		weekday: integer('weekday').notNull(),
+		startTime: text('start_time').notNull(),
+		endTime: text('end_time').notNull(),
+		...timestamps
+	},
+	(t) => [index('rota_org_idx').on(t.organizationId), index('rota_member_idx').on(t.memberId)]
+);
+
 export const resourceBooking = pgTable(
 	'resource_booking',
 	{

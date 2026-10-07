@@ -4,7 +4,7 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
-	import { getDashboard } from '#lib/remote/workspace.remote.ts';
+	import { getDashboard, getStaff } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import Users from '@lucide/svelte/icons/users';
@@ -21,6 +21,9 @@
 		getMyShift,
 		getOnShift,
 		getShiftLog,
+		getRota,
+		getScheduledNow,
+		setRota,
 		clockIn,
 		clockOut,
 		closeShift,
@@ -28,6 +31,8 @@
 		deleteShift
 	} from '#lib/remote/shifts.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -38,7 +43,11 @@
 	const ai = await getAiStatus();
 	const myShift = $derived(await getMyShift());
 	const onShift = $derived(await getOnShift());
+	const scheduled = $derived(await getScheduledNow());
+	const scheduledMissing = $derived(scheduled.filter((s) => !s.clockedInAt));
 	const shiftLog = $derived(await getShiftLog());
+	const rota = $derived(await getRota());
+	const staff = $derived(await getStaff());
 	const atRisk = $derived(await getAtRisk());
 	const isAdmin = $derived(myShift.role === 'owner' || myShift.role === 'admin');
 	let logOpen = $state(false);
@@ -85,6 +94,36 @@
 			toast.error(errMsg(e, 'Could not update shift'));
 		}
 	}
+	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	let rotaStaff = $state('');
+	let rotaWindows = $state<{ weekday: string; startTime: string; endTime: string }[]>([]);
+	let rotaBusy = $state(false);
+
+	function pickRotaStaff(memberId: string) {
+		rotaStaff = memberId;
+		rotaWindows = rota
+			.filter((r) => r.rota.memberId === memberId)
+			.map((r) => ({
+				weekday: String(r.rota.weekday),
+				startTime: r.rota.startTime,
+				endTime: r.rota.endTime
+			}));
+	}
+
+	async function saveRota() {
+		rotaBusy = true;
+		try {
+			await setRota({
+				memberId: rotaStaff,
+				windows: rotaWindows.map((w) => ({ ...w, weekday: Number(w.weekday) }))
+			});
+			toast.success('Rota saved');
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not save rota'));
+		}
+		rotaBusy = false;
+	}
+
 	let insights = $state<string[] | null | 'error'>(null);
 	$effect(() => {
 		if (!ai.configured || insights !== null) return;
@@ -240,6 +279,21 @@
 						</ul>
 					{:else}
 						<p class="text-sm text-muted-foreground">Nobody clocked in.</p>
+					{/if}
+					{#if scheduledMissing.length}
+						<ul class="mt-3 space-y-2 border-t pt-3">
+							{#each scheduledMissing as s (s.memberId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate text-muted-foreground">{s.staffName}</span>
+									<Badge
+										variant="outline"
+										class="shrink-0 {s.late
+											? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+											: ''}">{s.late ? 'late · ' : ''}rota {s.startTime}–{s.endTime}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
 					{/if}
 				</Card.Content>
 			</Card.Root>
@@ -503,5 +557,58 @@
 				</Table.Body>
 			</Table.Root>
 		</div>
+		{#if isAdmin}
+			<div class="mt-4 space-y-3 border-t pt-4">
+				<p class="text-sm font-medium">Weekly rota</p>
+				<Select.Root type="single" value={rotaStaff} onValueChange={(v) => pickRotaStaff(v)}>
+					<Select.Trigger class="w-56"
+						>{rotaStaff
+							? staff.find((s) => s.id === rotaStaff)?.name
+							: 'Pick a staff member'}</Select.Trigger
+					>
+					<Select.Content>
+						{#each staff as s (s.id)}
+							<Select.Item value={s.id}>{s.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				{#if rotaStaff}
+					{#each rotaWindows as w, i (i)}
+						<div class="flex flex-wrap items-center gap-3">
+							<Select.Root type="single" bind:value={rotaWindows[i].weekday}>
+								<Select.Trigger class="w-32">{WEEKDAYS[Number(w.weekday)]}</Select.Trigger>
+								<Select.Content>
+									{#each WEEKDAYS as day, di (day)}
+										<Select.Item value={String(di)}>{day}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<Input type="time" class="w-28" bind:value={rotaWindows[i].startTime} />
+							<span class="text-sm text-muted-foreground">–</span>
+							<Input type="time" class="w-28" bind:value={rotaWindows[i].endTime} />
+							<Button
+								variant="ghost"
+								size="icon"
+								class="ml-auto"
+								onclick={() => rotaWindows.splice(i, 1)}
+								aria-label="Remove window"><Trash2 class="size-4" /></Button
+							>
+						</div>
+					{/each}
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() =>
+								rotaWindows.push({ weekday: '1', startTime: '09:00', endTime: '17:00' })}
+							>Add window</Button
+						>
+						<Button size="sm" disabled={rotaBusy} onclick={saveRota}
+							>{rotaBusy ? 'Saving…' : 'Save rota'}</Button
+						>
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>

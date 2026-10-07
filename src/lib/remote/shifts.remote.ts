@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/shifts.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
-import { idSchema } from '#lib/schemas.ts';
+import { idSchema, rotaInput } from '#lib/schemas.ts';
 
 const tz = async () => (await getSettings((await requireOrg()).orgId)).timezone;
 
@@ -66,4 +66,18 @@ export const clockOut = command(async () => {
 	void getMyShift().refresh();
 	void getOnShift().refresh();
 	return row;
+});
+
+/** Everyone's weekly rota windows — staff can see the schedule. */
+export const getRota = query(async () => svc.listRota((await requireOrg()).orgId));
+
+/** Staff whose rota says they should be working right now. */
+export const getScheduledNow = query(async () => svc.scheduledNow((await requireOrg()).orgId));
+
+export const setRota = command(rotaInput, async (input) => {
+	const ctx = await requireOrg('admin');
+	const rows = await svc.setRota(ctx, input.memberId, input.windows);
+	void getRota().refresh();
+	void getScheduledNow().refresh();
+	return rows;
 });

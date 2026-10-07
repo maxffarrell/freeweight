@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { gymSettings, location, member, shift, user } from '#lib/server/db/schema.ts';
+import { gymSettings, location, member, rota, shift, user } from '#lib/server/db/schema.ts';
 import { emit } from '#lib/server/services/events.ts';
-import { zonedToUtc } from '#lib/tz.ts';
+import { localMinutes, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 
 async function staffRow(ctx: OrgContext) {
@@ -231,4 +231,97 @@ export async function deleteShift(ctx: OrgContext, id: string) {
 		.returning({ id: shift.id });
 	if (!row) error(404, 'Shift not found');
 	return { id: row.id };
+}
+
+/** Every rota window in the org, grouped by staff — the shift-log rota section. */
+export async function listRota(orgId: string) {
+	return db
+		.select({ rota, staffName: user.name })
+		.from(rota)
+		.innerJoin(member, eq(rota.memberId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(eq(rota.organizationId, orgId))
+		.orderBy(asc(user.name), asc(rota.weekday), asc(rota.startTime));
+}
+
+/** Admin: replace one staff member's weekly rota. */
+export async function setRota(
+	ctx: OrgContext,
+	memberId: string,
+	windows: { weekday: number; startTime: string; endTime: string }[]
+) {
+	const [target] = await db
+		.select({ id: member.id, staffName: user.name })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.id, memberId), eq(member.organizationId, ctx.orgId)))
+		.limit(1);
+	if (!target) error(404, 'Staff member not found');
+	for (const w of windows) {
+		if (w.endTime <= w.startTime) error(400, 'Each rota window must end after it starts');
+	}
+	const rows = await db.transaction(async (tx) => {
+		await tx
+			.delete(rota)
+			.where(and(eq(rota.organizationId, ctx.orgId), eq(rota.memberId, memberId)));
+		if (!windows.length) return [];
+		return tx
+			.insert(rota)
+			.values(windows.map((w) => ({ organizationId: ctx.orgId, memberId, ...w })))
+			.returning();
+	});
+	const [who] = await db
+		.select({ name: user.name })
+		.from(user)
+		.where(eq(user.id, ctx.userId))
+		.limit(1);
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'rota',
+		entityId: memberId,
+		action: 'update',
+		summary: `${who?.name ?? 'Staff'} updated ${target.staffName}'s rota`
+	});
+	return rows;
+}
+
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+
+/**
+ * Staff whose rota window covers *now* (org timezone) — dashboard "expected"
+ * list alongside who's actually clocked in. `late` = 15+ min into the window
+ * without a clock-in.
+ */
+export async function scheduledNow(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const now = new Date();
+	const wd = localWeekday(now, tz);
+	const mins = localMinutes(now, tz);
+	const rows = await db
+		.select({
+			rota,
+			staffName: user.name,
+			clockedInAt: shift.clockedInAt
+		})
+		.from(rota)
+		.innerJoin(member, eq(rota.memberId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.leftJoin(shift, and(eq(shift.memberId, rota.memberId), isNull(shift.clockedOutAt)))
+		.where(and(eq(rota.organizationId, orgId), eq(rota.weekday, wd)))
+		.orderBy(asc(rota.startTime));
+	return rows
+		.filter((r) => toMin(r.rota.startTime) <= mins && mins < toMin(r.rota.endTime))
+		.map((r) => ({
+			memberId: r.rota.memberId,
+			staffName: r.staffName,
+			startTime: r.rota.startTime,
+			endTime: r.rota.endTime,
+			clockedInAt: r.clockedInAt,
+			late: !r.clockedInAt && mins > toMin(r.rota.startTime) + 15
+		}));
 }

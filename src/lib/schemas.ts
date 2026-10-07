@@ -302,6 +302,21 @@ export const availabilityInput = v.object({
 	)
 });
 
+/** Admin-set weekly rota for one staff member — replaces their whole set. */
+export const rotaInput = v.object({
+	memberId: idSchema,
+	windows: v.pipe(
+		v.array(
+			v.object({
+				weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
+				startTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')),
+				endTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)'))
+			})
+		),
+		v.maxLength(30)
+	)
+});
+
 /** Member's rating of a class they attended (portal). */
 export const sessionFeedbackInput = v.object({
 	sessionId: idSchema,
