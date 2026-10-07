@@ -44,6 +44,13 @@
 	let tag = $state('__all');
 	let statusFilter = $state('__all');
 	let planFilter = $state('__all');
+	const SORT_LABELS = {
+		name: 'Name A–Z',
+		joined: 'Newest',
+		lastVisit: 'Last visit',
+		balance: 'Balance due'
+	} as const;
+	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let members = $state(await getMembers());
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
@@ -51,7 +58,8 @@
 			q,
 			tag: tag === '__all' ? undefined : tag,
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
-			planId: planFilter === '__all' ? undefined : planFilter
+			planId: planFilter === '__all' ? undefined : planFilter,
+			sort
 		});
 	}
 	function search() {
@@ -281,6 +289,14 @@
 				</Select.Content>
 			</Select.Root>
 		{/if}
+		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
+			<Select.Trigger class="w-36">{SORT_LABELS[sort]}</Select.Trigger>
+			<Select.Content>
+				{#each Object.entries(SORT_LABELS) as [value, label] (value)}
+					<Select.Item {value}>{label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 	</div>
 
 	<Card.Root class="py-0">

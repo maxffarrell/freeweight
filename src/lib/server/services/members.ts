@@ -25,12 +25,22 @@ import { creditUsage } from './schedule.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
+export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance';
+
+const MEMBER_ORDER = {
+	name: asc(gymMember.name),
+	joined: desc(gymMember.joinedAt),
+	lastVisit: sql`"lastVisit" desc nulls last`,
+	balance: sql`"openBalance" desc`
+} as const;
+
 export async function listMembers(
 	orgId: string,
 	q?: string,
 	tag?: string,
 	status?: 'active' | 'inactive',
-	planId?: string
+	planId?: string,
+	sort: MemberSort = 'name'
 ) {
 	const term = q?.trim();
 	return db
@@ -75,7 +85,7 @@ export async function listMembers(
 					: undefined
 			)
 		)
-		.orderBy(asc(gymMember.name));
+		.orderBy(MEMBER_ORDER[sort]);
 }
 
 /** Every tag in use in the workspace — feeds the list filter and member-page autocomplete. */
