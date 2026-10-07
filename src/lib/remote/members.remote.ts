@@ -22,6 +22,7 @@ import {
 	cancelScheduledAnnouncement,
 	countAnnouncementAudience,
 	listRecentAnnouncements,
+	requestPaymentNotice,
 	scheduleAnnouncement,
 	sendAnnouncement,
 	sendAnnouncementTest
@@ -199,6 +200,11 @@ export const cancelScheduledEmail = command(idSchema, async (id) => {
 });
 
 // ------- member notes -------
+
+/** Staff "Request payment" — emails the member their open balance + pay-online link (max 1/day). */
+export const requestPayment = command(idSchema, async (memberId) =>
+	requestPaymentNotice((await requireOrg()).orgId, memberId)
+);
 
 export const getMemberNotes = query(idSchema, async (memberId) =>
 	svc.listMemberNotes((await requireOrg()).orgId, memberId)

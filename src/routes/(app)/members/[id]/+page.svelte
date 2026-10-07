@@ -27,7 +27,8 @@
 		getTags,
 		addMemberTag,
 		removeMemberTag,
-		emailAllMembers
+		emailAllMembers,
+		requestPayment
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -218,6 +219,20 @@
 			emailOpen = false;
 			emailSubject = '';
 			emailMessage = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		pending = false;
+	}
+
+	// ------- payment request -------
+	async function requestPaymentFromMember() {
+		pending = true;
+		try {
+			const sent = await requestPayment(id);
+			toast.success(
+				sent ? 'Payment request emailed' : 'Not sent — already emailed today or balance is settled'
+			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send'));
 		}
@@ -553,10 +568,18 @@
 				</div>
 			</Card.Content>
 			{#if balance > 0}
-				<Card.Footer>
+				<Card.Footer class="flex-col gap-2">
 					<Button class="w-full" onclick={() => ((payAmount = balance), (payOpen = true))}
 						>Record payment</Button
 					>
+					{#if m.member.email}
+						<Button
+							class="w-full"
+							variant="outline"
+							disabled={pending}
+							onclick={requestPaymentFromMember}>Email payment request</Button
+						>
+					{/if}
 				</Card.Footer>
 			{/if}
 		</Card.Root>
