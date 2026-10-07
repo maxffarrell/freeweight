@@ -1605,7 +1605,7 @@ export async function sendStaffBriefing(orgId: string) {
 	const today = localDate(new Date(), tz);
 	const yesterday = addDays(today, -1);
 
-	const [sessions, pending, birthdays, joins] = await Promise.all([
+	const [sessions, pending, birthdays, joins, cover] = await Promise.all([
 		db
 			.select({
 				id: classSession.id,
@@ -1656,9 +1656,30 @@ export async function sendStaffBriefing(orgId: string) {
 			.select({ name: gymMember.name })
 			.from(gymMember)
 			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.joinedAt, yesterday)))
-			.orderBy(asc(gymMember.name))
+			.orderBy(asc(gymMember.name)),
+		db
+			.select({
+				className: classType.name,
+				startsAt: classSession.startsAt,
+				instructorName: user.name
+			})
+			.from(classSession)
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.leftJoin(member, eq(classSession.instructorId, member.id))
+			.leftJoin(user, eq(member.userId, user.id))
+			.where(
+				and(
+					eq(classSession.organizationId, orgId),
+					isNotNull(classSession.coverRequestedAt),
+					isNull(classSession.cancelledAt),
+					gt(classSession.startsAt, new Date())
+				)
+			)
+			.orderBy(asc(classSession.startsAt))
+			.limit(10)
 	]);
-	if (!sessions.length && !pending.length && !birthdays.length && !joins.length) return 0;
+	if (!sessions.length && !pending.length && !birthdays.length && !joins.length && !cover.length)
+		return 0;
 
 	const counts = sessions.length
 		? await db
@@ -1706,6 +1727,13 @@ export async function sendStaffBriefing(orgId: string) {
 		);
 		for (const p of pending)
 			lines.push(`${p.memberName} wants to ${p.kind}${p.reason ? ` — “${p.reason}”` : ''}`);
+	}
+	if (cover.length) {
+		lines.push(`<strong>Needs cover:</strong>`);
+		for (const s of cover)
+			lines.push(
+				`${localDate(s.startsAt, tz)} ${localTime(s.startsAt, tz)} ${s.className}${s.instructorName ? ` — ${s.instructorName}` : ''}`
+			);
 	}
 	if (birthdays.length)
 		lines.push(`<strong>Birthday today:</strong> ${birthdays.map((b) => b.name).join(', ')}`);
