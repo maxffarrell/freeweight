@@ -136,6 +136,34 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Retention by cohort</Card.Title>
+			<Card.Description
+				>Members who joined each month and are still active — newest month first</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each r.retention as m (m.month)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
+					<div class="relative h-4 flex-1">
+						<div
+							class="absolute inset-y-0 left-0 rounded bg-primary/70"
+							style="width: {(m.active / m.joined) * 70}%"
+						></div>
+					</div>
+					<span class="w-28 shrink-0 text-right tabular-nums">
+						{m.active}/{m.joined}
+						<span class="text-muted-foreground">({Math.round((m.active / m.joined) * 100)}%)</span>
+					</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No members joined in the last 12 months.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Revenue collected</Card.Title>
 			<Card.Description>Payments per month, last 12 months</Card.Description>
 		</Card.Header>

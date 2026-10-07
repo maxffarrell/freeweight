@@ -390,6 +390,26 @@ async function avgVisitMinutes(orgId: string) {
 	return { minutes: row?.minutes ?? null, visits: row?.count ?? 0 };
 }
 
+/**
+ * Retention by join cohort: members who joined in each of the last 12 months
+ * and how many still have status='active' today.
+ */
+async function retentionByCohort(orgId: string) {
+	const since = new Date();
+	since.setUTCMonth(since.getUTCMonth() - 12, 1);
+	since.setUTCHours(0, 0, 0, 0);
+	return db
+		.select({
+			month: sql<string>`to_char(${gymMember.createdAt}, 'YYYY-MM')`,
+			joined: sql<number>`count(*)`.mapWith(Number),
+			active: sql<number>`count(*) filter (where ${gymMember.status} = 'active')`.mapWith(Number)
+		})
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), gte(gymMember.createdAt, since)))
+		.groupBy(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`)
+		.orderBy(desc(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`));
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -406,7 +426,8 @@ export async function getReports(orgId: string) {
 		weekdays,
 		payroll,
 		trials,
-		visit
+		visit,
+		retention
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -422,7 +443,8 @@ export async function getReports(orgId: string) {
 		fillByWeekday(orgId),
 		instructorPayroll(orgId),
 		trialConversion(orgId),
-		avgVisitMinutes(orgId)
+		avgVisitMinutes(orgId),
+		retentionByCohort(orgId)
 	]);
 	return {
 		checkIns,
@@ -439,6 +461,7 @@ export async function getReports(orgId: string) {
 		weekdays,
 		payroll,
 		trials,
-		visit
+		visit,
+		retention
 	};
 }
