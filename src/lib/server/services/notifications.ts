@@ -854,6 +854,12 @@ export async function sendClassReminders(orgId: string) {
 	return sent;
 }
 
+/** Replaces {name} and {first_name} merge tags in an announcement draft. */
+export function mergeTags(t: string, memberName: string) {
+	const first = memberName.trim().split(/\s+/)[0] ?? memberName;
+	return t.replaceAll('{first_name}', first).replaceAll('{name}', memberName);
+}
+
 /** Sends one preview of the draft announcement to the staff user composing it. */
 export async function sendAnnouncementTest(
 	orgId: string,
@@ -862,16 +868,24 @@ export async function sendAnnouncementTest(
 	message: string
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
-	const [u] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
+	const [u] = await db
+		.select({ email: user.email, name: user.name })
+		.from(user)
+		.where(eq(user.id, userId));
 	if (!u?.email) error(400, 'Your account has no email address');
 	const name = await orgName(orgId);
 	const { text, html } = renderEmail({
 		orgName: name,
-		heading: subject,
-		lines: message.split(/\n+/).filter(Boolean),
+		heading: mergeTags(subject, u.name),
+		lines: mergeTags(message, u.name).split(/\n+/).filter(Boolean),
 		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 	});
-	await sendEmail({ to: u.email, subject: `[Test] ${name}: ${subject}`, text, html });
+	await sendEmail({
+		to: u.email,
+		subject: `[Test] ${name}: ${mergeTags(subject, u.name)}`,
+		text,
+		html
+	});
 	return { sent: 1 };
 }
 
@@ -891,7 +905,7 @@ export async function sendAnnouncement(
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
-		.select({ id: gymMember.id, email: gymMember.email })
+		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
 		.from(gymMember)
 		.where(
 			and(
@@ -917,16 +931,27 @@ export async function sendAnnouncement(
 				.then((r) => r[0]?.name ?? null)
 		: null;
 	const entityId = `announcement:${subject}::${message}`;
-	const { text, html } = renderEmail({
-		orgName: name,
-		heading: subject,
-		lines: message.split(/\n+/).filter(Boolean),
-		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
-	});
+	// {name} / {first_name} merge tags personalize per member; without them
+	// the body renders once and is shared.
+	const personalized = subject.includes('{') || message.includes('{');
+	const render = (memberName: string) =>
+		renderEmail({
+			orgName: name,
+			heading: mergeTags(subject, memberName),
+			lines: mergeTags(message, memberName).split(/\n+/).filter(Boolean),
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		});
+	const shared = personalized ? null : render('');
 	let sent = 0;
 	for (const m of members) {
 		if (!m.email || !(await logOnce(orgId, 'announcement', entityId, m.email))) continue;
-		await sendMemberEmail(m.id, { to: m.email, subject: `${name}: ${subject}`, text, html });
+		const { text, html } = personalized ? render(m.name) : shared!;
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject: `${name}: ${mergeTags(subject, m.name)}`,
+			text,
+			html
+		});
 		sent++;
 	}
 	await emit({
