@@ -6,7 +6,7 @@ import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { sendClassReminders, sendPastDueNotices } from '#lib/server/services/notifications.ts';
-import { markPastNoShows } from '#lib/server/services/schedule.ts';
+import { markPastNoShows, materializeTemplates } from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -25,6 +25,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let pastDue = 0;
 	let noShows = 0;
 	let suspended = 0;
+	let generated = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -51,9 +52,23 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`no-show cron failed for ${o.id}`, err);
 		}
+		try {
+			generated += await materializeTemplates(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`template cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
-	return json({ workspaces: orgs.length, failed, reminders, pastDue, noShows, suspended });
+	return json({
+		workspaces: orgs.length,
+		failed,
+		reminders,
+		pastDue,
+		noShows,
+		suspended,
+		generated
+	});
 };
 
 export const POST = GET;

@@ -11,7 +11,8 @@ import {
 	classTypeUpdate,
 	idSchema,
 	sessionInput,
-	sessionUpdate
+	sessionUpdate,
+	templateInput
 } from '#lib/schemas.ts';
 
 const tz = async () => {
@@ -62,6 +63,14 @@ export const updateSession = command(sessionUpdate, async (input) => {
 });
 
 export const getInstructors = query(async () => svc.listInstructors((await requireOrg()).orgId));
+
+export const getTemplates = query(async () => svc.listTemplates((await requireOrg()).orgId));
+export const createTemplate = command(templateInput, async (input) =>
+	svc.createTemplate(await requireOrg(), input)
+);
+export const deleteTemplate = command(idSchema, async (id) =>
+	svc.deleteTemplate(await requireOrg(), id)
+);
 
 export const bookSession = command(bookingInput, async (input) => {
 	const b = await svc.bookSession(await requireOrg(), input);

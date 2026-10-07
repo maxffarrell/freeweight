@@ -112,6 +112,17 @@ export const sessionInput = v.object({
 	/** Repeat weekly until this ISO date (inclusive). */
 	repeatUntil: v.optional(v.nullable(isoDate))
 });
+export const templateInput = v.object({
+	classTypeId: idSchema,
+	locationId: v.optional(v.nullable(idSchema)),
+	instructorId: v.optional(v.nullable(idSchema)),
+	/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+	weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
+	/** Org-local `HH:MM`. */
+	startTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')),
+	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+});
+
 export const sessionUpdate = v.object({
 	id: idSchema,
 	startsAt: v.optional(localDateTime),

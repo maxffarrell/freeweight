@@ -220,6 +220,29 @@ export const classType = pgTable(
 	(t) => [index('class_type_org_idx').on(t.organizationId)]
 );
 
+/** Recurring rule — "Tuesdays at 6pm". The cron materializes sessions ~2 weeks ahead. */
+export const classTemplate = pgTable(
+	'class_template',
+	{
+		id: id(),
+		organizationId: orgId(),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
+		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
+		/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+		weekday: integer('weekday').notNull(),
+		/** Org-local start time, `HH:MM` 24h. */
+		startTime: text('start_time').notNull(),
+		/** Seat override; null → class type default. */
+		capacity: integer('capacity'),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('class_template_org_idx').on(t.organizationId)]
+);
+
 /** One scheduled occurrence of a class type. */
 export const classSession = pgTable(
 	'class_session',
@@ -231,6 +254,8 @@ export const classSession = pgTable(
 			.references(() => classType.id, { onDelete: 'cascade' }),
 		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
 		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
+		/** Set when generated from a class_template — used to dedup materialization. */
+		templateId: text('template_id').references(() => classTemplate.id, { onDelete: 'set null' }),
 		startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
 		endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
 		capacity: integer('capacity').notNull(),

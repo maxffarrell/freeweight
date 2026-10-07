@@ -20,7 +20,10 @@
 		getRoster,
 		bookSession,
 		updateBooking,
-		getInstructors
+		getInstructors,
+		getTemplates,
+		createTemplate,
+		deleteTemplate
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -28,6 +31,8 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Repeat from '@lucide/svelte/icons/repeat';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { errMsg } from '#lib/format.ts';
 
 	const tz = (await getSettings()).timezone;
@@ -35,6 +40,7 @@
 	const instructors = await getInstructors();
 	const memberList = await getMembers();
 	const classTypes = $derived(await getClassTypes());
+	const templates = $derived(await getTemplates());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
@@ -121,6 +127,40 @@
 		pending = false;
 	}
 
+	// ------- recurring templates -------
+	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	let tplOpen = $state(false);
+	let tplTypeId = $state('');
+	let tplWeekday = $state('1');
+	let tplTime = $state('06:00');
+	let tplCapacity = $state<number | null>(null);
+	async function submitTemplate(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await createTemplate({
+				classTypeId: tplTypeId,
+				weekday: Number(tplWeekday),
+				startTime: tplTime,
+				capacity: tplCapacity ?? null
+			});
+			toast.success('Recurring template added — sessions generated 2 weeks out');
+			await getTemplates().refresh();
+			await reload();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+		pending = false;
+	}
+	async function removeTemplate(id: string) {
+		try {
+			await deleteTemplate(id);
+			await getTemplates().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
+
 	// ------- new class type -------
 	let typeOpen = $state(false);
 	let tName = $state('');
@@ -154,6 +194,9 @@
 
 <PageHeader title="Schedule">
 	{#snippet actions()}
+		<Button variant="outline" size="sm" onclick={() => (tplOpen = true)}
+			><Repeat /> Recurring</Button
+		>
 		<Button variant="outline" size="sm" onclick={() => (typeOpen = true)}
 			><Plus /> Class type</Button
 		>
@@ -428,5 +471,81 @@
 			</Field.Field>
 			<Dialog.Footer><Button type="submit" disabled={pending}>Create</Button></Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={tplOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header><Dialog.Title>Recurring templates</Dialog.Title></Dialog.Header>
+		<p class="text-sm text-muted-foreground">
+			Templates generate real sessions about two weeks ahead, every day. Editing or cancelling a
+			generated session only changes that one session.
+		</p>
+		<form class="grid gap-3" onsubmit={submitTemplate}>
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+				<Field.Field class="col-span-2 sm:col-span-2">
+					<Field.Label>Class</Field.Label>
+					<Select.Root type="single" bind:value={tplTypeId}>
+						<Select.Trigger class="w-full">
+							{classTypes.find((c) => c.id === tplTypeId)?.name ?? 'Pick a class'}
+						</Select.Trigger>
+						<Select.Content>
+							{#each classTypes as c (c.id)}
+								<Select.Item value={c.id}>{c.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label>Day</Field.Label>
+					<Select.Root type="single" bind:value={tplWeekday}>
+						<Select.Trigger class="w-full">{WEEKDAYS[Number(tplWeekday)]}</Select.Trigger>
+						<Select.Content>
+							{#each WEEKDAYS as d, i (d)}
+								<Select.Item value={String(i)}>{d}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="tpl-time">Time</Field.Label>
+					<Input id="tpl-time" type="time" bind:value={tplTime} required />
+				</Field.Field>
+			</div>
+			<div class="flex items-end gap-3">
+				<Field.Field class="w-28">
+					<Field.Label for="tpl-cap">
+						Seats <span class="text-muted-foreground">(opt.)</span>
+					</Field.Label>
+					<Input id="tpl-cap" type="number" min={1} bind:value={tplCapacity} />
+				</Field.Field>
+				<Button type="submit" disabled={pending || !tplTypeId}>Add template</Button>
+			</div>
+		</form>
+		{#if templates.length}
+			<div class="divide-y rounded-lg border">
+				{#each templates as t (t.template.id)}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="flex items-center gap-2">
+							<span class="h-2.5 w-2.5 rounded-full" style:background={t.color || '#94a3b8'}></span>
+							<span>
+								<strong>{WEEKDAYS[t.template.weekday]}s {t.template.startTime}</strong>
+								{t.className}{t.instructorName ? ` · ${t.instructorName}` : ''}{t.locationName
+									? ` · ${t.locationName}`
+									: ''}{t.template.capacity ? ` · ${t.template.capacity} seats` : ''}
+							</span>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-7 w-7 text-muted-foreground"
+							onclick={() => removeTemplate(t.template.id)}><Trash2 class="h-4 w-4" /></Button
+						>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-sm text-muted-foreground">No templates yet.</p>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>

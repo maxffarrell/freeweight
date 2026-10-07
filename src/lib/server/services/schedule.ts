@@ -19,6 +19,7 @@ import {
 	booking,
 	charge,
 	classSession,
+	classTemplate,
 	classType,
 	gymMember,
 	gymSettings,
@@ -39,7 +40,7 @@ import {
 	notifySessionCancelled,
 	notifyWaitlistPromoted
 } from './notifications.ts';
-import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
@@ -557,4 +558,136 @@ export async function listInstructors(orgId: string) {
 		.innerJoin(user, eq(member.userId, user.id))
 		.where(eq(member.organizationId, orgId))
 		.orderBy(asc(user.name));
+}
+
+// ---------- Recurring templates ----------
+
+export async function listTemplates(orgId: string) {
+	return db
+		.select({
+			template: classTemplate,
+			className: classType.name,
+			color: classType.color,
+			locationName: location.name,
+			instructorName: user.name
+		})
+		.from(classTemplate)
+		.innerJoin(classType, eq(classTemplate.classTypeId, classType.id))
+		.leftJoin(location, eq(classTemplate.locationId, location.id))
+		.leftJoin(member, eq(classTemplate.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.where(eq(classTemplate.organizationId, orgId))
+		.orderBy(asc(classTemplate.weekday), asc(classTemplate.startTime));
+}
+
+export async function createTemplate(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.templateInput>
+) {
+	const [ct] = await db
+		.select({ id: classType.id, name: classType.name })
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, input.classTypeId)));
+	if (!ct) error(404, 'Class not found');
+	const [row] = await db
+		.insert(classTemplate)
+		.values({
+			organizationId: ctx.orgId,
+			classTypeId: input.classTypeId,
+			locationId: input.locationId ?? null,
+			instructorId: input.instructorId ?? null,
+			weekday: input.weekday,
+			startTime: input.startTime,
+			capacity: input.capacity ?? null
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'class_template',
+		entityId: row!.id,
+		action: 'created',
+		summary: `Recurring ${ct.name} — ${WEEKDAYS[input.weekday]}s ${input.startTime}`
+	});
+	// Generate the first window right away; the daily cron keeps it rolling.
+	await materializeTemplates(ctx.orgId);
+	return row;
+}
+
+export async function deleteTemplate(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(classTemplate)
+		.where(and(eq(classTemplate.organizationId, ctx.orgId), eq(classTemplate.id, id)))
+		.returning();
+	if (!row) error(404, 'Template not found');
+	return row;
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** Sessions templates keep ahead of today (org-local). */
+const TEMPLATE_HORIZON_DAYS = 14;
+
+/**
+ * Turns active class templates into real sessions for the next TEMPLATE_HORIZON_DAYS
+ * org-local days. Dedup by (templateId, startsAt) — a session a staff member edited or
+ * cancelled stays as they left it; deleting the session lets the cron regenerate it.
+ */
+export async function materializeTemplates(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const today = localDate(new Date(), tz);
+
+	const templates = await db
+		.select({ template: classTemplate, classType })
+		.from(classTemplate)
+		.innerJoin(classType, eq(classTemplate.classTypeId, classType.id))
+		.where(and(eq(classTemplate.organizationId, orgId), eq(classTemplate.active, true)));
+	if (!templates.length) return 0;
+
+	const windowStart = zonedToUtc(`${today}T00:00`, tz);
+	const windowEnd = zonedToUtc(`${addDays(today, TEMPLATE_HORIZON_DAYS + 1)}T00:00`, tz);
+	const existing = await db
+		.select({ templateId: classSession.templateId, startsAt: classSession.startsAt })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				inArray(
+					classSession.templateId,
+					templates.map((t) => t.template.id)
+				),
+				gte(classSession.startsAt, windowStart),
+				lt(classSession.startsAt, windowEnd)
+			)
+		);
+	const have = new Set(existing.map((e) => `${e.templateId}|${e.startsAt.getTime()}`));
+
+	const now = Date.now();
+	const rows = [];
+	for (let i = 0; i <= TEMPLATE_HORIZON_DAYS; i++) {
+		const day = addDays(today, i);
+		// Noon local avoids the DST edge where the day has no midnight.
+		const weekday = localWeekday(zonedToUtc(`${day}T12:00`, tz), tz);
+		for (const { template: tpl, classType: ct } of templates) {
+			if (tpl.weekday !== weekday) continue;
+			const startsAt = zonedToUtc(`${day}T${tpl.startTime}`, tz);
+			if (startsAt.getTime() < now || have.has(`${tpl.id}|${startsAt.getTime()}`)) continue;
+			have.add(`${tpl.id}|${startsAt.getTime()}`);
+			rows.push({
+				organizationId: orgId,
+				classTypeId: tpl.classTypeId,
+				locationId: tpl.locationId ?? ct.locationId,
+				instructorId: tpl.instructorId ?? ct.instructorId,
+				templateId: tpl.id,
+				startsAt,
+				endsAt: new Date(startsAt.getTime() + ct.durationMin * 60_000),
+				capacity: tpl.capacity ?? ct.capacity
+			});
+		}
+	}
+	if (rows.length) await db.insert(classSession).values(rows);
+	return rows.length;
 }
