@@ -318,3 +318,30 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 	}
 	return { checkedIn, skipped };
 }
+
+/**
+ * Daily cron: members who forgot to scan out still count as "inside" forever and
+ * inflate visit-length stats. Closes any check-in left open past the end of its
+ * own local day, stamped at 23:59 that day (org timezone).
+ */
+export async function closeStaleCheckIns(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const rows = await db
+		.update(checkIn)
+		.set({
+			checkedOutAt: sql`((${checkIn.checkedAt} at time zone ${tz})::date + time '23:59:59') at time zone ${tz}`
+		})
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNull(checkIn.checkedOutAt),
+				sql`(${checkIn.checkedAt} at time zone ${tz})::date < (now() at time zone ${tz})::date`
+			)
+		)
+		.returning({ id: checkIn.id });
+	return rows.length;
+}
