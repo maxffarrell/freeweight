@@ -277,6 +277,45 @@ export const resources: Record<string, Resource> = {
 		create: { schema: s.recurringChargeInput, run: recurring.addRecurring as never },
 		update: { schema: s.recurringChargeUpdate, run: recurring.updateRecurring as never },
 		delete: (ctx, id) => recurring.removeRecurring(ctx, id)
+	},
+	expenses: {
+		description:
+			'Gym operating expenses (rent, payroll, equipment…) — feed the P&L on Reports. `expenseOn` is YYYY-MM-DD, `amountCents` minor units',
+		list: (ctx) => billing.listExpenses(ctx.orgId),
+		create: { schema: s.expenseInput, run: billing.addExpense as never },
+		delete: (ctx, id) => billing.removeExpense(ctx, id)
+	},
+	member_tags: {
+		description:
+			"Tag labels on members — `?member=` lists one member's tags, bare list = all distinct tags. POST {memberId, tag}; DELETE `/{memberId}:{tag}`",
+		list: (ctx, url) => {
+			const memberId = url.searchParams.get('member');
+			return memberId ? members.memberTags(ctx.orgId, memberId) : members.listTags(ctx.orgId);
+		},
+		create: {
+			schema: s.memberTagInput,
+			run: (ctx, input) => {
+				const { memberId, tag } = input as { memberId: string; tag: string };
+				return members.addMemberTag(ctx, memberId, tag);
+			}
+		},
+		delete: (ctx, id) => {
+			const [memberId, ...rest] = id.split(':');
+			if (!memberId || !rest.length) error(400, 'member_tags id must be {memberId}:{tag}');
+			return members.removeMemberTag(ctx, memberId, rest.join(':'));
+		}
+	},
+	desk_tasks: {
+		description:
+			"Daily front-desk checklist tasks (with today's tick state). POST {label}; DELETE removes the task",
+		list: (ctx) => shifts.deskChecklist(ctx.orgId),
+		create: {
+			schema: v.object({
+				label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120))
+			}),
+			run: (ctx, input) => shifts.createDeskTask(ctx, (input as { label: string }).label)
+		},
+		delete: (ctx, id) => shifts.removeDeskTask(ctx, id)
 	}
 };
 
