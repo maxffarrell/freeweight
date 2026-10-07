@@ -1,0 +1,124 @@
+<script lang="ts">
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import Logo from '#lib/components/app/logo.svelte';
+	import { formatMoney } from '#lib/format.ts';
+	import { localDate, localTime } from '#lib/tz.ts';
+	import MapPin from '@lucide/svelte/icons/map-pin';
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+	const { org, settings, sessions } = $derived(data);
+	const tz = $derived(settings.timezone);
+	const currency = $derived(settings.currency);
+
+	const dayLabel = (d: Date) =>
+		new Intl.DateTimeFormat('en-US', {
+			timeZone: tz,
+			weekday: 'long',
+			month: 'short',
+			day: 'numeric'
+		}).format(d);
+
+	/** Sessions grouped by local day, in order. */
+	const byDay = $derived(
+		[...sessions]
+			.reduce((acc, s) => {
+				const day = localDate(s.session.startsAt, tz);
+				(acc.get(day) ?? acc.set(day, []).get(day)!).push(s);
+				return acc;
+			}, new Map<string, typeof sessions>())
+			.entries()
+			.toArray()
+	);
+</script>
+
+<svelte:head>
+	<title>Class schedule — {org.name}</title>
+	<meta name="description" content="This week's class schedule at {org.name}." />
+</svelte:head>
+
+<div class="min-h-svh bg-background">
+	<header class="border-b">
+		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
+			{#if settings.logoDocumentId}
+				<img src="/api/logo/{settings.logoDocumentId}" alt="" class="h-8 w-auto object-contain" />
+			{:else}
+				<Logo />
+			{/if}
+			<span class="truncate font-semibold">{org.name}</span>
+			{#if settings.address}
+				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex"
+					><MapPin class="size-3.5" /> {settings.address}</span
+				>
+			{/if}
+		</div>
+	</header>
+
+	<main class="mx-auto max-w-3xl space-y-6 p-4 py-8">
+		<div class="flex items-center justify-between gap-3">
+			<div class="space-y-1">
+				<h1 class="text-2xl font-semibold tracking-tight">Class schedule</h1>
+				<p class="text-sm text-muted-foreground">Next 7 days · {tz}</p>
+			</div>
+			<Button variant="outline" size="sm" href="/j/{org.slug}">
+				<ArrowLeft /> Memberships
+			</Button>
+		</div>
+
+		{#each byDay as [day, rows] (day)}
+			<section class="space-y-2">
+				<h2 class="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+					{dayLabel(new Date(`${day}T12:00:00Z`))}
+				</h2>
+				<div class="divide-y rounded-lg border">
+					{#each rows as s (s.session.id)}
+						{@const spots = s.session.capacity - s.booked}
+						<div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+							<div class="flex min-w-0 items-center gap-2.5">
+								<span class="w-12 shrink-0 text-muted-foreground tabular-nums"
+									>{localTime(s.session.startsAt, tz)}</span
+								>
+								<span class="size-2 shrink-0 rounded-full" style:background={s.color}></span>
+								<span class="min-w-0">
+									<span class="block truncate font-medium">{s.className}</span>
+									<span class="block truncate text-xs text-muted-foreground">
+										{[
+											s.instructorName,
+											s.locationName,
+											`${Math.round(
+												(s.session.endsAt.getTime() - s.session.startsAt.getTime()) / 60_000
+											)} min`
+										]
+											.filter(Boolean)
+											.join(' · ')}
+									</span>
+								</span>
+							</div>
+							<span class="flex shrink-0 items-center gap-2">
+								{#if s.dropInPrice}<span class="text-xs text-muted-foreground"
+										>{formatMoney(s.dropInPrice, currency)} drop-in</span
+									>{/if}
+								<Badge variant={spots <= 0 ? 'outline' : 'secondary'}>
+									{spots <= 0 ? 'Full' : `${spots} spot${spots === 1 ? '' : 's'} left`}
+								</Badge>
+							</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{:else}
+			<div class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+				No classes scheduled this week — check back soon.
+			</div>
+		{/each}
+
+		<div class="rounded-lg border bg-muted/40 p-4 text-center text-sm">
+			<p class="mb-3 text-muted-foreground">
+				Want to book a spot? Members book online — drop-ins welcome where priced.
+			</p>
+			<Button href="/j/{org.slug}">Join {org.name}</Button>
+		</div>
+	</main>
+</div>

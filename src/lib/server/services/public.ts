@@ -13,9 +13,11 @@ import {
 	membership,
 	waiver,
 	location,
+	member,
 	organization,
 	plan,
-	outer
+	outer,
+	user
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
 import {
@@ -62,6 +64,7 @@ export async function getPublicGym(slug: string) {
 			className: classType.name,
 			color: classType.color,
 			locationName: location.name,
+			instructorName: user.name,
 			dropInPrice: classType.dropInPrice,
 			booked:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
@@ -71,6 +74,8 @@ export async function getPublicGym(slug: string) {
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.leftJoin(location, eq(classSession.locationId, location.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
 				eq(classSession.organizationId, org.id),

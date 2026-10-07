@@ -248,7 +248,14 @@
 
 		{#if sessions.length}
 			<section class="space-y-3">
-				<h2 class="text-lg font-semibold">This week's classes</h2>
+				<h2 class="flex items-baseline justify-between text-lg font-semibold">
+					This week's classes
+					<a
+						href="/j/{org.slug}/schedule"
+						class="text-sm font-normal text-muted-foreground underline-offset-4 hover:underline"
+						>Timetable</a
+					>
+				</h2>
 				<div class="divide-y rounded-lg border">
 					{#each sessions as s (s.session.id)}
 						<div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
