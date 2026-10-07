@@ -6,6 +6,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
+	import { page } from '$app/state';
 	import { joinGymForm } from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
 	import { errMsg, formatMoney } from '#lib/format.ts';
@@ -27,15 +28,18 @@
 	let website = $state(''); // honeypot — must stay empty
 	let pending = $state(false);
 	let joined = $state(false);
+	let checkoutUrl = $state<string | null>(null);
+	const paid = page.url.searchParams.get('paid') === '1';
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
-			await joinGymForm({
+			const r = await joinGymForm({
 				slug: org.slug,
 				input: { name, email, phone: phone || undefined, planId: planId || undefined, website }
 			});
+			checkoutUrl = r.checkoutUrl ?? null;
 			joined = true;
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not join — try again'));
@@ -140,6 +144,13 @@
 
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Join</h2>
+			{#if paid}
+				<Card.Root class="border-green-500">
+					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">
+						Signup fee paid — see you on the floor.
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if joined}
 				<Card.Root>
 					<Card.Content class="py-10 text-center">
@@ -148,6 +159,9 @@
 							The gym will reach out with your member portal link and first steps. See you on the
 							floor.
 						</p>
+						{#if checkoutUrl}
+							<Button class="mt-4" href={checkoutUrl}>Pay the signup fee</Button>
+						{/if}
 					</Card.Content>
 				</Card.Root>
 			{:else}

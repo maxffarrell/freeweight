@@ -12,6 +12,8 @@ export type CheckoutInput = {
 	currency: string;
 	description: string;
 	row: ProviderRow | null;
+	/** App-relative paths for post-checkout redirects (defaults to the member portal). */
+	paths?: { success: string; cancel: string };
 };
 
 /**

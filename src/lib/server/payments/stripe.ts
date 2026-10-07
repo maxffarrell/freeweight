@@ -107,8 +107,8 @@ export const stripeProvider: PaymentProvider = {
 				client_reference_id: i.memberId,
 				metadata,
 				payment_intent_data: { metadata },
-				success_url: `${appOrigin()}/portal?paid=1`,
-				cancel_url: `${appOrigin()}/portal`
+				success_url: `${appOrigin()}${i.paths?.success ?? '/portal?paid=1'}`,
+				cancel_url: `${appOrigin()}${i.paths?.cancel ?? '/portal'}`
 			},
 			i.row?.accountId ? { stripeAccount: i.row.accountId } : undefined
 		);

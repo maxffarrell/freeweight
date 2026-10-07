@@ -14,6 +14,8 @@ import {
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
 import { createMembership, getPlan } from './billing.ts';
+import { providers } from '../payments/index.ts';
+import { providerRow } from '../payments/settings.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -76,7 +78,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 	if (hits.length >= 10) error(429, 'Too many attempts — try again later');
 	joinRate.set(ip, [...hits, now]);
 
-	const { org } = await getPublicGym(slug);
+	const { org, settings } = await getPublicGym(slug);
 
 	// Reuse an existing member with the same email rather than duplicating.
 	const [existing] = input.email
@@ -98,10 +100,13 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			joinedAt: new Date().toISOString().slice(0, 10)
 		})
 		.returning();
+	let checkoutUrl: string | null = null;
 	if (input.planId) {
 		const p = await getPlan(org.id, input.planId);
-		if (p.listed && p.active)
+		if (p.listed && p.active) {
 			await createMembership({ orgId: org.id }, { memberId: m!.id, planId: input.planId });
+			checkoutUrl = await signupCheckout(org.id, slug, settings, p, m!.id, input.email);
+		}
 	}
 	await emit({
 		orgId: org.id,
@@ -110,5 +115,37 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		action: 'joined',
 		summary: `${input.name} joined from the public page`
 	});
-	return { member: m!, existing: false };
+	return { member: m!, existing: false, checkoutUrl };
+}
+
+/**
+ * When the chosen plan has a signup fee and an online provider is live for the workspace,
+ * returns a checkout URL so the new member can pay it right on the join page.
+ */
+async function signupCheckout(
+	orgId: string,
+	slug: string,
+	settings: { currency: string } | undefined,
+	p: { name: string; signupFee: number },
+	memberId: string,
+	email: string | null
+) {
+	if (p.signupFee <= 0) return null;
+	const currency = settings?.currency ?? 'usd';
+	for (const provider of providers) {
+		if (!provider.configured() || !provider.supportsCurrency(currency)) continue;
+		const row = await providerRow(orgId, provider.id);
+		if (!provider.ready(row)) continue;
+		return provider.checkout({
+			orgId,
+			memberId,
+			email,
+			amount: p.signupFee,
+			currency,
+			description: `Signup fee — ${p.name}`,
+			paths: { success: `/j/${slug}?paid=1`, cancel: `/j/${slug}` },
+			row
+		});
+	}
+	return null;
 }
