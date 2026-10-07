@@ -265,6 +265,37 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Top attendees — last 30 days</Card.Title>
+			<Card.Description>Your most consistent members (member check-ins, no guests)</Card.Description
+			>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Body>
+					{#each r.top as m, i (m.memberId)}
+						<Table.Row>
+							<Table.Cell class="w-8 text-muted-foreground">{i + 1}</Table.Cell>
+							<Table.Cell>
+								<a
+									class="font-medium underline-offset-2 hover:underline"
+									href="/members/{m.memberId}">{m.name}</a
+								>
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{m.visits} visits</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell class="text-muted-foreground">No check-ins yet this period.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
 </div>
 
 <Dialog.Root bind:open={emailOpen}>

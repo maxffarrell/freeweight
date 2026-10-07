@@ -139,6 +139,28 @@ async function atRiskMembers(orgId: string) {
 		.slice(0, 50);
 }
 
+/** Members with the most check-ins over the last 30 days (member visits only, no guests). */
+async function topAttendees(orgId: string) {
+	return db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			visits: sql<number>`count(${checkIn.id})`.mapWith(Number)
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, new Date(Date.now() - 30 * 86400_000)),
+				isNull(checkIn.guestName)
+			)
+		)
+		.groupBy(gymMember.id, gymMember.name)
+		.orderBy(desc(sql`count(${checkIn.id})`), gymMember.name)
+		.limit(10);
+}
+
 /** Sessions taught per instructor over the last 30 days, with attendance outcomes. */
 async function instructorStats(orgId: string) {
 	return db
@@ -173,14 +195,15 @@ async function instructorStats(orgId: string) {
 }
 
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill, atRisk, instructors] = await Promise.all([
+	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top] = await Promise.all([
 		checkInsByDay(orgId),
 		newMembersByMonth(orgId),
 		revenueByMonth(orgId),
 		membershipsByPlan(orgId),
 		fillByClass(orgId),
 		atRiskMembers(orgId),
-		instructorStats(orgId)
+		instructorStats(orgId),
+		topAttendees(orgId)
 	]);
-	return { checkIns, members, revenue, plans, fill, atRisk, instructors };
+	return { checkIns, members, revenue, plans, fill, atRisk, instructors, top };
 }
