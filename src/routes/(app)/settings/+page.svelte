@@ -29,7 +29,8 @@
 		deleteWebhook,
 		getStaff,
 		getJoinInfo,
-		seedDemo
+		seedDemo,
+		removeLogo
 	} from '#lib/remote/workspace.remote.ts';
 	import {
 		getPaymentProviders,
@@ -100,6 +101,39 @@
 	let timezone = $state(settings.timezone);
 	let currency = $state(settings.currency);
 	let tagline = $state(settings.tagline);
+	// svelte-ignore state_referenced_locally
+	let logoId = $state(settings.logoDocumentId);
+	let logoBusy = $state(false);
+	async function uploadLogo(e: Event) {
+		const file = (e.currentTarget as HTMLInputElement).files?.[0];
+		if (!file) return;
+		logoBusy = true;
+		try {
+			const form = new FormData();
+			form.set('entityType', 'org_logo');
+			form.set('file', file);
+			const res = await fetch('/api/documents', { method: 'POST', body: form });
+			if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message ?? res.statusText);
+			const doc = await res.json();
+			logoId = doc.id;
+			toast.success('Logo updated');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not upload logo'));
+		}
+		logoBusy = false;
+		(e.currentTarget as HTMLInputElement).value = '';
+	}
+	async function clearLogo() {
+		logoBusy = true;
+		try {
+			await removeLogo();
+			logoId = null;
+			toast.success('Logo removed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove logo'));
+		}
+		logoBusy = false;
+	}
 	let address = $state(settings.address);
 	let phone = $state(settings.phone);
 	let website = $state(settings.website);
@@ -310,6 +344,31 @@
 						<Field.Field>
 							<Field.Label for="tagline">Tagline</Field.Label>
 							<Input id="tagline" bind:value={tagline} placeholder="Strength, community, sweat." />
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="logo">Logo</Field.Label>
+							<div class="flex items-center gap-3">
+								{#if logoId}
+									<img
+										src={`/api/logo/${logoId}`}
+										alt="Gym logo"
+										class="h-12 w-auto rounded-md border bg-muted object-contain p-1"
+									/>
+									<Button variant="ghost" size="sm" disabled={logoBusy} onclick={clearLogo}
+										>Remove</Button
+									>
+								{/if}
+								<Input
+									id="logo"
+									type="file"
+									accept="image/png,image/jpeg,image/webp,image/gif"
+									disabled={logoBusy}
+									onchange={uploadLogo}
+								/>
+							</div>
+							<Field.Description>
+								Shown on your public join page, the member portal and the kiosk.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="addr">Address</Field.Label>

@@ -267,7 +267,11 @@
 <div class="flex min-h-svh flex-col bg-background">
 	<header class="flex items-center justify-between gap-4 border-b px-6 py-4">
 		<div class="flex items-center gap-3">
-			<Logo class="size-8" />
+			{#if settings.logoDocumentId}
+				<img src="/api/logo/{settings.logoDocumentId}" alt="" class="h-8 w-auto object-contain" />
+			{:else}
+				<Logo class="size-8" />
+			{/if}
 			<div>
 				<p class="font-semibold">{data.gymName}</p>
 				<p class="text-xs text-muted-foreground">Front-desk check-in</p>

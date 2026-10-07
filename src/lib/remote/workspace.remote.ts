@@ -55,6 +55,11 @@ export const updateSettings = command(settingsInput, async (input) => {
 	void getSettings().refresh();
 	return s;
 });
+/** Logo upload itself goes through POST /api/documents (entityType=org_logo); this just removes it. */
+export const removeLogo = command(async () => {
+	await settingsSvc.removeLogo(await requireOrg('admin'));
+	void getSettings().refresh();
+});
 
 export const getLocations = query(async () =>
 	settingsSvc.listLocations((await requireOrg()).orgId, true)

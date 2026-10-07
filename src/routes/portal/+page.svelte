@@ -356,6 +356,10 @@
 
 <svelte:head><title>Member portal</title></svelte:head>
 
+{#if d.settings.logoDocumentId}
+	<img src="/api/logo/{d.settings.logoDocumentId}" alt="" class="mb-4 h-10 w-auto object-contain" />
+{/if}
+
 {#if data.options.length > 1}
 	<select
 		class="h-9 rounded-md border bg-background px-3 text-sm"
