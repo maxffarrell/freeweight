@@ -30,7 +30,8 @@ import {
 	getPlan,
 	memberBalance,
 	nextPeriod,
-	proratePlanChange
+	proratePlanChange,
+	recordPayment
 } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
@@ -983,4 +984,59 @@ export async function logWorkoutResult(
 		})
 		.returning();
 	return row;
+}
+
+/**
+ * Retention "save" offer: a member about to cancel takes N% off their next
+ * bill instead of submitting the request. One per membership — `saveOfferAt`
+ * stamps it so the offer can't be farmed; the credit applies like a
+ * proration credit (kept out of revenue sums).
+ */
+export async function acceptSaveOffer(orgId: string, memberId: string) {
+	const [settings] = await db
+		.select({ saveOfferPct: gymSettings.saveOfferPct })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const pct = settings?.saveOfferPct ?? 0;
+	if (pct <= 0) error(404, 'No save offer configured');
+	const [ms] = await db
+		.select({ membership, plan })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active')
+			)
+		)
+		.orderBy(desc(membership.createdAt))
+		.limit(1);
+	if (!ms) error(404, 'No active membership');
+	if (ms.membership.saveOfferAt) error(409, 'This offer can only be used once');
+	const base = ms.membership.price ?? ms.plan.amount;
+	const credit = Math.round((base * pct) / 100);
+	if (credit <= 0) error(400, 'Nothing to discount');
+	await recordPayment(
+		{ orgId },
+		{
+			memberId,
+			amount: credit,
+			method: 'credit',
+			notes: `Stay offer — ${pct}% off ${ms.plan.name}`
+		},
+		{ silent: true }
+	);
+	await db
+		.update(membership)
+		.set({ saveOfferAt: new Date() })
+		.where(eq(membership.id, ms.membership.id));
+	await emit({
+		orgId,
+		entityType: 'membership',
+		entityId: ms.membership.id,
+		action: 'save_offer',
+		summary: `Stay offer accepted — ${pct}% off (${formatMoney(credit)})`
+	});
+	return { credit };
 }

@@ -471,6 +471,10 @@ export const settingsInput = v.object({
 	dayPassPrice: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	suspendAfterDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	referralCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Retention: % off the next bill offered when a member requests cancel; null = no offer. */
+	saveOfferPct: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)))
+	),
 	/** Max people inside at once; null = no cap. */
 	occupancyCap: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });

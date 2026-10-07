@@ -93,6 +93,8 @@ export const gymSettings = pgTable('gym_settings', {
 	referralCredits: integer('referral_credits'),
 	/** Max people allowed inside at once (fire-code cap); kiosk warns past it. null = no cap. */
 	occupancyCap: integer('occupancy_cap'),
+	/** One-time "stay" offer: % off the next bill shown when a member requests cancel. null = off. */
+	saveOfferPct: integer('save_offer_pct'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -280,6 +282,8 @@ export const membership = pgTable(
 		endReason: text('end_reason'),
 		/** Staff price override (minor units) — recurring charges bill this instead of the plan price. */
 		price: integer('price'),
+		/** When the member last took a retention save offer; each membership may take one. */
+		saveOfferAt: timestamp('save_offer_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [

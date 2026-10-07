@@ -538,3 +538,11 @@ export const logWorkoutResult = command(
 		return r;
 	}
 );
+
+/** Member takes the configured "stay" offer — a one-time credit instead of cancelling. */
+export const acceptSaveOffer = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const r = await svc.acceptSaveOffer(m.organizationId, m.id);
+	void getPortalOverview(memberId).refresh();
+	return r;
+});

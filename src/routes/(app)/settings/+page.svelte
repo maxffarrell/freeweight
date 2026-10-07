@@ -153,6 +153,8 @@
 	let dayPassPrice = $state<number | null>(settings.dayPassPrice);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let referralCredits = $state<number | null>(settings.referralCredits);
+	// svelte-ignore state_referenced_locally
+	let saveOfferPct = $state<number | null>(settings.saveOfferPct);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
 	// svelte-ignore state_referenced_locally
@@ -183,6 +185,7 @@
 				dayPassPrice,
 				suspendAfterDays,
 				referralCredits,
+				saveOfferPct,
 				publicPage,
 				staffBriefing,
 				firstClassFree
@@ -522,6 +525,22 @@
 							<Field.Description
 								>Class credits granted to a member the first time someone who joined through their
 								referral link makes a payment. Leave empty for no reward.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-save">Stay offer (% off next bill)</Field.Label>
+							<Input
+								id="s-save"
+								type="number"
+								min={1}
+								max={100}
+								bind:value={saveOfferPct}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Shown inside the member's cancellation form — "Stay instead, N% off your next
+								bill". Applies a one-time account credit; each membership can take it once. Leave
+								empty for no offer.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

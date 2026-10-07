@@ -58,7 +58,8 @@
 		redeemGiftCard,
 		rateSession,
 		setVisitGoal,
-		logWorkoutResult
+		logWorkoutResult,
+		acceptSaveOffer
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -587,6 +588,19 @@
 			toast.error(errMsg(err, 'Could not request'));
 		}
 	}
+	let offerBusy = $state(false);
+	async function takeSaveOffer() {
+		offerBusy = true;
+		try {
+			const r = await acceptSaveOffer(memberId);
+			toast.success(`Done — ${formatMoney(r.credit)} off your next bill`);
+			cancelReqId = '';
+			requestReason = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not apply the offer'));
+		}
+		offerBusy = false;
+	}
 	async function withdrawCancel(membershipId: string) {
 		try {
 			await withdrawMembershipCancel({ memberId, membershipId });
@@ -948,6 +962,17 @@
 									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 										>Confirm cancellation request</Button
 									>
+									{#if d.settings.saveOfferPct && !mm.membership.saveOfferAt}
+										<Button
+											size="sm"
+											variant="ghost"
+											class="h-7 px-2 text-xs text-emerald-600 dark:text-emerald-400"
+											type="button"
+											disabled={offerBusy}
+											onclick={takeSaveOffer}
+											>Stay instead — {d.settings.saveOfferPct}% off your next bill</Button
+										>
+									{/if}
 								</form>
 							{/if}
 						{/if}
