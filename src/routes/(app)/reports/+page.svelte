@@ -228,6 +228,31 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Recurring revenue</Card.Title>
+			<Card.Description>Monthly run rate from {r.mrr.activeMembers} active members</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<p class="text-3xl font-semibold tabular-nums">{formatMoney(r.mrr.total, currency, true)}</p>
+			<div class="space-y-1 text-sm">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Memberships</span>
+					<span class="tabular-nums">{formatMoney(r.mrr.memberships, currency, true)}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Add-ons</span>
+					<span class="tabular-nums">{formatMoney(r.mrr.addons, currency, true)}</span>
+				</div>
+				<div class="flex justify-between border-t pt-1 text-muted-foreground">
+					<span>Annualized</span>
+					<span class="tabular-nums">{formatMoney(r.mrr.total * 12, currency, true)}</span>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Revenue collected</Card.Title>
 			<Card.Description>Payments per month, last 12 months</Card.Description>
 		</Card.Header>

@@ -34,6 +34,7 @@ import {
 	membership,
 	payment,
 	plan,
+	recurringCharge,
 	resourceBooking,
 	sessionFeedback,
 	user,
@@ -894,6 +895,46 @@ async function expensesByCategory(orgId: string) {
 		.orderBy(desc(sql`sum(${expense.amountCents})`));
 }
 
+/** Monthly-recurring run rate: active memberships (staff price override wins, packs
+ * excluded) plus active recurring add-ons, each normalized to a monthly amount. */
+export async function monthlyRecurring(orgId: string) {
+	const toMonthly = (amount: number, interval: string) =>
+		interval === 'week'
+			? Math.round((amount * 52) / 12)
+			: interval === 'year'
+				? Math.round(amount / 12)
+				: amount;
+	const mems = await db
+		.select({
+			amount: membership.price,
+			planAmount: plan.amount,
+			interval: plan.interval
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		);
+	let membershipMrr = 0;
+	for (const r of mems) membershipMrr += toMonthly(r.amount ?? r.planAmount, r.interval);
+	const addons = await db
+		.select({ amount: recurringCharge.amount, interval: recurringCharge.interval })
+		.from(recurringCharge)
+		.where(and(eq(recurringCharge.organizationId, orgId), eq(recurringCharge.active, true)));
+	let addonMrr = 0;
+	for (const r of addons) addonMrr += toMonthly(r.amount, r.interval);
+	return {
+		memberships: membershipMrr,
+		addons: addonMrr,
+		total: membershipMrr + addonMrr,
+		activeMembers: mems.length
+	};
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -925,7 +966,8 @@ export async function getReports(orgId: string) {
 		locations,
 		ratings,
 		expenseMonths,
-		expenseCategories
+		expenseCategories,
+		mrr
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -959,7 +1001,8 @@ export async function getReports(orgId: string) {
 		byLocation(orgId),
 		classRatings(orgId),
 		expensesByMonth(orgId),
-		expensesByCategory(orgId)
+		expensesByCategory(orgId),
+		monthlyRecurring(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1000,6 +1043,7 @@ export async function getReports(orgId: string) {
 		staffShifts,
 		locations,
 		ratings,
-		pnl
+		pnl,
+		mrr
 	};
 }
