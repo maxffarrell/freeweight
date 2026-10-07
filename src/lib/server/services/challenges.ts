@@ -15,11 +15,12 @@ import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
 /** Members' check-in counts inside a challenge's local-date window. */
-async function entryProgress(orgId: string, challengeId: string, start: Date, end: Date) {
+export async function entryProgress(orgId: string, challengeId: string, start: Date, end: Date) {
 	return db
 		.select({
 			entry: challengeEntry,
 			memberName: gymMember.name,
+			memberEmail: gymMember.email,
 			count: sql<number>`count(${checkIn.id})`.mapWith(Number)
 		})
 		.from(challengeEntry)

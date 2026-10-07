@@ -45,7 +45,8 @@ import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
-import { addDays, localDate, localTime, localWeekday } from '#lib/tz.ts';
+import { addDays, localDate, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { entryProgress } from './challenges.ts';
 
 async function orgBrand(orgId: string) {
 	const [o, s] = await Promise.all([
@@ -1214,6 +1215,58 @@ export async function sendChallengeInvites(orgId: string) {
 						`Goal: ${c.goal} check-ins, ${c.startDate} → ${c.endDate}. Join in the member portal.`
 					],
 					action: { label: 'Join the challenge', url: `${appOrigin()}/portal` }
+				})
+			});
+			sent++;
+		}
+	}
+	return sent;
+}
+
+/** Day after a challenge ends: every participant gets their final rank and the result. */
+export async function sendChallengeResults(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const yesterday = addDays(localDate(new Date(), tz), -1);
+	const rows = await db
+		.select()
+		.from(challenge)
+		.where(and(eq(challenge.organizationId, orgId), eq(challenge.endDate, yesterday)));
+	if (!rows.length) return 0;
+	const name = await orgBrand(orgId);
+	let sent = 0;
+	for (const c of rows) {
+		const entries = await entryProgress(
+			orgId,
+			c.id,
+			zonedToUtc(`${c.startDate}T00:00`, tz),
+			zonedToUtc(`${addDays(c.endDate, 1)}T00:00`, tz)
+		);
+		if (!entries.length) continue;
+		const finishers = entries.filter((e) => e.count >= c.goal);
+		const top = entries[0]!;
+		for (const [i, e] of entries.entries()) {
+			const email = e.memberEmail;
+			if (!email) continue;
+			if (!(await logOnce(orgId, 'challenge_results', `${c.id}:${e.entry.memberId}`, email)))
+				continue;
+			const finished = e.count >= c.goal;
+			await sendMemberEmail(e.entry.memberId, {
+				to: email,
+				subject: `${c.name} — final results at ${name.orgName}`,
+				...renderEmail({
+					...name,
+					heading: `${c.name} has ended`,
+					lines: [
+						finished
+							? `You finished it — ${e.count} check-ins against a ${c.goal}-check-in goal. Nice work.`
+							: `You logged ${e.count} of ${c.goal} check-ins.`,
+						`You placed #${i + 1} of ${entries.length} participants.${
+							finishers.length
+								? ` ${finishers.length} member${finishers.length === 1 ? '' : 's'} hit the goal — led by ${top.memberName} (${top.count}).`
+								: ` Top scorer: ${top.memberName} (${top.count}).`
+						}`
+					],
+					action: { label: 'See the leaderboard', url: `${appOrigin()}/portal` }
 				})
 			});
 			sent++;
