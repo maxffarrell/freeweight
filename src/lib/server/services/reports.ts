@@ -387,6 +387,35 @@ async function instructorPayroll(orgId: string) {
 	return { rows, total: rows.reduce((a, r) => a + r.pay, 0) };
 }
 
+/** Per-session payroll detail for this month — the CSV export on the pay card. */
+async function instructorPayrollDetail(orgId: string) {
+	return db
+		.select({
+			instructor: user.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			rate: classType.payRate,
+			attended:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status = 'attended')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				sql`${classSession.startsAt} >= date_trunc('month', now())`,
+				lt(classSession.startsAt, new Date()),
+				isNull(classSession.cancelledAt),
+				isNotNull(classType.payRate)
+			)
+		)
+		.orderBy(asc(classSession.startsAt));
+}
+
 /**
  * Of memberships that started on a free-trial plan, how many became paying
  * members — still subscribed past the trial end, or cancelled only after it.
@@ -486,7 +515,8 @@ export async function getReports(orgId: string) {
 		retention,
 		waivers,
 		kinds,
-		sources
+		sources,
+		payrollDetail
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -506,7 +536,8 @@ export async function getReports(orgId: string) {
 		retentionByCohort(orgId),
 		waiverStatus(orgId),
 		revenueByKind(orgId),
-		leadSources(orgId)
+		leadSources(orgId),
+		instructorPayrollDetail(orgId)
 	]);
 	return {
 		checkIns,
@@ -527,6 +558,7 @@ export async function getReports(orgId: string) {
 		retention,
 		waivers,
 		kinds,
-		sources
+		sources,
+		payrollDetail
 	};
 }

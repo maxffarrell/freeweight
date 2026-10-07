@@ -14,6 +14,8 @@
 	import { getReportsQuery } from '#lib/remote/reports.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
+	import Download from '@lucide/svelte/icons/download';
 
 	const r = await getReportsQuery();
 	const currency = await getCurrency();
@@ -35,6 +37,24 @@
 	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
 	const hourLabel = (h: number) =>
 		h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
+
+	function exportPayroll() {
+		const csv = toCsv([
+			['Instructor', 'Class', 'Date', 'Attended', 'Rate'],
+			...r.payrollDetail.map((d) => [
+				d.instructor,
+				d.className,
+				formatDate(d.startsAt),
+				d.attended,
+				((d.rate ?? 0) / 100).toFixed(2)
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `instructor-pay-${new Date().toISOString().slice(0, 7)}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
 
 	function monthLabel(ym: string) {
 		return new Date(`${ym}-02T00:00:00Z`).toLocaleString('en', { month: 'short', year: '2-digit' });
@@ -401,9 +421,16 @@
 	</Card.Root>
 
 	<Card.Root>
-		<Card.Header>
-			<Card.Title class="text-base">Instructor pay — this month</Card.Title>
-			<Card.Description>Rated classes taught × per-class pay rate</Card.Description>
+		<Card.Header class="flex-row items-start justify-between space-y-0">
+			<div>
+				<Card.Title class="text-base">Instructor pay — this month</Card.Title>
+				<Card.Description>Rated classes taught × per-class pay rate</Card.Description>
+			</div>
+			{#if r.payrollDetail.length}
+				<Button variant="ghost" size="sm" onclick={exportPayroll}>
+					<Download class="size-3.5" /> CSV
+				</Button>
+			{/if}
 		</Card.Header>
 		<Card.Content>
 			<Table.Root>
