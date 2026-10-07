@@ -574,14 +574,25 @@ export async function memberBookSeries(
 	return { booked, waitlisted, skipped };
 }
 
-export async function memberCancel(orgId: string, userId: string, bookingId: string) {
+export async function memberCancel(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	bookingId: string
+) {
 	// Cancel cutoff: no last-minute member cancels unless a late-cancel fee is set
 	// (staff can still cancel from the roster regardless).
 	const [b] = await db
 		.select({ startsAt: classSession.startsAt })
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.id, bookingId),
+				eq(booking.memberId, memberId)
+			)
+		);
 	if (!b) error(404, 'Booking not found');
 	const { cancelCutoffMin, lateCancelFee } = await bookingRules(orgId);
 	if (

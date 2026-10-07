@@ -104,8 +104,33 @@ export const memberCancel = command(
 	async ({ memberId, bookingId }) => {
 		const m = await myMember(memberId);
 		const { user } = requireUser();
-		const b = await svc.memberCancel(m.organizationId, user.id, bookingId);
+		const b = await svc.memberCancel(m.organizationId, user.id, m.id, bookingId);
 		void getBookable(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return b;
+	}
+);
+
+/** Drops one upcoming occurrence of an enrolled course without unenrolling. */
+export const dropCourseSession = command(
+	v.object({ memberId: idSchema, bookingId: idSchema }),
+	async ({ memberId, bookingId }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const b = await svc.memberCancel(m.organizationId, user.id, m.id, bookingId);
+		void getPortalCourses(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return b;
+	}
+);
+
+/** Re-books a previously dropped course occurrence — waitlisted when full. */
+export const rebookCourseSession = command(
+	v.object({ memberId: idSchema, bookingId: idSchema }),
+	async ({ memberId, bookingId }) => {
+		const m = await myMember(memberId);
+		const b = await crs.rebookCourseSession(m.organizationId, m.id, bookingId);
+		void getPortalCourses(memberId).refresh();
 		void getPortalOverview(memberId).refresh();
 		return b;
 	}
