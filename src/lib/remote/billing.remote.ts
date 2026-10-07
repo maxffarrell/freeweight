@@ -5,6 +5,7 @@ import * as svc from '#lib/server/services/billing.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
+import { requestAllPaymentNotices } from '#lib/server/services/notifications.ts';
 import {
 	bulkChargeInput,
 	chargeInput,
@@ -136,6 +137,11 @@ export const recordPayment = command(paymentInput, async (input) => {
 });
 
 /** Refunds a recorded payment — reopens the charge it covered and emails the member. */
+/** "Email all" on the aging card — balance-due emails to every member with an unpaid charge. */
+export const requestAllPayments = command(async () =>
+	requestAllPaymentNotices((await requireOrg()).orgId)
+);
+
 export const refundPayment = command(idSchema, async (id) => {
 	const p = await svc.refundPayment(await requireOrg(), id);
 	void getPayments().refresh();
