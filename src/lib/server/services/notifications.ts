@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -158,6 +158,73 @@ export async function notifyPaymentReceived(
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/**
+ * Daily past-due notice: one email per member with open charges older than today (org tz),
+ * summarizing the total overdue. Dedup key includes the newest overdue dueDate, so a member
+ * is re-notified when another charge goes overdue but not re-pinged daily for the same set.
+ */
+export async function sendPastDueNotices(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			amount: charge.amount,
+			dueDate: charge.dueDate
+		})
+		.from(charge)
+		.innerJoin(gymMember, eq(charge.memberId, gymMember.id))
+		.where(
+			and(eq(charge.organizationId, orgId), eq(charge.status, 'open'), lt(charge.dueDate, today))
+		);
+	if (!rows.length) return 0;
+	const byMember = new Map<
+		string,
+		{ email: string | null; memberName: string; total: number; count: number; newest: string }
+	>();
+	for (const r of rows) {
+		const g = byMember.get(r.memberId) ?? {
+			email: r.email,
+			memberName: r.memberName,
+			total: 0,
+			count: 0,
+			newest: r.dueDate
+		};
+		g.total += r.amount;
+		g.count++;
+		if (r.dueDate > g.newest) g.newest = r.dueDate;
+		byMember.set(r.memberId, g);
+	}
+	const [name, st] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const currency = st[0]?.currency ?? 'usd';
+	let sent = 0;
+	for (const [memberId, g] of byMember) {
+		if (!g.email) continue;
+		if (!(await logOnce(orgId, 'past_due', `${memberId}:${g.newest}`, g.email))) continue;
+		const total = formatMoney(g.total, currency);
+		await sendEmail({
+			to: g.email,
+			subject: `Payment due: ${total} at ${name}`,
+			...renderEmail({
+				orgName: name,
+				heading: `${total} is past due`,
+				lines: [
+					`Hi ${g.memberName} — you have ${g.count} overdue ${g.count === 1 ? 'charge' : 'charges'} totaling ${total} at ${name}.`,
+					'You can pay online from the member portal.'
+				],
+				action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
 
 /** "Class cancelled" to every booked/waitlisted member of the session. One email per member. */
