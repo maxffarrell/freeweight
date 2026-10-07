@@ -554,6 +554,13 @@
       "when": 1791411271966,
       "tag": "0078_low_stock_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1791412096238,
+      "tag": "0079_expenses",
+      "breakpoints": true
     }
   ]
 }

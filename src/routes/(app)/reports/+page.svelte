@@ -247,6 +247,60 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.pnl.months.length}
+		<Card.Root class="lg:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Profit &amp; loss</Card.Title>
+				<Card.Description>
+					Revenue vs logged expenses per month — record costs on Billing → Expenses
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="grid gap-6 md:grid-cols-[1fr_auto]">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Month</Table.Head>
+								<Table.Head class="text-right">Revenue</Table.Head>
+								<Table.Head class="text-right">Expenses</Table.Head>
+								<Table.Head class="text-right">Net</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each r.pnl.months.slice(-8).reverse() as m (m.month)}
+								<Table.Row>
+									<Table.Cell class="text-muted-foreground">{monthLabel(m.month)}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums"
+										>{formatMoney(m.revenue, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-right tabular-nums"
+										>{formatMoney(m.expenses, currency)}</Table.Cell
+									>
+									<Table.Cell
+										class="text-right font-medium tabular-nums {m.net < 0
+											? 'text-destructive'
+											: ''}">{formatMoney(m.net, currency)}</Table.Cell
+									>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+					{#if r.pnl.byCategory.length}
+						<div class="min-w-44 space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">Spend by category (all time)</p>
+							{#each r.pnl.byCategory as c (c.category)}
+								<div class="flex items-center justify-between gap-3 text-sm">
+									<span class="capitalize">{c.category}</span>
+									<span class="tabular-nums">{formatMoney(c.total, currency, true)}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Trial conversion</Card.Title>
