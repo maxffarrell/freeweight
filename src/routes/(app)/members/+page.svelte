@@ -203,6 +203,7 @@
 						<Table.Head>Name</Table.Head>
 						<Table.Head class="hidden md:table-cell">Contact</Table.Head>
 						<Table.Head>Membership</Table.Head>
+						<Table.Head class="hidden lg:table-cell">Last visit</Table.Head>
 						<Table.Head>Status</Table.Head>
 						<Table.Head class="text-right">Open balance</Table.Head>
 					</Table.Row>
@@ -229,6 +230,9 @@
 								{m.email ?? m.phone ?? '—'}
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground">{m.planName ?? '—'}</Table.Cell>
+							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
+								{m.lastVisit ? formatDate(m.lastVisit) : '—'}
+							</Table.Cell>
 							<Table.Cell><StatusBadge status={m.status} /></Table.Cell>
 							<Table.Cell class="text-right tabular-nums">
 								{m.openBalance > 0 ? formatMoney(m.openBalance, currency) : '—'}
@@ -236,7 +240,7 @@
 						</Table.Row>
 					{:else}
 						<Table.Row>
-							<Table.Cell colspan={5}>
+							<Table.Cell colspan={6}>
 								<Empty.Root class="border-0">
 									<Empty.Header>
 										<Empty.Media><Users /></Empty.Media>

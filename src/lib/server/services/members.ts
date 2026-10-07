@@ -45,7 +45,8 @@ export async function listMembers(orgId: string, q?: string, tag?: string) {
 				),
 			planName: sql<
 				string | null
-			>`(select p2.name from ${membership} m2 join ${plan} p2 on p2.id = m2.plan_id where m2.member_id = ${outer(gymMember.id)} and m2.status = 'active' order by m2.created_at desc limit 1)`
+			>`(select p2.name from ${membership} m2 join ${plan} p2 on p2.id = m2.plan_id where m2.member_id = ${outer(gymMember.id)} and m2.status = 'active' order by m2.created_at desc limit 1)`,
+			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`
 		})
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
