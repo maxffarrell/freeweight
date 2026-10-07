@@ -4,8 +4,10 @@ import type { OrgContext } from '#lib/server/context.ts';
 import * as members from '#lib/server/services/members.ts';
 import * as billing from '#lib/server/services/billing.ts';
 import * as schedule from '#lib/server/services/schedule.ts';
+import * as events from '#lib/server/services/gym-events.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as settings from '#lib/server/services/settings.ts';
+import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
 
 type Resource = {
@@ -132,6 +134,59 @@ export const resources: Record<string, Resource> = {
 		description: 'Record received payments',
 		list: (ctx) => billing.listPayments(ctx.orgId),
 		create: { schema: s.paymentInput, run: billing.recordPayment as never }
+	},
+	events: {
+		description:
+			'One-off events/workshops (`?from=`/`?to=` ISO dates; DELETE cancels the event: registrants emailed, open signup charges voided)',
+		list: async (ctx, url) => {
+			const rows = await events.listEvents(ctx.orgId);
+			const from = url.searchParams.get('from');
+			const to = url.searchParams.get('to');
+			return rows.filter(
+				(r) =>
+					(!from || r.event.startsAt >= new Date(`${from}T00:00:00Z`)) &&
+					(!to || r.event.startsAt < new Date(`${to}T00:00:00Z`))
+			);
+		},
+		create: {
+			schema: s.eventInput,
+			run: async (ctx: OrgContext, input: never) => {
+				const st = await settings.getSettings(ctx.orgId);
+				const { startsAt: start, ...rest } = input as v.InferOutput<typeof s.eventInput>;
+				const startsAt = zonedToUtc(start, st.timezone);
+				return events.createEvent(ctx, {
+					...rest,
+					startsAt,
+					endsAt: new Date(startsAt.getTime() + rest.durationMin * 60_000)
+				});
+			}
+		},
+		update: { schema: s.eventUpdate, run: events.updateEvent as never },
+		delete: (ctx, id) => events.cancelEvent(ctx.orgId, id)
+	},
+	event_registrations: {
+		description:
+			'Event rosters (`?event=` required). POST registers a member (posts the signup charge); PATCH marks attendance; DELETE cancels (voids an unpaid charge)',
+		list: (ctx, url) => {
+			const eventId = url.searchParams.get('event');
+			if (!eventId) error(400, 'event_registrations requires ?event=<id>');
+			return events.eventRoster(ctx.orgId, eventId);
+		},
+		create: {
+			schema: v.object({ eventId: s.idSchema, memberId: s.idSchema }),
+			run: (ctx, input: never) => {
+				const { eventId, memberId } = input as { eventId: string; memberId: string };
+				return events.registerForEvent(ctx.orgId, memberId, eventId);
+			}
+		},
+		update: {
+			schema: v.object({ id: s.idSchema, attended: v.boolean() }),
+			run: (ctx, input: never) => {
+				const { id, attended } = input as { id: string; attended: boolean };
+				return events.setEventAttended(ctx.orgId, id, attended);
+			}
+		},
+		delete: (ctx, id) => events.cancelRegistration(ctx.orgId, id)
 	}
 };
 
