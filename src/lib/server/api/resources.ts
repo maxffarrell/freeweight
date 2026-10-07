@@ -8,6 +8,7 @@ import * as events from '#lib/server/services/gym-events.ts';
 import * as challenges from '#lib/server/services/challenges.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as amenities from '#lib/server/services/resources.ts';
+import * as shifts from '#lib/server/services/shifts.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
@@ -231,6 +232,17 @@ export const resources: Record<string, Resource> = {
 		create: { schema: s.equipmentInput, run: amenities.createEquipment as never },
 		update: { schema: s.equipmentUpdate, run: amenities.updateEquipment as never },
 		delete: (ctx, id) => amenities.deleteEquipment(ctx, id)
+	},
+	shifts: {
+		description:
+			'Staff clock-in/out records — ?from=&to= (YYYY-MM-DD) bound the range, defaults to the last 30 days',
+		list: (ctx, url) =>
+			shifts.listShifts(ctx.orgId, {
+				from:
+					url.searchParams.get('from') ??
+					new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10),
+				to: url.searchParams.get('to') ?? new Date().toISOString().slice(0, 10)
+			})
 	},
 	shop_items: {
 		description: 'Front-desk retail items (name, price, optional stock count)',

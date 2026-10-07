@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
+import { shiftHours } from '#lib/server/services/shifts.ts';
 import {
 	activity,
 	booking,
@@ -716,7 +717,8 @@ export async function getReports(orgId: string) {
 		noShows,
 		events,
 		leads,
-		amenities
+		amenities,
+		staffShifts
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -742,7 +744,11 @@ export async function getReports(orgId: string) {
 		noShowByClass(orgId),
 		eventStats(orgId),
 		leadStats(orgId),
-		amenityStats(orgId)
+		amenityStats(orgId),
+		shiftHours(orgId, {
+			from: new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10),
+			to: new Date().toISOString().slice(0, 10)
+		})
 	]);
 	return {
 		checkIns,
@@ -769,6 +775,7 @@ export async function getReports(orgId: string) {
 		noShows,
 		events,
 		leads,
-		amenities
+		amenities,
+		staffShifts
 	};
 }
