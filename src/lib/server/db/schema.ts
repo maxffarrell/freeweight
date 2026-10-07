@@ -456,6 +456,10 @@ export const facilityResource = pgTable(
 		openTo: text('open_to').notNull().default('22:00'),
 		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
 		active: boolean('active').notNull().default(true),
+		/** 'open' | 'maintenance' | 'closed' — non-open blocks every new booking (desk + portal). */
+		status: text('status').notNull().default('open'),
+		/** Short "why" shown to members when status isn't open ("leak — back Friday"). */
+		statusNote: text('status_note').notNull().default(''),
 		...timestamps
 	},
 	(t) => [index('facility_resource_org_idx').on(t.organizationId)]
