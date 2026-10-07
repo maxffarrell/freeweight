@@ -51,7 +51,8 @@
 		getPortalAnnouncements,
 		addDependent,
 		getPortalAi,
-		aiWorkoutPlan
+		aiWorkoutPlan,
+		redeemGiftCard
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -72,6 +73,22 @@
 	const d = $derived(await getPortalOverview(memberId));
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
+
+	// ------- gift cards -------
+	let gcCode = $state('');
+	let gcBusy = $state(false);
+	async function redeemCard() {
+		if (gcBusy || !gcCode.trim()) return;
+		gcBusy = true;
+		try {
+			const r = await redeemGiftCard({ memberId, code: gcCode });
+			toast.success(`Applied ${formatMoney(r.applied, currency)} to your account`);
+			gcCode = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not redeem that code'));
+		}
+		gcBusy = false;
+	}
 	async function uploadPhoto(file: File | null | undefined) {
 		if (!file || photoBusy) return;
 		photoBusy = true;
@@ -1215,7 +1232,13 @@
 			<Card.Title class="flex items-center gap-2 text-base"><CreditCard /> Balance</Card.Title>
 		</Card.Header>
 		<Card.Content class="space-y-3">
-			<p class="text-3xl font-semibold tabular-nums">{formatMoney(d.balance, currency)}</p>
+			{#if d.balance < 0}
+				<p class="text-3xl font-semibold text-green-600 tabular-nums dark:text-green-400">
+					{formatMoney(-d.balance, currency)} credit
+				</p>
+			{:else}
+				<p class="text-3xl font-semibold tabular-nums">{formatMoney(d.balance, currency)}</p>
+			{/if}
 			{#if d.openCharges.length}
 				<ul class="space-y-1 text-sm">
 					{#each d.openCharges as c (c.charge.id)}
@@ -1228,6 +1251,22 @@
 					{/each}
 				</ul>
 			{/if}
+			<form
+				class="flex items-center gap-2"
+				onsubmit={(e) => {
+					e.preventDefault();
+					redeemCard();
+				}}
+			>
+				<Input
+					bind:value={gcCode}
+					placeholder="Gift card code"
+					class="h-8 flex-1 font-mono text-xs"
+				/>
+				<Button size="sm" variant="outline" type="submit" disabled={gcBusy || !gcCode.trim()}>
+					{gcBusy ? 'Redeeming…' : 'Redeem'}
+				</Button>
+			</form>
 			{#if d.payments.length}
 				<div>
 					<p class="mb-1 text-xs font-medium text-muted-foreground uppercase">Recent payments</p>

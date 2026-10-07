@@ -12,6 +12,7 @@ import {
 	isNull,
 	lt,
 	lte,
+	ne,
 	or,
 	sql
 } from 'drizzle-orm';
@@ -1951,6 +1952,7 @@ export async function sendWeeklyDigest(orgId: string) {
 			and(
 				eq(payment.organizationId, orgId),
 				isNull(payment.refundedAt),
+				ne(payment.method, 'gift_card'),
 				gte(payment.createdAt, new Date(`${weekAgo}T00:00:00Z`))
 			)
 		);

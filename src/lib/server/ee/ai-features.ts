@@ -89,7 +89,13 @@ export async function gymInsights(orgId: string, tz: string): Promise<string[]> 
 				)
 		})
 		.from(payment)
-		.where(and(eq(payment.organizationId, orgId), sql`${payment.refundedAt} is null`));
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				sql`${payment.refundedAt} is null`,
+				ne(payment.method, 'gift_card')
+			)
+		);
 
 	const [fill] = await db
 		.select({

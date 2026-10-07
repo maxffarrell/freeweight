@@ -147,7 +147,12 @@ async function revenueByMonth(orgId: string) {
 		})
 		.from(payment)
 		.where(
-			and(eq(payment.organizationId, orgId), isNull(payment.refundedAt), gte(payment.paidAt, since))
+			and(
+				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
+				ne(payment.method, 'gift_card'),
+				gte(payment.paidAt, since)
+			)
 		)
 		.groupBy(sql`to_char(${payment.paidAt}, 'YYYY-MM')`)
 		.orderBy(asc(sql`to_char(${payment.paidAt}, 'YYYY-MM')`));
@@ -187,6 +192,7 @@ async function revenueByKind(orgId: string) {
 			and(
 				eq(payment.organizationId, orgId),
 				isNull(payment.refundedAt),
+				ne(payment.method, 'gift_card'),
 				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
 			)
 		)

@@ -11,6 +11,7 @@ import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
+import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { emit } from '#lib/server/services/events.ts';
@@ -247,6 +248,17 @@ export const buyPack = command(
 		const r = await svc.memberBuyPack(m.organizationId, m.id, planId);
 		void getPortalOverview(memberId).refresh();
 		void getJoinablePlans(memberId).refresh();
+		return r;
+	}
+);
+
+/** Member redeems a gift card code — drains it across their open charges, leftover becomes account credit. */
+export const redeemGiftCard = command(
+	v.object({ memberId: idSchema, code: v.string() }),
+	async ({ memberId, code }) => {
+		const m = await myMember(memberId);
+		const r = await gcSvc.redeemGiftCard(m.organizationId, m.id, code);
+		void getPortalOverview(memberId).refresh();
 		return r;
 	}
 );

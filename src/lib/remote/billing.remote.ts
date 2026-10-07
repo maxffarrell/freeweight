@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/billing.ts';
+import * as gc from '#lib/server/services/giftcards.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
@@ -17,6 +18,7 @@ import {
 	paymentInput,
 	planInput,
 	planUpdate,
+	giftCardSale,
 	promoCodeInput,
 	promoCodeUpdate,
 	saleInput,
@@ -123,6 +125,19 @@ export const sellItem = command(saleInput, async (input) => {
 	const r = await svc.sellItem(await requireOrg(), input);
 	void getCharges().refresh();
 	void getPayments().refresh();
+	void getMember(input.memberId).refresh();
+	return r;
+});
+
+// ------- gift cards -------
+
+export const getGiftCards = query(async () => gc.listGiftCards((await requireOrg()).orgId));
+
+/** Desk sale — creates the card code and posts the face value as an `other` charge on the buyer. */
+export const sellGiftCard = command(giftCardSale, async (input) => {
+	const r = await gc.sellGiftCard(await requireOrg(), input);
+	void getGiftCards().refresh();
+	void getCharges().refresh();
 	void getMember(input.memberId).refresh();
 	return r;
 });
