@@ -1,0 +1,1 @@
+ALTER TABLE "membership" ADD COLUMN "end_reason" text;

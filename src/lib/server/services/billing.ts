@@ -400,7 +400,11 @@ export async function updateMembership(
 	input: v.InferOutput<typeof s.membershipUpdate>
 ) {
 	const [current] = await db
-		.select({ status: membership.status, planId: membership.planId })
+		.select({
+			status: membership.status,
+			planId: membership.planId,
+			requestReason: membership.requestReason
+		})
 		.from(membership)
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)));
 	if (!current) error(404, 'Membership not found');
@@ -436,6 +440,11 @@ export async function updateMembership(
 		set.pauseRequestedAt = null;
 		set.pauseUntil = null;
 		set.requestReason = null;
+		// Capture their stated reason as the durable "why they left" for reports.
+		set.endReason =
+			input.status === 'cancelled' || input.status === 'paused'
+				? (current.requestReason ?? null)
+				: null;
 	}
 	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
 	if (input.clearPauseRequest) {

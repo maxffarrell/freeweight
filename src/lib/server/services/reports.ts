@@ -495,6 +495,31 @@ async function waiverStatus(orgId: string) {
 	return { required: !!s?.waiver, signed: row?.signed ?? 0, total: row?.total ?? 0 };
 }
 
+/** Why members leave: stated reasons bucketed by end state (cancelled vs paused). */
+async function churnReasons(orgId: string) {
+	const rows = await db
+		.select({
+			reason: membership.endReason,
+			status: membership.status,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(membership)
+		.where(
+			and(eq(membership.organizationId, orgId), sql`${membership.status} in ('cancelled','paused')`)
+		)
+		.groupBy(membership.endReason, membership.status)
+		.orderBy(desc(sql`count(*)`));
+	const byReason = new Map<string, { reason: string; cancelled: number; paused: number }>();
+	for (const r of rows) {
+		const reason = r.reason?.trim() || '(none given)';
+		const cur = byReason.get(reason) ?? { reason, cancelled: 0, paused: 0 };
+		if (r.status === 'paused') cur.paused += r.n;
+		else cur.cancelled += r.n;
+		byReason.set(reason, cur);
+	}
+	return [...byReason.values()].sort((a, b) => b.cancelled + b.paused - (a.cancelled + a.paused));
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -516,7 +541,8 @@ export async function getReports(orgId: string) {
 		waivers,
 		kinds,
 		sources,
-		payrollDetail
+		payrollDetail,
+		churn
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -537,7 +563,8 @@ export async function getReports(orgId: string) {
 		waiverStatus(orgId),
 		revenueByKind(orgId),
 		leadSources(orgId),
-		instructorPayrollDetail(orgId)
+		instructorPayrollDetail(orgId),
+		churnReasons(orgId)
 	]);
 	return {
 		checkIns,
@@ -559,6 +586,7 @@ export async function getReports(orgId: string) {
 		waivers,
 		kinds,
 		sources,
-		payrollDetail
+		payrollDetail,
+		churn
 	};
 }
