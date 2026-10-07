@@ -16,6 +16,7 @@
 	import { goto } from '$app/navigation';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { getAiInsights, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { getAtRisk } from '#lib/remote/reports.remote.ts';
 	import {
 		getMyShift,
 		getOnShift,
@@ -38,6 +39,7 @@
 	const myShift = $derived(await getMyShift());
 	const onShift = $derived(await getOnShift());
 	const shiftLog = $derived(await getShiftLog());
+	const atRisk = $derived(await getAtRisk());
 	const isAdmin = $derived(myShift.role === 'owner' || myShift.role === 'admin');
 	let logOpen = $state(false);
 	const tzName = $derived(d.timezone);
@@ -263,6 +265,31 @@
 								</li>
 							{/each}
 						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if atRisk.length}
+				<Card.Root class="border-amber-500/50">
+					<Card.Header class="flex flex-row items-center justify-between space-y-0">
+						<Card.Title class="text-base">Slipping away</Card.Title>
+						<a href="/reports" class="text-xs text-muted-foreground hover:underline">Reports</a>
+					</Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each atRisk.slice(0, 6) as r (r.memberId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.name}</a>
+									<Badge variant="outline" class="shrink-0"
+										>{r.daysSince ? `${r.daysSince}d ago` : 'never visited'}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+						{#if atRisk.length > 6}
+							<p class="mt-2 text-xs text-muted-foreground">
+								and {atRisk.length - 6} more — see Reports
+							</p>
+						{/if}
 					</Card.Content>
 				</Card.Root>
 			{/if}
