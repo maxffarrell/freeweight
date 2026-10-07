@@ -62,6 +62,8 @@ export const gymSettings = pgTable('gym_settings', {
 	bookingWindowDays: integer('booking_window_days'),
 	/** Members can't cancel a class within this many minutes of start; null = anytime. */
 	cancelCutoffMin: integer('cancel_cutoff_min'),
+	/** Open charge posted per auto-marked no-show, in minor units; null/0 = no fee. */
+	noShowFee: integer('no_show_fee'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

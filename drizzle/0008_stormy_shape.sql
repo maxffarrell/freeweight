@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "no_show_fee" integer;

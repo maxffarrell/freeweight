@@ -11,6 +11,7 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -62,6 +63,7 @@
 	let waiver = $state(settings.waiver);
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
+	let noShowFee = $state<number | null>(settings.noShowFee);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -79,6 +81,7 @@
 				waiver,
 				bookingWindowDays,
 				cancelCutoffMin,
+				noShowFee,
 				publicPage
 			});
 			toast.success('Settings saved');
@@ -291,6 +294,13 @@
 								/>
 							</Field.Field>
 						</div>
+						<Field.Field>
+							<Field.Label>No-show fee</Field.Label>
+							<MoneyInput bind:value={noShowFee} />
+							<Field.Description
+								>Charged to the member for every class they skip without checking in.</Field.Description
+							>
+						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
 								<p class="font-medium">Public join page</p>

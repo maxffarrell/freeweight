@@ -57,6 +57,13 @@
       "when": 1791347837769,
       "tag": "0007_outgoing_psynapse",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791348644058,
+      "tag": "0008_stormy_shape",
+      "breakpoints": true
     }
   ]
 }

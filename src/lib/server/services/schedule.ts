@@ -17,9 +17,11 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
+	charge,
 	classSession,
 	classType,
 	gymMember,
+	gymSettings,
 	location,
 	member,
 	membership,
@@ -31,12 +33,14 @@ import { emit } from './events.ts';
 import {
 	notifyBookingCancelled,
 	notifyBookingConfirmed,
+	notifyChargePosted,
 	notifyInstructorChanged,
 	notifySessionChanged,
 	notifySessionCancelled,
 	notifyWaitlistPromoted
 } from './notifications.ts';
-import { addDays, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
+import { todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -291,20 +295,58 @@ async function activeMembership(orgId: string, memberId: string) {
  * (check-ins have already flipped attendees to 'attended'). Cancelled sessions skip.
  */
 export async function markPastNoShows(orgId: string) {
-	const res = await db
-		.update(booking)
-		.set({ status: 'no_show' })
-		.from(classSession)
+	// Read before flip: need member/class for the optional no-show fee charge.
+	const rows = await db
+		.select({
+			id: booking.id,
+			memberId: booking.memberId,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.where(
 			and(
-				eq(booking.sessionId, classSession.id),
 				eq(booking.organizationId, orgId),
 				eq(booking.status, 'booked'),
 				lt(classSession.endsAt, new Date()),
 				isNull(classSession.cancelledAt)
 			)
 		);
-	return res.count;
+	if (!rows.length) return 0;
+	await db
+		.update(booking)
+		.set({ status: 'no_show' })
+		.where(
+			inArray(
+				booking.id,
+				rows.map((r) => r.id)
+			)
+		);
+
+	const [st] = await db
+		.select({ noShowFee: gymSettings.noShowFee, timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (st?.noShowFee && st.noShowFee > 0) {
+		const tz = st.timezone ?? 'UTC';
+		for (const r of rows) {
+			const [c] = await db
+				.insert(charge)
+				.values({
+					organizationId: orgId,
+					memberId: r.memberId,
+					kind: 'other',
+					description: `No-show fee — ${r.className} ${localDate(r.startsAt, tz)}`,
+					amount: st.noShowFee,
+					dueDate: todayISO()
+				})
+				.returning({ id: charge.id });
+			if (c) notifyChargePosted(orgId, c.id).catch(() => {});
+		}
+	}
+	return rows.length;
 }
 
 /** Bookings that consume a class credit (cancelled doesn't). */
