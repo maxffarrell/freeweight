@@ -996,9 +996,10 @@ export async function notifyReferralReward(orgId: string, paidMemberId: string) 
 }
 
 /**
- * Daily sweep: active members who never signed the liability waiver get one
- * reminder email each (once per member via notification_log — the portal also
- * prompts on every visit). No-op when the gym hasn't configured waiver text.
+ * Daily sweep: active members with no current-version waiver signature get one
+ * reminder email each (once per member per waiver version via notification_log
+ * — the portal also prompts on every visit). No-op when the gym hasn't
+ * configured waiver text.
  */
 export async function sendWaiverReminders(orgId: string) {
 	const [s] = await db
@@ -1009,19 +1010,23 @@ export async function sendWaiverReminders(orgId: string) {
 	const unsigned = await db
 		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
 		.from(gymMember)
-		.leftJoin(waiver, eq(waiver.memberId, gymMember.id))
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
 				eq(gymMember.status, 'active'),
 				isNotNull(gymMember.email),
-				isNull(waiver.id)
+				sql`not exists (select 1 from ${waiver} w where w.member_id = ${gymMember.id} and w.text = ${s.waiver})`
 			)
 		);
+	// Version tag so members who signed an older waiver get re-nudged once per edit.
+	let versionHash = 5381;
+	for (const c of s.waiver) versionHash = (versionHash * 33) ^ c.charCodeAt(0);
+	const version = (versionHash >>> 0).toString(36);
 	const name = await orgBrand(orgId);
 	let sent = 0;
 	for (const m of unsigned) {
-		if (!m.email || !(await logOnce(orgId, 'waiver_reminder', m.id, m.email))) continue;
+		if (!m.email || !(await logOnce(orgId, 'waiver_reminder', `${m.id}:${version}`, m.email)))
+			continue;
 		const first = m.name.split(' ')[0] ?? m.name;
 		await sendMemberEmail(m.id, {
 			to: m.email,
