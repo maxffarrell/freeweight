@@ -6,6 +6,7 @@ import ScanLine from '@lucide/svelte/icons/scan-line';
 import CreditCard from '@lucide/svelte/icons/credit-card';
 import Settings from '@lucide/svelte/icons/settings';
 import ChartColumn from '@lucide/svelte/icons/chart-column';
+import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 import History from '@lucide/svelte/icons/history';
 
 /** `key` is the second key of the `g <key>` keyboard shortcut. */
@@ -20,6 +21,7 @@ export const mainNav = [
 ] as const;
 
 export const secondaryNav = [
+	{ href: '/my-classes', label: 'My classes', icon: GraduationCap, key: 'y' },
 	{ href: '/activity', label: 'Activity', icon: History, key: 'a' },
 	{ href: '/settings', label: 'Settings', icon: Settings, key: 't' }
 ] as const;
