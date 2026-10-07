@@ -13,6 +13,7 @@
 		createMember,
 		logGuestVisit
 	} from '#lib/remote/members.remote.ts';
+	import { getRoster } from '#lib/remote/schedule.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
@@ -84,6 +85,28 @@
 	}
 
 	let searched = $state(false);
+	let rosterOpen = $state(false);
+	let rosterSess = $state<(typeof upNext)[number] | null>(null);
+	const sessRoster = $derived(rosterSess ? await getRoster(rosterSess.session.id) : []);
+	function openSessionRoster(s: (typeof upNext)[number]) {
+		rosterSess = s;
+		rosterOpen = true;
+	}
+	let rosterBusy = $state('');
+	async function rosterCheckIn(memberId: string, memberName: string) {
+		rosterBusy = memberId;
+		try {
+			const r = await recordCheckIn({
+				code: memberId,
+				locationId: rosterSess?.session.locationId ?? null
+			});
+			showFlash(true, `${memberName} checked in`, r.member.photoDocumentId);
+			await getRoster(rosterSess!.session.id).refresh();
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Could not check in'));
+		}
+		rosterBusy = '';
+	}
 	let walkInOpen = $state(false);
 	let wName = $state('');
 	let wPhone = $state('');
@@ -355,16 +378,18 @@
 				</p>
 				<div class="flex flex-wrap gap-2">
 					{#each upNext as s (s.session.id)}
-						<div
-							class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+						<button
+							type="button"
+							class="flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-accent"
 							style="border-left: 4px solid {s.color}"
+							onclick={() => openSessionRoster(s)}
 						>
 							<span class="font-medium tabular-nums">{localTime(s.session.startsAt, tz)}</span>
 							<span>{s.className}</span>
 							<span class="text-muted-foreground">
 								{s.booked}/{s.session.capacity}{s.locationName ? ` · ${s.locationName}` : ''}
 							</span>
-						</div>
+						</button>
 					{/each}
 				</div>
 			</div>
@@ -463,5 +488,40 @@
 				</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={rosterOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>
+				{rosterSess?.className} — {rosterSess ? localTime(rosterSess.session.startsAt, tz) : ''}
+			</Dialog.Title>
+			<Dialog.Description>Check in the booked members as they arrive.</Dialog.Description>
+		</Dialog.Header>
+		<div class="divide-y rounded-lg border">
+			{#each sessRoster as r (r.booking.id)}
+				<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+					<span class="min-w-0">
+						<span class="block truncate font-medium">{r.memberName}</span>
+						<span class="text-xs text-muted-foreground capitalize">
+							{r.booking.status.replace('_', ' ')}
+						</span>
+					</span>
+					{#if r.booking.status === 'booked'}
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={rosterBusy === r.booking.memberId}
+							onclick={() => rosterCheckIn(r.booking.memberId, r.memberName)}
+						>
+							{rosterBusy === r.booking.memberId ? '…' : 'Check in'}
+						</Button>
+					{/if}
+				</div>
+			{:else}
+				<p class="px-3 py-4 text-sm text-muted-foreground">Nobody booked yet.</p>
+			{/each}
+		</div>
 	</Dialog.Content>
 </Dialog.Root>
