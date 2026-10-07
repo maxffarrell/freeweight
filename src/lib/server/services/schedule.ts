@@ -292,7 +292,22 @@ export async function updateSession(
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)))
 		.returning();
 	if (!row) error(404, 'Session not found');
-	if (set.cancelled) notifySessionCancelled(ctx.orgId, id).catch(() => {});
+	if (set.cancelled) {
+		notifySessionCancelled(ctx.orgId, id).catch(() => {});
+		// Void open drop-in charges the cancelled session's bookings posted —
+		// no class, no fee. Paid charges stay; refunds are separate.
+		const [{ n: voided }] = await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(charge)
+			.innerJoin(booking, eq(booking.chargeId, charge.id))
+			.where(and(eq(booking.sessionId, id), eq(charge.status, 'open')));
+		if (voided > 0)
+			await db.execute(
+				sql`update ${charge} c set status = 'void', updated_at = now()
+					from ${booking} b
+					where b.charge_id = c.id and b.session_id = ${id} and c.status = 'open'`
+			);
+	}
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
 	const moved =
@@ -700,6 +715,8 @@ export async function bookSession(
 				dueDate: todayISO()
 			})
 			.returning({ id: charge.id });
+		// Link back so cancelling the booking or the session voids the charge.
+		await db.update(booking).set({ chargeId: c!.id }).where(eq(booking.id, row.id));
 		await emit({
 			orgId: ctx.orgId,
 			actorId: actorId ?? ctx.userId,
@@ -797,7 +814,7 @@ export async function cancelBooking(
 	const { promoted, lateCancel } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
-			.select({ status: booking.status })
+			.select({ status: booking.status, chargeId: booking.chargeId })
 			.from(booking)
 			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, id)))
 			.for('update');
@@ -807,6 +824,13 @@ export async function cancelBooking(
 			.set({ status: 'cancelled', cancelledAt: new Date() })
 			.where(eq(booking.id, id))
 			.returning();
+		// A cancelled drop-in shouldn't keep billing — void the charge it
+		// posted. Already-paid charges stay (refunds are a separate flow).
+		if (prev.chargeId)
+			await tx
+				.update(charge)
+				.set({ status: 'void', updatedAt: new Date() })
+				.where(and(eq(charge.id, prev.chargeId), eq(charge.status, 'open')));
 		if (prev.status !== 'booked') return { promoted: null, lateCancel: null };
 
 		const [[sess], [st]] = await Promise.all([
