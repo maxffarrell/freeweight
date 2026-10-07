@@ -9,6 +9,7 @@ import {
 	classSession,
 	classType,
 	eventRegistration,
+	facilityResource,
 	gymEvent,
 	gymMember,
 	gymSettings,
@@ -16,6 +17,7 @@ import {
 	membership,
 	payment,
 	plan,
+	resourceBooking,
 	user,
 	waiver,
 	outer
@@ -647,6 +649,47 @@ async function churnReasons(orgId: string) {
 	return [...byReason.values()].sort((a, b) => b.cancelled + b.paused - (a.cancelled + a.paused));
 }
 
+/** Last-30d amenity bookings + utilization vs each resource's daily slot capacity. */
+async function amenityStats(orgId: string) {
+	const resources = await db
+		.select()
+		.from(facilityResource)
+		.where(eq(facilityResource.organizationId, orgId))
+		.orderBy(asc(facilityResource.name));
+	if (!resources.length) return [];
+	const since = new Date(Date.now() - 30 * 86400_000);
+	const counts = await db
+		.select({
+			resourceId: resourceBooking.resourceId,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(resourceBooking)
+		.where(
+			and(
+				eq(resourceBooking.organizationId, orgId),
+				eq(resourceBooking.status, 'booked'),
+				gte(resourceBooking.startsAt, since)
+			)
+		)
+		.groupBy(resourceBooking.resourceId);
+	const byId = new Map(counts.map((c) => [c.resourceId, c.n]));
+	return resources.map((r) => {
+		// Daily capacity = open-window minutes / slot length × per-slot capacity, × 30 days.
+		const [fh, fm] = r.openFrom.split(':').map(Number);
+		const [th, tm] = r.openTo.split(':').map(Number);
+		const openMin = Math.max(0, th * 60 + (tm ?? 0) - (fh * 60 + (fm ?? 0)));
+		const capacity30 = Math.floor(openMin / r.slotMin) * r.capacity * 30;
+		const bookings = byId.get(r.id) ?? 0;
+		return {
+			id: r.id,
+			name: r.name,
+			kind: r.kind,
+			bookings,
+			util: capacity30 ? Math.min(100, Math.round((bookings / capacity30) * 100)) : 0
+		};
+	});
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -672,7 +715,8 @@ export async function getReports(orgId: string) {
 		churn,
 		noShows,
 		events,
-		leads
+		leads,
+		amenities
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -697,7 +741,8 @@ export async function getReports(orgId: string) {
 		churnReasons(orgId),
 		noShowByClass(orgId),
 		eventStats(orgId),
-		leadStats(orgId)
+		leadStats(orgId),
+		amenityStats(orgId)
 	]);
 	return {
 		checkIns,
@@ -723,6 +768,7 @@ export async function getReports(orgId: string) {
 		churn,
 		noShows,
 		events,
-		leads
+		leads,
+		amenities
 	};
 }
