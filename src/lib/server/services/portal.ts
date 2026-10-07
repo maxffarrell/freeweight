@@ -371,17 +371,16 @@ export async function memberBook(
 	if (!s) error(404, 'Session not found');
 	if (!s.memberBookable) error(409, 'This class is booked at the front desk');
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
-	if (
-		bookingWindowDays != null &&
-		s.startsAt.getTime() > Date.now() + bookingWindowDays * 86400_000
-	)
-		error(409, `Bookings open ${bookingWindowDays} days ahead`);
-	const cutoff = s.classCutoff ?? bookCutoffMin;
-	if (cutoff != null && s.startsAt.getTime() - Date.now() < cutoff * 60_000)
-		error(409, `Booking closes ${cutoff} minutes before class`);
 	// Members without an active plan buy the visit as a drop-in — the class's
 	// drop-in charge lands on their balance to pay online or at the desk.
 	const ms = await activeMembership(orgId, memberId);
+	// A plan's own book-ahead window takes precedence over the gym-wide one.
+	const windowDays = ms?.bookAheadDays ?? bookingWindowDays;
+	if (windowDays != null && s.startsAt.getTime() > Date.now() + windowDays * 86400_000)
+		error(409, `Bookings open ${windowDays} days ahead`);
+	const cutoff = s.classCutoff ?? bookCutoffMin;
+	if (cutoff != null && s.startsAt.getTime() - Date.now() < cutoff * 60_000)
+		error(409, `Booking closes ${cutoff} minutes before class`);
 	const dropIn = !ms;
 	if (dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 		error(402, 'An active membership is required to book');

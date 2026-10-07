@@ -1,0 +1,1 @@
+ALTER TABLE "plan" ADD COLUMN "book_ahead_days" integer;

@@ -83,6 +83,7 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 			guestPasses: input.guestPasses ?? null,
 			commitmentMonths: input.commitmentMonths ?? null,
 			memberLimit: input.memberLimit ?? null,
+			bookAheadDays: input.bookAheadDays ?? null,
 			listed: input.listed,
 			active: input.active
 		})

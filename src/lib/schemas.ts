@@ -66,6 +66,7 @@ export const planInput = v.object({
 	guestPasses: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	commitmentMonths: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	memberLimit: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	bookAheadDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	listed: v.optional(v.boolean(), true),
 	active: v.optional(v.boolean(), true)
 });
