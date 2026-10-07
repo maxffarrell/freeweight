@@ -19,6 +19,7 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
 	booking,
+	challenge,
 	charge,
 	checkIn,
 	classSession,
@@ -1169,6 +1170,58 @@ export async function notifyReferralReward(orgId: string, paidMemberId: string) 
  * — the portal also prompts on every visit). No-op when the gym hasn't
  * configured waiver text.
  */
+/** Day-one invite: a challenge that starts today (org tz) emails every active member. */
+export async function sendChallengeInvites(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	const rows = await db
+		.select()
+		.from(challenge)
+		.where(
+			and(
+				eq(challenge.organizationId, orgId),
+				eq(challenge.active, true),
+				eq(challenge.startDate, today)
+			)
+		);
+	if (!rows.length) return 0;
+	const members = await db
+		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email)
+			)
+		);
+	if (!members.length) return 0;
+	const name = await orgBrand(orgId);
+	let sent = 0;
+	for (const c of rows) {
+		for (const m of members) {
+			if (!m.email) continue;
+			if (!(await logOnce(orgId, 'challenge_invite', c.id, m.email))) continue;
+			await sendMemberEmail(m.id, {
+				to: m.email,
+				subject: `New challenge: ${c.name} at ${name.orgName}`,
+				...renderEmail({
+					...name,
+					heading: `${c.name} starts today`,
+					lines: [
+						c.description ||
+							`Check in ${c.goal} times between ${c.startDate} and ${c.endDate} to finish.`,
+						`Goal: ${c.goal} check-ins, ${c.startDate} → ${c.endDate}. Join in the member portal.`
+					],
+					action: { label: 'Join the challenge', url: `${appOrigin()}/portal` }
+				})
+			});
+			sent++;
+		}
+	}
+	return sent;
+}
+
 export async function sendWaiverReminders(orgId: string) {
 	const [s] = await db
 		.select({ waiver: gymSettings.waiver })

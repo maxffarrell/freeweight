@@ -3,6 +3,8 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
 	booking,
+	challenge,
+	challengeEntry,
 	charge,
 	checkIn,
 	classSession,
@@ -220,6 +222,30 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(membership.endsAt))
 		.limit(10);
 
+	// Challenges whose window includes today — joined count so staff can see
+	// engagement without opening the members page.
+	const liveChallenges = await db
+		.select({
+			id: challenge.id,
+			name: challenge.name,
+			goal: challenge.goal,
+			endDate: challenge.endDate,
+			joined: sql<number>`count(${challengeEntry.id})`.mapWith(Number)
+		})
+		.from(challenge)
+		.leftJoin(challengeEntry, eq(challengeEntry.challengeId, challenge.id))
+		.where(
+			and(
+				eq(challenge.organizationId, orgId),
+				eq(challenge.active, true),
+				lte(challenge.startDate, today),
+				gte(challenge.endDate, today)
+			)
+		)
+		.groupBy(challenge.id)
+		.orderBy(asc(challenge.endDate))
+		.limit(5);
+
 	return {
 		timezone: tz,
 		currency: settings?.currency ?? 'usd',
@@ -236,7 +262,8 @@ export async function dashboard(orgId: string) {
 		pendingRequests,
 		coverNeeded,
 		birthdaysThisWeek,
-		renewalsThisWeek
+		renewalsThisWeek,
+		liveChallenges
 	};
 }
 

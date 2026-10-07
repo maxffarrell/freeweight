@@ -149,6 +149,23 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.liveChallenges.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Live challenges</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.liveChallenges as c (c.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{c.name}</span>
+									<Badge variant="outline" class="shrink-0">
+										{c.joined} in · ends {formatDate(c.endDate)}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.birthdaysThisWeek.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Birthdays this week</Card.Title></Card.Header>
