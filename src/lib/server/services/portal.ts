@@ -9,6 +9,7 @@ import {
 	checkIn,
 	classSession,
 	classType,
+	document,
 	sessionFeedback,
 	workoutResult,
 	gymMember,
@@ -283,6 +284,26 @@ export async function portalOverview(memberId: string) {
 	> = {};
 	for (const r of wbRows) (whiteboard[r.sessionId] ??= []).push(r);
 
+	const [priorBooking, [avatarDoc], [firstVisit]] = await Promise.all([
+		hasPriorBooking(memberId),
+		db
+			.select({ id: document.id })
+			.from(document)
+			.where(and(eq(document.entityType, 'member_avatar'), eq(document.entityId, memberId)))
+			.limit(1),
+		db
+			.select({ id: checkIn.id })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.organizationId, orgId),
+					eq(checkIn.memberId, memberId),
+					isNull(checkIn.guestName)
+				)
+			)
+			.limit(1)
+	]);
+
 	return {
 		member: m,
 		settings,
@@ -300,7 +321,14 @@ export async function portalOverview(memberId: string) {
 		calendarToken: calendarToken(memberId),
 		orgSlug: org?.slug ?? '',
 		referralCount: referred?.n ?? 0,
-		dropInFree: !!settings?.firstClassFree && !(await hasPriorBooking(memberId)),
+		dropInFree: !!settings?.firstClassFree && !priorBooking,
+		onboarding: {
+			waiver: !settings?.waiver || !!signedWaiver,
+			photo: !!avatarDoc,
+			goal: m.goalVisitsPerMonth != null,
+			booked: priorBooking,
+			visited: !!firstVisit
+		},
 		waiverRequired: !!settings?.waiver,
 		signedWaiver,
 		waiverStale: !!settings?.waiver && !!signedWaiver && signedWaiver.text !== settings.waiver,
