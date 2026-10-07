@@ -28,7 +28,9 @@
 		addMemberTag,
 		removeMemberTag,
 		emailAllMembers,
-		requestPayment
+		requestPayment,
+		getMembers,
+		mergeMembers
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -174,6 +176,39 @@
 
 	// ------- edit member -------
 	let editOpen = $state(false);
+
+	// ------- merge duplicate -------
+	let mergeOpen = $state(false);
+	let mergeQ = $state('');
+	let mergeResults = $state<Awaited<ReturnType<typeof getMembers>>>([]);
+	let mergePick = $state('');
+	let mergePending = $state(false);
+	let mergeTimer: ReturnType<typeof setTimeout> | undefined;
+	function searchMerge() {
+		clearTimeout(mergeTimer);
+		mergeTimer = setTimeout(async () => {
+			mergeResults = (await getMembers({ q: mergeQ })).filter((r) => r.id !== id);
+		}, 150);
+	}
+	async function openMerge() {
+		mergePick = '';
+		mergeQ = '';
+		mergeResults = (await getMembers()).filter((r) => r.id !== id);
+		mergeOpen = true;
+	}
+	async function doMerge() {
+		mergePending = true;
+		try {
+			const name = mergeResults.find((r) => r.id === mergePick)?.name ?? 'duplicate';
+			await mergeMembers({ keepId: id, dropId: mergePick });
+			toast.success(`Merged ${name} into ${m.member.name}`);
+			mergeOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not merge'));
+		}
+		mergePending = false;
+	}
+
 	let name = $state(m.member.name);
 	let email = $state(m.member.email ?? '');
 	let phone = $state(m.member.phone ?? '');
@@ -438,6 +473,7 @@
 			><UserPlus /> Guest</Button
 		>
 		<Button size="sm" variant="outline" onclick={() => (editOpen = true)}>Edit</Button>
+		<Button size="sm" variant="ghost" onclick={openMerge}>Merge…</Button>
 	{/snippet}
 </PageHeader>
 
@@ -1286,6 +1322,42 @@
 				<Button type="submit" disabled={!seriesTypeId || seriesPending}>Book series</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={mergeOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Merge a duplicate into {m.member.name}</Dialog.Title>
+			<Dialog.Description>
+				Pick the duplicate record — its memberships, bookings, check-ins, charges, payments, tags,
+				notes and documents move onto this member, then the duplicate is deleted. This can't be
+				undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Input placeholder="Search members…" bind:value={mergeQ} oninput={searchMerge} autofocus />
+		<div class="max-h-52 overflow-y-auto rounded-md border">
+			{#each mergeResults as r (r.id)}
+				<button
+					type="button"
+					class="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted {mergePick ===
+					r.id
+						? 'bg-muted font-medium'
+						: ''}"
+					onclick={() => (mergePick = r.id)}
+				>
+					<span class="truncate">{r.name}</span>
+					<span class="shrink-0 text-xs text-muted-foreground">{r.email ?? r.phone ?? ''}</span>
+				</button>
+			{:else}
+				<p class="px-3 py-4 text-sm text-muted-foreground">No members match.</p>
+			{/each}
+		</div>
+		<Dialog.Footer>
+			<Button variant="destructive" disabled={!mergePick || mergePending} onclick={doMerge}>
+				{mergePending ? 'Merging…' : 'Merge and delete duplicate'}
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
 
