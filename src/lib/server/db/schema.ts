@@ -480,6 +480,56 @@ export const resourceBooking = pgTable(
 	]
 );
 
+/** A one-off paid/free event — seminar, comp, bring-a-friend day. */
+export const gymEvent = pgTable(
+	'gym_event',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		description: text('description').notNull().default(''),
+		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
+		startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+		endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+		capacity: integer('capacity').notNull().default(20),
+		/** Signup price in cents; null/0 = free. */
+		price: integer('price'),
+		/** Members can self-register in the portal. */
+		memberBookable: boolean('member_bookable').notNull().default(true),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('gym_event_org_idx').on(t.organizationId)]
+);
+
+export const eventRegistrationStatus = pgEnum('event_registration_status', [
+	'registered',
+	'cancelled',
+	'attended'
+]);
+
+export const eventRegistration = pgTable(
+	'event_registration',
+	{
+		id: id(),
+		organizationId: orgId(),
+		eventId: text('event_id')
+			.notNull()
+			.references(() => gymEvent.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		status: eventRegistrationStatus('status').notNull().default('registered'),
+		/** Signup charge this registration posted — voided on cancel before payment. */
+		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('event_registration_event_idx').on(t.eventId),
+		index('event_registration_member_idx').on(t.memberId)
+	]
+);
+
 export const checkInMethod = pgEnum('check_in_method', ['qr', 'manual']);
 
 /** A front-desk check-in, via the member's QR code or a staff search. */

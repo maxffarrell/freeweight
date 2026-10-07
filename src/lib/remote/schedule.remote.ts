@@ -3,6 +3,7 @@ import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
 import * as res from '#lib/server/services/resources.ts';
+import * as evt from '#lib/server/services/gym-events.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import { getMember, getTodayCheckIns } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
@@ -19,6 +20,7 @@ import {
 	seriesBookingInput,
 	sessionInput,
 	sessionUpdate,
+	eventInput,
 	resourceInput,
 	resourceUpdate,
 	templateInput,
@@ -248,4 +250,37 @@ export const updateResource = command(resourceUpdate, async (input) => {
 	const r = await res.updateResource(await requireOrg(), input);
 	void getResources().refresh();
 	return r;
+});
+
+// ---------- Events (workshops, comps, bring-a-friend days) ----------
+
+export const getEvents = query(async () => evt.listEvents((await requireOrg()).orgId));
+export const createEvent = command(eventInput, async (input) => {
+	const tzName = await tz();
+	const startsAt = zonedToUtc(input.startsAt, tzName);
+	const r = await evt.createEvent(await requireOrg(), {
+		...input,
+		startsAt,
+		endsAt: new Date(startsAt.getTime() + input.durationMin * 60_000)
+	});
+	void getEvents().refresh();
+	return r;
+});
+export const getEventRoster = query(idSchema, async (id) =>
+	evt.eventRoster((await requireOrg()).orgId, id)
+);
+/** Staff register a member into an event (posts the signup charge). */
+export const registerMemberForEvent = command(
+	v.object({ eventId: idSchema, memberId: idSchema }),
+	async ({ eventId, memberId }) => {
+		const r = await evt.registerForEvent((await requireOrg()).orgId, memberId, eventId);
+		void getEvents().refresh();
+		void getEventRoster(eventId).refresh();
+		return r;
+	}
+);
+/** Staff cancel a registration (voids an unpaid signup charge). */
+export const cancelEventRegistration = command(idSchema, async (id) => {
+	await evt.cancelRegistration((await requireOrg()).orgId, id);
+	void getEvents().refresh();
 });

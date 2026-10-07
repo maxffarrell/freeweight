@@ -36,7 +36,10 @@
 		getResourceDay,
 		bookResource,
 		cancelReservation,
-		getReservations
+		getReservations,
+		getPortalEvents,
+		registerEvent,
+		cancelEventReg
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -91,6 +94,32 @@
 		try {
 			await cancelReservation({ memberId, id });
 			toast.success('Reservation cancelled');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
+		}
+	}
+
+	// ------- events -------
+	const portalEvents = $derived(await getPortalEvents(memberId));
+	let evBusy = $state('');
+	async function registerEv(eventId: string) {
+		evBusy = eventId;
+		try {
+			const r = await registerEvent({ memberId, eventId });
+			toast.success(
+				r.registration.chargeId
+					? `Registered — ${formatMoney(r.event.price ?? 0, currency)} added to your balance`
+					: `You're registered for ${r.event.name}`
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not register'));
+		}
+		evBusy = '';
+	}
+	async function cancelEv(regId: string) {
+		try {
+			await cancelEventReg({ memberId, id: regId });
+			toast.success('Registration cancelled');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
 		}
@@ -745,6 +774,58 @@
 						{/each}
 					</div>
 				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if portalEvents.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Events</Card.Title>
+				<Card.Description>Workshops, comps, and gym days — grab a spot.</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6 pb-4">
+				{#each portalEvents as ev (ev.event.id)}
+					{@const full = ev.registered >= ev.event.capacity && !ev.myRegistration}
+					<div class="flex items-center gap-3 py-3">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<span class="truncate font-medium">{ev.event.name}</span>
+								{#if ev.myRegistration}
+									<Badge>Registered</Badge>
+								{/if}
+							</div>
+							<p class="text-sm text-muted-foreground">
+								{formatDate(ev.event.startsAt)} · {localTime(ev.event.startsAt, tz)}
+								{#if ev.locationName}· {ev.locationName}{/if}
+								· {ev.registered}/{ev.event.capacity}
+							</p>
+							{#if ev.event.description}
+								<p class="mt-0.5 truncate text-xs text-muted-foreground">
+									{ev.event.description}
+								</p>
+							{/if}
+						</div>
+						{#if ev.myRegistration}
+							<Button variant="ghost" size="sm" onclick={() => cancelEv(ev.myRegistration!.id)}
+								>Cancel</Button
+							>
+						{:else}
+							<Button
+								size="sm"
+								variant={full ? 'outline' : 'default'}
+								disabled={full || evBusy === ev.event.id}
+								onclick={() => registerEv(ev.event.id)}
+							>
+								{full
+									? 'Full'
+									: ev.event.price
+										? `Register — ${formatMoney(ev.event.price, currency)}`
+										: 'Register'}
+							</Button>
+						{/if}
+					</div>
+				{/each}
 			</Card.Content>
 		</Card.Root>
 	{/if}

@@ -36,7 +36,12 @@
 		getInstructorConflicts,
 		getResources,
 		createResource,
-		updateResource
+		updateResource,
+		getEvents,
+		createEvent,
+		getEventRoster,
+		registerMemberForEvent,
+		cancelEventRegistration
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -397,6 +402,65 @@
 	// ------- class types -------
 	let typeOpen = $state(false);
 
+	// ------- events -------
+	let evOpen = $state(false);
+	const events = $derived(await getEvents());
+	let evRosterId = $state('');
+	const evRoster = $derived(evRosterId ? await getEventRoster(evRosterId) : null);
+	let evMemberId = $state('');
+	let eName = $state('');
+	let eDesc = $state('');
+	let eDate = $state('');
+	let eTime = $state('');
+	let eDur = $state(60);
+	let eCap = $state(20);
+	let ePrice = $state('');
+	let eLoc = $state('');
+
+	async function submitEvent(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await createEvent({
+				name: eName.trim(),
+				description: eDesc.trim() || undefined,
+				startsAt: `${eDate}T${eTime}`,
+				durationMin: eDur,
+				capacity: eCap,
+				price: ePrice === '' ? null : Math.round(Number(ePrice) * 100),
+				locationId: eLoc || undefined
+			});
+			toast.success('Event created — members can register in the portal');
+			eName = eDesc = eDate = eTime = ePrice = eLoc = '';
+			await getEvents().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not create event'));
+		}
+		pending = false;
+	}
+
+	async function registerMember() {
+		if (!evRosterId || !evMemberId) return;
+		try {
+			const r = await registerMemberForEvent({ eventId: evRosterId, memberId: evMemberId });
+			toast.success(r.registration.chargeId ? 'Registered — signup charge posted' : 'Registered');
+			evMemberId = '';
+			await getEventRoster(evRosterId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not register'));
+		}
+	}
+
+	async function cancelReg(id: string) {
+		try {
+			await cancelEventRegistration(id);
+			toast.success('Registration cancelled');
+			if (evRosterId) await getEventRoster(evRosterId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
+		}
+	}
+
 	// ------- amenities (bookable resources) -------
 	let resOpen = $state(false);
 	let rName = $state('');
@@ -521,6 +585,7 @@
 			><Plus /> Class type</Button
 		>
 		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
+		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 	{/snippet}
 </PageHeader>
@@ -1487,6 +1552,129 @@
 			{/if}
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>Add amenity</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={evOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Events</Dialog.Title>
+			<Dialog.Description>
+				One-off workshops, comps, bring-a-friend days. Members register in the portal.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if events.length}
+			<div class="mb-4 divide-y rounded-lg border">
+				{#each events as ev (ev.event.id)}
+					<div class="px-3 py-2 text-sm">
+						<button
+							class="flex w-full items-center justify-between gap-2 text-left"
+							onclick={() => (evRosterId = evRosterId === ev.event.id ? '' : ev.event.id)}
+						>
+							<div class="min-w-0">
+								<span class="font-medium">{ev.event.name}</span>
+								{#if ev.event.price}
+									<span class="text-muted-foreground">
+										· {formatMoney(ev.event.price, currency)}</span
+									>
+								{/if}
+								<p class="text-xs text-muted-foreground">
+									{formatDate(ev.event.startsAt)} · {localTime(ev.event.startsAt, tz)}
+									{#if ev.locationName}· {ev.locationName}{/if}
+									{#if !ev.event.memberBookable}· staff-only signup{/if}
+								</p>
+							</div>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{ev.registered}/{ev.event.capacity}
+							</span>
+						</button>
+						{#if evRosterId === ev.event.id && evRoster}
+							<div class="mt-2 rounded-md border p-2">
+								{#each evRoster.rows as r (r.registration.id)}
+									<div class="flex items-center justify-between py-1 text-sm">
+										<span>{r.memberName}</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-6 px-2 text-xs"
+											onclick={() => cancelReg(r.registration.id)}>Cancel</Button
+										>
+									</div>
+								{:else}
+									<p class="py-1 text-xs text-muted-foreground">Nobody registered yet.</p>
+								{/each}
+								<div class="mt-2 flex gap-2">
+									<Select.Root type="single" bind:value={evMemberId}>
+										<Select.Trigger class="h-8 flex-1 text-sm">
+											{memberList.find((mm) => mm.id === evMemberId)?.name ?? 'Register a member…'}
+										</Select.Trigger>
+										<Select.Content>
+											{#each memberList.filter((mm) => !evRoster.rows.some((r) => r.registration.memberId === mm.id)) as mm (mm.id)}
+												<Select.Item value={mm.id}>{mm.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+									<Button size="sm" class="h-8" disabled={!evMemberId} onclick={registerMember}
+										>Add</Button
+									>
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<form class="space-y-4" onsubmit={submitEvent}>
+			<Field.Field>
+				<Field.Label for="e-name">Name</Field.Label>
+				<Input id="e-name" required bind:value={eName} placeholder="Mobility workshop" />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="e-desc">Description (optional)</Field.Label>
+				<Input id="e-desc" bind:value={eDesc} maxlength={500} />
+			</Field.Field>
+			<div class="grid grid-cols-3 gap-3">
+				<Field.Field>
+					<Field.Label for="e-date">Date</Field.Label>
+					<Input id="e-date" type="date" required bind:value={eDate} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="e-time">Time</Field.Label>
+					<Input id="e-time" type="time" required bind:value={eTime} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="e-dur">Minutes</Field.Label>
+					<Input id="e-dur" type="number" min={15} bind:value={eDur} />
+				</Field.Field>
+			</div>
+			<div class="grid grid-cols-3 gap-3">
+				<Field.Field>
+					<Field.Label for="e-cap">Capacity</Field.Label>
+					<Input id="e-cap" type="number" min={1} bind:value={eCap} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="e-price">Price (blank = free)</Field.Label>
+					<Input id="e-price" type="number" min={0} step="0.01" bind:value={ePrice} />
+				</Field.Field>
+				{#if locations.filter((l) => !l.archivedAt).length}
+					<Field.Field>
+						<Field.Label>Location</Field.Label>
+						<select
+							bind:value={eLoc}
+							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+						>
+							<option value="">—</option>
+							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+								<option value={l.id}>{l.name}</option>
+							{/each}
+						</select>
+					</Field.Field>
+				{/if}
+			</div>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>Create event</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
