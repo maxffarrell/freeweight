@@ -835,6 +835,27 @@
 				</form>
 			</Card.Content>
 		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Emails sent</Card.Title>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each m.emails as e (e.createdAt + e.kind)}
+					<div class="flex items-center justify-between gap-2 py-1 text-sm">
+						<span class="capitalize">{e.kind.replaceAll('_', ' ')}</span>
+						<span class="shrink-0 text-xs text-muted-foreground">{formatRelative(e.createdAt)}</span
+						>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						{m.member.email
+							? 'No system emails logged for this address yet.'
+							: 'No email on file — member gets no mail.'}
+					</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
 	</div>
 
 	<Card.Root class="lg:col-span-2">
