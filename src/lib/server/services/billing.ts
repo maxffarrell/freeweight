@@ -12,6 +12,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { notifyChargePosted } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
@@ -178,7 +179,7 @@ async function postMembershipCharge(
 	periodStart: string,
 	p: { name: string; amount: number }
 ) {
-	await db
+	const [row] = await db
 		.insert(charge)
 		.values({
 			organizationId: orgId,
@@ -195,7 +196,10 @@ async function postMembershipCharge(
 			dueDate: periodStart,
 			amount: p.amount
 		})
-		.onConflictDoNothing();
+		.onConflictDoNothing()
+		.returning();
+	// Inserted (not a re-run) → let the member know they owe.
+	if (row) notifyChargePosted(orgId, row.id).catch(() => {});
 }
 
 export async function updateMembership(

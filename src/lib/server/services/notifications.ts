@@ -3,6 +3,7 @@ import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
+	charge,
 	classSession,
 	classType,
 	gymMember,
@@ -12,6 +13,7 @@ import {
 	organization
 } from '#lib/server/db/schema.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
+import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { localDate, localTime } from '#lib/tz.ts';
 
@@ -208,4 +210,40 @@ export async function sendAnnouncement(
 		sent++;
 	}
 	return { sent, total: members.length };
+}
+
+/** "Invoice ready" when a charge posts — membership billing, first period, anything else. */
+export async function notifyChargePosted(orgId: string, chargeId: string) {
+	const [row] = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			description: charge.description,
+			amount: charge.amount,
+			dueDate: charge.dueDate
+		})
+		.from(charge)
+		.innerJoin(gymMember, eq(charge.memberId, gymMember.id))
+		.where(eq(charge.id, chargeId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'charge_posted', chargeId, row.email))) return;
+	const [name, settings] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const amount = formatMoney(row.amount, settings[0]?.currency ?? 'usd');
+	await sendEmail({
+		to: row.email,
+		subject: `New charge from ${name}: ${amount}`,
+		...renderEmail({
+			orgName: name,
+			heading: `${amount} due ${formatDate(row.dueDate)}`,
+			lines: [
+				`Hi ${row.memberName} — ${name} posted a charge to your account:`,
+				row.description ?? `${amount}`,
+				'You can pay it online from the member portal.'
+			],
+			action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
 }
