@@ -204,6 +204,25 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.waivers.required}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Waivers</Card.Title>
+				<Card.Description>Active members who signed the liability waiver</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<p class="text-4xl font-bold tabular-nums">
+					{r.waivers.total > 0 ? Math.round((r.waivers.signed / r.waivers.total) * 100) : 0}%
+				</p>
+				<p class="mt-1 text-sm text-muted-foreground">
+					{r.waivers.signed} of {r.waivers.total} signed
+					{#if r.waivers.total > r.waivers.signed}
+						· {r.waivers.total - r.waivers.signed} outstanding — the daily job emails them once{/if}
+				</p>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Memberships by plan</Card.Title>

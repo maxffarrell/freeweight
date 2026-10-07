@@ -19,7 +19,8 @@ import {
 	organization,
 	payment,
 	plan,
-	user
+	user,
+	waiver
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
@@ -962,6 +963,53 @@ export async function notifyReferralReward(orgId: string, paidMemberId: string) 
 		})
 	});
 	return true;
+}
+
+/**
+ * Daily sweep: active members who never signed the liability waiver get one
+ * reminder email each (once per member via notification_log — the portal also
+ * prompts on every visit). No-op when the gym hasn't configured waiver text.
+ */
+export async function sendWaiverReminders(orgId: string) {
+	const [s] = await db
+		.select({ waiver: gymSettings.waiver })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (!s?.waiver) return 0;
+	const unsigned = await db
+		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.leftJoin(waiver, eq(waiver.memberId, gymMember.id))
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email),
+				isNull(waiver.id)
+			)
+		);
+	const name = await orgName(orgId);
+	let sent = 0;
+	for (const m of unsigned) {
+		if (!m.email || !(await logOnce(orgId, 'waiver_reminder', m.id, m.email))) continue;
+		const first = m.name.split(' ')[0] ?? m.name;
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject: `${name}: please sign your waiver`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Please sign your waiver',
+				lines: [
+					`Hi ${first},`,
+					`Before your next visit to ${name}, take a minute to review and sign the liability waiver.`,
+					'It shows up automatically the next time you open the member portal.'
+				],
+				action: { label: 'Open the portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
 
 /** Replaces {name} and {first_name} merge tags in an announcement draft. */

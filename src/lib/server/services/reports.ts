@@ -13,6 +13,7 @@ import {
 	payment,
 	plan,
 	user,
+	waiver,
 	outer
 } from '#lib/server/db/schema.ts';
 
@@ -410,6 +411,25 @@ async function retentionByCohort(orgId: string) {
 		.orderBy(desc(sql`to_char(${gymMember.createdAt}, 'YYYY-MM')`));
 }
 
+/** Waiver coverage among active members; `required` is false when no waiver text is set. */
+async function waiverStatus(orgId: string) {
+	const [s] = await db
+		.select({ waiver: gymSettings.waiver })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const [row] = await db
+		.select({
+			total: sql<number>`count(*)`.mapWith(Number),
+			signed:
+				sql<number>`count(*) filter (where exists (select 1 from ${waiver} w where w.member_id = ${gymMember.id}))`.mapWith(
+					Number
+				)
+		})
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.status, 'active')));
+	return { required: !!s?.waiver, signed: row?.signed ?? 0, total: row?.total ?? 0 };
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -427,7 +447,8 @@ export async function getReports(orgId: string) {
 		payroll,
 		trials,
 		visit,
-		retention
+		retention,
+		waivers
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -444,7 +465,8 @@ export async function getReports(orgId: string) {
 		instructorPayroll(orgId),
 		trialConversion(orgId),
 		avgVisitMinutes(orgId),
-		retentionByCohort(orgId)
+		retentionByCohort(orgId),
+		waiverStatus(orgId)
 	]);
 	return {
 		checkIns,
@@ -462,6 +484,7 @@ export async function getReports(orgId: string) {
 		payroll,
 		trials,
 		visit,
-		retention
+		retention,
+		waivers
 	};
 }

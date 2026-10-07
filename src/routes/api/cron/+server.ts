@@ -14,6 +14,7 @@ import {
 	sendInstructorRosters,
 	sendPastDueNotices,
 	sendTrialEndingNotices,
+	sendWaiverReminders,
 	sendWeeklyDigest,
 	sendWinBackNudges
 } from '#lib/server/services/notifications.ts';
@@ -52,6 +53,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let billingReminders = 0;
 	let announcements = 0;
 	let packNudges = 0;
+	let waiverNudges = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -115,6 +117,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`pack-nudge cron failed for ${o.id}`, err);
 		}
 		try {
+			waiverNudges += await sendWaiverReminders(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`waiver-reminder cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -163,7 +171,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		rosters,
 		billingReminders,
 		announcements,
-		packNudges
+		packNudges,
+		waiverNudges
 	});
 };
 
