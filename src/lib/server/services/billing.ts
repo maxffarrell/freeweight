@@ -7,6 +7,7 @@ import {
 	getTableColumns,
 	gte,
 	inArray,
+	isNotNull,
 	isNull,
 	lt,
 	lte,
@@ -19,6 +20,7 @@ import {
 	gymSettings,
 	membership,
 	payment,
+	paymentMethod,
 	plan,
 	promoCode,
 	shopItem,
@@ -420,15 +422,18 @@ export async function updateMembership(
 		.select({
 			status: membership.status,
 			planId: membership.planId,
-			requestReason: membership.requestReason
+			requestReason: membership.requestReason,
+			memberId: membership.memberId,
+			nextChargeAt: membership.nextChargeAt,
+			price: membership.price
 		})
 		.from(membership)
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)));
 	if (!current) error(404, 'Membership not found');
 
 	// Staff plan change: moves the membership to another plan; the new price
-	// applies from the next charge (no proration).
-	let newPlan: { id: string; name: string } | null = null;
+	// applies from the next charge, plus an optional prorated catch-up now.
+	let newPlan: { id: string; name: string; amount: number; interval: string } | null = null;
 	if (input.planId && input.planId !== current.planId) {
 		const p = await getPlan(ctx.orgId, input.planId);
 		if (!p.active || p.isPack) error(404, 'Plan not available');
@@ -482,15 +487,17 @@ export async function updateMembership(
 	if (!row) error(404, 'Membership not found');
 	if (newPlan) {
 		const [oldPlan] = await db
-			.select({ name: plan.name })
+			.select({ name: plan.name, amount: plan.amount, interval: plan.interval })
 			.from(plan)
 			.where(eq(plan.id, current.planId));
+		const prorated =
+			input.prorate && oldPlan ? await proratePlanChange(ctx, current, oldPlan, newPlan) : 0;
 		await emit({
 			orgId: ctx.orgId,
 			entityType: 'membership',
 			entityId: row.id,
 			action: 'plan_changed',
-			summary: `Plan changed from ${oldPlan?.name ?? '?'} to ${newPlan.name}`
+			summary: `Plan changed from ${oldPlan?.name ?? '?'} to ${newPlan.name}${prorated ? ` (prorated ${formatMoney(prorated)})` : ''}`
 		});
 		notifyPlanChanged(ctx.orgId, row.id, oldPlan?.name ?? '?').catch(() => {});
 	}
@@ -683,7 +690,10 @@ export async function listCharges(orgId: string, status?: string) {
 		.orderBy(desc(charge.dueDate));
 }
 
-export async function addCharge(ctx: OrgContext, input: v.InferOutput<typeof s.chargeInput>) {
+export async function addCharge(
+	ctx: { orgId: string; userId?: string | null },
+	input: v.InferOutput<typeof s.chargeInput>
+) {
 	const [row] = await db
 		.insert(charge)
 		.values({
@@ -843,7 +853,16 @@ export async function updateCharge(ctx: OrgContext, input: v.InferOutput<typeof 
 }
 
 /** Records a payment and applies it to the member's open charges oldest-first. */
-export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof s.paymentInput>) {
+export async function recordPayment(
+	ctx: { orgId: string; userId?: string | null },
+	// Wider than paymentInput.method: internal callers may post system methods
+	// like 'credit' that staff can't pick in the UI.
+	input: Omit<v.InferOutput<typeof s.paymentInput>, 'method'> & {
+		method: (typeof paymentMethod.enumValues)[number];
+	},
+	/** silent: no receipt/referral emails — for internal credits that aren't money received. */
+	opts?: { silent?: boolean }
+) {
 	const [m] = await db
 		.select()
 		.from(gymMember)
@@ -934,14 +953,16 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 		summary: `${formatMoney(input.amount)} from ${m.name}`,
 		data: { memberId: input.memberId, method: input.method }
 	});
-	notifyPaymentReceived(
-		ctx.orgId,
-		rows.map((r) => r.id),
-		input.amount,
-		input.method
-	).catch(() => {});
+	if (!opts?.silent) {
+		notifyPaymentReceived(
+			ctx.orgId,
+			rows.map((r) => r.id),
+			input.amount,
+			input.method
+		).catch(() => {});
+		notifyReferralReward(ctx.orgId, input.memberId).catch(() => {});
+	}
 	unsuspendPaidUp(ctx.orgId, input.memberId).catch(() => {});
-	notifyReferralReward(ctx.orgId, input.memberId).catch(() => {});
 	return rows[0];
 }
 
@@ -1042,4 +1063,79 @@ export async function paymentsBetween(orgId: string, from: Date, to: Date) {
 			and(eq(payment.organizationId, orgId), gte(payment.paidAt, from), lt(payment.paidAt, to))
 		)
 		.orderBy(desc(payment.paidAt));
+}
+
+function prevPeriod(endISO: string, interval: string) {
+	const d = new Date(`${endISO}T00:00:00Z`);
+	if (interval === 'week') d.setUTCDate(d.getUTCDate() - 7);
+	else if (interval === 'year') d.setUTCFullYear(d.getUTCFullYear() - 1);
+	else d.setUTCMonth(d.getUTCMonth() - 1);
+	return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Bills (or credits) the price difference for the remainder of the current
+ * period when a membership changes plan mid-cycle. An upgrade posts an
+ * `other` charge due today; a downgrade records a `credit`-method payment
+ * that applies against open charges (leftover = account credit) — kept out
+ * of revenue sums like `gift_card`, since it isn't money received. Uses the
+ * staff price override as the old rate when one is set. Returns the signed
+ * amount posted, or 0 when the membership isn't mid-period.
+ */
+export async function proratePlanChange(
+	ctx: { orgId: string; userId?: string | null },
+	ms: { memberId: string; nextChargeAt: Date | null; price: number | null },
+	oldPlan: { name: string; amount: number; interval: string },
+	newPlan: { name: string; amount: number }
+) {
+	if (!ms.nextChargeAt) return 0;
+	const today = todayISO();
+	const periodEnd = ms.nextChargeAt.toISOString().slice(0, 10);
+	const [last] = await db
+		.select({ periodStart: charge.periodStart })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, ctx.orgId),
+				eq(charge.memberId, ms.memberId),
+				eq(charge.kind, 'membership'),
+				isNotNull(charge.periodStart)
+			)
+		)
+		.orderBy(desc(charge.periodStart))
+		.limit(1);
+	const periodStart = last?.periodStart ?? prevPeriod(periodEnd, oldPlan.interval);
+	const daysInPeriod = Math.max(
+		1,
+		Math.round((Date.parse(periodEnd) - Date.parse(periodStart)) / 86_400_000)
+	);
+	const daysLeft = Math.min(
+		daysInPeriod,
+		Math.max(0, Math.round((Date.parse(periodEnd) - Date.parse(today)) / 86_400_000))
+	);
+	if (daysLeft <= 0) return 0;
+	const diff = Math.round(
+		((newPlan.amount - (ms.price ?? oldPlan.amount)) * daysLeft) / daysInPeriod
+	);
+	if (diff > 0) {
+		await addCharge(ctx, {
+			memberId: ms.memberId,
+			kind: 'other',
+			description: `Plan change ${oldPlan.name} → ${newPlan.name} (${daysLeft}d remaining)`,
+			amount: diff,
+			dueDate: today
+		});
+	} else if (diff < 0) {
+		await recordPayment(
+			ctx,
+			{
+				memberId: ms.memberId,
+				amount: -diff,
+				method: 'credit',
+				notes: `Plan change credit ${oldPlan.name} → ${newPlan.name} (${daysLeft}d remaining)`
+			},
+			{ silent: true }
+		);
+	}
+	return diff;
 }

@@ -1,4 +1,18 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gt,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	ne,
+	notInArray,
+	sql
+} from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
@@ -150,7 +164,7 @@ async function revenueByMonth(orgId: string) {
 			and(
 				eq(payment.organizationId, orgId),
 				isNull(payment.refundedAt),
-				ne(payment.method, 'gift_card'),
+				notInArray(payment.method, ['gift_card', 'credit']),
 				gte(payment.paidAt, since)
 			)
 		)
@@ -192,7 +206,7 @@ async function revenueByKind(orgId: string) {
 			and(
 				eq(payment.organizationId, orgId),
 				isNull(payment.refundedAt),
-				ne(payment.method, 'gift_card'),
+				notInArray(payment.method, ['gift_card', 'credit']),
 				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
 			)
 		)

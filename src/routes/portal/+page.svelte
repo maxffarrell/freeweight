@@ -358,8 +358,14 @@
 	async function switchPlan(planId: string) {
 		joining = planId;
 		try {
-			await changePlan({ memberId, planId });
-			toast.success('Plan updated — your next bill reflects the new price');
+			const r = await changePlan({ memberId, planId });
+			toast.success(
+				r.prorated > 0
+					? `Plan updated — a ${formatMoney(r.prorated, currency)} proration is on your balance`
+					: r.prorated < 0
+						? `Plan updated — ${formatMoney(-r.prorated, currency)} credit applied`
+						: 'Plan updated — your next bill reflects the new price'
+			);
 			changeOpen = false;
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not change plan'));

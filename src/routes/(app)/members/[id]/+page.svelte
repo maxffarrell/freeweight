@@ -12,6 +12,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -407,6 +408,7 @@
 	// Custom recurring price override (cents); null field + prior override = clear.
 	let planChangePrice = $state<number | null>(null);
 	let planChangeHadPrice = $state(false);
+	let planChangeProrate = $state(false);
 	async function submitPlanChange(e: SubmitEvent) {
 		e.preventDefault();
 		const price = planChangePrice != null ? planChangePrice : planChangeHadPrice ? null : undefined;
@@ -416,6 +418,7 @@
 			await updateMembership({
 				id: planChangeId,
 				planId: planChangePlanId || undefined,
+				prorate: planChangePlanId ? planChangeProrate : undefined,
 				price
 			});
 			toast.success('Membership updated');
@@ -834,6 +837,7 @@
 											(planChangePlanId = ''),
 											(planChangePrice = mm.membership.price),
 											(planChangeHadPrice = mm.membership.price != null),
+											(planChangeProrate = false),
 											(planOpen = true)
 										)}>Plan</Button
 									>
@@ -1272,8 +1276,9 @@
 		<Dialog.Header>
 			<Dialog.Title>Change plan or price</Dialog.Title>
 			<Dialog.Description>
-				Changes apply from the next charge — no proration. Set a custom price to bill this member
-				something other than the plan's list price.
+				Changes apply from the next charge — turn on proration to also settle the price difference
+				for the rest of this period now. Set a custom price to bill this member something other than
+				the plan's list price.
 			</Dialog.Description>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitPlanChange}>
@@ -1299,6 +1304,15 @@
 					<p class="text-xs text-muted-foreground">Saving clears the custom price.</p>
 				{/if}
 			</Field.Field>
+			{#if planChangePlanId}
+				<label class="flex items-center gap-3 text-sm">
+					<Switch bind:checked={planChangeProrate} />
+					<span>
+						Prorate this change — posts the price difference for the rest of the period as a charge
+						(upgrade) or account credit (downgrade).
+					</span>
+				</label>
+			{/if}
 			<Dialog.Footer>
 				<Button
 					type="submit"

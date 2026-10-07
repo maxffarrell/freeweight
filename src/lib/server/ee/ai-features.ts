@@ -1,6 +1,6 @@
 /* @license Enterprise */
 
-import { and, eq, gte, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -93,7 +93,7 @@ export async function gymInsights(orgId: string, tz: string): Promise<string[]> 
 			and(
 				eq(payment.organizationId, orgId),
 				sql`${payment.refundedAt} is null`,
-				ne(payment.method, 'gift_card')
+				notInArray(payment.method, ['gift_card', 'credit'])
 			)
 		);
 
