@@ -201,20 +201,26 @@
 		audPlan ? (audiencePlans.find((p) => p.id === audPlan)?.name ?? 'plan') : ''
 	);
 	const audLabel = $derived(
-		emailAudience === '__all'
-			? 'All active members'
-			: audTag
-				? `Tag: ${audTag}`
-				: `Plan: ${audPlanName}`
+		emailAudience === '__sel'
+			? `Selected members (${selected.size})`
+			: emailAudience === '__all'
+				? 'All active members'
+				: audTag
+					? `Tag: ${audTag}`
+					: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
-		emailOpen ? await getAnnouncementAudience({ tag: audTag, planId: audPlan }) : null
+		emailAudience === '__sel'
+			? selected.size
+			: emailOpen
+				? await getAnnouncementAudience({ tag: audTag, planId: audPlan })
+				: null
 	);
 	async function submitAnnouncement(e: SubmitEvent) {
 		e.preventDefault();
 		emailPending = true;
 		try {
-			if (emailSendAt) {
+			if (emailSendAt && emailAudience !== '__sel') {
 				await scheduleEmail({
 					subject: emailSubject,
 					message: emailBody,
@@ -228,7 +234,8 @@
 					subject: emailSubject,
 					message: emailBody,
 					tag: audTag,
-					planId: audPlan
+					planId: audPlan,
+					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
 			}
@@ -267,7 +274,14 @@
 			><Upload /> Import</Button
 		>
 		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
-		<Button size="sm" variant="outline" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
+		<Button
+			size="sm"
+			variant="outline"
+			onclick={() => {
+				emailAudience = selected.size ? '__sel' : '__all';
+				emailOpen = true;
+			}}><Mail /> Email</Button
+		>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
 </PageHeader>
@@ -560,7 +574,7 @@
 			</div>
 		{/if}
 		<form class="space-y-4" onsubmit={submitAnnouncement}>
-			{#if allTags.length || audiencePlans.length}
+			{#if allTags.length || audiencePlans.length || selected.size}
 				<Field.Field>
 					<Field.Label for="a-audience">Audience</Field.Label>
 					<Select.Root type="single" bind:value={emailAudience}>
@@ -568,6 +582,9 @@
 							{audLabel}
 						</Select.Trigger>
 						<Select.Content>
+							{#if selected.size}
+								<Select.Item value="__sel">Selected members ({selected.size})</Select.Item>
+							{/if}
 							<Select.Item value="__all">All active members</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
@@ -583,11 +600,13 @@
 				<Field.Label for="a-subject">Subject</Field.Label>
 				<Input id="a-subject" required bind:value={emailSubject} autofocus />
 			</Field.Field>
-			<Field.Field>
-				<Field.Label for="a-sendat">Send at (optional)</Field.Label>
-				<Input id="a-sendat" type="datetime-local" bind:value={emailSendAt} />
-				<Field.Description>Leave blank to send right away.</Field.Description>
-			</Field.Field>
+			{#if emailAudience !== '__sel'}
+				<Field.Field>
+					<Field.Label for="a-sendat">Send at (optional)</Field.Label>
+					<Input id="a-sendat" type="datetime-local" bind:value={emailSendAt} />
+					<Field.Description>Leave blank to send right away.</Field.Description>
+				</Field.Field>
+			{/if}
 			<Field.Field>
 				<Field.Label for="a-body">Message</Field.Label>
 				<Textarea
@@ -619,11 +638,13 @@
 					<Button type="submit" disabled={emailPending || audienceCount === 0}>
 						{emailPending
 							? 'Sending…'
-							: emailSendAt
+							: emailSendAt && emailAudience !== '__sel'
 								? 'Schedule'
 								: emailAudience === '__all'
 									? 'Send to all members'
-									: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
+									: emailAudience === '__sel'
+										? `Send to ${selected.size} selected`
+										: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
 					</Button>
 				</div></Dialog.Footer
 			>
