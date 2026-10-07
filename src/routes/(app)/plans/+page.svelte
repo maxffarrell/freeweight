@@ -56,6 +56,7 @@
 	let commitmentMonths = $state<number | null>(null);
 	let memberLimit = $state<number | null>(null);
 	let bookAheadDays = $state<number | null>(null);
+	let grandfather = $state(false);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -76,6 +77,7 @@
 		bookAheadDays = p.bookAheadDays;
 		listed = p.listed;
 		active = p.active;
+		grandfather = false;
 		open = true;
 	}
 	function resetNew() {
@@ -93,6 +95,7 @@
 		memberLimit = null;
 		bookAheadDays = null;
 		listed = active = true;
+		grandfather = false;
 	}
 
 	async function submit(e: SubmitEvent) {
@@ -117,7 +120,8 @@
 					memberLimit: isPack ? null : memberLimit || null,
 					bookAheadDays: isPack ? null : bookAheadDays || null,
 					listed,
-					active
+					active,
+					grandfatherPrice: grandfather || undefined
 				});
 				toast.success('Plan updated');
 			} else {
@@ -517,6 +521,15 @@
 				<span>Active</span>
 				<Switch bind:checked={active} />
 			</div>
+			{#if editing && !isPack && amount != null && amount !== editing.amount}
+				<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+					<span
+						>Keep current members at {formatMoney(editing.amount, currency)}
+						— only new joins pay {formatMoney(amount, currency)}</span
+					>
+					<Switch bind:checked={grandfather} />
+				</div>
+			{/if}
 			<Dialog.Footer
 				><Button type="submit" disabled={pending || amount == null}
 					>{editing ? 'Save' : 'Create plan'}</Button

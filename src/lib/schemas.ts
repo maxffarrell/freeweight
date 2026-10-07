@@ -70,7 +70,12 @@ export const planInput = v.object({
 	listed: v.optional(v.boolean(), true),
 	active: v.optional(v.boolean(), true)
 });
-export const planUpdate = v.object({ id: idSchema, ...v.partial(planInput).entries });
+export const planUpdate = v.object({
+	id: idSchema,
+	...v.partial(planInput).entries,
+	/** On a price change: lock current members' recurring rate instead of repricing them. */
+	grandfatherPrice: v.optional(v.boolean())
+});
 
 export const membershipInput = v.object({
 	memberId: idSchema,
