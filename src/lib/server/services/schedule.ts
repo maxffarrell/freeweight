@@ -57,7 +57,7 @@ import {
 	notifyWaitlistPromoted,
 	sendCoverRequests
 } from './notifications.ts';
-import { addDays, localDate, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { nextPeriod } from './billing.ts';
 import { getSettings } from './settings.ts';
@@ -159,6 +159,99 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 			)
 		)
 		.orderBy(asc(classSession.startsAt));
+}
+
+export type DemandHint = {
+	kind: 'add' | 'drop';
+	classTypeId: string;
+	className: string;
+	color: string | null;
+	weekday: number;
+	/** Mode start time, `HH:MM` in the gym's timezone. */
+	time: string;
+	avgFill: number;
+	sessions: number;
+};
+
+/**
+ * Demand signals for the schedule: class/weekday pairs that ran at least `minRuns`
+ * times in the last `weeks` and average ≥85% full (suggest adding a session) or
+ * ≤30% full (suggest dropping/merging). Fill counts every non-cancelled booking —
+ * attended + no-show + still-booked + still-waitlisted.
+ */
+export async function scheduleDemandHints(orgId: string, tz: string, weeks = 6) {
+	const rows = await db
+		.select({
+			classTypeId: classSession.classTypeId,
+			className: classType.name,
+			color: classType.color,
+			startsAt: classSession.startsAt,
+			capacity: classSession.capacity,
+			demand:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status <> 'cancelled')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date(Date.now() - weeks * 7 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		);
+	type Group = {
+		className: string;
+		color: string | null;
+		weekday: number;
+		sessions: number;
+		fillSum: number;
+		times: Map<string, number>;
+	};
+	const groups = new Map<string, Group>();
+	for (const r of rows) {
+		const weekday = localWeekday(r.startsAt, tz);
+		const key = `${r.classTypeId}:${weekday}`;
+		const g =
+			groups.get(key) ??
+			groups
+				.set(key, {
+					className: r.className,
+					color: r.color,
+					weekday,
+					sessions: 0,
+					fillSum: 0,
+					times: new Map()
+				})
+				.get(key)!;
+		g.sessions++;
+		g.fillSum += Math.min(100, Math.round((r.demand / Math.max(1, r.capacity)) * 100));
+		const t = localTime(r.startsAt, tz);
+		g.times.set(t, (g.times.get(t) ?? 0) + 1);
+	}
+	const hints: DemandHint[] = [];
+	for (const [key, g] of groups) {
+		const avgFill = Math.round(g.fillSum / g.sessions);
+		const kind =
+			avgFill >= 85 && g.sessions >= 3 ? 'add' : avgFill <= 30 && g.sessions >= 4 ? 'drop' : null;
+		if (!kind) continue;
+		const time = [...g.times.entries()].sort((a, b) => b[1] - a[1])[0][0];
+		hints.push({
+			kind,
+			classTypeId: key.split(':')[0],
+			className: g.className,
+			color: g.color,
+			weekday: g.weekday,
+			time,
+			avgFill,
+			sessions: g.sessions
+		});
+	}
+	return hints.sort((a, b) =>
+		a.kind === b.kind ? b.avgFill - a.avgFill : a.kind === 'add' ? -1 : 1
+	);
 }
 
 /**

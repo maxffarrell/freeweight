@@ -46,7 +46,8 @@
 		registerMemberForEvent,
 		cancelEventRegistration,
 		setEventAttended,
-		cancelEvent
+		cancelEvent,
+		getScheduleHints
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -61,6 +62,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
+	import Flame from '@lucide/svelte/icons/flame';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -73,6 +75,7 @@
 	const templates = $derived(await getTemplates());
 	const resources = $derived(await getResources());
 	const amenityBookings = $derived(await getResourceBookings());
+	const hints = $derived(await getScheduleHints());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
@@ -494,6 +497,9 @@
 		}
 	}
 
+	// ------- demand hints -------
+	let hintsOpen = $state(false);
+
 	// ------- amenities (bookable resources) -------
 	let resOpen = $state(false);
 	let rName = $state('');
@@ -654,6 +660,12 @@
 			><Plus /> Class type</Button
 		>
 		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
+		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}
+			><Flame /> Demand{#if hints.length}
+				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
+					>{hints.length}</span
+				>{/if}</Button
+		>
 		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 	{/snippet}
@@ -1873,5 +1885,53 @@
 				<Button type="submit" disabled={pending}>Create event</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={hintsOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Demand hints</Dialog.Title>
+			<Dialog.Description>
+				Class/weekday pairs that consistently fill or empty over the last 6 weeks — where to add
+				sessions and where to trim.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if hints.length}
+			<div class="max-h-96 divide-y overflow-y-auto rounded-lg border">
+				{#each hints as h (h.classTypeId + ':' + h.weekday)}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="min-w-0">
+							<span
+								class="mr-1.5 inline-block size-2.5 rounded-full"
+								style="background:{h.color ?? '#94a3b8'}"
+							></span>
+							<span class="font-medium">{h.className}</span>
+							<span class="text-muted-foreground">
+								· {WEEKDAYS[h.weekday]}s {h.time} · {h.sessions} sessions</span
+							>
+							<p class="text-xs text-muted-foreground">
+								{#if h.kind === 'add'}
+									Avg {h.avgFill}% full — consider adding another {h.className} that day.
+								{:else}
+									Avg {h.avgFill}% full — consider dropping or merging this slot.
+								{/if}
+							</p>
+						</div>
+						<span
+							class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {h.kind === 'add'
+								? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+								: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}"
+						>
+							{h.kind === 'add' ? 'Add' : 'Drop'}
+						</span>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-sm text-muted-foreground">
+				No strong signals yet — hints appear once a class/weekday runs 3+ times in the last 6 weeks.
+			</p>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
