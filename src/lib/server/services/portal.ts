@@ -660,6 +660,30 @@ export async function memberJoinPlan(orgId: string, memberId: string, planId: st
 }
 
 /**
+ * Member buys a one-off class pack from the portal. Stacks alongside any
+ * membership (unlike plans, which are exclusive) — the pack's single charge
+ * posts to their balance and is paid via the normal portal checkout.
+ */
+export async function memberBuyPack(orgId: string, memberId: string, planId: string) {
+	const p = await getPlan(orgId, planId);
+	if (!p.active || !p.listed || !p.isPack) error(404, 'Pack not available');
+	const [existing] = await db
+		.select({ id: membership.id })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.planId, planId),
+				eq(membership.status, 'active')
+			)
+		)
+		.limit(1);
+	if (existing) error(409, 'You already have this pack');
+	return createMembership({ orgId }, { memberId, planId });
+}
+
+/**
  * Member switches their active membership to another listed plan from the
  * portal. Takes effect immediately for access/credits; billing reads the plan
  * at charge time, so the next scheduled bill is at the new price (no

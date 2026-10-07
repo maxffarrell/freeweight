@@ -26,6 +26,7 @@
 		resubscribe,
 		getJoinablePlans,
 		joinPlan,
+		buyPack,
 		changePlan,
 		updateProfile
 	} from '#lib/remote/portal.remote.ts';
@@ -45,6 +46,14 @@
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
+	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
+	const buyablePacks = $derived(
+		joinablePlans.filter(
+			(p) =>
+				p.isPack &&
+				!d.memberships.some((mm) => mm.plan.id === p.id && mm.membership.status === 'active')
+		)
+	);
 	let joining = $state('');
 	async function join(planId: string) {
 		joining = planId;
@@ -53,6 +62,16 @@
 			toast.success('Membership activated — pay any open balance below');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not join plan'));
+		}
+		joining = '';
+	}
+	async function buy(planId: string) {
+		joining = planId;
+		try {
+			await buyPack({ memberId, planId });
+			toast.success('Pack added — pay it off below');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not buy the pack'));
 		}
 		joining = '';
 	}
@@ -359,6 +378,29 @@
 									variant="outline"
 									disabled={joining === p.id}
 									onclick={() => join(p.id)}>{joining === p.id ? 'Joining…' : 'Join'}</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
+				{#if d.memberships.some((mm) => mm.membership.status === 'active') && buyablePacks.length}
+					<div class="mt-2 w-full space-y-1.5">
+						<p class="text-xs font-medium text-muted-foreground">Class packs</p>
+						{#each buyablePacks as p (p.id)}
+							<div class="flex items-center justify-between gap-2 text-sm">
+								<div class="min-w-0">
+									<span class="font-medium">{p.name}</span>
+									<span class="text-muted-foreground">
+										— {formatMoney(p.amount, currency)} · {p.classCredits} classes{p.packDays
+											? ` · expires in ${p.packDays} days`
+											: ''}
+									</span>
+								</div>
+								<Button
+									size="sm"
+									variant="outline"
+									disabled={joining === p.id}
+									onclick={() => buy(p.id)}>{joining === p.id ? 'Adding…' : 'Buy'}</Button
 								>
 							</div>
 						{/each}

@@ -186,6 +186,18 @@ export const joinPlan = command(
 	}
 );
 
+/** Member buys a class pack — stacks on top of a regular membership. */
+export const buyPack = command(
+	v.object({ memberId: idSchema, planId: idSchema }),
+	async ({ memberId, planId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.memberBuyPack(m.organizationId, m.id, planId);
+		void getPortalOverview(memberId).refresh();
+		void getJoinablePlans(memberId).refresh();
+		return r;
+	}
+);
+
 export const changePlan = command(
 	v.object({ memberId: idSchema, planId: idSchema }),
 	async ({ memberId, planId }) => {
