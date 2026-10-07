@@ -160,3 +160,41 @@ export async function dashboard(orgId: string) {
 		pendingRequests
 	};
 }
+
+/**
+ * Full audit feed for the Activity page: newest first, cursor-paginated by
+ * `before` (createdAt of the last row on the previous page), optionally
+ * filtered to one entityType. Actor names come from a left join on auth users.
+ */
+export async function listActivity(orgId: string, entityType?: string, before?: string) {
+	return db
+		.select({
+			id: activity.id,
+			entityType: activity.entityType,
+			entityId: activity.entityId,
+			action: activity.action,
+			summary: activity.summary,
+			createdAt: activity.createdAt,
+			actorName: user.name
+		})
+		.from(activity)
+		.leftJoin(user, eq(activity.actorId, user.id))
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				entityType ? eq(activity.entityType, entityType) : undefined,
+				before ? lt(activity.createdAt, new Date(before)) : undefined
+			)
+		)
+		.orderBy(desc(activity.createdAt))
+		.limit(51);
+}
+
+/** Distinct entity types present in the org's activity — feeds the page filter. */
+export async function listActivityTypes(orgId: string) {
+	const rows = await db
+		.selectDistinct({ entityType: activity.entityType })
+		.from(activity)
+		.where(eq(activity.organizationId, orgId));
+	return rows.map((r) => r.entityType).sort();
+}
