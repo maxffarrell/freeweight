@@ -21,7 +21,8 @@
 		getMyDocuments,
 		resubscribe,
 		getJoinablePlans,
-		joinPlan
+		joinPlan,
+		changePlan
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -47,6 +48,18 @@
 			toast.success('Membership activated — pay any open balance below');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not join plan'));
+		}
+		joining = '';
+	}
+	let changeOpen = $state(false);
+	async function switchPlan(planId: string) {
+		joining = planId;
+		try {
+			await changePlan({ memberId, planId });
+			toast.success('Plan updated — your next bill reflects the new price');
+			changeOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not change plan'));
 		}
 		joining = '';
 	}
@@ -237,6 +250,12 @@
 									>Withdraw request</button
 								>
 							{:else}
+								{#if !mm.plan.isPack && joinablePlans.some((p) => !p.isPack && p.id !== mm.plan.id)}
+									<button class="underline" onclick={() => (changeOpen = !changeOpen)}
+										>Change plan</button
+									>
+									·
+								{/if}
 								<button class="underline" onclick={() => requestCancel(mm.membership.id)}
 									>Request cancellation of {mm.plan.name}</button
 								>
@@ -244,6 +263,32 @@
 						</p>
 					{/if}
 				{/each}
+				{#if changeOpen}
+					<div class="mt-2 w-full space-y-1.5">
+						<p class="text-xs font-medium text-muted-foreground">
+							Switch plans — takes effect now, billed at your next charge
+						</p>
+						{#each joinablePlans.filter((p) => !p.isPack && !d.memberships.some((mm) => mm.plan.id === p.id && mm.membership.status === 'active')) as p (p.id)}
+							<div class="flex items-center justify-between gap-2 text-sm">
+								<div class="min-w-0">
+									<span class="font-medium">{p.name}</span>
+									<span class="text-muted-foreground">
+										— {formatMoney(p.amount, currency)}/{p.interval}{p.classCredits
+											? ` · ${p.classCredits} classes`
+											: ''}{p.trialDays ? ` · ${p.trialDays}-day free trial` : ''}
+									</span>
+								</div>
+								<Button
+									size="sm"
+									variant="outline"
+									disabled={joining === p.id}
+									onclick={() => switchPlan(p.id)}
+									>{joining === p.id ? 'Switching…' : 'Switch'}</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		</Card.Content>
 	</Card.Root>

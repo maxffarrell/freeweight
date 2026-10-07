@@ -26,7 +26,7 @@ import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
 import { emit } from './events.ts';
-import { notifyCancellationRequested } from './notifications.ts';
+import { notifyCancellationRequested, notifyPlanChanged } from './notifications.ts';
 import { localDate } from '#lib/tz.ts';
 
 const TTL_MS = 14 * 86400_000;
@@ -434,19 +434,22 @@ export async function resubscribe(memberId: string) {
 
 /**
  * Member self-joins a plan from the portal — the same plans the public join
- * page offers (active + listed). Refuses when an active membership already
- * exists; plan changes stay a staff action. Resulting charges appear on the
- * member's balance and are paid via the normal portal checkout.
+ * page offers (active + listed). Refuses when an active (non-pack) membership
+ * already exists — a pack holder can still join a plan; members with a plan
+ * use memberChangePlan instead. Resulting charges appear on the member's
+ * balance and are paid via the normal portal checkout.
  */
 export async function memberJoinPlan(orgId: string, memberId: string, planId: string) {
 	const [active] = await db
 		.select({ id: membership.id })
 		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
 				eq(membership.memberId, memberId),
-				eq(membership.status, 'active')
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
 			)
 		)
 		.limit(1);
@@ -454,4 +457,45 @@ export async function memberJoinPlan(orgId: string, memberId: string, planId: st
 	const p = await getPlan(orgId, planId);
 	if (!p.active || !p.listed) error(404, 'Plan not available');
 	return createMembership({ orgId }, { memberId, planId });
+}
+
+/**
+ * Member switches their active membership to another listed plan from the
+ * portal. Takes effect immediately for access/credits; billing reads the plan
+ * at charge time, so the next scheduled bill is at the new price (no
+ * proration, no signup fee, no new trial). Packs are excluded — a pack is a
+ * one-time purchase, not a switchable plan.
+ */
+export async function memberChangePlan(orgId: string, memberId: string, planId: string) {
+	const [ms] = await db
+		.select({ membership, plan })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		)
+		.limit(1);
+	if (!ms) error(409, 'No active membership to change');
+	const p = await getPlan(orgId, planId);
+	if (!p.active || !p.listed || p.isPack) error(404, 'Plan not available');
+	if (ms.plan.id === planId) error(409, 'Already on this plan');
+	const [row] = await db
+		.update(membership)
+		.set({ planId })
+		.where(eq(membership.id, ms.membership.id))
+		.returning();
+	await emit({
+		orgId,
+		entityType: 'membership',
+		entityId: ms.membership.id,
+		action: 'plan_changed',
+		summary: `Plan changed from ${ms.plan.name} to ${p.name} (member self-serve)`
+	});
+	notifyPlanChanged(orgId, ms.membership.id, ms.plan.name).catch(() => {});
+	return row;
 }

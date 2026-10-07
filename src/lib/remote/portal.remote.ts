@@ -138,3 +138,13 @@ export const joinPlan = command(
 		return r;
 	}
 );
+
+export const changePlan = command(
+	v.object({ memberId: idSchema, planId: idSchema }),
+	async ({ memberId, planId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.memberChangePlan(m.organizationId, m.id, planId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);

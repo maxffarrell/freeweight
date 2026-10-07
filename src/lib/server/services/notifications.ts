@@ -995,3 +995,46 @@ export async function sendWeeklyDigest(orgId: string) {
 	}
 	return sent;
 }
+
+/**
+ * "Your plan changed" — member-facing confirmation when a member switches plans
+ * from the portal. No dedupe: every switch is a real event worth confirming.
+ */
+export async function notifyPlanChanged(orgId: string, membershipId: string, oldPlanName: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			planName: plan.name,
+			amount: plan.amount,
+			interval: plan.interval,
+			nextChargeAt: membership.nextChargeAt
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
+	if (!row?.email) return;
+	const [name, st, tz] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1),
+		orgTimezone(orgId)
+	]);
+	const lines = [
+		`Hi ${row.memberName} — your membership at ${name} switched from ${oldPlanName} to ${row.planName}.`,
+		row.nextChargeAt
+			? `Your next bill on ${localDate(row.nextChargeAt, tz)} will be ${formatMoney(row.amount, st[0]?.currency ?? 'usd')}/${row.interval}.`
+			: `Your new rate is ${formatMoney(row.amount, st[0]?.currency ?? 'usd')}/${row.interval}.`
+	];
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Your plan changed: ${row.planName} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: `You're on ${row.planName} now`,
+			lines,
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
