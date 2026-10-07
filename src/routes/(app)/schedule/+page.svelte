@@ -130,9 +130,10 @@
 			toast.error(errMsg(err, 'Could not book'));
 		}
 	}
-	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show') {
+	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show' | 'booked') {
 		try {
 			await updateBooking({ id, status });
+			if (status === 'booked') toast.success('Promoted to booked');
 			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
@@ -483,6 +484,14 @@
 										size="sm"
 										class="h-7 px-2 text-xs"
 										onclick={() => setBooking(r.booking.id, 'no_show')}>No-show</Button
+									>
+								{/if}
+								{#if r.booking.status === 'waitlisted'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() => setBooking(r.booking.id, 'booked')}>Promote</Button
 									>
 								{/if}
 								<Button
