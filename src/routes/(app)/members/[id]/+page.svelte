@@ -40,9 +40,11 @@
 	const currency = $derived(await getCurrency());
 	const tz = settings.timezone;
 
-	const balance = m.charges
-		.filter((c) => c.charge.status === 'open')
-		.reduce((sum, c) => sum + c.charge.amount - c.paid, 0);
+	const balance = $derived(
+		m.charges
+			.filter((c) => c.charge.status === 'open')
+			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
+	);
 
 	// ------- edit member -------
 	let editOpen = $state(false);
