@@ -159,6 +159,14 @@ export const checkOut = command(idSchema, async (checkInId) => {
 	return row;
 });
 
+/** Desk undo for a mis-scan — deletes the row and reverts that day's auto-attend. */
+export const voidCheckIn = command(idSchema, async (checkInId) => {
+	const ctx = await requireOrg();
+	const r = await checkins.voidCheckIn(ctx, checkInId);
+	void getTodayCheckIns().refresh();
+	return r;
+});
+
 export const logGuestVisit = command(guestVisitInput, async (input) => {
 	const r = await checkins.recordGuestVisit(await requireOrg(), input);
 	void getTodayCheckIns().refresh();

@@ -7,7 +7,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getCheckIns, recordCheckIn } from '#lib/remote/members.remote.ts';
+	import { getCheckIns, recordCheckIn, voidCheckIn } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
@@ -36,6 +36,16 @@
 	function search() {
 		clearTimeout(searchTimer);
 		searchTimer = setTimeout(() => void refilter(), 250);
+	}
+	async function voidRow(id: string) {
+		if (!confirm('Void this check-in? Same-day attendance marks revert too.')) return;
+		try {
+			await voidCheckIn(id);
+			toast.success('Check-in voided');
+			await refilter();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not void'));
+		}
 	}
 
 	let code = $state('');
@@ -208,13 +218,21 @@
 								></Table.Cell
 							>
 							<Table.Cell class="text-right"
-								>{#if c.checkIn.checkedOutAt}
-									<span class="text-muted-foreground"
-										>out {localTime(c.checkIn.checkedOutAt, settings.timezone)}</span
+								><div class="flex items-center justify-end gap-1">
+									{#if c.checkIn.checkedOutAt}
+										<span class="text-muted-foreground"
+											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)}</span
+										>
+									{:else}
+										<Badge variant="default">In</Badge>
+									{/if}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs"
+										onclick={() => voidRow(c.checkIn.id)}>Void</Button
 									>
-								{:else}
-									<Badge variant="default">In</Badge>
-								{/if}</Table.Cell
+								</div></Table.Cell
 							>
 						</Table.Row>
 					{:else}

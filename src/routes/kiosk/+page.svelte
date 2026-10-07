@@ -8,6 +8,7 @@
 		getTodayCheckIns,
 		recordCheckIn,
 		checkOut,
+		voidCheckIn,
 		getMembers,
 		getUpNext,
 		createMember,
@@ -235,6 +236,17 @@
 		}
 	}
 
+	async function voidRow(id: string) {
+		if (!confirm('Void this check-in? Same-day attendance marks revert too.')) return;
+		try {
+			await voidCheckIn(id);
+			checkIns = await getTodayCheckIns();
+			showFlash(true, 'Check-in voided');
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Could not void'));
+		}
+	}
+
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (pending || !code.trim()) return;
@@ -458,6 +470,12 @@
 										onclick={() => checkOutRow(c.checkIn.id)}>Check out</Button
 									>
 								{/if}
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-6 px-2 text-xs"
+									onclick={() => voidRow(c.checkIn.id)}>Void</Button
+								>
 							</span>
 						</div>
 					{/each}
