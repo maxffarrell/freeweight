@@ -1,5 +1,18 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	getTableColumns,
+	gt,
+	gte,
+	inArray,
+	isNull,
+	lt,
+	or,
+	sql
+} from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -229,14 +242,21 @@ export async function updateSession(
 
 async function activeMembership(orgId: string, memberId: string) {
 	const [row] = await db
-		.select({ membership, classCredits: plan.classCredits, interval: plan.interval })
+		.select({
+			membership,
+			classCredits: plan.classCredits,
+			interval: plan.interval,
+			isPack: plan.isPack
+		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
 				eq(membership.memberId, memberId),
-				eq(membership.status, 'active')
+				eq(membership.status, 'active'),
+				// Expired packs stop granting bookings.
+				or(isNull(membership.endsAt), gt(membership.endsAt, new Date()))
 			)
 		)
 		.orderBy(desc(membership.createdAt))
@@ -250,7 +270,8 @@ const CREDIT_STATUSES = ['booked', 'attended', 'no_show'] as const;
 type ActiveMembership = {
 	classCredits: number | null;
 	interval: 'week' | 'month' | 'year';
-	membership: { startsAt: Date };
+	isPack: boolean;
+	membership: { startsAt: Date; endsAt: Date | null };
 };
 
 /** Current rolling membership period: startsAt stepped forward on the plan's interval. */
@@ -259,6 +280,17 @@ function periodWindow(startsAt: Date, interval: 'week' | 'month' | 'year') {
 	const today = new Date().toISOString().slice(0, 10);
 	while (nextPeriod(start, interval) <= today) start = nextPeriod(start, interval);
 	return { start, end: nextPeriod(start, interval) };
+}
+
+/** Credit-counting window: a pack counts bookings from purchase to expiry. */
+function creditWindow(ms: ActiveMembership) {
+	if (ms.isPack) {
+		return {
+			start: ms.membership.startsAt.toISOString().slice(0, 10),
+			end: (ms.membership.endsAt ?? new Date()).toISOString().slice(0, 10)
+		};
+	}
+	return periodWindow(ms.membership.startsAt, ms.interval);
 }
 
 async function creditsUsedIn(
@@ -291,23 +323,21 @@ async function creditsUsedIn(
 export async function creditUsage(orgId: string, memberId: string) {
 	const ms = await activeMembership(orgId, memberId);
 	if (!ms || ms.classCredits == null) return null;
-	const used = await creditsUsedIn(
-		orgId,
-		memberId,
-		periodWindow(ms.membership.startsAt, ms.interval)
-	);
+	const used = await creditsUsedIn(orgId, memberId, creditWindow(ms));
 	return { used, limit: ms.classCredits };
 }
 
 /** 402s when the member's plan caps classes per period and they've used them. */
 async function assertCreditAvailable(orgId: string, memberId: string, ms: ActiveMembership) {
 	if (ms.classCredits == null) return;
-	const used = await creditsUsedIn(
-		orgId,
-		memberId,
-		periodWindow(ms.membership.startsAt, ms.interval)
-	);
-	if (used >= ms.classCredits) error(402, `All ${ms.classCredits} classes used for this period`);
+	const used = await creditsUsedIn(orgId, memberId, creditWindow(ms));
+	if (used >= ms.classCredits)
+		error(
+			402,
+			ms.isPack
+				? `All ${ms.classCredits} classes used in this pack`
+				: `All ${ms.classCredits} classes used for this period`
+		);
 }
 
 /**

@@ -143,7 +143,12 @@ export async function createMembership(
 			memberId: input.memberId,
 			planId: input.planId,
 			startsAt: new Date(`${start}T00:00:00Z`),
-			nextChargeAt: new Date(`${nextPeriod(start, p.interval)}T00:00:00Z`)
+			// Packs bill once up front and expire packDays later; no recurring charge.
+			nextChargeAt: p.isPack ? null : new Date(`${nextPeriod(start, p.interval)}T00:00:00Z`),
+			endsAt:
+				p.isPack && p.packDays
+					? new Date(new Date(`${start}T00:00:00Z`).getTime() + p.packDays * 86400_000)
+					: null
 		})
 		.returning();
 
@@ -436,7 +441,13 @@ export async function monthlyRecurring(orgId: string) {
 		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))
-		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		);
 	return Math.round(row?.mrr ?? 0);
 }
 

@@ -196,9 +196,9 @@
 						<div class="min-w-0">
 							<p class="truncate font-medium">{mm.planName}</p>
 							<p class="text-xs text-muted-foreground">
-								{formatMoney(mm.amount, currency)}/{mm.interval} · from {formatDate(
+								{formatMoney(mm.amount, currency)}{mm.isPack ? ' pack' : `/${mm.interval}`} · from {formatDate(
 									mm.membership.startsAt
-								)}
+								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}
 							</p>
 						</div>
 						<div class="flex items-center gap-2">

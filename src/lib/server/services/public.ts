@@ -155,14 +155,21 @@ async function signupCheckout(
 	orgId: string,
 	slug: string,
 	settings: { currency: string } | undefined,
-	p: { name: string; signupFee: number },
+	p: { name: string; signupFee: number; isPack: boolean; amount: number },
 	memberId: string,
 	email: string | null
 ) {
+	// A pack's whole price is paid up front alongside any signup fee.
+	const amount = p.signupFee + (p.isPack ? p.amount : 0);
 	return onlineCheckout(
 		orgId,
 		settings,
-		{ amount: p.signupFee, description: `Signup fee — ${p.name}`, memberId, email },
+		{
+			amount,
+			description: `${p.isPack ? 'Class pack' : 'Signup fee'} — ${p.name}`,
+			memberId,
+			email
+		},
 		{ success: `/j/${slug}?paid=1`, cancel: `/j/${slug}` }
 	);
 }

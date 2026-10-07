@@ -55,6 +55,8 @@ export const planInput = v.object({
 	interval: v.optional(v.picklist(planIntervals), 'month'),
 	signupFee: v.optional(cents, 0),
 	classCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	isPack: v.optional(v.boolean(), false),
+	packDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	listed: v.optional(v.boolean(), true),
 	active: v.optional(v.boolean(), true)
 });

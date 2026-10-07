@@ -152,16 +152,18 @@
 							</Card.Header>
 							<Card.Content class="space-y-2 px-6">
 								<p class="text-2xl font-semibold tabular-nums">
-									{formatMoney(p.amount, currency)}<span
-										class="text-sm font-normal text-muted-foreground">/{p.interval}</span
-									>
+									{formatMoney(p.amount, currency)}{#if p.isPack}<span
+											class="text-sm font-normal text-muted-foreground">one-time</span
+										>{:else}<span class="text-sm font-normal text-muted-foreground"
+											>/{p.interval}</span
+										>{/if}
 								</p>
 								<div class="flex flex-wrap gap-1.5">
 									{#if p.signupFee > 0}<Badge variant="outline"
 											>{formatMoney(p.signupFee, currency)} signup</Badge
 										>{/if}
 									{#if p.classCredits}<Badge variant="outline"
-											>{p.classCredits} classes/{p.interval}</Badge
+											>{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}</Badge
 										>{/if}
 								</div>
 							</Card.Content>
@@ -271,7 +273,9 @@
 												<Select.Item value="">Choose later</Select.Item>
 												{#each plans as p (p.id)}
 													<Select.Item value={p.id}
-														>{p.name} — {formatMoney(p.amount, currency)}/{p.interval}</Select.Item
+														>{p.name} — {formatMoney(p.amount, currency)}{p.isPack
+															? ' one-time'
+															: `/${p.interval}`}</Select.Item
 													>
 												{/each}
 											</Select.Content>

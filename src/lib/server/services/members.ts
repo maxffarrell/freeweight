@@ -66,7 +66,13 @@ export async function getMember(orgId: string, id: string) {
 	if (!row) error(404, 'Member not found');
 
 	const memberships = await db
-		.select({ membership, planName: plan.name, amount: plan.amount, interval: plan.interval })
+		.select({
+			membership,
+			planName: plan.name,
+			amount: plan.amount,
+			interval: plan.interval,
+			isPack: plan.isPack
+		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(and(eq(membership.organizationId, orgId), eq(membership.memberId, id)))

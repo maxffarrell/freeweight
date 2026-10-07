@@ -15,6 +15,13 @@
       "when": 1791343184898,
       "tag": "0001_old_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791345113106,
+      "tag": "0002_familiar_mongoose",
+      "breakpoints": true
     }
   ]
 }

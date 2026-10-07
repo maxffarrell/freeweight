@@ -31,6 +31,8 @@
 	let interval = $state<'week' | 'month' | 'year'>('month');
 	let signupFee = $state<number | null>(0);
 	let classCredits = $state<number | null>(null);
+	let isPack = $state(false);
+	let packDays = $state<number | null>(null);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -42,6 +44,8 @@
 		interval = p.interval;
 		signupFee = p.signupFee;
 		classCredits = p.classCredits;
+		isPack = p.isPack;
+		packDays = p.packDays;
 		listed = p.listed;
 		active = p.active;
 		open = true;
@@ -53,6 +57,8 @@
 		interval = 'month';
 		signupFee = 0;
 		classCredits = null;
+		isPack = false;
+		packDays = null;
 		listed = active = true;
 	}
 
@@ -70,6 +76,8 @@
 					interval,
 					signupFee: signupFee ?? 0,
 					classCredits: classCredits || null,
+					isPack,
+					packDays: isPack ? packDays || null : null,
 					listed,
 					active
 				});
@@ -82,6 +90,8 @@
 					interval,
 					signupFee: signupFee ?? 0,
 					classCredits: classCredits || null,
+					isPack,
+					packDays: isPack ? packDays || null : null,
 					listed,
 					active
 				});
@@ -122,11 +132,16 @@
 						<span class="text-2xl font-semibold tabular-nums"
 							>{formatMoney(p.amount, currency)}</span
 						>
-						<span class="text-sm text-muted-foreground">/ {p.interval}</span>
+						{#if p.isPack}<span class="text-sm text-muted-foreground">one-time</span>{:else}<span
+								class="text-sm text-muted-foreground">/ {p.interval}</span
+							>{/if}
 					</div>
 					<div class="flex flex-wrap gap-1.5 text-xs">
 						{#if p.signupFee > 0}<Badge variant="outline"
 								>{formatMoney(p.signupFee, currency)} signup</Badge
+							>{/if}
+						{#if p.isPack}<Badge variant="secondary"
+								>pack{p.packDays ? ` · ${p.packDays} days` : ''}</Badge
 							>{/if}
 						{#if p.classCredits}<Badge variant="outline">{p.classCredits} credits</Badge>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
@@ -179,17 +194,24 @@
 					<Field.Label>Price</Field.Label>
 					<MoneyInput bind:value={amount} required />
 				</Field.Field>
-				<Field.Field>
-					<Field.Label>Billed</Field.Label>
-					<Select.Root type="single" bind:value={interval}>
-						<Select.Trigger class="w-full">per {interval}</Select.Trigger>
-						<Select.Content>
-							{#each planIntervals as i (i)}
-								<Select.Item value={i}>per {i}</Select.Item>
-							{/each}
-						</Select.Content>
-					</Select.Root>
-				</Field.Field>
+				{#if isPack}
+					<Field.Field>
+						<Field.Label for="p-days">Valid for (days)</Field.Label>
+						<Input id="p-days" type="number" min={1} bind:value={packDays} placeholder="Never" />
+					</Field.Field>
+				{:else}
+					<Field.Field>
+						<Field.Label>Billed</Field.Label>
+						<Select.Root type="single" bind:value={interval}>
+							<Select.Trigger class="w-full">per {interval}</Select.Trigger>
+							<Select.Content>
+								{#each planIntervals as i (i)}
+									<Select.Item value={i}>per {i}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</Field.Field>
+				{/if}
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
@@ -197,7 +219,7 @@
 					<MoneyInput bind:value={signupFee} />
 				</Field.Field>
 				<Field.Field>
-					<Field.Label for="p-credits">Class credits / period</Field.Label>
+					<Field.Label for="p-credits">Class credits {isPack ? 'in pack' : '/ period'}</Field.Label>
 					<Input
 						id="p-credits"
 						type="number"
@@ -206,6 +228,10 @@
 						placeholder="Unlimited"
 					/>
 				</Field.Field>
+			</div>
+			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+				<span>Class pack — one-time purchase, no recurring billing</span>
+				<Switch bind:checked={isPack} />
 			</div>
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<span>Listed on public page</span>

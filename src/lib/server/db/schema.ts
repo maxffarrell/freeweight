@@ -117,6 +117,10 @@ export const plan = pgTable(
 		signupFee: integer('signup_fee').notNull().default(0),
 		/** Bookable classes per interval; null = unlimited. */
 		classCredits: integer('class_credits'),
+		/** One-time punch pass: sells `classCredits` classes for `amount`, no recurring billing. */
+		isPack: boolean('is_pack').notNull().default(false),
+		/** Days a pack stays valid after purchase; null = never expires. */
+		packDays: integer('pack_days'),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),
@@ -144,6 +148,8 @@ export const membership = pgTable(
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		/** When the next recurring membership charge should be posted. */
 		nextChargeAt: timestamp('next_charge_at', { withTimezone: true }),
+		/** Pack expiry; null = recurring membership or a pack that never expires. */
+		endsAt: timestamp('ends_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [
