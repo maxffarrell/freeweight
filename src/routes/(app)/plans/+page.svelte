@@ -21,15 +21,24 @@
 		createPromoCode,
 		updatePromoCode
 	} from '#lib/remote/billing.remote.ts';
+	import { getJoinInfo } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { planIntervals } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
+	import Link2 from '@lucide/svelte/icons/link-2';
 
 	const currency = await getCurrency();
+	const joinInfo = await getJoinInfo();
 	let plans = $state(await getPlans());
 	let promoCodes = $state(await getPromoCodes());
+
+	/** Copy the join page deep-link that preselects this plan (ads/campaigns). */
+	async function copyPlanLink(p: { id: string; name: string }) {
+		await navigator.clipboard.writeText(`${joinInfo.url}?plan=${p.id}`);
+		toast.success(`${p.name} join link copied`);
+	}
 
 	let open = $state(page.url.searchParams.get('new') === '1');
 	let editing = $state<(typeof plans)[number] | null>(null);
@@ -191,7 +200,17 @@
 						</Card.Title>
 						<Card.Description class="truncate">{p.description || '—'}</Card.Description>
 					</div>
-					<Button variant="ghost" size="icon" onclick={() => openEdit(p)}><Pencil /></Button>
+					<div class="flex shrink-0">
+						{#if p.listed && joinInfo.enabled}
+							<Button
+								variant="ghost"
+								size="icon"
+								title="Copy join-page link for {p.name}"
+								onclick={() => copyPlanLink(p)}><Link2 /></Button
+							>
+						{/if}
+						<Button variant="ghost" size="icon" onclick={() => openEdit(p)}><Pencil /></Button>
+					</div>
 				</Card.Header>
 				<Card.Content class="space-y-2 px-6">
 					<div class="flex items-baseline gap-1">
