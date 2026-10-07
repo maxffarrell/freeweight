@@ -26,7 +26,8 @@
 		deleteMemberNote,
 		getTags,
 		addMemberTag,
-		removeMemberTag
+		removeMemberTag,
+		emailAllMembers
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -44,6 +45,7 @@
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
+	import Mail from '@lucide/svelte/icons/mail';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import Upload from '@lucide/svelte/icons/upload';
@@ -195,6 +197,29 @@
 			editOpen = false;
 		} catch (err) {
 			toast.error(errMsg(err, 'Update failed'));
+		}
+		pending = false;
+	}
+
+	// ------- email -------
+	let emailOpen = $state(false);
+	let emailSubject = $state('');
+	let emailMessage = $state('');
+	async function sendEmailToMember(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await emailAllMembers({
+				subject: emailSubject,
+				message: emailMessage,
+				memberIds: [id]
+			});
+			toast.success(r.sent ? 'Email sent' : 'Nothing sent — member has no email or unsubscribed');
+			emailOpen = false;
+			emailSubject = '';
+			emailMessage = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
 		}
 		pending = false;
 	}
@@ -391,6 +416,9 @@
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
 		<Button variant="outline" size="sm" onclick={openCard}><Printer /> Card</Button>
 		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
+		{#if m.member.email}
+			<Button variant="outline" size="sm" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
+		{/if}
 		<Button variant="outline" size="sm" onclick={() => (guestOpen = true)}
 			><UserPlus /> Guest</Button
 		>
@@ -1087,6 +1115,33 @@
 				><Button type="submit" disabled={pending || !planId}>Start membership</Button
 				></Dialog.Footer
 			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={emailOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Email {m.member.name}</Dialog.Title>
+			<Dialog.Description>Goes to {m.member.email}.</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendEmailToMember}>
+			<Field.Field>
+				<Field.Label for="mm-subject">Subject</Field.Label>
+				<Input id="mm-subject" required bind:value={emailSubject} autofocus />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="mm-message">Message</Field.Label>
+				<Textarea
+					id="mm-message"
+					required
+					rows={6}
+					bind:value={emailMessage}
+					placeholder={'Hi {first_name} — just checking in about…'}
+				/>
+				<Field.Description>Personalize with {'{name}'} or {'{first_name}'}.</Field.Description>
+			</Field.Field>
+			<Dialog.Footer><Button type="submit" disabled={pending}>Send</Button></Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
