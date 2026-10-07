@@ -498,6 +498,38 @@ export async function resubscribe(memberId: string) {
 }
 
 /**
+ * Member self-service profile edit — name, phone, birthday. Email stays
+ * staff-managed (it's tied to claim links, unsubscribe state and billing mail).
+ */
+export async function updatePortalProfile(
+	orgId: string,
+	memberId: string,
+	input: { name: string; phone?: string | null; birthday?: string | null }
+) {
+	const name = input.name.trim();
+	if (!name) error(400, 'Name is required');
+	const [row] = await db
+		.update(gymMember)
+		.set({
+			name,
+			phone: input.phone?.trim() || null,
+			birthday: input.birthday || null
+		})
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
+		.returning({ id: gymMember.id });
+	if (!row) error(404, 'Member not found');
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'profile_updated',
+		summary: `${name} updated their profile from the portal`
+	});
+	return row;
+}
+
+/**
  * Member self-joins a plan from the portal — the same plans the public join
  * page offers (active + listed). Refuses when an active (non-pack) membership
  * already exists — a pack holder can still join a plan; members with a plan

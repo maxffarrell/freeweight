@@ -172,3 +172,19 @@ export const changePlan = command(
 		return r;
 	}
 );
+
+/** Member edits their own profile (name, phone, birthday — not email). */
+export const updateProfile = command(
+	v.object({
+		memberId: idSchema,
+		name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+		phone: v.optional(v.nullable(v.string())),
+		birthday: v.optional(v.nullable(v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD'))))
+	}),
+	async ({ memberId, ...input }) => {
+		const m = await myMember(memberId);
+		const r = await svc.updatePortalProfile(m.organizationId, m.id, input);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);

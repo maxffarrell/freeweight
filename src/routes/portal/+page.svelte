@@ -25,7 +25,8 @@
 		resubscribe,
 		getJoinablePlans,
 		joinPlan,
-		changePlan
+		changePlan,
+		updateProfile
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -55,6 +56,34 @@
 		joining = '';
 	}
 	let changeOpen = $state(false);
+	let profileOpen = $state(false);
+	let pName = $state('');
+	let pPhone = $state('');
+	let pBirthday = $state('');
+	let pSaving = $state(false);
+	function openProfile() {
+		pName = d.member.name;
+		pPhone = d.member.phone ?? '';
+		pBirthday = d.member.birthday ?? '';
+		profileOpen = !profileOpen;
+	}
+	async function saveProfile(e: SubmitEvent) {
+		e.preventDefault();
+		pSaving = true;
+		try {
+			await updateProfile({
+				memberId,
+				name: pName,
+				phone: pPhone || null,
+				birthday: pBirthday || null
+			});
+			toast.success('Profile updated');
+			profileOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update profile'));
+		}
+		pSaving = false;
+	}
 	async function switchPlan(planId: string) {
 		joining = planId;
 		try {
@@ -246,6 +275,30 @@
 						<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
 					{/if}
 				</div>
+				<p class="mt-1 text-xs">
+					<button class="text-muted-foreground underline" onclick={openProfile}>Edit profile</button
+					>
+				</p>
+				{#if profileOpen}
+					<form class="mt-1 w-full max-w-xs space-y-2" onsubmit={saveProfile}>
+						<Input bind:value={pName} required placeholder="Name" class="h-8 text-sm" />
+						<Input bind:value={pPhone} placeholder="Phone" class="h-8 text-sm" />
+						<Input bind:value={pBirthday} type="date" aria-label="Birthday" class="h-8 text-sm" />
+						<div class="flex gap-2">
+							<Button size="sm" class="h-7 px-3 text-xs" type="submit" disabled={pSaving}
+								>{pSaving ? 'Saving…' : 'Save'}</Button
+							>
+							<Button
+								size="sm"
+								variant="outline"
+								class="h-7 px-3 text-xs"
+								type="button"
+								onclick={() => (profileOpen = false)}>Cancel</Button
+							>
+						</div>
+						<p class="text-xs text-muted-foreground">Email changes go through the front desk.</p>
+					</form>
+				{/if}
 				{#if !d.memberships.some((mm) => mm.membership.status === 'active') && joinablePlans.length}
 					<div class="mt-2 w-full space-y-1.5">
 						<p class="text-xs font-medium text-muted-foreground">Join a plan</p>
