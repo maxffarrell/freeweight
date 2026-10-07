@@ -189,5 +189,7 @@ export const dropInInput = v.object({
 
 export const announcementInput = v.object({
 	subject: requiredText('Subject'),
-	message: requiredText('Message')
+	message: requiredText('Message'),
+	/** Restrict the batch to these members (e.g. the at-risk list); empty = all actives. */
+	memberIds: v.optional(v.pipe(v.array(idSchema), v.maxLength(500)))
 });

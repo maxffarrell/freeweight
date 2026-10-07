@@ -173,7 +173,12 @@ export async function sendClassReminders(orgId: string) {
  * front desk isn't misled by a logged-but-unsent batch. Resending the exact
  * same subject+body is a no-op per member (notification_log 'announcement').
  */
-export async function sendAnnouncement(orgId: string, subject: string, message: string) {
+export async function sendAnnouncement(
+	orgId: string,
+	subject: string,
+	message: string,
+	memberIds?: string[]
+) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
 		.select({ email: gymMember.email })
@@ -182,6 +187,7 @@ export async function sendAnnouncement(orgId: string, subject: string, message: 
 			and(
 				eq(gymMember.organizationId, orgId),
 				eq(gymMember.status, 'active'),
+				memberIds?.length ? inArray(gymMember.id, memberIds) : undefined,
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
 		)

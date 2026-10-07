@@ -64,5 +64,5 @@ export const getCheckInCode = query(idSchema, async (memberId) => {
 });
 
 export const emailAllMembers = command(announcementInput, async (input) =>
-	sendAnnouncement((await requireOrg()).orgId, input.subject, input.message)
+	sendAnnouncement((await requireOrg()).orgId, input.subject, input.message, input.memberIds)
 );

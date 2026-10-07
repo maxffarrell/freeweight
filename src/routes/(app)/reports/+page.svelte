@@ -2,6 +2,15 @@
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { toast } from 'svelte-sonner';
+	import { emailAllMembers } from '#lib/remote/members.remote.ts';
+	import { errMsg } from '#lib/format.ts';
+	import Mail from '@lucide/svelte/icons/mail';
 	import { getReportsQuery } from '#lib/remote/reports.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
@@ -16,6 +25,29 @@
 
 	function monthLabel(ym: string) {
 		return new Date(`${ym}-02T00:00:00Z`).toLocaleString('en', { month: 'short', year: '2-digit' });
+	}
+
+	// ------- email the at-risk list -------
+	let emailOpen = $state(false);
+	let emailSubject = $state('');
+	let emailBody = $state('');
+	let emailPending = $state(false);
+	async function submitWinBack(e: SubmitEvent) {
+		e.preventDefault();
+		emailPending = true;
+		try {
+			const res = await emailAllMembers({
+				subject: emailSubject,
+				message: emailBody,
+				memberIds: r.atRisk.map((m) => m.memberId)
+			});
+			toast.success(res.total ? `Sent to ${res.sent} of ${res.total} members` : 'No emails sent');
+			emailOpen = false;
+			emailSubject = emailBody = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send — try again'));
+		}
+		emailPending = false;
 	}
 </script>
 
@@ -147,8 +179,13 @@
 	</Card.Root>
 
 	<Card.Root class="lg:col-span-2">
-		<Card.Header>
+		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
+			{#if r.atRisk.length}
+				<Button size="sm" variant="outline" onclick={() => (emailOpen = true)}
+					><Mail /> Email list</Button
+				>
+			{/if}
 			<Card.Description>
 				{r.atRisk.length} active member{r.atRisk.length === 1 ? '' : 's'} with no check-in in 30+ days
 			</Card.Description>
@@ -192,3 +229,36 @@
 		</Card.Content>
 	</Card.Root>
 </div>
+
+<Dialog.Root bind:open={emailOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Email at-risk members</Dialog.Title>
+			<Dialog.Description>
+				Goes to the {r.atRisk.length} member{r.atRisk.length === 1 ? '' : 's'} in the list — a "we miss
+				you" nudge to bring them back.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitWinBack}>
+			<Field.Field>
+				<Field.Label for="w-subject">Subject</Field.Label>
+				<Input id="w-subject" required bind:value={emailSubject} autofocus />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="w-body">Message</Field.Label>
+				<Textarea
+					id="w-body"
+					required
+					bind:value={emailBody}
+					rows={6}
+					placeholder="We miss you at the gym — your next class is on us…"
+				/>
+			</Field.Field>
+			<Dialog.Footer
+				><Button type="submit" disabled={emailPending}>
+					{emailPending ? 'Sending…' : 'Send'}
+				</Button></Dialog.Footer
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
