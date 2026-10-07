@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import {
-	charge,
-	giftCard,
-	gymMember,
-	organization,
-	payment
-} from '#lib/server/db/schema.ts';
+import { charge, giftCard, gymMember, organization, payment } from '#lib/server/db/schema.ts';
 import { redeemGiftCard, sellGiftCard } from '#lib/server/services/giftcards.ts';
 
 // Needs a seeded DATABASE_URL — skips cleanly in unit-test runs without one.

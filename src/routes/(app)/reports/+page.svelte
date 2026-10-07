@@ -664,6 +664,43 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.locations.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">By location — last 30 days</Card.Title>
+				<Card.Description>Members, class volume and check-ins per site</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Location</Table.Head>
+							<Table.Head class="text-right">Members</Table.Head>
+							<Table.Head class="text-right">Sessions</Table.Head>
+							<Table.Head class="text-right">Fill</Table.Head>
+							<Table.Head class="text-right">No-shows</Table.Head>
+							<Table.Head class="text-right">Check-ins</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.locations as l (l.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{l.name}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{l.members}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{l.sessions}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{l.capacity ? `${Math.round((l.booked / l.capacity) * 100)}%` : '—'}</Table.Cell
+								>
+								<Table.Cell class="text-right tabular-nums">{l.noShows}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{l.checkIns}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
