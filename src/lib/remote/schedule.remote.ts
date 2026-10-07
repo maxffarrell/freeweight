@@ -2,7 +2,8 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
-import { getMember } from './members.remote.ts';
+import * as checkins from '#lib/server/services/checkins.ts';
+import { getMember, getTodayCheckIns } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
 	bookingInput,
@@ -142,4 +143,14 @@ export const updateBooking = command(bookingUpdate, async (input) => {
 	void getRoster(b.sessionId).refresh();
 	void getMember(b.memberId).refresh();
 	return b;
+});
+
+/** Kiosk "Check in all" — one tap logs a visit for every booked member on the roster.
+ * Members already inside are skipped so the pass can't check anyone out. */
+export const checkInRoster = command(idSchema, async (sessionId) => {
+	const r = await checkins.checkInRoster(await requireOrg(), sessionId);
+	void getSession(sessionId).refresh();
+	void getRoster(sessionId).refresh();
+	void getTodayCheckIns().refresh();
+	return r;
 });
