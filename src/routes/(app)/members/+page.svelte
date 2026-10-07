@@ -13,11 +13,13 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { toast } from 'svelte-sonner';
 	import { getMembers, createMember } from '#lib/remote/members.remote.ts';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Users from '@lucide/svelte/icons/users';
 	import Search from '@lucide/svelte/icons/search';
+	import Download from '@lucide/svelte/icons/download';
 
 	const currency = await getCurrency();
 	let q = $state('');
@@ -34,6 +36,27 @@
 	let email = $state('');
 	let phone = $state('');
 	let status = $state<'active' | 'inactive'>('active');
+
+	function exportCsv() {
+		const csv = toCsv([
+			['Name', 'Email', 'Phone', 'Status', 'Location', 'Plan', 'Open balance', 'Joined'],
+			...members.map((m) => [
+				m.name,
+				m.email,
+				m.phone,
+				m.status,
+				m.locationName,
+				m.planName,
+				(m.openBalance / 100).toFixed(2),
+				m.joinedAt ? formatDate(m.joinedAt) : ''
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `members-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -58,6 +81,7 @@
 
 <PageHeader title="Members">
 	{#snippet actions()}
+		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
 </PageHeader>

@@ -13,6 +13,7 @@
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
 	import { errMsg } from '#lib/format.ts';
+	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 
 	const settings = await getSettings();
 	const locations = await getLocations();
@@ -40,7 +41,11 @@
 	}
 </script>
 
-<PageHeader title="Check-ins" />
+<PageHeader title="Check-ins">
+	{#snippet actions()}
+		<Button size="sm" variant="outline" href="/kiosk"><MonitorSmartphone /> Open kiosk</Button>
+	{/snippet}
+</PageHeader>
 
 <div class="grid gap-6 p-4 md:p-6 lg:grid-cols-3">
 	<Card.Root>
