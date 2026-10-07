@@ -6,7 +6,7 @@
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { getDashboard } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
-	import { localTime } from '#lib/tz.ts';
+	import { localDate, localTime } from '#lib/tz.ts';
 	import Users from '@lucide/svelte/icons/users';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import Wallet from '@lucide/svelte/icons/wallet';
@@ -16,7 +16,19 @@
 	import { goto } from '$app/navigation';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { getAiInsights, getAiStatus } from '#lib/remote/ai.remote.ts';
-	import { getMyShift, getOnShift, clockIn, clockOut } from '#lib/remote/shifts.remote.ts';
+	import {
+		getMyShift,
+		getOnShift,
+		getShiftLog,
+		clockIn,
+		clockOut,
+		closeShift,
+		updateShift,
+		deleteShift
+	} from '#lib/remote/shifts.remote.ts';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { toast } from 'svelte-sonner';
 	import Timer from '@lucide/svelte/icons/timer';
@@ -25,6 +37,39 @@
 	const ai = await getAiStatus();
 	const myShift = $derived(await getMyShift());
 	const onShift = $derived(await getOnShift());
+	const shiftLog = $derived(await getShiftLog());
+	const isAdmin = $derived(myShift.role === 'owner' || myShift.role === 'admin');
+	let logOpen = $state(false);
+	const tzName = $derived(d.timezone);
+	const fmtLocal = (date: Date | string) =>
+		`${localDate(new Date(date), tzName)}T${localTime(new Date(date), tzName)}`;
+	const shiftHours = (s: { clockedInAt: Date | string; clockedOutAt: Date | string | null }) =>
+		s.clockedOutAt
+			? `${((new Date(s.clockedOutAt).getTime() - new Date(s.clockedInAt).getTime()) / 3_600_000).toFixed(1)}h`
+			: 'open';
+	async function editShift(s: {
+		id: string;
+		clockedInAt: Date | string;
+		clockedOutAt: Date | string | null;
+	}) {
+		const inAt = prompt('Clock-in (YYYY-MM-DDTHH:mm, gym time)', fmtLocal(s.clockedInAt));
+		if (inAt === null) return;
+		const outAt = prompt(
+			'Clock-out (YYYY-MM-DDTHH:mm, blank = still open)',
+			s.clockedOutAt ? fmtLocal(s.clockedOutAt) : ''
+		);
+		if (outAt === null) return;
+		try {
+			await updateShift({
+				id: s.id,
+				clockedInAt: inAt.trim(),
+				clockedOutAt: outAt.trim() || null
+			});
+			toast.success('Shift updated');
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not update shift'));
+		}
+	}
 	async function toggleShift() {
 		try {
 			if (myShift.shift) {
@@ -170,9 +215,12 @@
 					<Card.Title class="flex items-center gap-2 text-base"
 						><Timer class="size-4" /> On shift</Card.Title
 					>
-					<Button size="sm" variant={myShift.shift ? 'outline' : 'default'} onclick={toggleShift}
-						>{myShift.shift ? 'Clock out' : 'Clock in'}</Button
-					>
+					<div class="flex items-center gap-1.5">
+						<Button size="sm" variant="ghost" onclick={() => (logOpen = true)}>Log</Button>
+						<Button size="sm" variant={myShift.shift ? 'outline' : 'default'} onclick={toggleShift}
+							>{myShift.shift ? 'Clock out' : 'Clock in'}</Button
+						>
+					</div>
 				</Card.Header>
 				<Card.Content class="px-4">
 					{#if onShift.length}
@@ -334,3 +382,99 @@
 		</div>
 	</div>
 </div>
+
+<Dialog.Root bind:open={logOpen}>
+	<Dialog.Content class="sm:max-w-2xl">
+		<Dialog.Header>
+			<Dialog.Title>Shift log — last 30 days</Dialog.Title>
+			<Dialog.Description>
+				Staff clock-ins. Admins can close, correct, or delete entries.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="max-h-96 overflow-y-auto rounded-lg border">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Staff</Table.Head>
+						<Table.Head>In</Table.Head>
+						<Table.Head>Out</Table.Head>
+						<Table.Head class="text-right">Hours</Table.Head>
+						{#if isAdmin}<Table.Head class="w-24"></Table.Head>{/if}
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each shiftLog as r (r.shift.id)}
+						<Table.Row>
+							<Table.Cell class="font-medium">
+								{r.staffName}
+								{#if r.locationName}
+									<span class="text-xs text-muted-foreground"> · {r.locationName}</span>{/if}
+							</Table.Cell>
+							<Table.Cell class="text-sm whitespace-nowrap"
+								>{formatDate(r.shift.clockedInAt)}
+								{localTime(r.shift.clockedInAt, tzName)}</Table.Cell
+							>
+							<Table.Cell class="text-sm whitespace-nowrap">
+								{#if r.shift.clockedOutAt}
+									{formatDate(r.shift.clockedOutAt)} {localTime(r.shift.clockedOutAt, tzName)}
+								{:else}
+									<span class="text-amber-600 dark:text-amber-400">open</span>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{shiftHours(r.shift)}</Table.Cell>
+							{#if isAdmin}
+								<Table.Cell class="text-right">
+									<div class="flex justify-end gap-0.5">
+										{#if !r.shift.clockedOutAt}
+											<Button
+												size="xs"
+												variant="ghost"
+												title="Force clock-out now"
+												onclick={async () => {
+													try {
+														await closeShift(r.shift.id);
+														toast.success('Clocked out');
+													} catch (e) {
+														toast.error(errMsg(e, 'Could not close'));
+													}
+												}}>Close</Button
+											>
+										{/if}
+										<Button
+											size="xs"
+											variant="ghost"
+											class="text-muted-foreground"
+											title="Edit times"
+											onclick={() => editShift(r.shift)}><Pencil /></Button
+										>
+										<Button
+											size="xs"
+											variant="ghost"
+											class="text-muted-foreground"
+											title="Delete shift"
+											onclick={async () => {
+												if (!confirm('Delete this shift record?')) return;
+												try {
+													await deleteShift(r.shift.id);
+													toast.success('Deleted');
+												} catch (e) {
+													toast.error(errMsg(e, 'Could not delete'));
+												}
+											}}><Trash2 /></Button
+										>
+									</div>
+								</Table.Cell>
+							{/if}
+						</Table.Row>
+					{:else}
+						<Table.Row>
+							<Table.Cell colspan={isAdmin ? 5 : 4} class="text-muted-foreground"
+								>No shifts yet — use Clock in on the dashboard.</Table.Cell
+							>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>

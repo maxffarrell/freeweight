@@ -31,6 +31,7 @@ import {
 	sendPackLowCreditNudges
 } from '#lib/server/services/schedule.ts';
 import { closeStaleCheckIns } from '#lib/server/services/checkins.ts';
+import { closeStaleShifts } from '#lib/server/services/shifts.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -68,6 +69,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let challengeResults = 0;
 	let underEnrolled = 0;
 	let autoCheckouts = 0;
+	let shiftCloses = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -163,6 +165,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`auto-checkout cron failed for ${o.id}`, err);
 		}
 		try {
+			shiftCloses += await closeStaleShifts(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`shift-close cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -225,7 +233,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		packNudges,
 		waiverNudges,
 		underEnrolled,
-		autoCheckouts
+		autoCheckouts,
+		shiftCloses
 	});
 };
 
