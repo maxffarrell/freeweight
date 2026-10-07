@@ -477,6 +477,8 @@ export const shopItem = pgTable(
 		organizationId: orgId(),
 		name: text('name').notNull(),
 		price: integer('price').notNull(),
+		/** Units on hand — null = untracked/unlimited. Decremented on each sale. */
+		stock: integer('stock'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

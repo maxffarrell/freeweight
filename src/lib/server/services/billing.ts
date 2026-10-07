@@ -714,7 +714,12 @@ export async function createShopItem(
 ) {
 	const [row] = await db
 		.insert(shopItem)
-		.values({ organizationId: ctx.orgId, name: input.name, price: input.price })
+		.values({
+			organizationId: ctx.orgId,
+			name: input.name,
+			price: input.price,
+			stock: input.stock ?? null
+		})
 		.returning();
 	return row;
 }
@@ -728,6 +733,7 @@ export async function updateShopItem(
 		.update(shopItem)
 		.set(set)
 		.where(and(eq(shopItem.organizationId, ctx.orgId), eq(shopItem.id, id)))
+
 		.returning();
 	if (!row) error(404, 'Item not found');
 	return row;
@@ -749,6 +755,8 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 			)
 		);
 	if (!item) error(404, 'Item not found');
+	if (item.stock !== null && item.stock < input.qty)
+		error(409, item.stock === 0 ? `${item.name} is out of stock` : `Only ${item.stock} left`);
 	const [m] = await db
 		.select({ id: gymMember.id })
 		.from(gymMember)
@@ -771,6 +779,11 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 			reference: null,
 			notes: `Shop sale: ${item.name}`
 		});
+	if (item.stock !== null)
+		await db
+			.update(shopItem)
+			.set({ stock: sql`${shopItem.stock} - ${input.qty}` })
+			.where(and(eq(shopItem.id, item.id), eq(shopItem.organizationId, ctx.orgId)));
 	return { charge: c, paid: input.payNow };
 }
 

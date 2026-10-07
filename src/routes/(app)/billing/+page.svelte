@@ -225,19 +225,37 @@
 	let shopItems = $state(await getShopItems());
 	let itemName = $state('');
 	let itemPrice = $state<number | null>(null);
+	let itemStock = $state<number | null>(null);
 	async function addItem(e: SubmitEvent) {
 		e.preventDefault();
 		if (itemPrice == null) return;
 		pending = true;
 		try {
-			await createShopItem({ name: itemName, price: itemPrice });
+			await createShopItem({ name: itemName, price: itemPrice, stock: itemStock });
 			itemName = '';
 			itemPrice = null;
+			itemStock = null;
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add item'));
 		}
 		pending = false;
+	}
+	/** Prompt for a new count; '' or 'x' clears tracking (unlimited). */
+	async function setStock(item: { id: string; name: string; stock: number | null }) {
+		const raw = prompt(
+			`${item.name} — units on hand (blank = unlimited)`,
+			String(item.stock ?? '')
+		);
+		if (raw === null) return;
+		const n = raw.trim() === '' ? null : Math.max(0, Math.floor(Number(raw)));
+		if (n !== null && !Number.isFinite(n)) return toast.error('Not a number');
+		try {
+			await updateShopItem({ id: item.id, stock: n });
+			shopItems = await getShopItems();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update stock'));
+		}
 	}
 	async function toggleItem(item: { id: string; active: boolean }) {
 		try {
@@ -539,6 +557,7 @@
 								<Table.Row>
 									<Table.Head>Item</Table.Head>
 									<Table.Head class="text-right">Price</Table.Head>
+									<Table.Head class="text-right">Stock</Table.Head>
 									<Table.Head>Selling</Table.Head>
 									<Table.Head></Table.Head>
 								</Table.Row>
@@ -550,6 +569,17 @@
 										<Table.Cell class="text-right tabular-nums"
 											>{formatMoney(i.price, currency)}</Table.Cell
 										>
+										<Table.Cell class="text-right tabular-nums">
+											{#if i.stock === null}—{:else}<span
+													class={i.stock === 0 ? 'text-destructive' : ''}>{i.stock}</span
+												>{/if}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-1.5 text-xs text-muted-foreground"
+												onclick={() => setStock(i)}>Set</Button
+											>
+										</Table.Cell>
 										<Table.Cell
 											><Switch
 												checked={i.active}
@@ -558,21 +588,25 @@
 										>
 										<Table.Cell class="text-right">
 											{#if i.active}
-												<Button
-													variant="ghost"
-													size="sm"
-													class="h-7 px-2 text-xs"
-													onclick={() => {
-														sellItemId = i.id;
-														sellOpen = true;
-													}}>Sell</Button
-												>
+												{#if i.stock === 0}
+													<span class="px-2 text-xs text-muted-foreground">Out of stock</span>
+												{:else}
+													<Button
+														variant="ghost"
+														size="sm"
+														class="h-7 px-2 text-xs"
+														onclick={() => {
+															sellItemId = i.id;
+															sellOpen = true;
+														}}>Sell</Button
+													>
+												{/if}
 											{/if}
 										</Table.Cell>
 									</Table.Row>
 								{:else}
 									<Table.Row
-										><Table.Cell colspan={4} class="text-muted-foreground"
+										><Table.Cell colspan={5} class="text-muted-foreground"
 											>No items yet — add one on the right.</Table.Cell
 										></Table.Row
 									>
@@ -598,6 +632,16 @@
 								<Field.Label>Price</Field.Label>
 								<MoneyInput bind:value={itemPrice} />
 							</Field.Field>
+							<Field.Field>
+								<Field.Label for="i-stock">Units in stock — optional</Field.Label>
+								<Input
+									id="i-stock"
+									type="number"
+									min={0}
+									bind:value={itemStock}
+									placeholder="Leave blank for unlimited"
+								/>
+							</Field.Field>
 							<Button type="submit" disabled={pending || itemPrice == null || !itemName.trim()}
 								>Add item</Button
 							>
@@ -614,7 +658,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Sell {sellItemRow?.name ?? 'item'}</Dialog.Title>
 			<Dialog.Description>
-				{#if sellItemRow}{formatMoney(sellItemRow.price, currency)} each.{/if}
+				{#if sellItemRow}{formatMoney(sellItemRow.price, currency)} each{#if sellItemRow.stock !== null}
+						· {sellItemRow.stock} in stock{/if}.{/if}
 				Posts a charge to the member — or mark it paid now.
 			</Dialog.Description>
 		</Dialog.Header>
@@ -634,7 +679,14 @@
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="s-qty">Quantity</Field.Label>
-				<Input id="s-qty" type="number" min={1} max={50} required bind:value={sellQty} />
+				<Input
+					id="s-qty"
+					type="number"
+					min={1}
+					max={sellItemRow?.stock ?? 50}
+					required
+					bind:value={sellQty}
+				/>
 			</Field.Field>
 			<label class="flex items-center gap-2 text-sm">
 				<Switch bind:checked={sellPayNow} /> Paid now
