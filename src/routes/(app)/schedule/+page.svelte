@@ -673,6 +673,9 @@
 			<Field.Field>
 				<Field.Label for="edit-cap">Capacity</Field.Label>
 				<Input id="edit-cap" type="number" min={1} required bind:value={editCapacity} />
+				<p class="text-xs text-muted-foreground">
+					Raising it promotes waitlisted members in order.
+				</p>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label>Location</Field.Label>
