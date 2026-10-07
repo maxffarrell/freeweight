@@ -55,7 +55,7 @@
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { localDate, localTime, addDays } from '#lib/tz.ts';
+	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -505,6 +505,22 @@
 
 	// ------- demand hints -------
 	let hintsOpen = $state(false);
+	// Next gym-local date landing on `weekday` (0=Sun), at least tomorrow — used
+	// to prefill the session dialog from an "add" demand hint.
+	function nextWeekdayDate(weekday: number) {
+		const wd = localWeekday(new Date(), tz);
+		const delta = (weekday - wd + 7) % 7 || 7;
+		return addDays(localDate(new Date(), tz), delta);
+	}
+	function scheduleHint(h: { classTypeId: string; weekday: number; time: string }) {
+		sessTypeId = h.classTypeId;
+		sessStart = nextWeekdayDate(h.weekday);
+		sessStartTime = h.time;
+		sessRepeatUntil = '';
+		sessNote = '';
+		hintsOpen = false;
+		sessOpen = true;
+	}
 
 	// ------- equipment -------
 	let eqOpen = $state(false);
@@ -1970,13 +1986,19 @@
 								{/if}
 							</p>
 						</div>
-						<span
-							class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {h.kind === 'add'
-								? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-								: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}"
-						>
-							{h.kind === 'add' ? 'Add' : 'Drop'}
-						</span>
+						<div class="flex shrink-0 items-center gap-1.5">
+							{#if h.kind === 'add'}
+								<Button size="xs" variant="outline" onclick={() => scheduleHint(h)}>Schedule</Button
+								>
+							{/if}
+							<span
+								class="rounded-full px-2 py-0.5 text-xs font-medium {h.kind === 'add'
+									? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+									: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'}"
+							>
+								{h.kind === 'add' ? 'Add' : 'Drop'}
+							</span>
+						</div>
 					</div>
 				{/each}
 			</div>
