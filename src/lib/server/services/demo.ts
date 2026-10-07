@@ -1,0 +1,210 @@
+import { db } from '#lib/server/db/index.ts';
+import {
+	booking,
+	charge,
+	checkIn,
+	classSession,
+	classType,
+	gymMember,
+	gymSettings,
+	location,
+	membership,
+	payment,
+	plan
+} from '#lib/server/db/schema.ts';
+import type { OrgContext } from '#lib/server/context.ts';
+import { zonedToUtc } from '#lib/tz.ts';
+
+/** Fills a fresh workspace with a believable gym: classes this week, members, bookings, payments. */
+export async function loadDemoData(ctx: OrgContext) {
+	const tz = 'America/Los_Angeles';
+	const now = new Date();
+	const today = now.toISOString().slice(0, 10);
+
+	await db
+		.insert(gymSettings)
+		.values({
+			organizationId: ctx.orgId,
+			timezone: tz,
+			currency: 'usd',
+			publicPage: true,
+			tagline: 'Strength, conditioning and yoga in the Mission.',
+			address: '2140 Mission St, San Francisco, CA',
+			phone: '(415) 555-0134'
+		})
+		.onConflictDoNothing();
+
+	const [loc] = await db
+		.insert(location)
+		.values({ organizationId: ctx.orgId, name: 'Mission HQ', address: '2140 Mission St' })
+		.returning();
+
+	const [unlimited, offPeak, dropIn] = await db
+		.insert(plan)
+		.values([
+			{
+				organizationId: ctx.orgId,
+				name: 'Unlimited',
+				description: 'All classes, all locations, anytime.',
+				amount: 12900,
+				interval: 'month',
+				signupFee: 4900
+			},
+			{
+				organizationId: ctx.orgId,
+				name: 'Off-Peak',
+				description: 'Classes before 4pm on weekdays.',
+				amount: 7900,
+				interval: 'month',
+				signupFee: 2900
+			},
+			{
+				organizationId: ctx.orgId,
+				name: '10-Class Pack',
+				description: 'Ten classes, use them within six months.',
+				amount: 22000,
+				interval: 'year',
+				classCredits: 10,
+				listed: true
+			}
+		])
+		.returning();
+
+	const [hiit, strength, yoga] = await db
+		.insert(classType)
+		.values([
+			{
+				organizationId: ctx.orgId,
+				locationId: loc!.id,
+				name: 'HIIT Express',
+				color: '#ef4444',
+				durationMin: 45,
+				capacity: 18
+			},
+			{
+				organizationId: ctx.orgId,
+				locationId: loc!.id,
+				name: 'Strength Foundations',
+				color: '#3b82f6',
+				durationMin: 60,
+				capacity: 12
+			},
+			{
+				organizationId: ctx.orgId,
+				locationId: loc!.id,
+				name: 'Vinyasa Yoga',
+				color: '#22c55e',
+				durationMin: 60,
+				capacity: 24
+			}
+		])
+		.returning();
+
+	const memberNames = [
+		'Alex Rivera',
+		'Jordan Lee',
+		'Sam Patel',
+		'Casey Kim',
+		'Riley Chen',
+		'Morgan Diaz',
+		'Taylor Brooks',
+		'Jamie Nguyen'
+	];
+	const members = await db
+		.insert(gymMember)
+		.values(
+			memberNames.map((name, i) => ({
+				organizationId: ctx.orgId,
+				locationId: loc!.id,
+				name,
+				email: `${name.split(' ')[0]!.toLowerCase()}@example.com`,
+				joinedAt: today.slice(0, 8) + String((i % 20) + 1).padStart(2, '0')
+			}))
+		)
+		.returning();
+
+	const plans = [unlimited!, offPeak!, dropIn!];
+	for (const [i, m] of members.entries()) {
+		const p = plans[i % plans.length]!;
+		const [ms] = await db
+			.insert(membership)
+			.values({
+				organizationId: ctx.orgId,
+				memberId: m.id,
+				planId: p.id,
+				startsAt: new Date(`${today.slice(0, 8)}01T00:00:00Z`),
+				nextChargeAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+			})
+			.returning();
+		const [c] = await db
+			.insert(charge)
+			.values({
+				organizationId: ctx.orgId,
+				memberId: m.id,
+				membershipId: ms!.id,
+				kind: 'membership',
+				description: `${p.name} — period starting ${today.slice(0, 8)}01`,
+				periodStart: `${today.slice(0, 8)}01`,
+				dueDate: `${today.slice(0, 8)}01`,
+				amount: p.amount
+			})
+			.returning();
+		if (i % 3 !== 0) {
+			await db.insert(payment).values({
+				organizationId: ctx.orgId,
+				memberId: m.id,
+				chargeId: c!.id,
+				amount: p.amount,
+				method: 'card',
+				paidAt: new Date(now.getTime() - (i + 1) * 86400_000)
+			});
+		}
+	}
+
+	// This week's sessions at 7:00, 12:15, 17:30.
+	const times = ['07:00', '12:15', '17:30'];
+	const types = [hiit!, strength!, yoga!];
+	const sessions = [];
+	for (let day = 0; day < 7; day++) {
+		for (const [ti, t] of times.entries()) {
+			const ct = types[(day + ti) % types.length]!;
+			const d = new Date(now.getTime() + day * 86400_000);
+			const dateStr = d.toISOString().slice(0, 10);
+			const start = zonedToUtc(`${dateStr}T${t}`, tz);
+			sessions.push({
+				organizationId: ctx.orgId,
+				classTypeId: ct.id,
+				locationId: loc!.id,
+				startsAt: start,
+				endsAt: new Date(start.getTime() + ct.durationMin * 60_000),
+				capacity: ct.capacity
+			});
+		}
+	}
+	const created = await db.insert(classSession).values(sessions).returning();
+
+	// Sprinkle bookings and today's check-ins.
+	let bi = 0;
+	for (const s of created) {
+		for (const m of members.slice(0, 4 + (bi % 3))) {
+			await db.insert(booking).values({
+				organizationId: ctx.orgId,
+				sessionId: s.id,
+				memberId: m.id,
+				status: 'booked'
+			});
+		}
+		bi++;
+	}
+	for (const m of members.slice(0, 5)) {
+		await db.insert(checkIn).values({
+			organizationId: ctx.orgId,
+			memberId: m.id,
+			locationId: loc!.id,
+			method: 'qr',
+			checkedAt: new Date(now.getTime() - Math.floor(Math.random() * 8) * 3600_000)
+		});
+	}
+
+	return { members: members.length, sessions: created.length };
+}

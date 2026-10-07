@@ -1,0 +1,15 @@
+Copyright (c) 2026-present Freeweight
+
+Portions of this software are licensed as follows:
+
+* Files marked with `/* @license Enterprise */`, including all content under
+  `src/lib/server/ee/`, are licensed under the Freeweight Enterprise License
+  defined in `ee/LICENSE`.
+* The SDK (`packages/sdk/`) is licensed under the MIT license in its directory.
+* All other content is licensed under the GNU Affero General Public License v3
+  (AGPLv3), reproduced in `LICENSE-AGPL.txt`.
+
+Application exception: programs that interact with Freeweight only through its
+published interfaces (the REST API, webhooks and the SDK) without incorporating
+or modifying Freeweight source code are not considered derivative works and may
+use any license.

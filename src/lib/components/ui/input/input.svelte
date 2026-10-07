@@ -1,12 +1,12 @@
 <script lang="ts">
-	import type { HTMLInputAttributes, HTMLInputTypeAttribute } from "svelte/elements";
-	import { cn, type WithElementRef } from "#lib/utils.js";
+	import { cn, type WithElementRef } from '#lib/utils.js';
+	import type { HTMLInputAttributes, HTMLInputTypeAttribute } from 'svelte/elements';
 
-	type InputType = Exclude<HTMLInputTypeAttribute, "file">;
+	type InputType = Exclude<HTMLInputTypeAttribute, 'file'>;
 
 	type Props = WithElementRef<
-		Omit<HTMLInputAttributes, "type"> &
-			({ type: "file"; files?: FileList } | { type?: InputType; files?: undefined })
+		Omit<HTMLInputAttributes, 'type'> &
+			({ type: 'file'; files?: FileList } | { type?: InputType; files?: undefined })
 	>;
 
 	let {
@@ -15,20 +15,17 @@
 		type,
 		files = $bindable(),
 		class: className,
-		"data-slot": dataSlot = "input",
+		'data-slot': dataSlot = 'input',
 		...restProps
 	}: Props = $props();
 </script>
 
-{#if type === "file"}
+{#if type === 'file'}
 	<input
 		bind:this={ref}
 		data-slot={dataSlot}
 		class={cn(
-			"flex h-10 w-full rounded-[4px] border-[3px] border-black bg-white px-3 py-2 text-sm font-bold uppercase shadow-[4px_4px_0_0_#000] transition-all duration-200",
-			"focus:outline-none focus:shadow-[6px_6px_0_0_#000]",
-			"disabled:cursor-not-allowed disabled:opacity-50",
-			"placeholder:text-gray-500",
+			'h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
 			className
 		)}
 		type="file"
@@ -41,10 +38,7 @@
 		bind:this={ref}
 		data-slot={dataSlot}
 		class={cn(
-			"flex h-10 w-full rounded-[4px] border-[3px] border-black bg-white px-4 py-2 text-base font-bold uppercase shadow-[4px_4px_0_0_#000] transition-all duration-200",
-			"focus:outline-none focus:shadow-[6px_6px_0_0_#000]",
-			"disabled:cursor-not-allowed disabled:opacity-50",
-			"placeholder:text-gray-500 placeholder:font-bold placeholder:uppercase placeholder:text-xs",
+			'h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
 			className
 		)}
 		{type}

@@ -1,0 +1,19 @@
+Freeweight Enterprise License
+
+Copyright (c) 2026-present Freeweight
+
+Files marked with `/* @license Enterprise */` (including everything under
+`src/lib/server/ee/`) are licensed under this Freeweight Enterprise License and
+NOT under the AGPLv3 that covers the rest of the repository.
+
+You may use, copy and modify these files for development and testing. Use of
+these files in production requires a valid Freeweight Enterprise subscription
+(a `FREEWEIGHT_ENTERPRISE_KEY`) or running on Freeweight Cloud, and is limited to
+the number of seats and workspaces covered by that subscription.
+
+You may not sell, sublicense, or distribute these files, or modify them to
+bypass license checks.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.

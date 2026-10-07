@@ -1,36 +1,45 @@
 <script lang="ts" module>
-	import { cn, type WithElementRef } from "#lib/utils.js";
-	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
-	import { type VariantProps, tv } from "tailwind-variants";
+	import { type VariantProps, tv } from 'tailwind-variants';
+	import { cn, type WithElementRef } from '#lib/utils.js';
+	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
 
 	export const buttonVariants = tv({
-		base: "inline-flex shrink-0 items-center justify-center gap-2 rounded-[4px] font-bold uppercase text-sm transition-all duration-200 border-[3px] border-black cursor-pointer",
+		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-lg border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
-				default: "bg-[#FFFF00] text-black shadow-[4px_4px_0_0_#000]",
-				destructive: "bg-[#e74c3c] text-white shadow-[4px_4px_0_0_#000]",
-				outline: "bg-transparent text-black shadow-[4px_4px_0_0_#000]",
-				secondary: "bg-[#FF69B4] text-black shadow-[4px_4px_0_0_#000]",
-				ghost: "bg-transparent border-transparent shadow-none hover:bg-[#FFFF00]",
-				link: "text-black underline-offset-4 hover:underline border-transparent shadow-none",
+				default: 'bg-primary text-primary-foreground hover:bg-primary/80',
+				outline:
+					'border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground',
+				secondary:
+					'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+				ghost:
+					'hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground',
+				destructive:
+					'bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30',
+				link: 'text-primary underline-offset-4 hover:underline'
 			},
 			size: {
-				default: "h-10 px-4 py-2",
-				sm: "h-8 px-3 py-1 text-xs",
-				lg: "h-12 px-6 py-3 text-base",
-				icon: "size-10",
-				"icon-sm": "size-8",
-				"icon-lg": "size-12",
-			},
+				default:
+					'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+				xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+				sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+				lg: 'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+				icon: 'size-8',
+				'icon-xs':
+					"size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
+				'icon-sm':
+					'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
+				'icon-lg': 'size-9'
+			}
 		},
 		defaultVariants: {
-			variant: "default",
-			size: "default",
-		},
+			variant: 'default',
+			size: 'default'
+		}
 	});
 
-	export type ButtonVariant = VariantProps<typeof buttonVariants>["variant"];
-	export type ButtonSize = VariantProps<typeof buttonVariants>["size"];
+	export type ButtonVariant = VariantProps<typeof buttonVariants>['variant'];
+	export type ButtonSize = VariantProps<typeof buttonVariants>['size'];
 
 	export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
 		WithElementRef<HTMLAnchorAttributes> & {
@@ -42,11 +51,11 @@
 <script lang="ts">
 	let {
 		class: className,
-		variant = "default",
-		size = "default",
+		variant = 'default',
+		size = 'default',
 		ref = $bindable(null),
 		href = undefined,
-		type = "button",
+		type = 'button',
 		disabled,
 		children,
 		...restProps
@@ -57,15 +66,10 @@
 	<a
 		bind:this={ref}
 		data-slot="button"
-		class={cn(
-			buttonVariants({ variant, size }),
-			"hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000]",
-			"active:translate-x-[2px] active:translate-y-[2px] active:shadow-[0_0_0_0_#000]",
-			className
-		)}
+		class={cn(buttonVariants({ variant, size }), className)}
 		href={disabled ? undefined : href}
 		aria-disabled={disabled}
-		role={disabled ? "link" : undefined}
+		role={disabled ? 'link' : undefined}
 		tabindex={disabled ? -1 : undefined}
 		{...restProps}
 	>
@@ -75,12 +79,7 @@
 	<button
 		bind:this={ref}
 		data-slot="button"
-		class={cn(
-			buttonVariants({ variant, size }),
-			"hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000]",
-			"active:translate-x-[2px] active:translate-y-[2px] active:shadow-[0_0_0_0_#000]",
-			className
-		)}
+		class={cn(buttonVariants({ variant, size }), className)}
 		{type}
 		{disabled}
 		{...restProps}

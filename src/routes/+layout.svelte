@@ -1,20 +1,13 @@
 <script lang="ts">
-  import '../app.css';
-  import { onMount } from 'svelte';
-  import { auth } from '#lib/auth.js';
-  import { theme } from '#lib/theme.js';
-  import favicon from '#lib/assets/favicon.svg';
+	import './layout.css';
+	import { ModeWatcher } from 'mode-watcher';
+	import { Toaster } from '#lib/components/ui/sonner/index.js';
+	import favicon from '#lib/assets/favicon.svg';
 
-  let { children } = $props();
-
-  onMount(() => {
-    auth.init();
-    theme.initTheme();
-  });
+	let { children } = $props();
 </script>
 
-<svelte:head>
-  <link rel="icon" href={favicon} />
-</svelte:head>
-
+<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<ModeWatcher />
+<Toaster richColors closeButton />
 {@render children()}

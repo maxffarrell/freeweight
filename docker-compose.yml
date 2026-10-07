@@ -1,0 +1,28 @@
+# Self-host Freeweight with Postgres: `BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d`
+services:
+  app:
+    image: ghcr.io/maxffarrell/freeweight:latest
+    build: .
+    ports: ['3000:3000']
+    environment:
+      DATABASE_URL: postgres://freeweight:freeweight@db:5432/freeweight
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      FREEWEIGHT_ENTERPRISE_KEY: ${FREEWEIGHT_ENTERPRISE_KEY:-}
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: freeweight
+      POSTGRES_PASSWORD: freeweight
+      POSTGRES_DB: freeweight
+    volumes: ['pgdata:/var/lib/postgresql']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U freeweight']
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+volumes:
+  pgdata:

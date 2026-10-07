@@ -1,20 +1,22 @@
 <script lang="ts">
-	import type { HTMLAttributes } from "svelte/elements";
-	import { cn, type WithElementRef } from "#lib/utils.js";
+	import { cn, type WithElementRef } from '#lib/utils.js';
+	import type { HTMLAttributes } from 'svelte/elements';
 
 	let {
 		ref = $bindable(null),
 		class: className,
 		children,
+		size = 'default',
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { size?: 'default' | 'sm' } = $props();
 </script>
 
 <div
 	bind:this={ref}
 	data-slot="card"
+	data-size={size}
 	class={cn(
-		"bg-white border-[3px] border-black rounded-[4px] shadow-[4px_4px_0_0_#000] flex flex-col gap-4 p-6",
+		'group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
 		className
 	)}
 	{...restProps}
