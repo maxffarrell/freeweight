@@ -41,7 +41,8 @@
 		createEvent,
 		getEventRoster,
 		registerMemberForEvent,
-		cancelEventRegistration
+		cancelEventRegistration,
+		setEventAttended
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -458,6 +459,13 @@
 			if (evRosterId) await getEventRoster(evRosterId).refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
+		}
+	}
+	async function markAttended(eventId: string, id: string, attended: boolean) {
+		try {
+			await setEventAttended({ eventId, id, attended });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
 
@@ -1603,13 +1611,31 @@
 							<div class="mt-2 rounded-md border p-2">
 								{#each evRoster.rows as r (r.registration.id)}
 									<div class="flex items-center justify-between py-1 text-sm">
-										<span>{r.memberName}</span>
-										<Button
-											variant="ghost"
-											size="sm"
-											class="h-6 px-2 text-xs"
-											onclick={() => cancelReg(r.registration.id)}>Cancel</Button
+										<span class="flex items-center gap-2"
+											>{r.memberName}
+											{#if r.registration.status === 'attended'}
+												<Badge variant="secondary">Attended</Badge>
+											{/if}</span
 										>
+										<div>
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-6 px-2 text-xs"
+												onclick={() =>
+													markAttended(
+														ev.event.id,
+														r.registration.id,
+														r.registration.status !== 'attended'
+													)}>{r.registration.status === 'attended' ? 'Undo' : 'Attended'}</Button
+											>
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-6 px-2 text-xs"
+												onclick={() => cancelReg(r.registration.id)}>Cancel</Button
+											>
+										</div>
 									</div>
 								{:else}
 									<p class="py-1 text-xs text-muted-foreground">Nobody registered yet.</p>

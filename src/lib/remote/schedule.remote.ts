@@ -281,6 +281,16 @@ export const registerMemberForEvent = command(
 );
 /** Staff cancel a registration (voids an unpaid signup charge). */
 export const cancelEventRegistration = command(idSchema, async (id) => {
-	await evt.cancelRegistration((await requireOrg()).orgId, id);
+	const r = await evt.cancelRegistration((await requireOrg()).orgId, id);
 	void getEvents().refresh();
+	void getEventRoster(r.eventId).refresh();
 });
+/** Mark/unmark a registered member as attended at the event. */
+export const setEventAttended = command(
+	v.object({ eventId: idSchema, id: idSchema, attended: v.boolean() }),
+	async ({ eventId, id, attended }) => {
+		const r = await evt.setEventAttended((await requireOrg()).orgId, id, attended);
+		void getEventRoster(eventId).refresh();
+		return r;
+	}
+);

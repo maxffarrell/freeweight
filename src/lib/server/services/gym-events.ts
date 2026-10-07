@@ -4,6 +4,7 @@ import { error } from '@sveltejs/kit';
 import { charge, eventRegistration, gymEvent, gymMember, location } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { notifyEventRegistered } from './notifications.ts';
 import { todayISO } from '#lib/format.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -171,7 +172,25 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 		action: 'created',
 		summary: `${r.memberName} → ${r.event.name}`
 	});
+	notifyEventRegistered(orgId, r.registration.id).catch(() => {});
 	return r;
+}
+
+/** Mark/unmark a registered member as attended from the event roster. */
+export async function setEventAttended(orgId: string, registrationId: string, attended: boolean) {
+	const [row] = await db
+		.update(eventRegistration)
+		.set({ status: attended ? 'attended' : 'registered' })
+		.where(
+			and(
+				eq(eventRegistration.organizationId, orgId),
+				eq(eventRegistration.id, registrationId),
+				ne(eventRegistration.status, 'cancelled')
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Registration not found');
+	return row;
 }
 
 /** Cancel a registration; an unpaid signup charge is voided with it. */
