@@ -5,7 +5,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { getDashboard } from '#lib/remote/workspace.remote.ts';
-	import { formatDate, formatMoney, formatRelative } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
 	import Users from '@lucide/svelte/icons/users';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
@@ -16,9 +16,28 @@
 	import { goto } from '$app/navigation';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { getAiInsights, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { getMyShift, getOnShift, clockIn, clockOut } from '#lib/remote/shifts.remote.ts';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { toast } from 'svelte-sonner';
+	import Timer from '@lucide/svelte/icons/timer';
 
 	const d = await getDashboard();
 	const ai = await getAiStatus();
+	const myShift = $derived(await getMyShift());
+	const onShift = $derived(await getOnShift());
+	async function toggleShift() {
+		try {
+			if (myShift.shift) {
+				await clockOut();
+				toast.success('Clocked out');
+			} else {
+				await clockIn({});
+				toast.success('Clocked in');
+			}
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not update shift'));
+		}
+	}
 	let insights = $state<string[] | null | 'error'>(null);
 	$effect(() => {
 		if (!ai.configured || insights !== null) return;
@@ -146,6 +165,34 @@
 		</Card.Root>
 
 		<div class="space-y-6">
+			<Card.Root>
+				<Card.Header class="flex flex-row items-center justify-between space-y-0">
+					<Card.Title class="flex items-center gap-2 text-base"
+						><Timer class="size-4" /> On shift</Card.Title
+					>
+					<Button size="sm" variant={myShift.shift ? 'outline' : 'default'} onclick={toggleShift}
+						>{myShift.shift ? 'Clock out' : 'Clock in'}</Button
+					>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#if onShift.length}
+						<ul class="space-y-2">
+							{#each onShift as r (r.shift.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{r.staffName}</span>
+									<Badge variant="outline" class="shrink-0"
+										>since {localTime(r.shift.clockedInAt, d.timezone)}{r.locationName
+											? ` · ${r.locationName}`
+											: ''}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="text-sm text-muted-foreground">Nobody clocked in.</p>
+					{/if}
+				</Card.Content>
+			</Card.Root>
 			{#if d.pendingRequests.length}
 				<Card.Root class="border-amber-500/50">
 					<Card.Header><Card.Title class="text-base">Needs attention</Card.Title></Card.Header>

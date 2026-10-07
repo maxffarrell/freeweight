@@ -622,6 +622,48 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Staff hours — last 30 days</Card.Title>
+			<Card.Description>Clocked-in time per staff member (dashboard clock in/out)</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Staff</Table.Head>
+						<Table.Head class="text-right">Shifts</Table.Head>
+						<Table.Head class="text-right">Hours</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.staffShifts as s (s.memberId)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{s.staffName}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{s.shifts}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{(s.minutes / 60).toFixed(1)}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground"
+								>No shifts yet — staff clock in from the dashboard.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+					{#if r.staffShifts.length > 1}
+						<Table.Row class="font-medium">
+							<Table.Cell>Total</Table.Cell>
+							<Table.Cell></Table.Cell>
+							<Table.Cell class="text-right tabular-nums"
+								>{(r.staffShifts.reduce((n, s) => n + s.minutes, 0) / 60).toFixed(1)}</Table.Cell
+							>
+						</Table.Row>
+					{/if}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>

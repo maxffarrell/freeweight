@@ -488,6 +488,24 @@ export const equipment = pgTable(
 	(t) => [index('equipment_org_idx').on(t.organizationId)]
 );
 
+/** Staff clock-in/out records — memberId is the org member (staff), like instructorId. */
+export const shift = pgTable(
+	'shift',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
+		clockedInAt: timestamp('clocked_in_at', { withTimezone: true }).notNull().defaultNow(),
+		clockedOutAt: timestamp('clocked_out_at', { withTimezone: true }),
+		note: text('note').notNull().default(''),
+		...timestamps
+	},
+	(t) => [index('shift_org_idx').on(t.organizationId), index('shift_member_idx').on(t.memberId)]
+);
+
 export const resourceBooking = pgTable(
 	'resource_booking',
 	{
