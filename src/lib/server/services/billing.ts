@@ -8,6 +8,7 @@ import {
 	membership,
 	payment,
 	plan,
+	promoCode,
 	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -84,6 +85,105 @@ export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 	return row;
 }
 
+// ---------- Promo codes ----------
+
+export type PromoDiscount = {
+	code: string;
+	percentOff: number | null;
+	amountOff: number | null;
+};
+
+export async function listPromoCodes(orgId: string) {
+	return db
+		.select()
+		.from(promoCode)
+		.where(eq(promoCode.organizationId, orgId))
+		.orderBy(asc(promoCode.code));
+}
+
+export async function createPromoCode(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.promoCodeInput>
+) {
+	if ((input.percentOff == null) === (input.amountOff == null))
+		error(400, 'Set either percent off or amount off');
+	const [row] = await db
+		.insert(promoCode)
+		.values({
+			organizationId: ctx.orgId,
+			code: input.code.toUpperCase(),
+			percentOff: input.percentOff ?? null,
+			amountOff: input.amountOff ?? null,
+			maxUses: input.maxUses ?? null,
+			expiresAt: input.expiresAt ?? null
+		})
+		.onConflictDoNothing()
+		.returning();
+	if (!row) error(409, 'That code already exists');
+	return row;
+}
+
+export async function updatePromoCode(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.promoCodeUpdate>
+) {
+	const [row] = await db
+		.update(promoCode)
+		.set({ active: input.active })
+		.where(and(eq(promoCode.organizationId, ctx.orgId), eq(promoCode.id, input.id)))
+		.returning();
+	if (!row) error(404, 'Promo code not found');
+	return row;
+}
+
+/** The promo row if the code can be redeemed right now, else 404/410. */
+export async function redeemablePromo(orgId: string, code: string) {
+	const [row] = await db
+		.select()
+		.from(promoCode)
+		.where(
+			and(
+				eq(promoCode.organizationId, orgId),
+				eq(promoCode.code, code.trim().toUpperCase())
+			)
+		)
+		.limit(1);
+	if (!row || !row.active) error(400, 'Invalid promo code');
+	if (row.expiresAt && row.expiresAt < todayISO()) error(400, 'Promo code has expired');
+	if (row.maxUses != null && row.timesUsed >= row.maxUses)
+		error(400, 'Promo code has been fully used');
+	return row;
+}
+
+/** Counts a successful redemption. */
+export async function markPromoUsed(orgId: string, id: string) {
+	await db
+		.update(promoCode)
+		.set({ timesUsed: sql`${promoCode.timesUsed} + 1` })
+		.where(and(eq(promoCode.organizationId, orgId), eq(promoCode.id, id)));
+}
+
+/**
+ * Distributes a promo across the up-front amounts (signup fee, then first charge):
+ * percent off applies per-charge; a flat amount is consumed in order.
+ */
+export function promoApply(
+	promo: PromoDiscount,
+	state: { left: number | null },
+	amount: number
+) {
+	if (promo.percentOff != null)
+		return Math.max(0, amount - Math.round((amount * promo.percentOff) / 100));
+	if (state.left != null) {
+		const d = Math.min(state.left, amount);
+		state.left -= d;
+		return amount - d;
+	}
+	return amount;
+}
+
+export const promoState = (promo: PromoDiscount) => ({ left: promo.amountOff });
+
 // ---------- Memberships ----------
 
 /** Adds the interval to a date, on the same calendar day for month/year. */
@@ -138,7 +238,8 @@ export async function getMembership(orgId: string, id: string) {
  */
 export async function createMembership(
 	ctx: { orgId: string; userId?: string | null },
-	input: v.InferOutput<typeof s.membershipInput>
+	input: v.InferOutput<typeof s.membershipInput>,
+	promo?: PromoDiscount
 ) {
 	const [m] = await db
 		.select()
@@ -171,20 +272,24 @@ export async function createMembership(
 
 	const payerId = m.guardianId ?? input.memberId;
 	const forDependent = payerId !== input.memberId ? ` — ${m.name}` : '';
-	if (p.signupFee > 0) {
+	// A promo discounts the up-front total: signup fee first, then the first charge.
+	const pState = promo ? promoState(promo) : null;
+	const signupAmount = promo ? promoApply(promo, pState!, p.signupFee) : p.signupFee;
+	if (signupAmount > 0) {
 		await db.insert(charge).values({
 			organizationId: ctx.orgId,
 			memberId: payerId,
 			membershipId: row!.id,
 			kind: 'signup',
-			description: `Signup fee — ${p.name}${forDependent}`,
+			description: `Signup fee — ${p.name}${forDependent}${promo ? ` (${promo.code})` : ''}`,
 			dueDate: start,
-			amount: p.signupFee
+			amount: signupAmount
 		});
 	}
 	// During a trial the first period charge is deferred to trial end.
 	if (p.amount > 0 && (!p.trialDays || p.isPack)) {
-		await postMembershipCharge(ctx.orgId, row!.id, start, p);
+		const firstAmount = promo ? promoApply(promo, pState!, p.amount) : p.amount;
+		await postMembershipCharge(ctx.orgId, row!.id, start, p, firstAmount, promo?.code);
 	}
 	await emit({
 		orgId: ctx.orgId,
@@ -202,7 +307,9 @@ async function postMembershipCharge(
 	orgId: string,
 	membershipId: string,
 	periodStart: string,
-	p: { name: string; amount: number }
+	p: { name: string; amount: number },
+	amount?: number,
+	promoCodeStr?: string
 ) {
 	const [ms] = await db
 		.select({
@@ -214,6 +321,8 @@ async function postMembershipCharge(
 		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
 		.where(eq(membership.id, membershipId));
 	const payerId = ms!.guardianId ?? ms!.memberId;
+	const chargeAmount = amount ?? p.amount;
+	if (chargeAmount <= 0) return;
 	const [row] = await db
 		.insert(charge)
 		.values({
@@ -221,10 +330,10 @@ async function postMembershipCharge(
 			memberId: payerId,
 			membershipId,
 			kind: 'membership',
-			description: `${p.name} — period starting ${periodStart}${payerId !== ms!.memberId ? ` — ${ms!.memberName}` : ''}`,
+			description: `${p.name} — period starting ${periodStart}${payerId !== ms!.memberId ? ` — ${ms!.memberName}` : ''}${promoCodeStr ? ` (${promoCodeStr})` : ''}`,
 			periodStart,
 			dueDate: periodStart,
-			amount: p.amount
+			amount: chargeAmount
 		})
 		.onConflictDoNothing()
 		.returning();

@@ -12,8 +12,16 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
-	import { getPlans, createPlan, updatePlan, getCurrency } from '#lib/remote/billing.remote.ts';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import {
+		getPlans,
+		createPlan,
+		updatePlan,
+		getCurrency,
+		getPromoCodes,
+		createPromoCode,
+		updatePromoCode
+	} from '#lib/remote/billing.remote.ts';
+	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { planIntervals } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -21,6 +29,7 @@
 
 	const currency = await getCurrency();
 	let plans = $state(await getPlans());
+	let promoCodes = $state(await getPromoCodes());
 
 	let open = $state(page.url.searchParams.get('new') === '1');
 	let editing = $state<(typeof plans)[number] | null>(null);
@@ -120,6 +129,48 @@
 		}
 		pending = false;
 	}
+
+	// ------- promo codes -------
+	let promoOpen = $state(false);
+	let pcCode = $state('');
+	let pcPercent = $state<number | null>(null);
+	let pcAmount = $state<number | null>(null);
+	let pcMaxUses = $state<number | null>(null);
+	let pcExpires = $state('');
+	async function submitPromo(e: SubmitEvent) {
+		e.preventDefault();
+		if ((pcPercent == null) === (pcAmount == null)) {
+			toast.error('Set either a percent or a flat amount off');
+			return;
+		}
+		pending = true;
+		try {
+			await createPromoCode({
+				code: pcCode,
+				percentOff: pcPercent || null,
+				amountOff: pcAmount != null ? Math.round(pcAmount * 100) : null,
+				maxUses: pcMaxUses || null,
+				expiresAt: pcExpires || null
+			});
+			toast.success('Promo code created');
+			promoCodes = await getPromoCodes();
+			promoOpen = false;
+			pcCode = '';
+			pcPercent = pcAmount = pcMaxUses = null;
+			pcExpires = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not create code'));
+		}
+		pending = false;
+	}
+	async function togglePromo(id: string, active: boolean) {
+		try {
+			await updatePromoCode({ id, active });
+			promoCodes = await getPromoCodes();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 </script>
 
 <PageHeader title="Membership plans">
@@ -184,7 +235,118 @@
 			</Card.Root>
 		{/each}
 	</div>
+
+	<Card.Root class="mt-6">
+		<Card.Header class="flex-row items-center justify-between">
+			<div>
+				<Card.Title class="text-base">Promo codes</Card.Title>
+				<Card.Description
+					>Discount the up-front charge on your public join page.</Card.Description
+				>
+			</div>
+			<Button size="sm" variant="outline" onclick={() => (promoOpen = true)}
+				><Plus /> New code</Button
+			>
+		</Card.Header>
+		<Card.Content class="px-6">
+			<div class="divide-y">
+				{#each promoCodes as c (c.id)}
+					<div class="flex items-center justify-between gap-3 py-2.5 text-sm">
+						<div class="min-w-0">
+							<p class="font-mono font-medium">{c.code}</p>
+							<p class="text-xs text-muted-foreground">
+								{c.percentOff != null
+									? `${c.percentOff}% off`
+									: `${formatMoney(c.amountOff!, currency)} off`}
+								· {c.maxUses != null
+									? `${c.timesUsed}/${c.maxUses} used`
+									: `${c.timesUsed} used`}{c.expiresAt
+									? ` · expires ${formatDate(c.expiresAt)}`
+									: ''}
+							</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<StatusBadge status={c.active ? 'active' : 'inactive'} />
+							<Switch checked={c.active} onCheckedChange={(v) => togglePromo(c.id, v)} />
+						</div>
+					</div>
+				{:else}
+					<p class="py-4 text-sm text-muted-foreground">
+						No codes yet — make one like LAUNCH20 or FREEJOIN.
+					</p>
+				{/each}
+			</div>
+		</Card.Content>
+	</Card.Root>
 </div>
+
+<Dialog.Root bind:open={promoOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>New promo code</Dialog.Title>
+			<Dialog.Description
+				>Applies to the signup fee (and pack price) on the public join page.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitPromo}>
+			<Field.Field
+				><Field.Label for="pc-code">Code</Field.Label><Input
+					id="pc-code"
+					required
+					bind:value={pcCode}
+					placeholder="LAUNCH20"
+					class="font-mono uppercase"
+					autofocus
+				/></Field.Field
+			>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="pc-pct">Percent off</Field.Label>
+					<Input
+						id="pc-pct"
+						type="number"
+						min={1}
+						max={100}
+						bind:value={pcPercent}
+						placeholder="20"
+						disabled={pcAmount != null}
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="pc-amt">Amount off</Field.Label>
+					<Input
+						id="pc-amt"
+						type="number"
+						min={0.01}
+						step={0.01}
+						bind:value={pcAmount}
+						placeholder="25.00"
+						disabled={pcPercent != null}
+					/>
+				</Field.Field>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="pc-uses">Max uses</Field.Label>
+					<Input
+						id="pc-uses"
+						type="number"
+						min={1}
+						bind:value={pcMaxUses}
+						placeholder="Unlimited"
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="pc-exp">Expires on</Field.Label>
+					<Input id="pc-exp" type="date" bind:value={pcExpires} />
+				</Field.Field>
+			</div>
+			<Dialog.Footer
+				><Button type="submit" disabled={pending || !pcCode}>Create code</Button></Dialog.Footer
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open>
 	<Dialog.Content>

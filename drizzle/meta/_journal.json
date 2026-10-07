@@ -211,6 +211,13 @@
       "when": 1791364432614,
       "tag": "0029_cultured_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791365533704,
+      "tag": "0030_promo_codes",
+      "breakpoints": true
     }
   ]
 }

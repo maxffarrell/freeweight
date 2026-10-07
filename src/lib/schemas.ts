@@ -228,6 +228,25 @@ export const referralSources = [
 	'Other'
 ] as const;
 
+export const promoCodeInput = v.object({
+	code: v.pipe(
+		v.string(),
+		v.trim(),
+		v.minLength(2),
+		v.maxLength(50),
+		v.regex(/^[A-Za-z0-9_-]+$/, 'Letters, numbers, - and _ only')
+	),
+	percentOff: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)))),
+	amountOff: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	maxUses: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	expiresAt: v.optional(v.nullable(isoDate))
+});
+
+export const promoCodeUpdate = v.object({
+	id: idSchema,
+	active: v.boolean()
+});
+
 export const joinInput = v.object({
 	name: requiredText('Name'),
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
@@ -237,6 +256,8 @@ export const joinInput = v.object({
 	referredById: v.optional(v.nullable(idSchema)),
 	planId: v.optional(v.nullable(idSchema)),
 	agreedWaiver: v.optional(v.boolean(), false),
+	/** Discount code applied to the up-front charge. */
+	promoCode: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(50)))),
 	/** Honeypot: must stay empty. */
 	website: v.optional(v.string(), '')
 });

@@ -166,6 +166,28 @@ export const plan = pgTable(
 	(t) => [index('plan_org_idx').on(t.organizationId)]
 );
 
+/** Discount code redeemed on the public join page — off the up-front charge. */
+export const promoCode = pgTable(
+	'promo_code',
+	{
+		id: id(),
+		organizationId: orgId(),
+		code: text('code').notNull(),
+		/** Percent off (1–100) XOR amountOff. */
+		percentOff: integer('percent_off'),
+		/** Flat amount off in minor units XOR percentOff. */
+		amountOff: integer('amount_off'),
+		/** Total redemptions allowed; null = unlimited. */
+		maxUses: integer('max_uses'),
+		timesUsed: integer('times_used').notNull().default(0),
+		/** Local-date cutoff, inclusive; null = never expires. */
+		expiresAt: date('expires_at', { mode: 'string' }),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [uniqueIndex('promo_code_org_code_idx').on(t.organizationId, t.code)]
+);
+
 /** A member's signed liability waiver — stores the exact text they agreed to. */
 export const waiver = pgTable(
 	'waiver',
