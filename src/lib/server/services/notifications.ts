@@ -854,6 +854,27 @@ export async function sendClassReminders(orgId: string) {
 	return sent;
 }
 
+/** Sends one preview of the draft announcement to the staff user composing it. */
+export async function sendAnnouncementTest(
+	orgId: string,
+	userId: string,
+	subject: string,
+	message: string
+) {
+	if (!emailProvider()) error(409, 'No email provider configured');
+	const [u] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
+	if (!u?.email) error(400, 'Your account has no email address');
+	const name = await orgName(orgId);
+	const { text, html } = renderEmail({
+		orgName: name,
+		heading: subject,
+		lines: message.split(/\n+/).filter(Boolean),
+		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+	});
+	await sendEmail({ to: u.email, subject: `[Test] ${name}: ${subject}`, text, html });
+	return { sent: 1 };
+}
+
 /**
  * Staff announcement to every active member with an email on file.
  * Requires a real email provider — 409s when mail isn't configured so the

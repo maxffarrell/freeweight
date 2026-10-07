@@ -6,7 +6,7 @@
 	import Logo from '#lib/components/app/logo.svelte';
 	import { getTodayCheckIns, recordCheckIn, getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { errMsg } from '#lib/format.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import QrCode from '@lucide/svelte/icons/qr-code';
@@ -23,7 +23,9 @@
 	let checkIns = $state(await getTodayCheckIns());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
-	let suggestions = $state<{ id: string; name: string; status: string }[]>([]);
+	let suggestions = $state<
+		{ id: string; name: string; status: string; openBalance: number; planName: string | null }[]
+	>([]);
 	let flash = $state<{ ok: boolean; text: string } | null>(null);
 	let pending = $state(false);
 	let inputEl = $state<HTMLInputElement | null>(null);
@@ -138,7 +140,14 @@
 							onclick={() => checkIn(m.id)}
 						>
 							<span class="font-medium">{m.name}</span>
-							{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
+							<span class="flex items-center gap-2">
+								{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
+								{#if m.openBalance > 0}
+									<Badge variant="destructive"
+										>owes {formatMoney(m.openBalance, settings.currency)}</Badge
+									>
+								{/if}
+							</span>
 						</button>
 					{/each}
 				</div>
