@@ -20,6 +20,7 @@ import {
 	sendWinBackNudges
 } from '#lib/server/services/notifications.ts';
 import {
+	autoCancelUnderEnrolled,
 	expireWaitlists,
 	markPastNoShows,
 	materializeTemplates,
@@ -56,6 +57,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let announcements = 0;
 	let packNudges = 0;
 	let waiverNudges = 0;
+	let underEnrolled = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -125,6 +127,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`waiver-reminder cron failed for ${o.id}`, err);
 		}
 		try {
+			underEnrolled += await autoCancelUnderEnrolled(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`under-enrollment cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -181,7 +189,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		billingReminders,
 		announcements,
 		packNudges,
-		waiverNudges
+		waiverNudges,
+		underEnrolled
 	});
 };
 

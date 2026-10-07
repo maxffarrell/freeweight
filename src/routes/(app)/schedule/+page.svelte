@@ -315,6 +315,7 @@
 	let tCapacity = $state(20);
 	let tDropIn = $state('');
 	let tPayRate = $state('');
+	let tMinEnroll = $state<number | null>(null);
 	let tDescription = $state('');
 	let tActive = $state(true);
 	function editType(c: (typeof classTypes)[number]) {
@@ -326,6 +327,7 @@
 		tCapacity = c.capacity;
 		tDropIn = c.dropInPrice != null ? (c.dropInPrice / 100).toFixed(2) : '';
 		tPayRate = c.payRate != null ? (c.payRate / 100).toFixed(2) : '';
+		tMinEnroll = c.minEnrollment;
 		tActive = c.active;
 	}
 	function resetTypeForm() {
@@ -336,6 +338,7 @@
 		tCapacity = 20;
 		tDropIn = '';
 		tPayRate = '';
+		tMinEnroll = null;
 		tActive = true;
 	}
 	async function submitType(e: SubmitEvent) {
@@ -349,6 +352,7 @@
 				capacity: tCapacity,
 				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : null,
 				payRate: tPayRate ? Math.round(parseFloat(tPayRate) * 100) : null,
+				minEnrollment: tMinEnroll,
 				description: tDescription || undefined,
 				active: tActive
 			};
@@ -939,6 +943,21 @@
 					bind:value={tPayRate}
 					placeholder="0.00 — feeds the payroll report"
 				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-min-enroll">
+					Min. enrollment <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-min-enroll"
+					type="number"
+					min={1}
+					bind:value={tMinEnroll}
+					placeholder="Auto-cancel quiet classes"
+				/>
+				<Field.Description>
+					Sessions booked below this are cancelled the day before — booked members get an email.
+				</Field.Description>
 			</Field.Field>
 			{#if editTypeId}
 				<div class="flex items-center justify-between rounded-lg border px-3 py-2">

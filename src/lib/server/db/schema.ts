@@ -287,6 +287,8 @@ export const classType = pgTable(
 		dropInPrice: integer('drop_in_price'),
 		/** Instructor pay per session taught (minor units); null = unrated. Feeds the payroll report. */
 		payRate: integer('pay_rate'),
+		/** Cron cancels sessions booked below this the day before; null = never auto-cancel. */
+		minEnrollment: integer('min_enrollment'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
