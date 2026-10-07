@@ -47,6 +47,12 @@ export const updateClassType = command(classTypeUpdate, async (input) => {
 	return c;
 });
 
+/** Demand hints — class/weekday pairs running hot (add) or cold (drop), last 6 weeks. */
+export const getScheduleHints = query(async () => {
+	const { orgId } = await requireOrg();
+	return svc.scheduleDemandHints(orgId, await tz());
+});
+
 /** Sessions within `[from, to]` ISO dates; defaults to the next 14 days. */
 export const getSessions = query(
 	v.optional(v.object({ from: v.optional(v.string()), to: v.optional(v.string()) })),
