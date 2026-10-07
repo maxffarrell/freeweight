@@ -64,6 +64,20 @@ export function validUnsubscribeToken(memberId: string, token: string) {
 const unsubscribeUrl = (memberId: string) =>
 	`${appOrigin()}/unsubscribe?m=${memberId}&t=${unsubscribeToken(memberId)}`;
 
+/** Signed token behind the portal's "Sync to calendar" .ics feed URL. */
+export function calendarToken(memberId: string) {
+	return createHmac('sha256', BETTER_AUTH_SECRET)
+		.update(`ical:${memberId}`)
+		.digest('hex')
+		.slice(0, 32);
+}
+
+export function validCalendarToken(memberId: string, token: string) {
+	const a = Buffer.from(calendarToken(memberId));
+	const b = Buffer.from(token);
+	return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /**
  * sendEmail for member-facing mail: skips members who unsubscribed and appends
  * the signed Unsubscribe footer every marketing/notification email needs.

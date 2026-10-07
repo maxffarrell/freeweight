@@ -27,6 +27,7 @@ import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
 import { emit } from './events.ts';
 import {
+	calendarToken,
 	notifyCancellationRequested,
 	notifyPauseRequested,
 	notifyPlanChanged
@@ -192,6 +193,7 @@ export async function portalOverview(memberId: string) {
 		payments,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
+		calendarToken: calendarToken(memberId),
 		orgSlug: org?.slug ?? '',
 		referralCount: referred?.n ?? 0,
 		waiverRequired: !!settings?.waiver,
