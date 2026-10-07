@@ -10,6 +10,7 @@ import * as checkins from '#lib/server/services/checkins.ts';
 import * as amenities from '#lib/server/services/resources.ts';
 import * as shifts from '#lib/server/services/shifts.ts';
 import * as giftcards from '#lib/server/services/giftcards.ts';
+import * as recurring from '#lib/server/services/recurring.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
@@ -263,6 +264,14 @@ export const resources: Record<string, Resource> = {
 			'Gift cards — code-keyed store credit; POST sells a card (memberId + amount in cents, posts an `other` charge to the buyer)',
 		list: (ctx) => giftcards.listGiftCards(ctx.orgId),
 		create: { schema: s.giftCardSale, run: giftcards.sellGiftCard as never }
+	},
+	recurring_charges: {
+		description:
+			'Recurring member add-ons (PT package, towel service) — cron posts an `other` charge each week/month/year until inactive',
+		list: (ctx) => recurring.listRecurring(ctx.orgId),
+		create: { schema: s.recurringChargeInput, run: recurring.addRecurring as never },
+		update: { schema: s.recurringChargeUpdate, run: recurring.updateRecurring as never },
+		delete: (ctx, id) => recurring.removeRecurring(ctx, id)
 	}
 };
 

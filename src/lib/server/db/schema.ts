@@ -714,6 +714,34 @@ export const giftCard = pgTable(
 	]
 );
 
+/**
+ * A recurring add-on on a member — monthly PT packages, towel service,
+ * locker rental. The cron posts an `other` charge and advances `nextDue`
+ * each period; unlike plans these carry no access rights.
+ */
+export const recurringCharge = pgTable(
+	'recurring_charge',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		description: text('description').notNull(),
+		amount: integer('amount').notNull(),
+		/** 'week' | 'month' | 'year' — same vocabulary as plan intervals. */
+		interval: text('interval').notNull().default('month'),
+		/** Next gym-local posting date (YYYY-MM-DD). */
+		nextDue: date('next_due', { mode: 'string' }).notNull(),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [
+		index('recurring_charge_org_due_idx').on(t.organizationId, t.nextDue),
+		index('recurring_charge_member_idx').on(t.memberId)
+	]
+);
+
 /** A front-desk retail item — water, wraps, shirts — sold into a charge or paid on the spot. */
 export const shopItem = pgTable(
 	'shop_item',

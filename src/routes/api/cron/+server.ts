@@ -32,6 +32,7 @@ import {
 } from '#lib/server/services/schedule.ts';
 import { closeStaleCheckIns } from '#lib/server/services/checkins.ts';
 import { closeStaleShifts } from '#lib/server/services/shifts.ts';
+import { postDueRecurring } from '#lib/server/services/recurring.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -70,10 +71,12 @@ export const GET: RequestHandler = async ({ request }) => {
 	let underEnrolled = 0;
 	let autoCheckouts = 0;
 	let shiftCloses = 0;
+	let recurringPosted = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
 			suspended += await suspendDelinquentMembers(o.id);
+			recurringPosted += await postDueRecurring(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);
@@ -234,7 +237,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		waiverNudges,
 		underEnrolled,
 		autoCheckouts,
-		shiftCloses
+		shiftCloses,
+		recurringPosted
 	});
 };
 

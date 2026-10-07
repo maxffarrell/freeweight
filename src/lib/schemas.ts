@@ -356,6 +356,20 @@ export const paymentInput = v.object({
 	notes: optionalText
 });
 
+export const recurringChargeInput = v.object({
+	memberId: idSchema,
+	description: requiredText('Description'),
+	amount: cents,
+	interval: v.optional(v.picklist(planIntervals), 'month'),
+	/** First posting date (gym-local YYYY-MM-DD). */
+	nextDue: isoDate
+});
+export const recurringChargeUpdate = v.object({
+	id: idSchema,
+	active: v.optional(v.boolean()),
+	nextDue: v.optional(isoDate)
+});
+
 export const giftCardSale = v.object({
 	memberId: idSchema,
 	amount: cents,
