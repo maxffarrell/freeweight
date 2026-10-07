@@ -492,8 +492,11 @@
 					required
 					bind:value={emailBody}
 					rows={6}
-					placeholder="Hi everyone — we're closed this Thursday for maintenance…"
+					placeholder={"Hi {first_name} — we're closed this Thursday for maintenance…"}
 				/>
+				<Field.Description>
+					Personalize with {'{name}'} or {'{first_name}'}.
+				</Field.Description>
 			</Field.Field>
 			<Dialog.Footer class="items-center justify-between sm:justify-between">
 				<span class="text-xs text-muted-foreground">
