@@ -25,6 +25,7 @@ const EVENT_TYPES = [
 	'membership.cancel_requested',
 	'membership.suspended',
 	'member.imported',
+	'member.lead',
 	'member.waiver_signed',
 	'booking.dropin'
 ] as const;

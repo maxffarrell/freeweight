@@ -8,6 +8,8 @@ import {
 	classType,
 	gymMember,
 	gymSettings,
+	memberNote,
+	memberTag,
 	membership,
 	waiver,
 	location,
@@ -181,6 +183,61 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		notifyReferralJoin(org.id, referrer.id, m!.id).catch(() => {});
 	}
 	return { member: m!, existing: false, checkoutUrl };
+}
+
+const leadRate = new Map<string, number[]>();
+
+/**
+ * Public lead form → member tagged `lead` (+ a staff note with their interest).
+ * Same unauthenticated + rate-limited + honeypot treatment as joinGym; staff find
+ * leads via the members list's "No plan" filter or the `lead` tag.
+ */
+export async function captureLead(
+	slug: string,
+	ip: string,
+	input: v.InferOutput<typeof s.leadInput>
+) {
+	if (input.website) error(400, 'Invalid form'); // honeypot
+	const now = Date.now();
+	const hits = (leadRate.get(ip) ?? []).filter((t) => now - t < 3600_000);
+	if (hits.length >= 10) error(429, 'Too many attempts — try again later');
+	leadRate.set(ip, [...hits, now]);
+
+	const { org } = await getPublicGym(slug);
+
+	const [existing] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, input.email)))
+		.limit(1);
+	if (existing) return { member: existing, existing: true };
+
+	const [m] = await db
+		.insert(gymMember)
+		.values({
+			organizationId: org.id,
+			name: input.name,
+			email: input.email,
+			phone: input.phone ?? null,
+			joinedAt: new Date().toISOString().slice(0, 10)
+		})
+		.returning();
+	await db.insert(memberTag).values({ organizationId: org.id, memberId: m!.id, tag: 'lead' });
+	if (input.interest) {
+		await db.insert(memberNote).values({
+			organizationId: org.id,
+			memberId: m!.id,
+			body: `Lead form: ${input.interest}`
+		});
+	}
+	await emit({
+		orgId: org.id,
+		entityType: 'member',
+		entityId: m!.id,
+		action: 'lead',
+		summary: `${input.name} left their info on the public page`
+	});
+	return { member: m!, existing: false };
 }
 
 /** First live online provider's checkout URL for a one-off amount, or null when none is ready. */
