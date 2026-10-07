@@ -3,8 +3,8 @@ import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { document, gymMember } from '#lib/server/db/schema.ts';
-import { and, desc, eq } from 'drizzle-orm';
+import { document, gymMember, plan } from '#lib/server/db/schema.ts';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import { idSchema } from '#lib/schemas.ts';
 
@@ -116,3 +116,25 @@ export const resubscribe = command(idSchema, async (memberId) => {
 	await svc.resubscribe(m.id);
 	void getPortalOverview(memberId).refresh();
 });
+
+/** Listed + active plans the member can self-join (the public page's plan set). */
+export const getJoinablePlans = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return db
+		.select()
+		.from(plan)
+		.where(
+			and(eq(plan.organizationId, m.organizationId), eq(plan.active, true), eq(plan.listed, true))
+		)
+		.orderBy(asc(plan.amount));
+});
+
+export const joinPlan = command(
+	v.object({ memberId: idSchema, planId: idSchema }),
+	async ({ memberId, planId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.memberJoinPlan(m.organizationId, m.id, planId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);

@@ -19,7 +19,9 @@
 		startCheckout,
 		signWaiver,
 		getMyDocuments,
-		resubscribe
+		resubscribe,
+		getJoinablePlans,
+		joinPlan
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -35,6 +37,18 @@
 	const bookable = $derived(await getBookable(memberId));
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
+	const joinablePlans = $derived(await getJoinablePlans(memberId));
+	let joining = $state('');
+	async function join(planId: string) {
+		joining = planId;
+		try {
+			await joinPlan({ memberId, planId });
+			toast.success('Membership activated — pay any open balance below');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not join plan'));
+		}
+		joining = '';
+	}
 	const tz = $derived(d.settings?.timezone ?? 'UTC');
 	const currency = $derived(d.settings?.currency ?? 'usd');
 
@@ -183,6 +197,29 @@
 						<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
 					{/if}
 				</div>
+				{#if !d.memberships.some((mm) => mm.membership.status === 'active') && joinablePlans.length}
+					<div class="mt-2 w-full space-y-1.5">
+						<p class="text-xs font-medium text-muted-foreground">Join a plan</p>
+						{#each joinablePlans as p (p.id)}
+							<div class="flex items-center justify-between gap-2 text-sm">
+								<div class="min-w-0">
+									<span class="font-medium">{p.name}</span>
+									<span class="text-muted-foreground">
+										— {formatMoney(p.amount, currency)}{p.isPack
+											? ` · ${p.classCredits} classes`
+											: `/${p.interval}`}{p.trialDays ? ` · ${p.trialDays}-day free trial` : ''}
+									</span>
+								</div>
+								<Button
+									size="sm"
+									variant="outline"
+									disabled={joining === p.id}
+									onclick={() => join(p.id)}>{joining === p.id ? 'Joining…' : 'Join'}</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
 				{#each d.memberships as mm (mm.membership.id)}
 					{#if mm.membership.status === 'active'}
 						<p class="mt-1 text-xs text-muted-foreground">

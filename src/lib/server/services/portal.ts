@@ -20,7 +20,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { checkInToken } from './checkins.ts';
 import { bookSession, cancelBooking } from './schedule.ts';
-import { memberBalance } from './billing.ts';
+import { createMembership, getPlan, memberBalance } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
@@ -419,4 +419,28 @@ export async function withdrawCancellation(orgId: string, memberId: string, memb
 /** Member re-enables gym emails after using the unsubscribe link. */
 export async function resubscribe(memberId: string) {
 	await db.update(gymMember).set({ unsubscribedAt: null }).where(eq(gymMember.id, memberId));
+}
+
+/**
+ * Member self-joins a plan from the portal — the same plans the public join
+ * page offers (active + listed). Refuses when an active membership already
+ * exists; plan changes stay a staff action. Resulting charges appear on the
+ * member's balance and are paid via the normal portal checkout.
+ */
+export async function memberJoinPlan(orgId: string, memberId: string, planId: string) {
+	const [active] = await db
+		.select({ id: membership.id })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active')
+			)
+		)
+		.limit(1);
+	if (active) error(409, 'You already have an active membership');
+	const p = await getPlan(orgId, planId);
+	if (!p.active || !p.listed) error(404, 'Plan not available');
+	return createMembership({ orgId }, { memberId, planId });
 }
