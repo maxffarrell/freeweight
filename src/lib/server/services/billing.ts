@@ -619,6 +619,42 @@ export async function addCharge(ctx: OrgContext, input: v.InferOutput<typeof s.c
 	return row;
 }
 
+/**
+ * Posts one manual charge to every member holding an active membership —
+ * annual facility fees, rate adjustments. Each member gets one charge
+ * regardless of how many active memberships they hold.
+ */
+export async function bulkCharge(ctx: OrgContext, input: v.InferOutput<typeof s.bulkChargeInput>) {
+	const members = await db
+		.select({ memberId: membership.memberId })
+		.from(membership)
+		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.status, 'active')))
+		.groupBy(membership.memberId);
+	if (!members.length) return { posted: 0 };
+	const rows = await db
+		.insert(charge)
+		.values(
+			members.map((m) => ({
+				organizationId: ctx.orgId,
+				memberId: m.memberId,
+				kind: 'other' as const,
+				description: input.description,
+				amount: input.amount,
+				dueDate: input.dueDate
+			}))
+		)
+		.returning({ id: charge.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'charge',
+		entityId: rows[0]!.id,
+		action: 'bulk_created',
+		summary: `"${input.description}" posted to ${rows.length} member${rows.length === 1 ? '' : 's'}`
+	});
+	return { posted: rows.length };
+}
+
 export async function updateCharge(ctx: OrgContext, input: v.InferOutput<typeof s.chargeUpdate>) {
 	const { id, ...set } = input;
 	const [row] = await db

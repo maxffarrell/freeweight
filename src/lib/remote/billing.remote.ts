@@ -5,6 +5,7 @@ import * as svc from '#lib/server/services/billing.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
+	bulkChargeInput,
 	chargeInput,
 	chargeUpdate,
 	idSchema,
@@ -77,6 +78,12 @@ export const addCharge = command(chargeInput, async (input) => {
 	void getCharges().refresh();
 	void getMember(input.memberId).refresh();
 	return c;
+});
+/** Posts a manual charge to every member with an active membership. */
+export const bulkCharge = command(bulkChargeInput, async (input) => {
+	const r = await svc.bulkCharge(await requireOrg('admin'), input);
+	void getCharges().refresh();
+	return r;
 });
 export const updateCharge = command(chargeUpdate, async (input) => {
 	const c = await svc.updateCharge(await requireOrg(), input);

@@ -194,6 +194,13 @@ export const chargeInput = v.object({
 	amount: cents,
 	dueDate: isoDate
 });
+/** One manual charge posted to every member with an active membership. */
+export const bulkChargeInput = v.object({
+	description: requiredText('Description'),
+	amount: cents,
+	dueDate: isoDate
+});
+
 export const chargeUpdate = v.object({
 	id: idSchema,
 	status: v.optional(v.picklist(chargeStatuses)),
