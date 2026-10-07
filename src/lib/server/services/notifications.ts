@@ -39,6 +39,7 @@ import {
 	payment,
 	plan,
 	resourceBooking,
+	sessionFeedback,
 	user,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -2693,4 +2694,67 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 			})
 		});
 	}
+}
+
+/**
+ * "How was class?" — emails attended members a rating nudge the day a session
+ * ends, once per (session, member); skips sessions that already have feedback.
+ */
+export async function ratingNudges(orgId: string) {
+	const since = new Date(Date.now() - 36 * 3600_000);
+	const rows = await db
+		.select({
+			sessionId: classSession.id,
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.leftJoin(
+			sessionFeedback,
+			and(
+				eq(sessionFeedback.sessionId, classSession.id),
+				eq(sessionFeedback.memberId, booking.memberId)
+			)
+		)
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'attended'),
+				isNull(classSession.cancelledAt),
+				isNull(sessionFeedback.id),
+				gte(classSession.endsAt, since),
+				lt(classSession.endsAt, new Date())
+			)
+		)
+		.limit(200);
+	if (!rows.length) return 0;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email) continue;
+		if (!(await logOnce(orgId, 'rating_nudge', `${r.sessionId}:${r.memberId}`, r.email))) continue;
+		const first = r.memberName.split(' ')[0] ?? r.memberName;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `How was ${r.className}?`,
+			...renderEmail({
+				...name,
+				heading: `How was ${r.className}?`,
+				lines: [
+					`Hi ${first},`,
+					`You took ${r.className} on ${localDate(r.startsAt, tz)} — a quick star rating helps ${name.orgName} tune the schedule.`,
+					'Rate it from your Class history in the member portal — takes 10 seconds.'
+				],
+				action: { label: 'Rate this class', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
