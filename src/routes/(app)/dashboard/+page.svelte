@@ -149,6 +149,24 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.birthdaysThisWeek.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Birthdays this week</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.birthdaysThisWeek as r (r.memberId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
+									>
+									<Badge variant={r.days === 0 ? 'default' : 'outline'} class="shrink-0">
+										{r.days === 0 ? 'today' : formatDate(r.when)}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.renewalsThisWeek.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Renewing this week</Card.Title></Card.Header>
