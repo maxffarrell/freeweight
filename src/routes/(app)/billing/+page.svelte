@@ -30,7 +30,11 @@
 		updateShopItem,
 		sellItem,
 		getGiftCards,
-		sellGiftCard
+		sellGiftCard,
+		getRecurring,
+		addRecurring,
+		updateRecurring,
+		removeRecurring
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
@@ -39,6 +43,7 @@
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import Download from '@lucide/svelte/icons/download';
 	import Gift from '@lucide/svelte/icons/gift';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { toCsv } from '#lib/csv.ts';
 
 	const currency = await getCurrency();
@@ -49,6 +54,7 @@
 	let memberships = $state(await getMemberships());
 	let payments = $state(await getPayments());
 	let giftCards = $state(await getGiftCards());
+	let recurring = $state(await getRecurring());
 	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
 
@@ -133,6 +139,51 @@
 	async function copyCode(code: string) {
 		await navigator.clipboard.writeText(code).catch(() => {});
 		toast.success('Code copied');
+	}
+
+	// ------- recurring add-ons -------
+	let rcMemberId = $state('');
+	let rcDesc = $state('');
+	let rcAmount = $state<number | null>(null);
+	let rcInterval = $state<'week' | 'month' | 'year'>('month');
+	let rcNextDue = $state(todayISO());
+	async function submitRecurring(e: SubmitEvent) {
+		e.preventDefault();
+		if (!rcAmount || !rcDesc.trim()) return;
+		pending = true;
+		try {
+			await addRecurring({
+				memberId: rcMemberId,
+				description: rcDesc.trim(),
+				amount: rcAmount,
+				interval: rcInterval,
+				nextDue: rcNextDue
+			});
+			recurring = await getRecurring();
+			toast.success('Recurring add-on created');
+			rcDesc = '';
+			rcAmount = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not create'));
+		}
+		pending = false;
+	}
+	async function toggleRecurring(r: { rec: { id: string; active: boolean } }) {
+		try {
+			await updateRecurring({ id: r.rec.id, active: !r.rec.active });
+			recurring = await getRecurring();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
+	async function deleteRecurring(r: { rec: { id: string; description: string } }) {
+		if (!confirm(`Delete the recurring "${r.rec.description}"? Past charges stay.`)) return;
+		try {
+			await removeRecurring(r.rec.id);
+			recurring = await getRecurring();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
 	}
 
 	// ------- record payment -------
@@ -356,6 +407,7 @@
 			<Tabs.Trigger value="memberships">Memberships</Tabs.Trigger>
 			<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 			<Tabs.Trigger value="shop">Shop</Tabs.Trigger>
+			<Tabs.Trigger value="recurring">Recurring</Tabs.Trigger>
 		</Tabs.List>
 
 		<Tabs.Content value="charges">
@@ -762,6 +814,118 @@
 					</Table.Root>
 				</Card.Content>
 			</Card.Root>
+		</Tabs.Content>
+
+		<Tabs.Content value="recurring">
+			<div class="grid gap-4 lg:grid-cols-2">
+				<Card.Root class="py-0">
+					<Card.Content class="px-0">
+						<Table.Root>
+							<Table.Header>
+								<Table.Row>
+									<Table.Head>Member</Table.Head>
+									<Table.Head>Item</Table.Head>
+									<Table.Head class="text-right">Amount</Table.Head>
+									<Table.Head>Next due</Table.Head>
+									<Table.Head>On</Table.Head>
+									<Table.Head></Table.Head>
+								</Table.Row>
+							</Table.Header>
+							<Table.Body>
+								{#each recurring as r (r.rec.id)}
+									<Table.Row class={r.rec.active ? '' : 'opacity-50'}>
+										<Table.Cell>
+											<a class="font-medium hover:underline" href="/members/{r.rec.memberId}"
+												>{r.memberName}</a
+											>
+										</Table.Cell>
+										<Table.Cell class="text-muted-foreground"
+											>{r.rec.description} · {r.rec.interval}ly</Table.Cell
+										>
+										<Table.Cell class="text-right tabular-nums"
+											>{formatMoney(r.rec.amount, currency)}</Table.Cell
+										>
+										<Table.Cell class="tabular-nums">{r.rec.nextDue}</Table.Cell>
+										<Table.Cell
+											><Switch
+												checked={r.rec.active}
+												onCheckedChange={() => toggleRecurring(r)}
+											/></Table.Cell
+										>
+										<Table.Cell class="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => deleteRecurring(r)}><Trash2 /></Button
+											>
+										</Table.Cell>
+									</Table.Row>
+								{:else}
+									<Table.Row
+										><Table.Cell colspan={6} class="text-muted-foreground"
+											>No recurring add-ons — PT packages, towel service, locker rental live here.</Table.Cell
+										></Table.Row
+									>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</Card.Content>
+				</Card.Root>
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-base">New recurring add-on</Card.Title>
+						<Card.Description>
+							Posts a charge each period — for extras that aren't part of a membership plan.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<form class="space-y-3" onsubmit={submitRecurring}>
+							<Field.Field>
+								<Field.Label>Member</Field.Label>
+								<Select.Root type="single" bind:value={rcMemberId}>
+									<Select.Trigger class="w-full">
+										{memberList.find((m) => m.id === rcMemberId)?.name ?? 'Pick a member'}
+									</Select.Trigger>
+									<Select.Content>
+										{#each memberList as m (m.id)}
+											<Select.Item value={m.id}>{m.name}</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="rc-desc">Item</Field.Label>
+								<Input id="rc-desc" required bind:value={rcDesc} placeholder="Towel service" />
+							</Field.Field>
+							<div class="grid grid-cols-3 gap-3">
+								<Field.Field>
+									<Field.Label>Amount</Field.Label>
+									<MoneyInput bind:value={rcAmount} />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>Every</Field.Label>
+									<Select.Root type="single" bind:value={rcInterval}>
+										<Select.Trigger class="w-full">{rcInterval}</Select.Trigger>
+										<Select.Content>
+											<Select.Item value="week">week</Select.Item>
+											<Select.Item value="month">month</Select.Item>
+											<Select.Item value="year">year</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="rc-due">First charge</Field.Label>
+									<Input id="rc-due" type="date" required bind:value={rcNextDue} />
+								</Field.Field>
+							</div>
+							<Button type="submit" disabled={pending || !rcAmount || !rcDesc.trim() || !rcMemberId}
+								>Add recurring</Button
+							>
+						</form>
+					</Card.Content>
+				</Card.Root>
+			</div>
 		</Tabs.Content>
 	</Tabs.Root>
 </div>

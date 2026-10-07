@@ -3,6 +3,7 @@ import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/billing.ts';
 import * as gc from '#lib/server/services/giftcards.ts';
+import * as recSvc from '#lib/server/services/recurring.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
@@ -20,6 +21,8 @@ import {
 	planUpdate,
 	giftCardSale,
 	promoCodeInput,
+	recurringChargeInput,
+	recurringChargeUpdate,
 	promoCodeUpdate,
 	saleInput,
 	shopItemInput,
@@ -126,6 +129,28 @@ export const sellItem = command(saleInput, async (input) => {
 	void getCharges().refresh();
 	void getPayments().refresh();
 	void getMember(input.memberId).refresh();
+	return r;
+});
+
+// ------- recurring add-ons -------
+
+export const getRecurring = query(async () => recSvc.listRecurring((await requireOrg()).orgId));
+
+export const addRecurring = command(recurringChargeInput, async (input) => {
+	const r = await recSvc.addRecurring(await requireOrg(), input);
+	void getRecurring().refresh();
+	return r;
+});
+
+export const updateRecurring = command(recurringChargeUpdate, async (input) => {
+	const r = await recSvc.updateRecurring(await requireOrg(), input);
+	void getRecurring().refresh();
+	return r;
+});
+
+export const removeRecurring = command(idSchema, async (id) => {
+	const r = await recSvc.removeRecurring(await requireOrg(), id);
+	void getRecurring().refresh();
 	return r;
 });
 
