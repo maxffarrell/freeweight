@@ -39,6 +39,7 @@ import {
 	payment,
 	plan,
 	resourceBooking,
+	rota,
 	sessionFeedback,
 	user,
 	waiver
@@ -2653,6 +2654,7 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 	const [row] = await db
 		.select({
 			startsAt: classSession.startsAt,
+			endsAt: classSession.endsAt,
 			className: classType.name,
 			locationName: location.name,
 			instructorName: user.name,
@@ -2668,6 +2670,23 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const day = localDate(row.startsAt, tz);
 	const time = localTime(row.startsAt, tz);
+
+	// Name whoever is already rota'd to work during the session — the likeliest sub.
+	const onRota = (
+		await db
+			.select({ staffName: user.name })
+			.from(rota)
+			.innerJoin(member, eq(rota.memberId, member.id))
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(
+				and(
+					eq(rota.organizationId, orgId),
+					eq(rota.weekday, localWeekday(row.startsAt, tz)),
+					lt(rota.startTime, localTime(row.endsAt, tz)),
+					gt(rota.endTime, localTime(row.startsAt, tz))
+				)
+			)
+	).map((r) => r.staffName);
 
 	const staff = await db
 		.select({ email: user.email })
@@ -2685,6 +2704,7 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 				heading: `${row.className} needs a sub`,
 				lines: [
 					`${row.instructorName ?? 'The assigned instructor'} can't make ${row.className} on ${formatDate(day)} at ${time}${row.locationName ? ` (${row.locationName})` : ''} — ${row.booked} booked.`,
+					...(onRota.length ? [`Scheduled to work then: ${onRota.join(', ')}.`] : []),
 					'Tap below to claim it — you become the instructor, the flag clears, and booked members are emailed.'
 				],
 				action: {
