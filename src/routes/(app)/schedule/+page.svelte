@@ -103,6 +103,42 @@
 		}
 	}
 
+	// ------- edit session -------
+	let editOpen = $state(false);
+	let editDate = $state('');
+	let editTime = $state('');
+	let editCapacity = $state<number | null>(null);
+	let editLocationId = $state('');
+	let editInstructorId = $state('');
+	function openEdit() {
+		if (!focus) return;
+		editDate = localDate(focus.session.startsAt, tz);
+		editTime = localTime(focus.session.startsAt, tz);
+		editCapacity = focus.session.capacity;
+		editLocationId = focus.session.locationId ?? '';
+		editInstructorId = focus.session.instructorId ?? '';
+		editOpen = true;
+	}
+	async function submitEdit(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await updateSession({
+				id: focusId,
+				startsAt: `${editDate}T${editTime}`,
+				capacity: editCapacity ?? undefined,
+				locationId: editLocationId || null,
+				instructorId: editInstructorId || null
+			});
+			toast.success('Session updated');
+			editOpen = false;
+			await reload();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+		pending = false;
+	}
+
 	// ------- new session -------
 	let sessOpen = $state(page.url.searchParams.get('new') === '1');
 	let sessTypeId = $state('');
@@ -338,6 +374,7 @@
 				<Button onclick={book} disabled={!bookMemberId}>Book</Button>
 			</div>
 			{#if focus}
+				<Button variant="outline" class="w-full" onclick={openEdit}>Edit session</Button>
 				<Button
 					variant="outline"
 					class="w-full"
@@ -419,6 +456,64 @@
 		}
 	</style>
 </svelte:head>
+
+<Dialog.Root bind:open={editOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Edit {focus?.className ?? 'session'}</Dialog.Title>
+			<Dialog.Description>
+				Booked members are emailed when the instructor or time/location changes.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitEdit}>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="edit-date">Date</Field.Label>
+					<Input id="edit-date" type="date" required bind:value={editDate} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="edit-time">Start time</Field.Label>
+					<Input id="edit-time" type="time" required bind:value={editTime} />
+				</Field.Field>
+			</div>
+			<Field.Field>
+				<Field.Label for="edit-cap">Capacity</Field.Label>
+				<Input id="edit-cap" type="number" min={1} required bind:value={editCapacity} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>Location</Field.Label>
+				<Select.Root type="single" bind:value={editLocationId}>
+					<Select.Trigger class="w-full">
+						{locations.find((l) => l.id === editLocationId)?.name ?? 'No location'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="">No location</Select.Item>
+						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+							<Select.Item value={l.id}>{l.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>Instructor</Field.Label>
+				<Select.Root type="single" bind:value={editInstructorId}>
+					<Select.Trigger class="w-full">
+						{instructors.find((i) => i.id === editInstructorId)?.name ?? 'Default'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="">Default</Select.Item>
+						{#each instructors as i (i.id)}
+							<Select.Item value={i.id}>{i.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save changes'}</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={sessOpen}>
 	<Dialog.Content>
