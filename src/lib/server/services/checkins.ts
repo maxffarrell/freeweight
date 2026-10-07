@@ -1,6 +1,19 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gte, ilike, isNotNull, isNull, lt, or, gt, sql } from 'drizzle-orm';
+import {
+	and,
+	desc,
+	eq,
+	gte,
+	gt,
+	ilike,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	or,
+	sql
+} from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -16,6 +29,7 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import { notifyCheckInMilestone, notifyFirstVisit } from './notifications.ts';
+import { getRoster, getSession } from './schedule.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -258,4 +272,49 @@ export async function listCheckIns(
 			)
 		)
 		.orderBy(desc(checkIn.checkedAt));
+}
+
+/**
+ * Kiosk "Check in all": logs a visit for every still-booked member on a session's roster.
+ * Members already inside (an open check-in) are skipped — a second recordCheckIn would check them out.
+ */
+export async function checkInRoster(ctx: OrgContext, sessionId: string) {
+	const [sess, roster] = await Promise.all([
+		getSession(ctx.orgId, sessionId),
+		getRoster(ctx.orgId, sessionId)
+	]);
+	const booked = roster.filter((r) => r.booking.status === 'booked');
+	if (!booked.length) return { checkedIn: 0, skipped: 0 };
+	const open = await db
+		.select({ memberId: checkIn.memberId })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				inArray(
+					checkIn.memberId,
+					booked.map((r) => r.booking.memberId)
+				),
+				isNull(checkIn.checkedOutAt)
+			)
+		);
+	const inside = new Set(open.map((o) => o.memberId));
+	let checkedIn = 0;
+	let skipped = 0;
+	for (const r of booked) {
+		if (inside.has(r.booking.memberId)) {
+			skipped++;
+			continue;
+		}
+		try {
+			await recordCheckIn(ctx, {
+				code: r.booking.memberId,
+				locationId: sess.session.locationId
+			});
+			checkedIn++;
+		} catch {
+			skipped++;
+		}
+	}
+	return { checkedIn, skipped };
 }

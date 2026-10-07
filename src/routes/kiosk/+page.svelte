@@ -13,7 +13,7 @@
 		createMember,
 		logGuestVisit
 	} from '#lib/remote/members.remote.ts';
-	import { getRoster } from '#lib/remote/schedule.remote.ts';
+	import { getRoster, checkInRoster } from '#lib/remote/schedule.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
@@ -101,6 +101,22 @@
 				locationId: rosterSess?.session.locationId ?? null
 			});
 			showFlash(true, `${memberName} checked in`, r.member.photoDocumentId);
+			await getRoster(rosterSess!.session.id).refresh();
+		} catch (err) {
+			showFlash(false, errMsg(err, 'Could not check in'));
+		}
+		rosterBusy = '';
+	}
+	async function checkInAll() {
+		rosterBusy = 'all';
+		try {
+			const r = await checkInRoster(rosterSess!.session.id);
+			showFlash(
+				true,
+				r.checkedIn
+					? `Checked in ${r.checkedIn} member${r.checkedIn === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped)` : ''}`
+					: 'Nobody left to check in'
+			);
 			await getRoster(rosterSess!.session.id).refresh();
 		} catch (err) {
 			showFlash(false, errMsg(err, 'Could not check in'));
@@ -523,5 +539,12 @@
 				<p class="px-3 py-4 text-sm text-muted-foreground">Nobody booked yet.</p>
 			{/each}
 		</div>
+		{#if sessRoster.some((r) => r.booking.status === 'booked')}
+			<Dialog.Footer>
+				<Button size="sm" disabled={rosterBusy === 'all'} onclick={checkInAll}>
+					{rosterBusy === 'all' ? 'Checking in…' : 'Check in all'}
+				</Button>
+			</Dialog.Footer>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
