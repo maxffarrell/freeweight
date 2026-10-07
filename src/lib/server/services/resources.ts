@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, gte, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { error } from '@sveltejs/kit';
-import { facilityResource, location, resourceBooking } from '#lib/server/db/schema.ts';
+import { facilityResource, gymMember, location, resourceBooking } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 import { getSettings } from './settings.ts';
@@ -193,6 +193,28 @@ export async function memberReservations(orgId: string, memberId: string, from =
 		)
 		.orderBy(asc(resourceBooking.startsAt))
 		.limit(30);
+}
+
+/** All upcoming reservations across resources (staff view + REST API). */
+export async function listResourceBookings(orgId: string, from = new Date()) {
+	return db
+		.select({
+			booking: resourceBooking,
+			resourceName: facilityResource.name,
+			memberName: gymMember.name
+		})
+		.from(resourceBooking)
+		.innerJoin(facilityResource, eq(resourceBooking.resourceId, facilityResource.id))
+		.innerJoin(gymMember, eq(resourceBooking.memberId, gymMember.id))
+		.where(
+			and(
+				eq(resourceBooking.organizationId, orgId),
+				eq(resourceBooking.status, 'booked'),
+				gte(resourceBooking.endsAt, from)
+			)
+		)
+		.orderBy(asc(resourceBooking.startsAt))
+		.limit(200);
 }
 
 /** Cancel — members may cancel their own upcoming slots; staff cancel anyone's. */

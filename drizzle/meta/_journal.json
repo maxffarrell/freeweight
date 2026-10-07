@@ -442,6 +442,13 @@
       "when": 1791397455355,
       "tag": "0062_plan-book-ahead",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1791398691334,
+      "tag": "0063_challenge-prize",
+      "breakpoints": true
     }
   ]
 }

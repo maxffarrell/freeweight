@@ -962,7 +962,8 @@
 								</div>
 								<p class="text-sm text-muted-foreground">
 									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
-									{c.challenge.goal} check-ins · {c.joined} in
+									{c.challenge.goal} check-ins · {c.joined}
+									in{c.challenge.prize ? ` · win ${c.challenge.prize}` : ''}
 								</p>
 								{#if c.challenge.description}
 									<p class="mt-0.5 truncate text-xs text-muted-foreground">

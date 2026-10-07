@@ -106,6 +106,7 @@ export async function createChallenge(
 			organizationId: ctx.orgId,
 			name: input.name,
 			description: input.description ?? '',
+			prize: input.prize ?? '',
 			goal: input.goal,
 			startDate: input.startDate,
 			endDate: input.endDate
