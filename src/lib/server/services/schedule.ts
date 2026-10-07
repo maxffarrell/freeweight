@@ -892,7 +892,7 @@ export async function bookSession(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.bookingInput>,
 	actorId?: string | null,
-	opts?: { notify?: boolean }
+	opts?: { notify?: boolean; skipDailyLimit?: boolean }
 ) {
 	const [m] = await db
 		.select()
@@ -957,7 +957,11 @@ export async function bookSession(
 		// Daily booking limit: the member can't hold more than N non-cancelled
 		// bookings on sessions in the same local day. (An existing live booking
 		// falls through to the 'Already booked' check below instead.)
-		if (st?.maxPerDay != null && !(existing && existing.status !== 'cancelled')) {
+		if (
+			st?.maxPerDay != null &&
+			!opts?.skipDailyLimit &&
+			!(existing && existing.status !== 'cancelled')
+		) {
 			const tz = st.tz ?? 'UTC';
 			const day = localDate(s.startsAt, tz);
 			const dayStart = zonedToUtc(`${day}T00:00`, tz);

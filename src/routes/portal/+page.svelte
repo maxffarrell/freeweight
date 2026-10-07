@@ -18,6 +18,7 @@
 		memberBook,
 		memberBookSeries,
 		memberCancel,
+		memberMove,
 		requestMembershipCancel,
 		requestMembershipPause,
 		withdrawMembershipPause,
@@ -518,6 +519,35 @@
 	const myBookingId = (b: (typeof bookable)[number]) =>
 		d.upcoming.find((u) => u.booking.sessionId === b.session.id && u.booking.status !== 'cancelled')
 			?.booking.id;
+
+	// ------- move booking (swap class) -------
+	let moveOpen = $state(false);
+	let moveFrom = $state<(typeof bookable)[number] | null>(null);
+	const moveTargets = $derived(
+		moveFrom
+			? bookable.filter(
+					(c) =>
+						c.session.id !== moveFrom!.session.id &&
+						c.memberBookable &&
+						(!c.myStatus || c.myStatus === 'cancelled') &&
+						c.booked < c.session.capacity
+				)
+			: []
+	);
+	async function moveTo(sessionId: string) {
+		const bookingId = moveFrom ? myBookingId(moveFrom) : null;
+		if (!bookingId) return;
+		busy = `move:${sessionId}`;
+		try {
+			await memberMove({ memberId, bookingId, sessionId });
+			toast.success('Moved — see you there');
+			moveOpen = false;
+			moveFrom = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not move the booking'));
+		}
+		busy = null;
+	}
 
 	// ------- family members -------
 	let depOpen = $state(false);
@@ -1453,6 +1483,16 @@
 								<Button
 									size="sm"
 									variant="ghost"
+									title="Move to a different session"
+									disabled={busy === b.session.id}
+									onclick={() => {
+										moveFrom = b;
+										moveOpen = true;
+									}}>Move</Button
+								>
+								<Button
+									size="sm"
+									variant="ghost"
 									disabled={busy === b.session.id}
 									onclick={() => cancel(myBookingId(b)!, b.session.id)}>Cancel</Button
 								>
@@ -1578,5 +1618,53 @@
 				>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={moveOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Move your spot</Dialog.Title>
+			<Dialog.Description>
+				{#if moveFrom}
+					{moveFrom.className} · {localDate(moveFrom.session.startsAt, tz)}
+					{localTime(moveFrom.session.startsAt, tz)} → pick a new session. Your old spot frees the moment
+					the new one is yours.
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if moveTargets.length}
+			<div class="max-h-80 divide-y overflow-y-auto rounded-lg border">
+				{#each moveTargets as c (c.session.id)}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="min-w-0">
+							<span class="mr-1.5 inline-block size-2 rounded-full" style:background={c.color}
+							></span>
+							<span class="font-medium">{c.className}</span>
+							<p class="text-xs text-muted-foreground">
+								{localDate(c.session.startsAt, tz)}
+								{localTime(c.session.startsAt, tz)} · {c.session.capacity - c.booked} spot{c.session
+									.capacity -
+									c.booked ===
+								1
+									? ''
+									: 's'} left{#if c.locationName}
+									· {c.locationName}{/if}
+							</p>
+						</div>
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={busy === `move:${c.session.id}`}
+							onclick={() => moveTo(c.session.id)}>Move here</Button
+						>
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-sm text-muted-foreground">
+				No open sessions to move into — full classes only take waitlist joins.
+			</p>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>

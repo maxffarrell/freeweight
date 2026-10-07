@@ -90,6 +90,19 @@ export const memberCancel = command(
 	}
 );
 
+/** Moves an upcoming booking to a different session — one-tap swap. */
+export const memberMove = command(
+	v.object({ memberId: idSchema, bookingId: idSchema, sessionId: idSchema }),
+	async ({ memberId, bookingId, sessionId }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const b = await svc.memberMoveBooking(m.organizationId, user.id, m.id, bookingId, sessionId);
+		void getBookable(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return b;
+	}
+);
+
 const reasonField = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)));
 
 export const requestMembershipCancel = command(
