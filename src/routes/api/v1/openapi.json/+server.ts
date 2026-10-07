@@ -17,7 +17,16 @@ const EVENT_TYPES = [
 	'booking.cancelled',
 	'check_in.recorded',
 	'class_session.created',
-	'class_session.updated'
+	'class_session.updated',
+	'class_template.created',
+	'class_template.deleted',
+	'document.created',
+	'payment.refunded',
+	'membership.cancel_requested',
+	'membership.suspended',
+	'member.imported',
+	'member.waiver_signed',
+	'booking.dropin'
 ] as const;
 
 export const GET: RequestHandler = ({ url }) => {
@@ -47,7 +56,7 @@ export const GET: RequestHandler = ({ url }) => {
 					}
 				: {})
 		};
-		if (r.get || r.update) {
+		if (r.get || r.update || r.delete) {
 			paths[`/${name}/{id}`] = {
 				parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
 				...(r.get
@@ -68,6 +77,16 @@ export const GET: RequestHandler = ({ url }) => {
 								description: `Requires \`${name}:write\`.`,
 								requestBody: { content: { 'application/json': {} } },
 								responses: { 200: { description: 'OK' } }
+							}
+						}
+					: {}),
+				...(r.delete
+					? {
+							delete: {
+								tags,
+								summary: `Delete ${one}`,
+								description: `Requires \`${name}:write\`.`,
+								responses: { 200: { description: 'OK' }, 404: { description: 'Not found' } }
 							}
 						}
 					: {})

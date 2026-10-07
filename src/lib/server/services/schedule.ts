@@ -620,6 +620,14 @@ export async function deleteTemplate(ctx: OrgContext, id: string) {
 		.where(and(eq(classTemplate.organizationId, ctx.orgId), eq(classTemplate.id, id)))
 		.returning();
 	if (!row) error(404, 'Template not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'class_template',
+		entityId: row.id,
+		action: 'deleted',
+		summary: `Deleted recurring template`
+	});
 	return row;
 }
 

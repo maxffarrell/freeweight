@@ -14,6 +14,7 @@ type Resource = {
 	get?: (ctx: OrgContext, id: string) => Promise<unknown>;
 	create?: { schema: v.GenericSchema; run: (ctx: OrgContext, input: never) => Promise<unknown> };
 	update?: { schema: v.GenericSchema; run: (ctx: OrgContext, input: never) => Promise<unknown> };
+	delete?: (ctx: OrgContext, id: string) => Promise<unknown>;
 };
 
 /** Public REST surface, mirrored by the OpenAPI document. Mutations go through the same services as the UI. */
@@ -68,6 +69,13 @@ export const resources: Record<string, Resource> = {
 				return schedule.createSession(ctx, st.timezone, input as never);
 			}
 		}
+	},
+	class_templates: {
+		description:
+			'Recurring weekly class rules (weekday + startTime; sessions materialize ~2 weeks ahead)',
+		list: (ctx) => schedule.listTemplates(ctx.orgId),
+		create: { schema: s.templateInput, run: schedule.createTemplate as never },
+		delete: (ctx, id) => schedule.deleteTemplate(ctx, id)
 	},
 	bookings: {
 		description: 'Book a member into a session; PATCH cancels or sets attended/no_show',
