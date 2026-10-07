@@ -14,6 +14,8 @@ import {
 	classTypeUpdate,
 	closureInput,
 	emailRosterInput,
+	equipmentInput,
+	equipmentUpdate,
 	idSchema,
 	instructorConflictInput,
 	instructorHandoffInput,
@@ -45,6 +47,23 @@ export const updateClassType = command(classTypeUpdate, async (input) => {
 	const c = await svc.updateClassType(await requireOrg(), input);
 	void getClassTypes().refresh();
 	return c;
+});
+
+/** Facility equipment + service log (staff-managed). */
+export const getEquipment = query(async () => res.listEquipment((await requireOrg()).orgId));
+export const createEquipment = command(equipmentInput, async (input) => {
+	const r = await res.createEquipment(await requireOrg(), input);
+	void getEquipment().refresh();
+	return r;
+});
+export const updateEquipment = command(equipmentUpdate, async (input) => {
+	const r = await res.updateEquipment(await requireOrg(), input);
+	void getEquipment().refresh();
+	return r;
+});
+export const removeEquipment = command(idSchema, async (id) => {
+	await res.deleteEquipment(await requireOrg(), id);
+	void getEquipment().refresh();
 });
 
 /** Demand hints — class/weekday pairs running hot (add) or cold (drop), last 6 weeks. */
