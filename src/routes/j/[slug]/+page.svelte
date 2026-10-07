@@ -13,6 +13,7 @@
 	import Logo from '#lib/components/app/logo.svelte';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
+	import { referralSources } from '#lib/schemas.ts';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import Phone from '@lucide/svelte/icons/phone';
 	import Globe from '@lucide/svelte/icons/globe';
@@ -26,6 +27,7 @@
 	let name = $state('');
 	let email = $state('');
 	let phone = $state('');
+	let referralSource = $state<(typeof referralSources)[number] | ''>('');
 	let planId = $state('');
 	let website = $state(''); // honeypot — must stay empty
 	let agreedWaiver = $state(false);
@@ -44,6 +46,7 @@
 					name,
 					email,
 					phone: phone || undefined,
+					referralSource: referralSource || null,
 					planId: planId || undefined,
 					agreedWaiver,
 					website
@@ -271,6 +274,19 @@
 								<Field.Field>
 									<Field.Label for="j-phone">Phone (optional)</Field.Label>
 									<Input id="j-phone" bind:value={phone} autocomplete="tel" />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label>How did you hear about us?</Field.Label>
+									<Select.Root type="single" bind:value={referralSource}>
+										<Select.Trigger class="w-full">
+											{referralSource || 'Select (optional)'}
+										</Select.Trigger>
+										<Select.Content>
+											{#each referralSources as src (src)}
+												<Select.Item value={src}>{src}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
 								</Field.Field>
 								{#if plans.length}
 									<Field.Field>

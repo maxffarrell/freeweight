@@ -210,6 +210,11 @@
 					>
 				</div>
 				<div class="flex justify-between">
+					<span class="text-muted-foreground">Source</span><span
+						>{m.member.referralSource ?? '—'}</span
+					>
+				</div>
+				<div class="flex justify-between">
 					<span class="text-muted-foreground">Waiver</span>
 					<span
 						>{m.signedWaiver ? `Signed ${formatDate(m.signedWaiver.signedAt)}` : 'Not signed'}</span

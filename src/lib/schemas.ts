@@ -186,10 +186,20 @@ export const webhookInput = v.object({
 });
 
 /** Public join-page form. */
+export const referralSources = [
+	'Friend or family',
+	'Google',
+	'Instagram',
+	'Facebook',
+	'Walked by',
+	'Other'
+] as const;
+
 export const joinInput = v.object({
 	name: requiredText('Name'),
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
 	phone: optionalText,
+	referralSource: v.optional(v.nullable(v.picklist(referralSources))),
 	planId: v.optional(v.nullable(idSchema)),
 	agreedWaiver: v.optional(v.boolean(), false),
 	/** Honeypot: must stay empty. */

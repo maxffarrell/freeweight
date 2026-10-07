@@ -104,6 +104,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			name: input.name,
 			email: input.email,
 			phone: input.phone ?? null,
+			referralSource: input.referralSource ?? null,
 			joinedAt: new Date().toISOString().slice(0, 10)
 		})
 		.returning();

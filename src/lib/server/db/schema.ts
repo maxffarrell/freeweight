@@ -99,6 +99,8 @@ export const gymMember = pgTable(
 		phone: text('phone'),
 		status: memberStatus('status').notNull().default('active'),
 		notes: text('notes'),
+		/** "How did you hear about us?" — set from the public join form. */
+		referralSource: text('referral_source'),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		...timestamps
 	},
