@@ -379,6 +379,13 @@
       "when": 1791388237771,
       "tag": "0053_gym-logo",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791389393363,
+      "tag": "0054_first-class-free",
+      "breakpoints": true
     }
   ]
 }

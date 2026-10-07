@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -221,6 +221,7 @@ export async function portalOverview(memberId: string) {
 		calendarToken: calendarToken(memberId),
 		orgSlug: org?.slug ?? '',
 		referralCount: referred?.n ?? 0,
+		dropInFree: !!settings?.firstClassFree && !(await hasPriorBooking(memberId)),
 		waiverRequired: !!settings?.waiver,
 		signedWaiver,
 		waiverStale: !!settings?.waiver && !!signedWaiver && signedWaiver.text !== settings.waiver,
@@ -232,6 +233,14 @@ export async function portalOverview(memberId: string) {
  * Member-facing engagement numbers: own check-ins this calendar month and the run of
  * consecutive ISO weeks with at least one visit (guest visits don't count).
  */
+async function hasPriorBooking(memberId: string) {
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.where(and(eq(booking.memberId, memberId), ne(booking.status, 'cancelled')));
+	return n > 0;
+}
+
 async function attendanceStats(orgId: string, memberId: string, tz: string) {
 	const rows = await db
 		.select({ checkedAt: checkIn.checkedAt, locationName: location.name })

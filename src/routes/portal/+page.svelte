@@ -966,7 +966,9 @@
 										onclick={() => book(b.session.id)}
 									>
 										{!hasPlan && b.dropInPrice
-											? `Book — ${formatMoney(b.dropInPrice, currency)}`
+											? d.dropInFree
+												? 'Book — first class free'
+												: `Book — ${formatMoney(b.dropInPrice, currency)}`
 											: b.booked >= b.session.capacity
 												? 'Join waitlist'
 												: 'Book'}

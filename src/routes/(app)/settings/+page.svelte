@@ -152,6 +152,8 @@
 	let referralCredits = $state<number | null>(settings.referralCredits);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
+	// svelte-ignore state_referenced_locally
+	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
 	async function saveSettings(e: SubmitEvent) {
@@ -178,7 +180,8 @@
 				suspendAfterDays,
 				referralCredits,
 				publicPage,
-				staffBriefing
+				staffBriefing,
+				firstClassFree
 			});
 			toast.success('Settings saved');
 		} catch (err) {
@@ -528,6 +531,16 @@
 								</p>
 							</div>
 							<Switch bind:checked={staffBriefing} />
+						</div>
+						<div class="flex items-center justify-between gap-4">
+							<div>
+								<p class="font-medium">First class free</p>
+								<p class="text-xs text-muted-foreground">
+									A member's first-ever drop-in books without posting the charge. Still requires a
+									drop-in price on the class.
+								</p>
+							</div>
+							<Switch bind:checked={firstClassFree} />
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>

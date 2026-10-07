@@ -801,7 +801,11 @@ export async function bookSession(
 	if (ms) await assertCreditAvailable(ctx.orgId, input.memberId, ms);
 
 	const [st] = await db
-		.select({ tz: gymSettings.timezone, maxPerDay: gymSettings.maxBookingsPerDay })
+		.select({
+			tz: gymSettings.timezone,
+			maxPerDay: gymSettings.maxBookingsPerDay,
+			firstClassFree: gymSettings.firstClassFree
+		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 
@@ -821,11 +825,18 @@ export async function bookSession(
 			.for('update');
 		if (!s) error(404, 'Session not found');
 		if (s.cancelledAt) error(409, 'This session is cancelled');
+		if (input.dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
+			error(409, `No drop-in price set on ${s.className}`);
+		// "First class free": a member's first-ever booking skips the drop-in charge.
+		const [{ prior }] = input.dropIn
+			? await tx
+					.select({ prior: sql<number>`count(*)`.mapWith(Number) })
+					.from(booking)
+					.where(and(eq(booking.memberId, input.memberId), ne(booking.status, 'cancelled')))
+			: [{ prior: 1 }];
+		const freeFirst = !!input.dropIn && !!st?.firstClassFree && prior === 0;
 		const dropInInfo =
-			input.dropIn && s.dropInPrice != null && s.dropInPrice > 0
-				? { className: s.className, price: s.dropInPrice }
-				: null;
-		if (input.dropIn && !dropInInfo) error(409, `No drop-in price set on ${s.className}`);
+			input.dropIn && !freeFirst ? { className: s.className, price: s.dropInPrice! } : null;
 
 		const [{ count }] = await tx
 			.select({ count: sql<number>`count(*)`.mapWith(Number) })
