@@ -59,13 +59,26 @@
 	}
 	const dayFmt = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
+	// ------- filters -------
+	let fType = $state('');
+	let fInstructor = $state('');
+	let fLocation = $state('');
+	const visible = $derived(
+		sessions.filter(
+			(s) =>
+				(!fType || s.session.classTypeId === fType) &&
+				(!fInstructor || s.session.instructorId === fInstructor) &&
+				(!fLocation || s.session.locationId === fLocation)
+		)
+	);
+
 	const days = $derived(
 		Array.from({ length: 7 }, (_, i) => {
 			const d = addDays(weekStart, i);
 			return {
 				date: d,
 				label: dayFmt.format(new Date(`${d}T00:00:00Z`)),
-				sessions: sessions.filter((s) => localDate(s.session.startsAt, tz) === d)
+				sessions: visible.filter((s) => localDate(s.session.startsAt, tz) === d)
 			};
 		})
 	);
@@ -319,6 +332,24 @@
 			><ChevronRight /></Button
 		>
 		<span class="ml-2 text-sm text-muted-foreground">Week of {weekStart}</span>
+		<div class="ml-auto flex flex-wrap items-center gap-2">
+			<select bind:value={fType} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+				<option value="">All classes</option>
+				{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+			</select>
+			<select bind:value={fInstructor} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+				<option value="">All instructors</option>
+				{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
+			</select>
+			{#if locations.filter((l) => !l.archivedAt).length > 1}
+				<select bind:value={fLocation} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+					<option value="">All locations</option>
+					{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+						<option value={l.id}>{l.name}</option>
+					{/each}
+				</select>
+			{/if}
+		</div>
 	</div>
 
 	<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
