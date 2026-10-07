@@ -230,7 +230,10 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 	return { checkIn: row!, member: m, attended: attended.length };
 }
 
-export async function listCheckIns(orgId: string, opts: { since: Date; until?: Date; q?: string }) {
+export async function listCheckIns(
+	orgId: string,
+	opts: { since: Date; until?: Date; q?: string; inside?: boolean }
+) {
 	const term = opts.q?.trim();
 	return db
 		.select({
@@ -247,6 +250,7 @@ export async function listCheckIns(orgId: string, opts: { since: Date; until?: D
 				eq(checkIn.organizationId, orgId),
 				gte(checkIn.checkedAt, opts.since),
 				opts.until ? lt(checkIn.checkedAt, opts.until) : undefined,
+				opts.inside ? isNull(checkIn.checkedOutAt) : undefined,
 				term
 					? or(ilike(gymMember.name, `%${term}%`), ilike(checkIn.guestName, `%${term}%`))
 					: undefined

@@ -24,8 +24,13 @@
 	let viewDate = $state(today);
 	let q = $state('');
 	let checkIns = $state(await getCheckIns({ date: viewDate }));
+	let insideOnly = $state(false);
 	async function refilter() {
-		checkIns = await getCheckIns({ date: viewDate, q: q.trim() || undefined });
+		checkIns = await getCheckIns({
+			date: viewDate,
+			q: q.trim() || undefined,
+			inside: insideOnly || undefined
+		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
 	function search() {
@@ -140,6 +145,8 @@
 			<Card.Description
 				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
 					? ' so far'
+					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
+					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
 					: ''}.</Card.Description
 			>
 		</Card.Header>
@@ -152,6 +159,14 @@
 					bind:value={q}
 					oninput={search}
 				/>
+				<Button
+					size="sm"
+					variant={insideOnly ? 'default' : 'outline'}
+					onclick={() => {
+						insideOnly = !insideOnly;
+						void refilter();
+					}}>Still inside</Button
+				>
 			</div>
 			<Table.Root>
 				<Table.Header>
@@ -160,6 +175,7 @@
 						<Table.Head>Time</Table.Head>
 						<Table.Head>Location</Table.Head>
 						<Table.Head>Method</Table.Head>
+						<Table.Head class="text-right">Status</Table.Head>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
@@ -180,10 +196,19 @@
 									class="uppercase">{c.checkIn.method}</Badge
 								></Table.Cell
 							>
+							<Table.Cell class="text-right"
+								>{#if c.checkIn.checkedOutAt}
+									<span class="text-muted-foreground"
+										>out {localTime(c.checkIn.checkedOutAt, settings.timezone)}</span
+									>
+								{:else}
+									<Badge variant="default">In</Badge>
+								{/if}</Table.Cell
+							>
 						</Table.Row>
 					{:else}
 						<Table.Row
-							><Table.Cell colspan={4} class="text-muted-foreground"
+							><Table.Cell colspan={5} class="text-muted-foreground"
 								>No check-ins{q.trim() ? ' match that search' : ''}{viewDate === today
 									? ' yet today'
 									: ' that day'}.</Table.Cell
