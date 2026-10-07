@@ -33,15 +33,16 @@
 	const locations = await getLocations();
 	const instructors = await getInstructors();
 	const memberList = await getMembers();
-	let classTypes = $state(await getClassTypes());
+	const classTypes = $derived(await getClassTypes());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
 	const to = $derived(addDays(weekStart, 7));
-	let sessions = $state(await getSessions({ from, to }));
+	const sessions = $derived(await getSessions({ from, to }));
 
+	// `.refresh()` re-runs this args instance, so the derived grid + roster update.
 	async function reload() {
-		sessions = await getSessions({ from, to });
+		await getSessions({ from, to }).refresh();
 	}
 	const dayFmt = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
@@ -59,12 +60,10 @@
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
-	let roster = $state<Awaited<ReturnType<typeof getRoster>>>([]);
-	let focus = $state<Awaited<ReturnType<typeof getSessions>>[number] | null>(null);
-	async function openRoster(id: string) {
+	const roster = $derived(focusId ? await getRoster(focusId) : []);
+	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
+	function openRoster(id: string) {
 		focusId = id;
-		focus = sessions.find((s) => s.session.id === id) ?? null;
-		roster = await getRoster(id);
 		rosterOpen = true;
 	}
 	if (focusId) void openRoster(focusId);
@@ -76,7 +75,7 @@
 			const b = await bookSession({ sessionId: focusId, memberId: bookMemberId });
 			toast.success(b.status === 'waitlisted' ? 'Class full — waitlisted' : 'Booked');
 			bookMemberId = '';
-			roster = await getRoster(focusId);
+			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Could not book');
@@ -85,7 +84,7 @@
 	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show') {
 		try {
 			await updateBooking({ id, status });
-			roster = await getRoster(focusId);
+			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Could not update');
@@ -139,7 +138,7 @@
 				capacity: tCapacity,
 				description: tDescription || undefined
 			});
-			classTypes = await getClassTypes();
+			await getClassTypes().refresh();
 			toast.success('Class type created');
 			typeOpen = false;
 			tName = tDescription = '';
