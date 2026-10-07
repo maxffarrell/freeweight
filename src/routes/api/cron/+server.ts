@@ -5,7 +5,11 @@ import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
-import { sendClassReminders, sendPastDueNotices } from '#lib/server/services/notifications.ts';
+import {
+	sendClassReminders,
+	sendPastDueNotices,
+	sendWeeklyDigest
+} from '#lib/server/services/notifications.ts';
 import { markPastNoShows, materializeTemplates } from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
 
@@ -16,7 +20,7 @@ const authorized = (header: string | null) => {
 	return a.length === b.length && timingSafeEqual(a, b);
 };
 
-/** Daily job: posts due membership charges, sends reminders + past-due notices, marks no-shows, deletes expired demos. */
+/** Daily job: posts due membership charges, sends reminders + past-due notices + Monday digests, marks no-shows, generates template sessions, deletes expired demos. */
 export const GET: RequestHandler = async ({ request }) => {
 	if (!authorized(request.headers.get('authorization'))) error(401, 'Unauthorized');
 	const orgs = await db.select({ id: organization.id }).from(organization);
@@ -26,6 +30,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let noShows = 0;
 	let suspended = 0;
 	let generated = 0;
+	let digests = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -58,6 +63,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`template cron failed for ${o.id}`, err);
 		}
+		try {
+			digests += await sendWeeklyDigest(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`digest cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
 	return json({
@@ -67,7 +78,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		pastDue,
 		noShows,
 		suspended,
-		generated
+		generated,
+		digests
 	});
 };
 

@@ -4,6 +4,7 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
 	charge,
+	checkIn,
 	classSession,
 	classType,
 	gymMember,
@@ -20,7 +21,7 @@ import {
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
-import { localDate, localTime } from '#lib/tz.ts';
+import { addDays, localDate, localTime, localWeekday } from '#lib/tz.ts';
 
 async function orgName(orgId: string) {
 	const [o] = await db
@@ -644,4 +645,93 @@ export async function notifyCancellationRequested(orgId: string, membershipId: s
 			]
 		})
 	});
+}
+
+/**
+ * Weekly owner/admin digest (Mondays, org tz): last-7-day new members, check-ins,
+ * bookings, collected revenue — plus open-balance and at-risk counts so nothing
+ * quietly drifts. Deduped per ISO week via the Monday date in the log key.
+ */
+export async function sendWeeklyDigest(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	if (localWeekday(new Date(), tz) !== 1) return 0; // Mondays only
+
+	const weekAgo = addDays(today, -7);
+	const [newMembers] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), gte(gymMember.joinedAt, weekAgo)));
+	const [visits] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, new Date(`${weekAgo}T00:00:00Z`))
+			)
+		);
+	const [bookings] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(booking.status, ['booked', 'attended', 'no_show']),
+				gte(booking.createdAt, new Date(`${weekAgo}T00:00:00Z`))
+			)
+		);
+	const [collected] = await db
+		.select({ n: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number) })
+		.from(payment)
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				gte(payment.createdAt, new Date(`${weekAgo}T00:00:00Z`))
+			)
+		);
+	const [openBalance] = await db
+		.select({
+			n: sql<number>`coalesce(sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id}), 0)), 0)`.mapWith(
+				Number
+			)
+		})
+		.from(charge)
+		.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'open')));
+	const [active] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(membership)
+		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
+
+	const [name, st] = await Promise.all([
+		orgName(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const currency = st[0]?.currency ?? 'usd';
+
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	let sent = 0;
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'weekly_digest', today, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${name}: your week — ${newMembers!.n} new members, ${formatMoney(collected!.n, currency)} collected`,
+			...renderEmail({
+				orgName: name,
+				heading: 'Your weekly digest',
+				lines: [
+					`<strong>${newMembers!.n}</strong> new members joined in the last 7 days (active memberships: ${active!.n}).`,
+					`<strong>${visits!.n}</strong> check-ins · <strong>${bookings!.n}</strong> class bookings this week.`,
+					`<strong>${formatMoney(collected!.n, currency)}</strong> collected · <strong>${formatMoney(openBalance!.n, currency)}</strong> still open.`
+				],
+				action: { label: 'Open reports', url: `${appOrigin()}/reports` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
