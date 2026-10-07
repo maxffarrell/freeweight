@@ -9,9 +9,11 @@ import {
 	classType,
 	gymMember,
 	location,
+	memberNote,
 	membership,
 	organization,
 	payment,
+	user,
 	waiver,
 	plan,
 	outer
@@ -247,6 +249,53 @@ export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof 
 		.returning();
 	if (!row) error(404, 'Member not found');
 	return row;
+}
+
+// ------- staff notes on a member -------
+
+export async function listMemberNotes(orgId: string, memberId: string) {
+	return db
+		.select({
+			id: memberNote.id,
+			body: memberNote.body,
+			createdAt: memberNote.createdAt,
+			authorName: user.name
+		})
+		.from(memberNote)
+		.leftJoin(user, eq(memberNote.authorId, user.id))
+		.where(and(eq(memberNote.organizationId, orgId), eq(memberNote.memberId, memberId)))
+		.orderBy(desc(memberNote.createdAt))
+		.limit(50);
+}
+
+export async function addMemberNote(ctx: OrgContext, memberId: string, body: string) {
+	const [m] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const [row] = await db
+		.insert(memberNote)
+		.values({ organizationId: ctx.orgId, memberId, authorId: ctx.userId, body })
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'note_added',
+		summary: 'Staff note added',
+		data: { noteId: row!.id }
+	});
+	return row;
+}
+
+export async function deleteMemberNote(ctx: OrgContext, noteId: string) {
+	const [row] = await db
+		.delete(memberNote)
+		.where(and(eq(memberNote.organizationId, ctx.orgId), eq(memberNote.id, noteId)))
+		.returning();
+	if (!row) error(404, 'Note not found');
 }
 
 /** Members whose portal login is this user — one user can belong to several gyms. */

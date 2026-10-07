@@ -12,6 +12,7 @@ import {
 	idSchema,
 	memberImportInput,
 	memberInput,
+	memberNoteInput,
 	memberUpdate
 } from '#lib/schemas.ts';
 import { listRecentAnnouncements, sendAnnouncement } from '#lib/server/services/notifications.ts';
@@ -86,3 +87,23 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 	void getRecentAnnouncements().refresh();
 	return r;
 });
+
+// ------- member notes -------
+
+export const getMemberNotes = query(idSchema, async (memberId) =>
+	svc.listMemberNotes((await requireOrg()).orgId, memberId)
+);
+
+export const addMemberNote = command(memberNoteInput, async ({ memberId, body }) => {
+	const r = await svc.addMemberNote(await requireOrg(), memberId, body);
+	void getMemberNotes(memberId).refresh();
+	return r;
+});
+
+export const deleteMemberNote = command(
+	v.object({ noteId: idSchema, memberId: idSchema }),
+	async ({ noteId, memberId }) => {
+		await svc.deleteMemberNote(await requireOrg(), noteId);
+		void getMemberNotes(memberId).refresh();
+	}
+);

@@ -472,6 +472,22 @@ export const documentBlob = pgTable('document_blob', {
 	data: text('data').notNull()
 });
 
+/** Staff notes on a member — injuries, preferences, front-desk flags. */
+export const memberNote = pgTable(
+	'member_note',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		authorId: text('author_id').references(() => user.id, { onDelete: 'set null' }),
+		body: text('body').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [index('member_note_member_idx').on(t.memberId, t.createdAt)]
+);
+
 export const activity = pgTable(
 	'activity',
 	{

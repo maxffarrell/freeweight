@@ -10,6 +10,7 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -17,7 +18,10 @@
 		updateMember,
 		getPortalInvite,
 		recordCheckIn,
-		logGuestVisit
+		logGuestVisit,
+		getMemberNotes,
+		addMemberNote,
+		deleteMemberNote
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -42,6 +46,26 @@
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
+	const memberNotes = $derived(await getMemberNotes(id));
+	let noteBody = $state('');
+	let notePending = $state(false);
+	async function addNote() {
+		notePending = true;
+		try {
+			await addMemberNote({ memberId: id, body: noteBody.trim() });
+			noteBody = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add note'));
+		}
+		notePending = false;
+	}
+	async function removeNote(noteId: string) {
+		try {
+			await deleteMemberNote({ noteId, memberId: id });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete note'));
+		}
+	}
 	const plans = $derived(await getPlans());
 	const settings = $derived(await getSettings());
 	const currency = $derived(await getCurrency());
@@ -420,6 +444,47 @@
 						portal.
 					</p>
 				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Notes</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-3 px-4">
+				{#each memberNotes as n (n.id)}
+					<div class="flex items-start justify-between gap-2 text-sm">
+						<div class="min-w-0">
+							<p class="break-words whitespace-pre-wrap">{n.body}</p>
+							<p class="text-xs text-muted-foreground">
+								{n.authorName ?? 'Staff'} · {formatRelative(n.createdAt)}
+							</p>
+						</div>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-7 shrink-0 px-1.5 text-destructive"
+							onclick={() => removeNote(n.id)}
+							aria-label="Delete note"><Trash2 class="size-3.5" /></Button
+						>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						No notes yet — staff-only; the member can't see these.
+					</p>
+				{/each}
+				<form
+					class="space-y-2 border-t pt-3"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void addNote();
+					}}
+				>
+					<Textarea bind:value={noteBody} rows={2} placeholder="Add a note…" />
+					<Button type="submit" size="sm" disabled={notePending || !noteBody.trim()}>
+						{notePending ? 'Saving…' : 'Add note'}
+					</Button>
+				</form>
 			</Card.Content>
 		</Card.Root>
 	</div>

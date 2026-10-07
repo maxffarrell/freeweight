@@ -235,3 +235,8 @@ export const announcementInput = v.object({
 	/** Restrict the batch to these members (e.g. the at-risk list); empty = all actives. */
 	memberIds: v.optional(v.pipe(v.array(idSchema), v.maxLength(500)))
 });
+
+export const memberNoteInput = v.object({
+	memberId: idSchema,
+	body: v.pipe(requiredText('Note'), v.maxLength(2000))
+});
