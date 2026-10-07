@@ -817,7 +817,28 @@ async function classRatings(orgId: string) {
 			.groupBy(user.name)
 			.orderBy(desc(sql`count(*)`))
 	]);
-	return { byClass, byInstructor };
+	const recent = await db
+		.select({
+			rating: sessionFeedback.rating,
+			comment: sessionFeedback.comment,
+			createdAt: sessionFeedback.createdAt,
+			memberName: gymMember.name,
+			className: classType.name
+		})
+		.from(sessionFeedback)
+		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(sessionFeedback.organizationId, orgId),
+				gte(sessionFeedback.createdAt, since),
+				sql`${sessionFeedback.comment} <> ''`
+			)
+		)
+		.orderBy(desc(sessionFeedback.createdAt))
+		.limit(6);
+	return { byClass, byInstructor, recent };
 }
 
 /** Raw member-rating rows for the REST API — newest first, last 90 days. */

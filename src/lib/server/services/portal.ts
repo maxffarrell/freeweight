@@ -38,6 +38,7 @@ import { emit } from './events.ts';
 import {
 	calendarToken,
 	notifyCancellationRequested,
+	notifyLowRating,
 	notifyPauseRequested,
 	notifyPlanChanged
 } from './notifications.ts';
@@ -346,6 +347,7 @@ export async function submitSessionFeedback(
 			set: { rating, comment: comment ?? '', updatedAt: new Date() }
 		})
 		.returning();
+	if (rating <= 3) notifyLowRating(orgId, sessionId, memberId).catch(() => {});
 	return row;
 }
 

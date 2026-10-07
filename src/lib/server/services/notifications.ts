@@ -2758,3 +2758,54 @@ export async function ratingNudges(orgId: string) {
 	}
 	return sent;
 }
+
+/** A member rated a class ≤3 — alert owner/admin so someone can follow up. Once per (session, member). */
+export async function notifyLowRating(orgId: string, sessionId: string, memberId: string) {
+	const [row] = await db
+		.select({
+			rating: sessionFeedback.rating,
+			comment: sessionFeedback.comment,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			instructorName: user.name
+		})
+		.from(sessionFeedback)
+		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(sessionFeedback.organizationId, orgId),
+				eq(sessionFeedback.sessionId, sessionId),
+				eq(sessionFeedback.memberId, memberId)
+			)
+		)
+		.limit(1);
+	if (!row || row.rating > 3) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'low_rating', `${sessionId}:${memberId}`, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${row.rating}★ for ${row.className} — ${row.memberName}`,
+			...renderEmail({
+				...name,
+				heading: `Low rating on ${row.className}`,
+				lines: [
+					`${row.memberName} rated ${row.className} ${row.rating}/5 from ${localDate(row.startsAt, tz)}${row.instructorName ? ` (${row.instructorName})` : ''}.`,
+					row.comment ? `"${row.comment}"` : 'They left no comment.',
+					'Worth a quick follow-up before they drift.'
+				],
+				action: { label: 'Open member page', url: `${appOrigin()}/members/${memberId}` }
+			})
+		});
+	}
+}

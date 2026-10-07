@@ -754,6 +754,30 @@
 						</Table.Body>
 					</Table.Root>
 				</div>
+				{#if r.ratings.recent.length}
+					<div class="sm:col-span-2">
+						<p class="mb-2 text-xs font-medium text-muted-foreground uppercase">Recent comments</p>
+						<Table.Root>
+							<Table.Body>
+								{#each r.ratings.recent as f (f.createdAt)}
+									<Table.Row>
+										<Table.Cell class="font-medium whitespace-nowrap text-amber-500">
+											{'★'.repeat(f.rating)}<span class="text-muted-foreground"
+												>{'★'.repeat(5 - f.rating)}</span
+											>
+										</Table.Cell>
+										<Table.Cell class="font-medium">{f.className}</Table.Cell>
+										<Table.Cell>{f.comment}</Table.Cell>
+										<Table.Cell class="text-muted-foreground">{f.memberName}</Table.Cell>
+										<Table.Cell class="text-right whitespace-nowrap text-muted-foreground"
+											>{formatDate(f.createdAt)}</Table.Cell
+										>
+									</Table.Row>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}
