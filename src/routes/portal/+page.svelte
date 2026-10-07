@@ -529,6 +529,10 @@
 					Share your link — anyone who joins from it counts toward you
 					{#if d.referralCount}
 						({d.referralCount} joined so far){/if}.
+					{#if d.settings?.referralCredits}
+						Earn {d.settings.referralCredits} class credit{d.settings.referralCredits === 1
+							? ''
+							: 's'} for each one that pays.{/if}
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex items-center gap-2 px-6">

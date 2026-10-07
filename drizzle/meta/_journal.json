@@ -253,6 +253,13 @@
       "when": 1791370059460,
       "tag": "0035_shop-items",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791370776236,
+      "tag": "0036_referral-credits",
+      "breakpoints": true
     }
   ]
 }
