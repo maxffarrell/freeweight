@@ -102,7 +102,7 @@
 			q,
 			tag: tag === '__all' ? undefined : tag,
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
-			planId: planFilter === '__all' ? undefined : planFilter,
+			planId: planFilter === '__all' ? undefined : planFilter === '__none' ? 'none' : planFilter,
 			sort
 		});
 	}
@@ -337,10 +337,13 @@
 				<Select.Trigger class="w-40"
 					>{planFilter === '__all'
 						? 'All plans'
-						: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}</Select.Trigger
+						: planFilter === '__none'
+							? 'No plan'
+							: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}</Select.Trigger
 				>
 				<Select.Content>
 					<Select.Item value="__all">All plans</Select.Item>
+					<Select.Item value="__none">No plan</Select.Item>
 					{#each audiencePlans as p (p.id)}
 						<Select.Item value={p.id}>{p.name}</Select.Item>
 					{/each}

@@ -87,9 +87,11 @@ export async function listMembers(
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.tag = ${tag})`
 					: undefined,
 				status ? eq(gymMember.status, status) : undefined,
-				planId
-					? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
-					: undefined
+				planId === 'none'
+					? sql`not exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active')`
+					: planId
+						? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
+						: undefined
 			)
 		)
 		.orderBy(MEMBER_ORDER[sort]);
