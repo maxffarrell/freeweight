@@ -380,6 +380,8 @@ export const settingsInput = v.object({
 	maxBookingsPerDay: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	noShowFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	lateCancelFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Single-day pass price in minor units; null = not sold on the public page. */
+	dayPassPrice: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	suspendAfterDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	referralCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	/** Max people inside at once; null = no cap. */
@@ -451,6 +453,14 @@ export const leadInput = v.object({
 /** Visitor buying a single class on the public page. */
 export const dropInInput = v.object({
 	sessionId: idSchema,
+	name: requiredText('Name'),
+	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+	phone: v.optional(optionalText),
+	agreedWaiver: v.optional(v.boolean(), false)
+});
+
+/** Visitor buying a single-day gym pass on the public page. */
+export const dayPassInput = v.object({
 	name: requiredText('Name'),
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
 	phone: v.optional(optionalText),

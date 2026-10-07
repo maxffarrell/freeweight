@@ -148,6 +148,7 @@
 	let occupancyCap = $state<number | null>(settings.occupancyCap);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
+	let dayPassPrice = $state<number | null>(settings.dayPassPrice);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let referralCredits = $state<number | null>(settings.referralCredits);
 	let publicPage = $state(settings.publicPage);
@@ -177,6 +178,7 @@
 				occupancyCap,
 				noShowFee,
 				lateCancelFee,
+				dayPassPrice,
 				suspendAfterDays,
 				referralCredits,
 				publicPage,
@@ -483,6 +485,13 @@
 							<Field.Description
 								>When set, members can cancel inside the cancel cutoff — for this fee. Leave empty
 								to block late cancels entirely.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Day pass price</Field.Label>
+							<MoneyInput bind:value={dayPassPrice} />
+							<Field.Description
+								>Sells a one-day visit on your public join page. Leave empty to hide it.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>

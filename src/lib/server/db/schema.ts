@@ -83,6 +83,8 @@ export const gymSettings = pgTable('gym_settings', {
 	noShowFee: integer('no_show_fee'),
 	/** Charged when a booking is cancelled inside cancelCutoffMin; also lets members late-cancel. */
 	lateCancelFee: integer('late_cancel_fee'),
+	/** Price of a single-day visit sold on the public join page (minor units); null = not sold. */
+	dayPassPrice: integer('day_pass_price'),
 	/** Auto-suspend a membership once a charge is this many days overdue; null = off. */
 	suspendAfterDays: integer('suspend_after_days'),
 	/** Bonus class credits a referrer earns when a referred member first pays; null/0 = off. */

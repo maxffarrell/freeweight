@@ -11,6 +11,7 @@
 	import { page } from '$app/state';
 	import {
 		bookDropInForm,
+		buyDayPassForm,
 		captureLeadForm,
 		getReferrerName,
 		joinGymForm
@@ -126,6 +127,29 @@
 			toast.error(errMsg(err, 'Could not book — try again'));
 		}
 		dPending = false;
+	}
+
+	// ------- day pass -------
+	const dayPassPaid = page.url.searchParams.get('daypass') === 'paid';
+	let passOpen = $state(false);
+	let passDone = $state(false);
+	let passCheckoutUrl = $state<string | null>(null);
+	let passPending = $state(false);
+
+	async function submitDayPass(e: SubmitEvent) {
+		e.preventDefault();
+		passPending = true;
+		try {
+			const r = await buyDayPassForm({
+				slug: org.slug,
+				input: { name: dName, email: dEmail, phone: dPhone || undefined, agreedWaiver: dAgreed }
+			});
+			passCheckoutUrl = r.checkoutUrl ?? null;
+			passDone = true;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not buy — try again'));
+		}
+		passPending = false;
 	}
 
 	// ------- lead capture -------
@@ -288,6 +312,20 @@
 			</section>
 		{/if}
 
+		{#if settings.dayPassPrice}
+			<Card.Root>
+				<Card.Content class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+					<div>
+						<p class="font-medium">Just visiting?</p>
+						<p class="text-sm text-muted-foreground">Train for a day — no membership needed.</p>
+					</div>
+					<Button variant="outline" onclick={() => (passOpen = true)}
+						>Day pass · {formatMoney(settings.dayPassPrice, currency)}</Button
+					>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">
 				Join{#if invitedBy}
@@ -307,6 +345,13 @@
 				<Card.Root class="border-green-500">
 					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">
 						Signup fee paid — see you on the floor.
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if dayPassPaid}
+				<Card.Root class="border-green-500">
+					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">
+						Day pass paid — see you on the floor.
 					</Card.Content>
 				</Card.Root>
 			{/if}
@@ -490,6 +535,65 @@
 					<Dialog.Footer>
 						<Button type="submit" disabled={dPending}
 							>{dPending ? 'Booking…' : 'Book this class'}</Button
+						>
+					</Dialog.Footer>
+				</form>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root bind:open={passOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>Day pass — {org.name}</Dialog.Title>
+				<Dialog.Description>
+					{formatMoney(settings.dayPassPrice ?? 0, currency)} for today's visit. No membership needed.
+				</Dialog.Description>
+			</Dialog.Header>
+			{#if passDone}
+				<div class="space-y-3 py-2 text-sm">
+					<p class="font-medium">You're set for today.</p>
+					{#if passCheckoutUrl}
+						<p class="text-muted-foreground">Pay now to lock it in:</p>
+						<Button class="w-full" href={passCheckoutUrl}
+							>Pay {formatMoney(settings.dayPassPrice ?? 0, currency)}</Button
+						>
+					{:else}
+						<p class="text-muted-foreground">Pay at the front desk when you arrive.</p>
+					{/if}
+				</div>
+			{:else}
+				<form class="space-y-4" onsubmit={submitDayPass}>
+					<Field.Field>
+						<Field.Label for="p-name">Name</Field.Label>
+						<Input id="p-name" required bind:value={dName} autocomplete="name" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="p-email">Email</Field.Label>
+						<Input id="p-email" type="email" required bind:value={dEmail} autocomplete="email" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="p-phone"
+							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
+						>
+						<Input id="p-phone" type="tel" bind:value={dPhone} autocomplete="tel" />
+					</Field.Field>
+					{#if settings.waiver}
+						<div class="rounded-lg border bg-muted/40 p-3">
+							<p
+								class="mb-2 max-h-32 overflow-y-auto text-xs whitespace-pre-wrap text-muted-foreground"
+							>
+								{settings.waiver}
+							</p>
+							<label class="flex items-start gap-2 text-sm">
+								<input type="checkbox" required bind:checked={dAgreed} class="mt-0.5" />
+								<span>I have read and agree to the liability waiver.</span>
+							</label>
+						</div>
+					{/if}
+					<Dialog.Footer>
+						<Button type="submit" disabled={passPending}
+							>{passPending ? 'Buying…' : `Buy a day pass`}</Button
 						>
 					</Dialog.Footer>
 				</form>

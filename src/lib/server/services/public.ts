@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, isNull, ne, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -19,6 +19,7 @@ import {
 	outer,
 	user
 } from '#lib/server/db/schema.ts';
+import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
 import {
 	createMembership,
@@ -438,4 +439,99 @@ export async function bookDropIn(
 		summary: `${input.name} booked a drop-in for ${className}`
 	});
 	return { member, bookingId: b.id, checkoutUrl };
+}
+
+/**
+ * Visitor buying a day pass on the public page — creates the member (tagged `day-pass`),
+ * posts a "Day pass" charge due today, and returns an online checkout URL when a
+ * provider is live (otherwise staff collect at the desk).
+ */
+export async function buyDayPass(
+	slug: string,
+	ip: string,
+	input: v.InferOutput<typeof s.dayPassInput>
+) {
+	const now = Date.now();
+	const hits = (dropInRate.get(ip) ?? []).filter((t) => now - t < 3600_000);
+	if (hits.length >= 10) error(429, 'Too many attempts — try again later');
+	dropInRate.set(ip, [...hits, now]);
+
+	const { org, settings } = await getPublicGym(slug);
+	if (!settings?.dayPassPrice) error(404, 'Not sold online');
+	if (settings?.waiver && !input.agreedWaiver) error(400, 'Please agree to the waiver');
+	const email = input.email.toLowerCase();
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.limit(1);
+	const member =
+		m ??
+		(
+			await db
+				.insert(gymMember)
+				.values({
+					organizationId: org.id,
+					name: input.name,
+					email,
+					phone: input.phone ?? null,
+					joinedAt: new Date().toISOString().slice(0, 10)
+				})
+				.returning()
+		)[0];
+	if (!m) {
+		await db
+			.insert(memberTag)
+			.values({ organizationId: org.id, memberId: member.id, tag: 'day-pass' });
+	}
+	if (settings?.waiver) await recordWaiver(org.id, member.id, settings.waiver);
+
+	const today = localDate(new Date(), settings.timezone);
+	const [dup] = await db
+		.select({ id: charge.id })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, org.id),
+				eq(charge.memberId, member.id),
+				eq(charge.kind, 'dropin'),
+				eq(charge.dueDate, today),
+				ne(charge.status, 'void')
+			)
+		)
+		.limit(1);
+	if (dup) error(409, "You already have a pass for today — you're all set");
+
+	const [c] = await db
+		.insert(charge)
+		.values({
+			organizationId: org.id,
+			memberId: member.id,
+			kind: 'dropin',
+			description: `Day pass — ${today}`,
+			dueDate: today,
+			amount: settings.dayPassPrice
+		})
+		.returning();
+
+	const checkoutUrl = await onlineCheckout(
+		org.id,
+		settings,
+		{
+			amount: settings.dayPassPrice,
+			description: `Day pass — ${org.name}`,
+			memberId: member.id,
+			email
+		},
+		{ success: `/j/${slug}?daypass=paid`, cancel: `/j/${slug}` }
+	);
+
+	await emit({
+		orgId: org.id,
+		entityType: 'charge',
+		entityId: c.id,
+		action: 'daypass',
+		summary: `${input.name} bought a day pass for ${today}`
+	});
+	return { member, chargeId: c.id, checkoutUrl };
 }
