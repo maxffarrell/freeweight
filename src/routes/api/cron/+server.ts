@@ -22,7 +22,8 @@ import {
 	sendTrialEndingNotices,
 	sendWaiverReminders,
 	sendWeeklyDigest,
-	sendWinBackNudges
+	sendWinBackNudges,
+	sendLeadNudges
 } from '#lib/server/services/notifications.ts';
 import {
 	autoCancelUnderEnrolled,
@@ -61,6 +62,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let generated = 0;
 	let digests = 0;
 	let winbacks = 0;
+	let leadNudges = 0;
 	let rosters = 0;
 	let briefings = 0;
 	let billingReminders = 0;
@@ -200,6 +202,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`win-back cron failed for ${o.id}`, err);
 		}
 		try {
+			leadNudges += await sendLeadNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`lead-nudge cron failed for ${o.id}`, err);
+		}
+		try {
 			rosters += await sendInstructorRosters(o.id);
 		} catch (err) {
 			failed++;
@@ -237,6 +245,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		generated,
 		digests,
 		winbacks,
+		leadNudges,
 		rosters,
 		briefings,
 		billingReminders,
