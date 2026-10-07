@@ -212,6 +212,8 @@ export const membership = pgTable(
 		pauseRequestedAt: timestamp('pause_requested_at', { withTimezone: true }),
 		/** The auto-resume date the member asked for with their pause request. */
 		pauseUntil: date('pause_until', { mode: 'string' }),
+		/** Staff-granted comp classes on top of the plan's classCredits (per period / per pack). */
+		bonusCredits: integer('bonus_credits').notNull().default(0),
 		...timestamps
 	},
 	(t) => [

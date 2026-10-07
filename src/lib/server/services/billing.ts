@@ -277,6 +277,25 @@ export async function updateMembership(
 	return row;
 }
 
+/** Staff-granted comp classes on top of the plan's classCredits (this period / this pack). */
+export async function grantCredits(ctx: OrgContext, membershipId: string, count: number) {
+	const [row] = await db
+		.update(membership)
+		.set({ bonusCredits: sql`${membership.bonusCredits} + ${count}` })
+		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, membershipId)))
+		.returning({ id: membership.id, memberId: membership.memberId });
+	if (!row) error(404, 'Membership not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'membership',
+		entityId: row.id,
+		action: 'updated',
+		summary: `Granted ${count} comp class${count === 1 ? '' : 'es'}`
+	});
+	return row;
+}
+
 /**
  * Posts membership charges that have come due and rolls `nextChargeAt` forward.
  * Runs from /api/cron and opportunistically when staff open the app.

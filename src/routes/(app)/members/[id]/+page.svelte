@@ -33,7 +33,8 @@
 		updateMembership,
 		recordPayment,
 		refundPayment,
-		getCurrency
+		getCurrency,
+		grantCredits
 	} from '#lib/remote/billing.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
@@ -146,6 +147,22 @@
 			toast.success('Payment refunded');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not refund'));
+		}
+	}
+
+	// ------- comp classes -------
+	let compOpen = $state(false);
+	let compCount = $state(1);
+	async function submitComp(e: SubmitEvent) {
+		e.preventDefault();
+		if (!m.credits?.membershipId) return;
+		try {
+			await grantCredits({ membershipId: m.credits.membershipId, count: compCount });
+			toast.success(`Granted ${compCount} comp class${compCount === 1 ? '' : 'es'}`);
+			compOpen = false;
+			compCount = 1;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not grant'));
 		}
 	}
 
@@ -535,9 +552,19 @@
 					<p class="text-sm text-muted-foreground">No memberships.</p>
 				{/each}
 				{#if m.credits}
-					<p class="text-xs text-muted-foreground">
-						{m.credits.used} of {m.credits.limit} classes used this period
-					</p>
+					<div class="flex items-center justify-between">
+						<p class="text-xs text-muted-foreground">
+							{m.credits.used} of {m.credits.limit} classes used this period{m.credits.bonus
+								? ` (+${m.credits.bonus} comp)`
+								: ''}
+						</p>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-6 px-2 text-xs"
+							onclick={() => (compOpen = true)}>Grant comp classes</Button
+						>
+					</div>
 				{/if}
 			</Card.Content>
 		</Card.Root>
@@ -951,6 +978,24 @@
 			<Dialog.Footer
 				><Button type="submit" disabled={pending || !payAmount}>Record</Button></Dialog.Footer
 			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={compOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Grant comp classes</Dialog.Title>
+			<Dialog.Description
+				>Adds to {m.member.name}'s class-credit cap for the current period (or this pack).</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitComp}>
+			<Field.Field>
+				<Field.Label for="comp-count">Classes</Field.Label>
+				<Input id="comp-count" type="number" min="1" max="50" required bind:value={compCount} />
+			</Field.Field>
+			<Dialog.Footer><Button type="submit" disabled={!compCount}>Grant</Button></Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>

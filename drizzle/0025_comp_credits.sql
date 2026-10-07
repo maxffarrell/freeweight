@@ -1,0 +1,1 @@
+ALTER TABLE "membership" ADD COLUMN "bonus_credits" integer DEFAULT 0 NOT NULL;

@@ -9,6 +9,7 @@ import {
 	chargeUpdate,
 	idSchema,
 	membershipInput,
+	grantCreditsInput,
 	membershipUpdate,
 	paymentInput,
 	planInput,
@@ -40,6 +41,14 @@ export const createMembership = command(membershipInput, async (input) => {
 });
 export const updateMembership = command(membershipUpdate, async (input) => {
 	const m = await svc.updateMembership(await requireOrg(), input);
+	void getMemberships().refresh();
+	void getMember(m.memberId).refresh();
+	return m;
+});
+
+/** Grant comp classes on top of the plan's credit cap (this period / this pack). */
+export const grantCredits = command(grantCreditsInput, async ({ membershipId, count }) => {
+	const m = await svc.grantCredits(await requireOrg(), membershipId, count);
 	void getMemberships().refresh();
 	void getMember(m.memberId).refresh();
 	return m;

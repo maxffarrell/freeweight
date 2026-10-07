@@ -84,6 +84,11 @@ export const membershipUpdate = v.object({
 	clearPauseRequest: v.optional(v.boolean())
 });
 
+export const grantCreditsInput = v.object({
+	membershipId: idSchema,
+	count: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50))
+});
+
 export const locationInput = v.object({
 	name: requiredText('Name'),
 	address: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)), '')

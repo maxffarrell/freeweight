@@ -378,7 +378,7 @@ type ActiveMembership = {
 	classCredits: number | null;
 	interval: 'week' | 'month' | 'year';
 	isPack: boolean;
-	membership: { startsAt: Date; endsAt: Date | null };
+	membership: { id: string; startsAt: Date; endsAt: Date | null; bonusCredits: number };
 };
 
 /** Current rolling membership period: startsAt stepped forward on the plan's interval. */
@@ -431,19 +431,25 @@ export async function creditUsage(orgId: string, memberId: string) {
 	const ms = await activeMembership(orgId, memberId);
 	if (!ms || ms.classCredits == null) return null;
 	const used = await creditsUsedIn(orgId, memberId, creditWindow(ms));
-	return { used, limit: ms.classCredits };
+	return {
+		used,
+		limit: ms.classCredits + ms.membership.bonusCredits,
+		bonus: ms.membership.bonusCredits,
+		membershipId: ms.membership.id
+	};
 }
 
 /** 402s when the member's plan caps classes per period and they've used them. */
 async function assertCreditAvailable(orgId: string, memberId: string, ms: ActiveMembership) {
 	if (ms.classCredits == null) return;
 	const used = await creditsUsedIn(orgId, memberId, creditWindow(ms));
-	if (used >= ms.classCredits)
+	const limit = ms.classCredits + ms.membership.bonusCredits;
+	if (used >= limit)
 		error(
 			402,
 			ms.isPack
-				? `All ${ms.classCredits} classes used in this pack`
-				: `All ${ms.classCredits} classes used for this period`
+				? `All ${limit} classes used in this pack`
+				: `All ${limit} classes used for this period`
 		);
 }
 
