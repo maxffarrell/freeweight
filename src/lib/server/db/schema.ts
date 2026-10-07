@@ -8,6 +8,7 @@ import {
 	pgEnum,
 	pgTable,
 	primaryKey,
+	real,
 	text,
 	timestamp,
 	uniqueIndex
@@ -605,6 +606,24 @@ export const memberNote = pgTable(
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [index('member_note_member_idx').on(t.memberId, t.createdAt)]
+);
+
+/** Member-logged body metrics (weight, body fat, …) — the portal Progress card. */
+export const memberMeasurement = pgTable(
+	'member_measurement',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		kind: text('kind').notNull(),
+		value: real('value').notNull(),
+		unit: text('unit').notNull(),
+		recordedAt: date('recorded_at', { mode: 'string' }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [index('member_measurement_member_idx').on(t.memberId, t.recordedAt)]
 );
 
 export const activity = pgTable(

@@ -23,6 +23,9 @@
 		startCheckout,
 		signWaiver,
 		getMyDocuments,
+		getMeasurements,
+		logMeasurement,
+		removeMeasurement,
 		resubscribe,
 		getJoinablePlans,
 		joinPlan,
@@ -36,6 +39,8 @@
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
+	import TrendingUp from '@lucide/svelte/icons/trending-up';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
 	import type { PageProps } from './$types';
 
@@ -48,6 +53,53 @@
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
 	const planFull = (p: (typeof joinablePlans)[number]) =>
 		!p.isPack && p.memberLimit !== null && p.activeMembers >= p.memberLimit;
+
+	// ------- progress tracking -------
+	const measurements = $derived(await getMeasurements(memberId));
+	const KIND_LABELS = {
+		weight: 'Weight',
+		body_fat: 'Body fat',
+		waist: 'Waist',
+		chest: 'Chest'
+	} as const;
+	const UNITS = ['lb', 'kg', '%', 'in', 'cm'] as const;
+	let msKind = $state<keyof typeof KIND_LABELS>('weight');
+	let msValue = $state('');
+	let msUnit = $state<(typeof UNITS)[number]>('lb');
+	let msDate = $state('');
+	let msPending = $state(false);
+	/** Entries come newest-first; the next same-kind+unit row is the previous reading. */
+	const statDelta = (e: (typeof measurements)[number]) => {
+		const prev = measurements
+			.slice(measurements.indexOf(e) + 1)
+			.find((x) => x.kind === e.kind && x.unit === e.unit);
+		return prev ? e.value - prev.value : null;
+	};
+	async function logStat(e: SubmitEvent) {
+		e.preventDefault();
+		msPending = true;
+		try {
+			await logMeasurement({
+				memberId,
+				kind: msKind,
+				value: Number(msValue),
+				unit: msUnit as (typeof UNITS)[number],
+				recordedAt: msDate || undefined
+			});
+			msValue = '';
+			toast.success('Logged');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log'));
+		}
+		msPending = false;
+	}
+	async function removeStat(id: string) {
+		try {
+			await removeMeasurement({ memberId, id });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
 	const buyablePacks = $derived(
 		joinablePlans.filter(
@@ -681,6 +733,70 @@
 						</li>
 					{/each}
 				</ul>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2 text-base"><TrendingUp /> Progress</Card.Title>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<form class="flex flex-wrap items-center gap-2" onsubmit={logStat}>
+				<select bind:value={msKind} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+					{#each Object.entries(KIND_LABELS) as [k, label] (k)}
+						<option value={k}>{label}</option>
+					{/each}
+				</select>
+				<Input
+					type="number"
+					step="0.1"
+					min="0"
+					required
+					bind:value={msValue}
+					placeholder="Value"
+					class="h-8 w-24"
+				/>
+				<select bind:value={msUnit} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+					{#each UNITS as u (u)}<option value={u}>{u}</option>{/each}
+				</select>
+				<Input type="date" bind:value={msDate} class="h-8 w-auto text-xs" aria-label="Date" />
+				<Button size="sm" class="h-8" type="submit" disabled={msPending}>Log</Button>
+			</form>
+			{#if measurements.length}
+				<ul class="space-y-1.5 border-t pt-3">
+					{#each measurements as e (e.id)}
+						{@const delta = statDelta(e)}
+						<li class="group flex items-baseline gap-2 text-sm">
+							<span class="w-16 shrink-0 text-xs text-muted-foreground"
+								>{KIND_LABELS[e.kind as keyof typeof KIND_LABELS] ?? e.kind}</span
+							>
+							<span class="font-medium tabular-nums">{e.value} {e.unit}</span>
+							{#if delta !== null}
+								<span
+									class="text-xs tabular-nums {delta > 0
+										? 'text-amber-600'
+										: delta < 0
+											? 'text-green-600'
+											: 'text-muted-foreground'}"
+									>{delta > 0 ? '+' : ''}{Math.round(delta * 10) / 10}</span
+								>
+							{/if}
+							<span class="ml-auto shrink-0 text-xs text-muted-foreground">{e.recordedAt}</span>
+							<button
+								class="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+								onclick={() => removeStat(e.id)}
+								aria-label="Delete entry"
+							>
+								<Trash2 class="size-3.5" />
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-xs text-muted-foreground">
+					Log your first measurement — weight, body fat, waist.
+				</p>
 			{/if}
 		</Card.Content>
 	</Card.Root>

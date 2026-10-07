@@ -6,7 +6,8 @@ import { db } from '#lib/server/db/index.ts';
 import { document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
-import { idSchema } from '#lib/schemas.ts';
+import * as memberSvc from '#lib/server/services/members.ts';
+import { idSchema, measurementInput } from '#lib/schemas.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -181,6 +182,30 @@ export const getJoinablePlans = query(idSchema, async (memberId) => {
 		)
 		.orderBy(asc(plan.amount));
 });
+
+export const getMeasurements = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return memberSvc.listMeasurements(m.organizationId, m.id);
+});
+
+export const logMeasurement = command(
+	v.object({ memberId: idSchema, ...measurementInput.entries }),
+	async ({ memberId, ...input }) => {
+		const m = await myMember(memberId);
+		const r = await memberSvc.addMeasurement(m.organizationId, m.id, input);
+		void getMeasurements(memberId).refresh();
+		return r;
+	}
+);
+
+export const removeMeasurement = command(
+	v.object({ memberId: idSchema, id: idSchema }),
+	async ({ memberId, id }) => {
+		const m = await myMember(memberId);
+		await memberSvc.deleteMeasurement(m.organizationId, m.id, id);
+		void getMeasurements(memberId).refresh();
+	}
+);
 
 export const joinPlan = command(
 	v.object({ memberId: idSchema, planId: idSchema }),

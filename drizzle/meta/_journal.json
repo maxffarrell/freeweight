@@ -295,6 +295,13 @@
       "when": 1791375526116,
       "tag": "0041_plan-cap",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791375894785,
+      "tag": "0042_member-measurements",
+      "breakpoints": true
     }
   ]
 }
