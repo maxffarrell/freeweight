@@ -455,6 +455,28 @@ export const booking = pgTable(
 	]
 );
 
+/** Member's 1–5 rating + optional note on a class they attended. */
+export const sessionFeedback = pgTable(
+	'session_feedback',
+	{
+		id: id(),
+		organizationId: orgId(),
+		sessionId: text('session_id')
+			.notNull()
+			.references(() => classSession.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		rating: integer('rating').notNull(),
+		comment: text('comment').notNull().default(''),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('session_feedback_session_member_idx').on(t.sessionId, t.memberId),
+		index('session_feedback_org_idx').on(t.organizationId)
+	]
+);
+
 /** Bookable amenity — sauna, court, child-care room. Members self-book slots in the portal. */
 export const facilityResource = pgTable(
 	'facility_resource',

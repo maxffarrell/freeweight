@@ -15,7 +15,12 @@ import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { emit } from '#lib/server/services/events.ts';
-import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
+import {
+	idSchema,
+	measurementInput,
+	resourceBookInput,
+	sessionFeedbackInput
+} from '#lib/schemas.ts';
 import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
 
@@ -71,6 +76,20 @@ export const memberBookSeries = command(
 		return r;
 	}
 );
+
+/** Rate a class the member attended — one rating per session, editable. */
+export const rateSession = command(sessionFeedbackInput, async (input) => {
+	const m = await myMember(input.memberId);
+	const r = await svc.submitSessionFeedback(
+		m.organizationId,
+		m.id,
+		input.sessionId,
+		input.rating,
+		input.comment
+	);
+	void getPortalOverview(input.memberId).refresh();
+	return r;
+});
 
 export const signWaiver = command(idSchema, async (memberId) => {
 	const m = await myMember(memberId);

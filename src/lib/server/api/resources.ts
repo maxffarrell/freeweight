@@ -11,6 +11,7 @@ import * as amenities from '#lib/server/services/resources.ts';
 import * as shifts from '#lib/server/services/shifts.ts';
 import * as giftcards from '#lib/server/services/giftcards.ts';
 import * as recurring from '#lib/server/services/recurring.ts';
+import * as reports from '#lib/server/services/reports.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
@@ -245,6 +246,10 @@ export const resources: Record<string, Resource> = {
 					new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10),
 				to: url.searchParams.get('to') ?? new Date().toISOString().slice(0, 10)
 			})
+	},
+	session_feedback: {
+		description: 'Member 1–5 class ratings submitted in the portal — newest first, last 90 days',
+		list: (ctx) => reports.listSessionFeedback(ctx.orgId)
 	},
 	shop_items: {
 		description: 'Front-desk retail items (name, price, optional stock count)',
