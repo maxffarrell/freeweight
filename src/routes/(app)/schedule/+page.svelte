@@ -92,6 +92,13 @@
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
 	);
 	const printWaitlist = $derived(roster.filter((r) => r.booking.status === 'waitlisted'));
+	const waitlistPos = $derived(
+		new Map(
+			roster
+				.filter((r) => r.booking.status === 'waitlisted')
+				.map((r, i) => [r.booking.id, i + 1] as const)
+		)
+	);
 	function openRoster(id: string) {
 		focusId = id;
 		rosterOpen = true;
@@ -418,7 +425,14 @@
 					{#each roster.filter((r) => r.booking.status !== 'cancelled') as r (r.booking.id)}
 						<Table.Row>
 							<Table.Cell class="font-medium">{r.memberName}</Table.Cell>
-							<Table.Cell><StatusBadge status={r.booking.status} /></Table.Cell>
+							<Table.Cell>
+								<StatusBadge status={r.booking.status} />
+								{#if r.booking.status === 'waitlisted'}
+									<span class="ml-1 text-xs text-muted-foreground"
+										>#{waitlistPos.get(r.booking.id)}</span
+									>
+								{/if}
+							</Table.Cell>
 							<Table.Cell class="text-right">
 								{#if r.booking.status === 'booked'}
 									<Button
