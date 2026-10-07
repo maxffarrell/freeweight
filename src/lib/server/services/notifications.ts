@@ -44,12 +44,23 @@ import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { addDays, localDate, localTime, localWeekday } from '#lib/tz.ts';
 
-async function orgName(orgId: string) {
-	const [o] = await db
-		.select({ name: organization.name })
-		.from(organization)
-		.where(eq(organization.id, orgId));
-	return o?.name ?? 'your gym';
+async function orgBrand(orgId: string) {
+	const [o, s] = await Promise.all([
+		db
+			.select({ name: organization.name })
+			.from(organization)
+			.where(eq(organization.id, orgId))
+			.limit(1),
+		db
+			.select({ logoDocumentId: gymSettings.logoDocumentId })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, orgId))
+			.limit(1)
+	]);
+	return {
+		orgName: o[0]?.name ?? 'your gym',
+		logoUrl: s[0]?.logoDocumentId ? `${appOrigin()}/api/logo/${s[0].logoDocumentId}` : undefined
+	};
 }
 
 async function orgTimezone(orgId: string) {
@@ -146,13 +157,13 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 		.where(eq(booking.id, bookingId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'waitlist_promoted', bookingId, row.email))) return;
-	const [name, settings] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, settings] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const date = localDate(row.startsAt, settings);
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
-		subject: `You're in: ${row.className} at ${name}`,
+		subject: `You're in: ${row.className} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `You're off the waitlist, ${row.memberName}`,
 			lines: [
 				`A spot opened up in ${row.className} on ${date} at ${localTime(row.startsAt, settings)}.`,
@@ -182,15 +193,15 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 	if (!row?.email) return;
 	const waitlisted = row.status === 'waitlisted';
 	if (!(await logOnce(orgId, 'booking_confirmed', bookingId, row.email))) return;
-	const [name, settings] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, settings] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const when = `${localDate(row.startsAt, settings)} at ${localTime(row.startsAt, settings)}`;
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
 		subject: waitlisted
-			? `Waitlisted: ${row.className} at ${name}`
-			: `Booked: ${row.className} at ${name}`,
+			? `Waitlisted: ${row.className} at ${name.orgName}`
+			: `Booked: ${row.className} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: waitlisted
 				? `You're on the waitlist, ${row.memberName}`
 				: `You're booked, ${row.memberName}`,
@@ -222,7 +233,7 @@ export async function notifySeriesBooked(
 			.from(gymMember)
 			.where(eq(gymMember.id, memberId))
 			.limit(1),
-		orgName(orgId)
+		orgBrand(orgId)
 	]);
 	const m = row[0];
 	if (!m?.email || (!counts.booked && !counts.waitlisted)) return;
@@ -236,9 +247,9 @@ export async function notifySeriesBooked(
 	parts.push('See times and cancel any of them from your member portal.');
 	await sendMemberEmail(memberId, {
 		to: m.email,
-		subject: `You're in: ${className} at ${name}`,
+		subject: `You're in: ${className} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `You're booked in, ${m.memberName}`,
 			lines: parts,
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -261,7 +272,7 @@ export async function notifyPlanPriceChange(
 ) {
 	if (!memberIds.length) return;
 	const [name, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db
 			.select({ currency: gymSettings.currency })
 			.from(gymSettings)
@@ -278,9 +289,9 @@ export async function notifyPlanPriceChange(
 		if (!m.email) continue;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `Your ${planName} rate is changing at ${name}`,
+			subject: `Your ${planName} rate is changing at ${name.orgName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `Heads up, ${m.memberName}`,
 				lines: [
 					`Your ${planName} membership changes from ${formatMoney(oldAmount, currency)}${each} to ${formatMoney(newAmount, currency)}${each} on your next billing date.`,
@@ -316,18 +327,18 @@ export async function notifyPaymentReceived(
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'payment_received', paymentIds[0]!, row.email))) return;
 	const [name, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const money = formatMoney(amount, st[0]?.currency ?? 'usd');
 	await sendMemberEmail(row.balanceMemberId, {
 		to: row.email,
-		subject: `Payment received: ${money} at ${name}`,
+		subject: `Payment received: ${money} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `Thanks, ${row.memberName} — ${money} received`,
 			lines: [
-				`${name} received your ${money} payment (${method}).`,
+				`${name.orgName} received your ${money} payment (${method}).`,
 				'Any remaining balance shows in your member portal.'
 			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -350,18 +361,18 @@ export async function notifyPaymentRefunded(orgId: string, paymentId: string) {
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'payment_refunded', paymentId, row.email))) return;
 	const [name, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const money = formatMoney(row.amount, st[0]?.currency ?? 'usd');
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
-		subject: `Refund issued: ${money} at ${name}`,
+		subject: `Refund issued: ${money} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `Hi ${row.memberName} — ${money} refunded`,
 			lines: [
-				`${name} issued a ${money} refund to you.`,
+				`${name.orgName} issued a ${money} refund to you.`,
 				'If a charge was reopened it will show in your member portal.'
 			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -409,7 +420,7 @@ export async function sendPastDueNotices(orgId: string) {
 		byMember.set(r.memberId, g);
 	}
 	const [name, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const currency = st[0]?.currency ?? 'usd';
@@ -420,12 +431,12 @@ export async function sendPastDueNotices(orgId: string) {
 		const total = formatMoney(g.total, currency);
 		await sendMemberEmail(memberId, {
 			to: g.email,
-			subject: `Payment due: ${total} at ${name}`,
+			subject: `Payment due: ${total} at ${name.orgName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${total} is past due`,
 				lines: [
-					`Hi ${g.memberName} — you have ${g.count} overdue ${g.count === 1 ? 'charge' : 'charges'} totaling ${total} at ${name}.`,
+					`Hi ${g.memberName} — you have ${g.count} overdue ${g.count === 1 ? 'charge' : 'charges'} totaling ${total} at ${name.orgName}.`,
 					'You can pay online from the member portal.'
 				],
 				action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
@@ -468,7 +479,7 @@ export async function sendTrialEndingNotices(orgId: string) {
 		);
 	if (!rows.length) return 0;
 	const [name, tz, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		orgTimezone(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
@@ -481,12 +492,12 @@ export async function sendTrialEndingNotices(orgId: string) {
 		const date = localDate(r.nextChargeAt, tz);
 		await sendMemberEmail(r.memberId, {
 			to: r.email,
-			subject: `Your free trial at ${name} ends ${date}`,
+			subject: `Your free trial at ${name.orgName} ends ${date}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Your trial is almost up',
 				lines: [
-					`Hi ${r.memberName} — your free trial of ${r.planName} at ${name} ends ${date}.`,
+					`Hi ${r.memberName} — your free trial of ${r.planName} at ${name.orgName} ends ${date}.`,
 					`Your first payment of ${amount}/${r.interval} posts that day. Questions about your plan? Just reply to this email or stop by the front desk.`
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -502,7 +513,7 @@ export async function sendTrialEndingNotices(orgId: string) {
  * One email per member per year (logOnce 'birthday', memberId:year).
  */
 export async function sendBirthdayGreetings(orgId: string) {
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	const mmdd = today.slice(5);
 	const year = today.slice(0, 4);
@@ -525,10 +536,10 @@ export async function sendBirthdayGreetings(orgId: string) {
 			to: r.email,
 			subject: `Happy birthday, ${r.memberName.split(' ')[0]}!`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Happy birthday!',
 				lines: [
-					`Hi ${r.memberName} — everyone at ${name} is wishing you a great birthday.`,
+					`Hi ${r.memberName} — everyone at ${name.orgName} is wishing you a great birthday.`,
 					'See you at the gym — first workout of the year is on you.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -544,7 +555,7 @@ export async function sendBirthdayGreetings(orgId: string) {
  * (skipped on the join day itself — years >= 1 only). Once per year per member.
  */
 export async function sendAnniversaryGreetings(orgId: string) {
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	const mmdd = today.slice(5);
 	const year = Number(today.slice(0, 4));
@@ -573,12 +584,12 @@ export async function sendAnniversaryGreetings(orgId: string) {
 		if (years < 1) continue;
 		await sendMemberEmail(r.memberId, {
 			to: r.email,
-			subject: `${years} ${years === 1 ? 'year' : 'years'} at ${name} — happy anniversary, ${r.memberName.split(' ')[0]}`,
+			subject: `${years} ${years === 1 ? 'year' : 'years'} at ${name.orgName} — happy anniversary, ${r.memberName.split(' ')[0]}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `Happy ${years}-year anniversary`,
 				lines: [
-					`Hi ${r.memberName} — ${years} ${years === 1 ? 'year' : 'years'} ago today you joined ${name}, and we're glad you did.`,
+					`Hi ${r.memberName} — ${years} ${years === 1 ? 'year' : 'years'} ago today you joined ${name.orgName}, and we're glad you did.`,
 					'Thanks for being part of the community.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -603,15 +614,15 @@ export async function notifyReferralJoin(orgId: string, referrerId: string, newM
 	]);
 	if (!referrer?.email || !joined) return;
 	if (!(await logOnce(orgId, 'referral_join', newMemberId, referrer.email))) return;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	await sendMemberEmail(referrerId, {
 		to: referrer.email,
-		subject: `${joined.name} just joined ${name} from your link`,
+		subject: `${joined.name} just joined ${name.orgName} from your link`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'Your referral worked',
 			lines: [
-				`Hi ${referrer.name} — ${joined.name} just signed up at ${name} using your referral link.`,
+				`Hi ${referrer.name} — ${joined.name} just signed up at ${name.orgName} using your referral link.`,
 				'Thanks for spreading the word — keep sharing your link from the member portal.'
 			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -637,7 +648,7 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
 		);
 	if (!rows.length) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	for (const row of rows) {
 		if (!row.email) continue;
 		if (!(await logOnce(orgId, 'session_cancelled', sessionId, row.email))) continue;
@@ -646,10 +657,10 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 			to: row.email,
 			subject: `${row.className} on ${date} is cancelled`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${row.className} is cancelled`,
 				lines: [
-					`Hi ${row.memberName} — ${row.className} at ${name} on ${date} at ${localTime(row.startsAt, tz)} has been cancelled.`,
+					`Hi ${row.memberName} — ${row.className} at ${name.orgName} on ${date} at ${localTime(row.startsAt, tz)} has been cancelled.`,
 					'Check the member portal for the rest of this week’s schedule.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -680,13 +691,13 @@ export async function notifyBookingCancelled(orgId: string, bookingId: string) {
 		.where(eq(booking.id, bookingId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'booking_cancelled', bookingId, row.email))) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
-		subject: `Cancelled: ${row.className} at ${name}`,
+		subject: `Cancelled: ${row.className} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `Your ${row.className} booking is cancelled`,
 			lines: [
 				`Hi ${row.memberName} — your ${row.className} spot on ${when}${row.locationName ? ` at ${row.locationName}` : ''} has been cancelled.`,
@@ -728,7 +739,7 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
 		);
 	if (!rows.length) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const date = `${localDate(sess.startsAt, tz)} at ${localTime(sess.startsAt, tz)}`;
 	const who = instr?.name ?? 'a new instructor';
 	for (const row of rows) {
@@ -746,10 +757,10 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 			to: row.email,
 			subject: `${sess.className} on ${localDate(sess.startsAt, tz)}: now taught by ${who}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `Instructor change for ${sess.className}`,
 				lines: [
-					`Hi ${row.memberName} — your ${sess.className} at ${name} on ${date} is now taught by ${who}.`,
+					`Hi ${row.memberName} — your ${sess.className} at ${name.orgName} on ${date} is now taught by ${who}.`,
 					'Everything else about the class is unchanged.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -783,7 +794,7 @@ export async function notifySessionChanged(orgId: string, sessionId: string) {
 			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
 		);
 	if (!rows.length) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const when = `${localDate(sess.startsAt, tz)} at ${localTime(sess.startsAt, tz)}`;
 	const where = sess.locationName ? ` at ${sess.locationName}` : '';
 	for (const row of rows) {
@@ -801,10 +812,10 @@ export async function notifySessionChanged(orgId: string, sessionId: string) {
 			to: row.email,
 			subject: `${sess.className} moved — now ${when}${where}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${sess.className} has moved`,
 				lines: [
-					`Hi ${row.memberName} — your ${sess.className} at ${name} is now ${when}${where}.`,
+					`Hi ${row.memberName} — your ${sess.className} at ${name.orgName} is now ${when}${where}.`,
 					'Your booking carries over — nothing to rebook.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -845,7 +856,7 @@ export async function sendClassReminders(orgId: string) {
 			)
 		);
 	if (!rows.length) return 0;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	let sent = 0;
 	for (const row of rows) {
 		if (!row.email) continue;
@@ -853,9 +864,9 @@ export async function sendClassReminders(orgId: string) {
 		const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
 		await sendMemberEmail(row.memberId, {
 			to: row.email,
-			subject: `Tomorrow: ${row.className} at ${name}`,
+			subject: `Tomorrow: ${row.className} at ${name.orgName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `See you tomorrow, ${row.memberName}`,
 				lines: [
 					`You're booked into ${row.className} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
@@ -885,25 +896,30 @@ export async function notifyPackLowCredit(
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
 	if (!m?.email || !(await logOnce(orgId, 'pack-low-credit', membershipId, m.email))) return false;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	const first = m.name.split(' ')[0] ?? m.name;
 	const heading =
 		remaining > 0
 			? `${remaining} class${remaining === 1 ? '' : 'es'} left on your pack`
 			: 'Your class pack is used up';
 	const { text, html } = renderEmail({
-		orgName: name,
+		...name,
 		heading,
 		lines: [
 			`Hi ${first},`,
 			remaining > 0
-				? `You've used ${limit - remaining} of ${limit} classes on your pack at ${name}.`
-				: `You've used all ${limit} classes on your pack at ${name}.`,
+				? `You've used ${limit - remaining} of ${limit} classes on your pack at ${name.orgName}.`
+				: `You've used all ${limit} classes on your pack at ${name.orgName}.`,
 			'Grab a new pack anytime from the member portal.'
 		],
 		action: { label: 'Buy a pack', url: `${appOrigin()}/portal` }
 	});
-	await sendMemberEmail(memberId, { to: m.email, subject: `${name}: ${heading}`, text, html });
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${name.orgName}: ${heading}`,
+		text,
+		html
+	});
 	return true;
 }
 
@@ -961,15 +977,15 @@ export async function notifyReferralReward(orgId: string, paidMemberId: string) 
 		.update(membership)
 		.set({ bonusCredits: sql`${membership.bonusCredits} + ${credits}` })
 		.where(eq(membership.id, ms.id));
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	await sendMemberEmail(joined.referredByMemberId, {
 		to: referrer.email,
-		subject: `${name}: you earned ${credits} class credits`,
+		subject: `${name.orgName}: you earned ${credits} class credits`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `You earned ${credits} class credits`,
 			lines: [
-				`Hi ${referrer.name} — ${joined.name} just became a paying member at ${name} using your referral link.`,
+				`Hi ${referrer.name} — ${joined.name} just became a paying member at ${name.orgName} using your referral link.`,
 				`${credits} bonus class credit${credits === 1 ? ' is' : 's are'} on your membership — book your next class in the portal.`,
 				'Keep sharing your referral link to earn more.'
 			],
@@ -1002,20 +1018,20 @@ export async function sendWaiverReminders(orgId: string) {
 				isNull(waiver.id)
 			)
 		);
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	let sent = 0;
 	for (const m of unsigned) {
 		if (!m.email || !(await logOnce(orgId, 'waiver_reminder', m.id, m.email))) continue;
 		const first = m.name.split(' ')[0] ?? m.name;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `${name}: please sign your waiver`,
+			subject: `${name.orgName}: please sign your waiver`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Please sign your waiver',
 				lines: [
 					`Hi ${first},`,
-					`Before your next visit to ${name}, take a minute to review and sign the liability waiver.`,
+					`Before your next visit to ${name.orgName}, take a minute to review and sign the liability waiver.`,
 					'It shows up automatically the next time you open the member portal.'
 				],
 				action: { label: 'Open the portal', url: `${appOrigin()}/portal` }
@@ -1052,7 +1068,7 @@ export async function requestPaymentNotice(orgId: string, memberId: string) {
 	if (amount <= 0) return false;
 	const day = new Date().toISOString().slice(0, 10);
 	if (!(await logOnce(orgId, 'payment_request', `${memberId}:${day}`, m.email))) return false;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	const [st] = await db
 		.select({ currency: gymSettings.currency })
 		.from(gymSettings)
@@ -1060,13 +1076,13 @@ export async function requestPaymentNotice(orgId: string, memberId: string) {
 	const first = m.name.split(' ')[0] ?? m.name;
 	await sendMemberEmail(memberId, {
 		to: m.email,
-		subject: `${name}: you have a balance due`,
+		subject: `${name.orgName}: you have a balance due`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'You have a balance due',
 			lines: [
 				`Hi ${first},`,
-				`Your open balance at ${name} is ${formatMoney(amount, st?.currency ?? 'usd')}.`,
+				`Your open balance at ${name.orgName} is ${formatMoney(amount, st?.currency ?? 'usd')}.`,
 				'You can pay it anytime from the member portal.'
 			],
 			action: { label: 'Pay online', url: `${appOrigin()}/portal` }
@@ -1114,16 +1130,16 @@ export async function sendAnnouncementTest(
 		.from(user)
 		.where(eq(user.id, userId));
 	if (!u?.email) error(400, 'Your account has no email address');
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	const { text, html } = renderEmail({
-		orgName: name,
+		...name,
 		heading: mergeTags(subject, u.name),
 		lines: mergeTags(message, u.name).split(/\n+/).filter(Boolean),
 		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 	});
 	await sendEmail({
 		to: u.email,
-		subject: `[Test] ${name}: ${mergeTags(subject, u.name)}`,
+		subject: `[Test] ${name.orgName}: ${mergeTags(subject, u.name)}`,
 		text,
 		html
 	});
@@ -1163,7 +1179,7 @@ export async function sendAnnouncement(
 		)
 		.limit(1000);
 	if (!members.length) return { sent: 0, total: 0 };
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	const planName = planId
 		? await db
 				.select({ name: plan.name })
@@ -1177,7 +1193,7 @@ export async function sendAnnouncement(
 	const personalized = subject.includes('{') || message.includes('{');
 	const render = (memberName: string) =>
 		renderEmail({
-			orgName: name,
+			...name,
 			heading: mergeTags(subject, memberName),
 			lines: mergeTags(message, memberName).split(/\n+/).filter(Boolean),
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -1189,7 +1205,7 @@ export async function sendAnnouncement(
 		const { text, html } = personalized ? render(m.name) : shared!;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `${name}: ${mergeTags(subject, m.name)}`,
+			subject: `${name.orgName}: ${mergeTags(subject, m.name)}`,
 			text,
 			html
 		});
@@ -1353,18 +1369,18 @@ export async function notifyChargePosted(orgId: string, chargeId: string) {
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'charge_posted', chargeId, row.email))) return;
 	const [name, settings] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const amount = formatMoney(row.amount, settings[0]?.currency ?? 'usd');
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
-		subject: `New charge from ${name}: ${amount}`,
+		subject: `New charge from ${name.orgName}: ${amount}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `${amount} due ${formatDate(row.dueDate)}`,
 			lines: [
-				`Hi ${row.memberName} — ${name} posted a charge to your account:`,
+				`Hi ${row.memberName} — ${name.orgName} posted a charge to your account:`,
 				row.description ?? `${amount}`,
 				'You can pay it online from the member portal.'
 			],
@@ -1383,19 +1399,19 @@ export async function notifyMembershipSuspended(orgId: string, memberIds: string
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, orgId), inArray(gymMember.id, memberIds)));
 	if (!rows.length) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	for (const m of rows) {
 		if (!m.email) continue;
 		if (!(await logOnce(orgId, 'membership_suspended', `${m.id}:${today}`, m.email))) continue;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `Membership suspended — ${name}`,
+			subject: `Membership suspended — ${name.orgName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Your membership is suspended',
 				lines: [
-					`Hi ${m.name} — your membership at ${name} was suspended because of an overdue balance.`,
+					`Hi ${m.name} — your membership at ${name.orgName} was suspended because of an overdue balance.`,
 					'Class bookings are paused until the balance is paid; your membership resumes automatically once it clears.'
 				],
 				action: { label: 'Pay in the member portal', url: `${appOrigin()}/portal` }
@@ -1423,15 +1439,15 @@ export async function notifyMembershipResumed(
 		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
 	if (!row?.memberEmail) return;
 	if (!(await logOnce(orgId, 'membership_resumed', membershipId, row.memberEmail))) return;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	await sendMemberEmail(row.memberId, {
 		to: row.memberEmail,
 		subject: `Welcome back — your ${row.planName} membership is active`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'Welcome back!',
 			lines: [
-				`Hi ${row.memberName} — your pause is over and your ${row.planName} membership at ${name} is active again.`,
+				`Hi ${row.memberName} — your pause is over and your ${row.planName} membership at ${name.orgName} is active again.`,
 				`Your next bill is scheduled for ${formatDate(nextChargeOn)}. Book a class and pick up where you left off.`
 			],
 			action: { label: 'Book a class', url: `${appOrigin()}/portal` }
@@ -1456,7 +1472,7 @@ export async function notifyCancellationRequested(orgId: string, membershipId: s
 		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
 	if (!row) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 
 	const staff = await db
@@ -1471,7 +1487,7 @@ export async function notifyCancellationRequested(orgId: string, membershipId: s
 			to: s.email,
 			subject: `Cancellation request — ${row.memberName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${row.memberName} wants to cancel`,
 				lines: [
 					`${row.memberName} requested cancellation of their ${row.planName} membership from the member portal.`,
@@ -1486,12 +1502,12 @@ export async function notifyCancellationRequested(orgId: string, membershipId: s
 		return;
 	await sendMemberEmail(row.memberId, {
 		to: row.memberEmail,
-		subject: `Cancellation requested — ${name}`,
+		subject: `Cancellation requested — ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'We received your request',
 			lines: [
-				`Hi ${row.memberName} — we got your request to cancel your ${row.planName} membership at ${name}.`,
+				`Hi ${row.memberName} — we got your request to cancel your ${row.planName} membership at ${name.orgName}.`,
 				'A staff member will confirm your cancellation shortly. Changed your mind? You can withdraw the request from the member portal until then.'
 			]
 		})
@@ -1556,7 +1572,7 @@ export async function sendWeeklyDigest(orgId: string) {
 		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
 
 	const [name, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
 	const currency = st[0]?.currency ?? 'usd';
@@ -1571,9 +1587,9 @@ export async function sendWeeklyDigest(orgId: string) {
 		if (!(await logOnce(orgId, 'weekly_digest', today, s.email))) continue;
 		await sendEmail({
 			to: s.email,
-			subject: `${name}: your week — ${newMembers!.n} new members, ${formatMoney(collected!.n, currency)} collected`,
+			subject: `${name.orgName}: your week — ${newMembers!.n} new members, ${formatMoney(collected!.n, currency)} collected`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Your weekly digest',
 				lines: [
 					`<strong>${newMembers!.n}</strong> new members joined in the last 7 days (active memberships: ${active!.n}).`,
@@ -1597,7 +1613,7 @@ export async function sendWeeklyDigest(orgId: string) {
  */
 export async function sendStaffBriefing(orgId: string) {
 	const [name, tz, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		orgTimezone(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
@@ -1752,10 +1768,10 @@ export async function sendStaffBriefing(orgId: string) {
 		if (!(await logOnce(orgId, 'staff_briefing', today, s.email))) continue;
 		await sendEmail({
 			to: s.email,
-			subject: `${name}: morning briefing — ${formatDate(today)}`,
+			subject: `${name.orgName}: morning briefing — ${formatDate(today)}`,
 			...renderEmail({
-				orgName: name,
-				heading: `Today at ${name}`,
+				...name,
+				heading: `Today at ${name.orgName}`,
 				lines,
 				action: { label: 'Open dashboard', url: `${appOrigin()}/dashboard` }
 			})
@@ -1786,21 +1802,21 @@ export async function notifyPlanChanged(orgId: string, membershipId: string, old
 		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
 	if (!row?.email) return;
 	const [name, st, tz] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1),
 		orgTimezone(orgId)
 	]);
 	const lines = [
-		`Hi ${row.memberName} — your membership at ${name} switched from ${oldPlanName} to ${row.planName}.`,
+		`Hi ${row.memberName} — your membership at ${name.orgName} switched from ${oldPlanName} to ${row.planName}.`,
 		row.nextChargeAt
 			? `Your next bill on ${localDate(row.nextChargeAt, tz)} will be ${formatMoney(row.amount, st[0]?.currency ?? 'usd')}/${row.interval}.`
 			: `Your new rate is ${formatMoney(row.amount, st[0]?.currency ?? 'usd')}/${row.interval}.`
 	];
 	await sendMemberEmail(row.memberId, {
 		to: row.email,
-		subject: `Your plan changed: ${row.planName} at ${name}`,
+		subject: `Your plan changed: ${row.planName} at ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `You're on ${row.planName} now`,
 			lines,
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -1826,7 +1842,7 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
 	if (!row) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	const resume = row.pauseUntil ? formatDate(row.pauseUntil) : 'a future date';
 
@@ -1842,7 +1858,7 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 			to: s.email,
 			subject: `Pause request — ${row.memberName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${row.memberName} wants to pause`,
 				lines: [
 					`${row.memberName} asked to pause their ${row.planName} membership until ${resume}.`,
@@ -1856,12 +1872,12 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 	if (!(await logOnce(orgId, 'pause_request', `${membershipId}:${today}`, row.memberEmail))) return;
 	await sendMemberEmail(row.memberId, {
 		to: row.memberEmail,
-		subject: `Pause requested — ${name}`,
+		subject: `Pause requested — ${name.orgName}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'We received your request',
 			lines: [
-				`Hi ${row.memberName} — we got your request to pause your ${row.planName} membership at ${name} until ${resume}.`,
+				`Hi ${row.memberName} — we got your request to pause your ${row.planName} membership at ${name.orgName} until ${resume}.`,
 				'A staff member will confirm your pause shortly. Changed your mind? You can withdraw the request from the member portal until then.'
 			]
 		})
@@ -1895,7 +1911,7 @@ export async function sendWinBackNudges(orgId: string) {
 		.limit(200);
 	const cutoff = Date.now() - 30 * 86400_000;
 	const month = new Date().toISOString().slice(0, 7);
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	let sent = 0;
 	for (const r of rows) {
 		if (!r.email) continue;
@@ -1905,12 +1921,12 @@ export async function sendWinBackNudges(orgId: string) {
 		const days = Math.floor((Date.now() - since.getTime()) / 86400_000);
 		await sendMemberEmail(r.memberId, {
 			to: r.email,
-			subject: `We miss you at ${name}`,
+			subject: `We miss you at ${name.orgName}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'We miss you',
 				lines: [
-					`Hi ${r.name} — it's been ${days} days since your last visit to ${name}.`,
+					`Hi ${r.name} — it's been ${days} days since your last visit to ${name.orgName}.`,
 					'Your spot is still here. Book a class and get back into the rhythm.'
 				],
 				action: { label: 'Book a class', url: `${appOrigin()}/portal` }
@@ -1938,7 +1954,7 @@ export async function notifyNoShow(
 			.from(gymMember)
 			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
 			.then((r) => r[0]),
-		orgName(orgId),
+		orgBrand(orgId),
 		orgTimezone(orgId)
 	]);
 	if (!m?.email) return;
@@ -1948,7 +1964,7 @@ export async function notifyNoShow(
 		to: m.email,
 		subject: `We missed you at ${className}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'We missed you',
 			lines: [
 				`Hi ${m.name} — you were booked into ${className} on ${when} but didn't make it. Life happens.`,
@@ -1967,15 +1983,15 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
 	if (!m?.email) return;
 	if (!(await logOnce(orgId, 'checkin_milestone', `${memberId}:${count}`, m.email))) return;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	await sendMemberEmail(memberId, {
 		to: m.email,
-		subject: `${count} check-ins at ${name} — nice work, ${m.name.split(' ')[0]}`,
+		subject: `${count} check-ins at ${name.orgName} — nice work, ${m.name.split(' ')[0]}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: `${count} check-ins. Keep it up.`,
 			lines: [
-				`Hi ${m.name} — you just hit ${count} check-ins at ${name}. That's real consistency.`,
+				`Hi ${m.name} — you just hit ${count} check-ins at ${name.orgName}. That's real consistency.`,
 				'See you at the next one.'
 			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -1991,15 +2007,15 @@ export async function notifyFirstVisit(orgId: string, memberId: string) {
 		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
 	if (!m?.email) return;
 	if (!(await logOnce(orgId, 'first_visit', memberId, m.email))) return;
-	const name = await orgName(orgId);
+	const name = await orgBrand(orgId);
 	await sendMemberEmail(memberId, {
 		to: m.email,
-		subject: `First visit down at ${name} — nice work, ${m.name.split(' ')[0]}`,
+		subject: `First visit down at ${name.orgName} — nice work, ${m.name.split(' ')[0]}`,
 		...renderEmail({
-			orgName: name,
+			...name,
 			heading: 'Your first visit is in the books.',
 			lines: [
-				`Hi ${m.name} — welcome to ${name}. You just checked in for the first time, which is the hardest one.`,
+				`Hi ${m.name} — welcome to ${name.orgName}. You just checked in for the first time, which is the hardest one.`,
 				'Book your next class in the portal and keep the streak going.'
 			],
 			action: { label: 'Book your next class', url: `${appOrigin()}/portal` }
@@ -2012,7 +2028,7 @@ export async function notifyFirstVisit(orgId: string, memberId: string) {
  * time, location, booked/waitlist counts. Staff mail, so no unsubscribe check.
  */
 export async function sendInstructorRosters(orgId: string) {
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	const sessions = await db
 		.select({
@@ -2084,11 +2100,11 @@ export async function sendInstructorRosters(orgId: string) {
 		if (!lines.length) continue;
 		await sendEmail({
 			to: instructor.email,
-			subject: `Today's classes at ${name} — ${lines.length} on your schedule`,
+			subject: `Today's classes at ${name.orgName} — ${lines.length} on your schedule`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `Your classes today, ${instructor.name.split(' ')[0]}`,
-				lines: [`${formatDate(today)} at ${name}:`, ...lines]
+				lines: [`${formatDate(today)} at ${name.orgName}:`, ...lines]
 			})
 		});
 		sent++;
@@ -2105,7 +2121,7 @@ export async function sendBillingReminders(orgId: string) {
 	const now = new Date();
 	const soon = new Date(now.getTime() + 7 * 86400_000);
 	const [name, tz, st] = await Promise.all([
-		orgName(orgId),
+		orgBrand(orgId),
 		orgTimezone(orgId),
 		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
 	]);
@@ -2148,10 +2164,10 @@ export async function sendBillingReminders(orgId: string) {
 			to: r.email,
 			subject: `Your ${r.planName} membership renews ${date}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Membership renewal coming up',
 				lines: [
-					`Hi ${r.memberName} — your ${r.planName} membership at ${name} renews on ${date} for ${formatMoney(amount, currency)}.`,
+					`Hi ${r.memberName} — your ${r.planName} membership at ${name.orgName} renews on ${date} for ${formatMoney(amount, currency)}.`,
 					`Need to pause or cancel instead? You can request either in the member portal, or just reply to this email.`
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -2216,10 +2232,10 @@ export async function sendBillingReminders(orgId: string) {
 			to: r.email,
 			subject: `Your ${r.planName} pack expires ${date}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: 'Class pack expiring soon',
 				lines: [
-					`Hi ${r.memberName} — your ${r.planName} class pack at ${name} expires on ${date}. ${creditsLine}`
+					`Hi ${r.memberName} — your ${r.planName} class pack at ${name.orgName} expires on ${date}. ${creditsLine}`
 				],
 				action: { label: 'Book a class', url: `${appOrigin()}/portal` }
 			})
@@ -2249,7 +2265,7 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!row) return;
-	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const day = localDate(row.startsAt, tz);
 	const time = localTime(row.startsAt, tz);
 
@@ -2265,7 +2281,7 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 			to: s.email,
 			subject: `Cover needed: ${row.className} — ${formatDate(day)} ${time}`,
 			...renderEmail({
-				orgName: name,
+				...name,
 				heading: `${row.className} needs a sub`,
 				lines: [
 					`${row.instructorName ?? 'The assigned instructor'} can't make ${row.className} on ${formatDate(day)} at ${time}${row.locationName ? ` (${row.locationName})` : ''} — ${row.booked} booked.`,
