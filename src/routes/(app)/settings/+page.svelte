@@ -112,6 +112,7 @@
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
+	let referralCredits = $state<number | null>(settings.referralCredits);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -135,6 +136,7 @@
 				noShowFee,
 				lateCancelFee,
 				suspendAfterDays,
+				referralCredits,
 				publicPage
 			});
 			toast.success('Settings saved');
@@ -404,6 +406,20 @@
 							<Field.Description
 								>Members this many days behind on a charge lose class bookings until they pay up;
 								billing keeps accruing meanwhile.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-refcredits">Referral reward (credits)</Field.Label>
+							<Input
+								id="s-refcredits"
+								type="number"
+								min={1}
+								bind:value={referralCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Class credits granted to a member the first time someone who joined through their
+								referral link makes a payment. Leave empty for no reward.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

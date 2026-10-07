@@ -74,6 +74,8 @@ export const gymSettings = pgTable('gym_settings', {
 	lateCancelFee: integer('late_cancel_fee'),
 	/** Auto-suspend a membership once a charge is this many days overdue; null = off. */
 	suspendAfterDays: integer('suspend_after_days'),
+	/** Bonus class credits a referrer earns when a referred member first pays; null/0 = off. */
+	referralCredits: integer('referral_credits'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

@@ -33,7 +33,8 @@ import {
 	notifyPaymentReceived,
 	notifyPaymentRefunded,
 	notifyPlanChanged,
-	notifyPlanPriceChange
+	notifyPlanPriceChange,
+	notifyReferralReward
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
@@ -883,6 +884,7 @@ export async function recordPayment(ctx: OrgContext, input: v.InferOutput<typeof
 		input.method
 	).catch(() => {});
 	unsuspendPaidUp(ctx.orgId, input.memberId).catch(() => {});
+	notifyReferralReward(ctx.orgId, input.memberId).catch(() => {});
 	return rows[0];
 }
 

@@ -892,6 +892,78 @@ export async function notifyPackLowCredit(
 	return true;
 }
 
+/**
+ * Referral bounty: when a member referred via a ?ref= link records their first
+ * non-refunded payment, the referrer earns `gymSettings.referralCredits` bonus
+ * credits on their active membership. Called after every recordPayment; returns
+ * false unless a reward actually went out. Once per referred member via
+ * notification_log; skipped entirely when the bounty is unset or the referrer
+ * has no active membership to credit.
+ */
+export async function notifyReferralReward(orgId: string, paidMemberId: string) {
+	const [s] = await db
+		.select({ referralCredits: gymSettings.referralCredits })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const credits = s?.referralCredits ?? 0;
+	if (credits <= 0) return false;
+	const [joined] = await db
+		.select({ name: gymMember.name, referredByMemberId: gymMember.referredByMemberId })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, paidMemberId)));
+	if (!joined?.referredByMemberId) return false;
+	// Only the member's first payment earns the bounty.
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(payment)
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				eq(payment.memberId, paidMemberId),
+				isNull(payment.refundedAt)
+			)
+		);
+	if (n !== 1) return false;
+	const [referrer] = await db
+		.select({ name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, joined.referredByMemberId)));
+	if (!referrer?.email) return false;
+	const [ms] = await db
+		.select({ id: membership.id })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, joined.referredByMemberId),
+				eq(membership.status, 'active')
+			)
+		)
+		.limit(1);
+	if (!ms) return false;
+	if (!(await logOnce(orgId, 'referral_reward', paidMemberId, referrer.email))) return false;
+	await db
+		.update(membership)
+		.set({ bonusCredits: sql`${membership.bonusCredits} + ${credits}` })
+		.where(eq(membership.id, ms.id));
+	const name = await orgName(orgId);
+	await sendMemberEmail(joined.referredByMemberId, {
+		to: referrer.email,
+		subject: `${name}: you earned ${credits} class credits`,
+		...renderEmail({
+			orgName: name,
+			heading: `You earned ${credits} class credits`,
+			lines: [
+				`Hi ${referrer.name} — ${joined.name} just became a paying member at ${name} using your referral link.`,
+				`${credits} bonus class credit${credits === 1 ? ' is' : 's are'} on your membership — book your next class in the portal.`,
+				'Keep sharing your referral link to earn more.'
+			],
+			action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+		})
+	});
+	return true;
+}
+
 /** Replaces {name} and {first_name} merge tags in an announcement draft. */
 export function mergeTags(t: string, memberName: string) {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;
