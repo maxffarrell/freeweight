@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
+import * as res from '#lib/server/services/resources.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import { getMember, getTodayCheckIns } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
@@ -18,6 +19,8 @@ import {
 	seriesBookingInput,
 	sessionInput,
 	sessionUpdate,
+	resourceInput,
+	resourceUpdate,
 	templateInput,
 	templateUpdate,
 	timeOffInput
@@ -230,5 +233,19 @@ export const claimCover = command(idSchema, async (sessionId) => {
 	void getSession(sessionId).refresh();
 	void getCoverNeeded().refresh();
 	void getMyClasses().refresh();
+	return r;
+});
+
+// ---------- Bookable resources (sauna, court, child care) ----------
+
+export const getResources = query(async () => res.listResources((await requireOrg()).orgId));
+export const createResource = command(resourceInput, async (input) => {
+	const r = await res.createResource(await requireOrg(), input);
+	void getResources().refresh();
+	return r;
+});
+export const updateResource = command(resourceUpdate, async (input) => {
+	const r = await res.updateResource(await requireOrg(), input);
+	void getResources().refresh();
 	return r;
 });

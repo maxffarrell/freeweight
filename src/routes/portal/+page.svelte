@@ -31,7 +31,12 @@
 		joinPlan,
 		buyPack,
 		changePlan,
-		updateProfile
+		updateProfile,
+		getPortalResources,
+		getResourceDay,
+		bookResource,
+		cancelReservation,
+		getReservations
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -51,6 +56,45 @@
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
+
+	// ------- amenity reservations -------
+	const amenities = $derived(await getPortalResources(memberId));
+	const reservations = $derived(await getReservations(memberId));
+	let amenityId = $state('');
+	const amenity = $derived(
+		amenities.find((a) => a.resource.id === amenityId) ?? amenities[0] ?? null
+	);
+	let amenityDay = $state('');
+	const amenitySlots = $derived(
+		amenity && amenityDay
+			? await getResourceDay({ memberId, resourceId: amenity.resource.id, day: amenityDay })
+			: null
+	);
+	let amenityBusy = $state(0);
+	async function bookAmenity(startsAt: Date) {
+		if (!amenity) return;
+		amenityBusy = startsAt.getTime();
+		try {
+			await bookResource({
+				memberId,
+				resourceId: amenity.resource.id,
+				day: amenityDay,
+				time: localTime(startsAt, tz)
+			});
+			toast.success(`${amenity.resource.name} booked`);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book'));
+		}
+		amenityBusy = 0;
+	}
+	async function cancelRes(id: string) {
+		try {
+			await cancelReservation({ memberId, id });
+			toast.success('Reservation cancelled');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
+		}
+	}
 	const planFull = (p: (typeof joinablePlans)[number]) =>
 		!p.isPack && p.memberLimit !== null && p.activeMembers >= p.memberLimit;
 
@@ -619,6 +663,91 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
+
+	{#if amenities.length || reservations.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Amenities</Card.Title>
+				<Card.Description>Book the sauna, court, or child care.</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				{#if amenities.length}
+					<div class="flex flex-wrap items-end gap-3">
+						<div class="space-y-1">
+							<label for="am-res" class="text-xs text-muted-foreground">Amenity</label>
+							{#if amenities.length === 1}
+								<p id="am-res" class="h-9 content-center text-sm font-medium">
+									{amenity!.resource.name}
+								</p>
+							{:else}
+								<select
+									id="am-res"
+									bind:value={amenityId}
+									class="h-9 rounded-md border bg-transparent px-2 text-sm"
+								>
+									{#each amenities as a (a.resource.id)}
+										<option value={a.resource.id}>{a.resource.name}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+						<div class="space-y-1">
+							<label for="am-day" class="text-xs text-muted-foreground">Day</label>
+							<Input
+								id="am-day"
+								type="date"
+								min={localDate(new Date(), tz)}
+								bind:value={amenityDay}
+							/>
+						</div>
+					</div>
+					{#if amenity && amenityDay}
+						{#if amenitySlots?.slots.length}
+							<div class="flex flex-wrap gap-2">
+								{#each amenitySlots.slots as s (s.startsAt.getTime())}
+									{@const full = s.taken >= amenitySlots.resource.capacity}
+									{@const past = s.startsAt.getTime() <= Date.now()}
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={full || past || amenityBusy > 0}
+										onclick={() => bookAmenity(s.startsAt)}
+									>
+										{localTime(s.startsAt, tz)}{#if full}
+											· full{:else if amenitySlots.resource.capacity > 1}
+											· {amenitySlots.resource.capacity - s.taken} left{/if}
+									</Button>
+								{/each}
+							</div>
+						{:else if amenitySlots}
+							<p class="text-sm text-muted-foreground">Not bookable that day.</p>
+						{:else}
+							<p class="text-sm text-muted-foreground">Loading…</p>
+						{/if}
+					{:else}
+						<p class="text-sm text-muted-foreground">Pick a day to see open slots.</p>
+					{/if}
+				{/if}
+				{#if reservations.length}
+					<div class="divide-y rounded-lg border">
+						{#each reservations as r (r.booking.id)}
+							<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+								<div>
+									<span class="font-medium">{r.resourceName}</span>
+									<span class="text-muted-foreground">
+										· {localDate(r.booking.startsAt, tz)} at {localTime(r.booking.startsAt, tz)}
+									</span>
+								</div>
+								<Button variant="ghost" size="sm" onclick={() => cancelRes(r.booking.id)}
+									>Cancel</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	{#if d.orgSlug}
 		<Card.Root class="sm:col-span-2">

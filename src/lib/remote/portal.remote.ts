@@ -7,7 +7,9 @@ import { document, gymMember, membership, outer, plan } from '#lib/server/db/sch
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
-import { idSchema, measurementInput } from '#lib/schemas.ts';
+import * as resSvc from '#lib/server/services/resources.ts';
+import { getSettings } from '#lib/server/services/settings.ts';
+import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -251,6 +253,57 @@ export const updateProfile = command(
 		const m = await myMember(memberId);
 		const r = await svc.updatePortalProfile(m.organizationId, m.id, input);
 		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- Resource reservations (sauna, court, child care) ----------
+
+/** Active bookable amenities for the member's gym. */
+export const getPortalResources = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const rows = await resSvc.listResources(m.organizationId);
+	return rows.filter((r) => r.resource.active);
+});
+
+/** Slot grid for one resource on one day. */
+export const getResourceDay = query(
+	v.object({ memberId: idSchema, resourceId: idSchema, day: v.pipe(v.string(), v.isoDate()) }),
+	async ({ memberId, resourceId, day }) => {
+		const m = await myMember(memberId);
+		const st = await getSettings(m.organizationId);
+		return resSvc.resourceAvailability(m.organizationId, resourceId, day, st.timezone);
+	}
+);
+
+/** The member's upcoming reservations. */
+export const getReservations = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return resSvc.memberReservations(m.organizationId, m.id);
+});
+
+export const bookResource = command(resourceBookInput, async ({ memberId, ...input }) => {
+	const m = await myMember(memberId);
+	const st = await getSettings(m.organizationId);
+	const r = await resSvc.bookResource(
+		m.organizationId,
+		m.id,
+		input.resourceId,
+		input.day,
+		input.time,
+		input.note,
+		st.timezone
+	);
+	void getReservations(memberId).refresh();
+	return r;
+});
+
+export const cancelReservation = command(
+	v.object({ memberId: idSchema, id: idSchema }),
+	async ({ memberId, id }) => {
+		const m = await myMember(memberId);
+		const r = await resSvc.cancelResourceBooking(m.organizationId, id, m.id);
+		void getReservations(memberId).refresh();
 		return r;
 	}
 );
