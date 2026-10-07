@@ -157,7 +157,9 @@ export const templateInput = v.object({
 	weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
 	/** Org-local `HH:MM`. */
 	startTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')),
-	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Last date sessions are generated for (inclusive); null = runs forever. */
+	until: v.optional(v.nullable(isoDate))
 });
 
 /** Same fields as templateInput plus the row id — the form always submits all values. */

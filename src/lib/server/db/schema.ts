@@ -332,6 +332,8 @@ export const classTemplate = pgTable(
 		startTime: text('start_time').notNull(),
 		/** Seat override; null → class type default. */
 		capacity: integer('capacity'),
+		/** Last org-local date sessions may be generated for; null = runs forever. */
+		until: date('until', { mode: 'string' }),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
