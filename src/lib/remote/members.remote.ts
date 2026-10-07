@@ -39,7 +39,8 @@ export const getMembers = query(
 			tag: v.optional(v.string()),
 			status: v.optional(v.picklist(['active', 'inactive'])),
 			planId: v.optional(v.string()),
-			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance']))
+			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance'])),
+			owes: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -49,7 +50,8 @@ export const getMembers = query(
 			opts?.tag,
 			opts?.status,
 			opts?.planId,
-			opts?.sort
+			opts?.sort,
+			opts?.owes
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

@@ -55,6 +55,7 @@
 		balance: 'Balance due'
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
+	let owesFilter = $state('any');
 	let members = $state(await getMembers());
 	const dupes = await getDuplicates();
 	const initials = (name: string) =>
@@ -103,7 +104,8 @@
 			tag: tag === '__all' ? undefined : tag,
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
 			planId: planFilter === '__all' ? undefined : planFilter === '__none' ? 'none' : planFilter,
-			sort
+			sort,
+			owes: owesFilter === 'owes' || undefined
 		});
 	}
 	function search() {
@@ -350,6 +352,15 @@
 				</Select.Content>
 			</Select.Root>
 		{/if}
+		<Select.Root type="single" bind:value={owesFilter} onValueChange={() => void refilter()}>
+			<Select.Trigger class="w-36"
+				>{owesFilter === 'owes' ? 'Owes money' : 'Any balance'}</Select.Trigger
+			>
+			<Select.Content>
+				<Select.Item value="any">Any balance</Select.Item>
+				<Select.Item value="owes">Owes money</Select.Item>
+			</Select.Content>
+		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
 			<Select.Trigger class="w-36">{SORT_LABELS[sort]}</Select.Trigger>
 			<Select.Content>
