@@ -245,7 +245,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			action: 'checked-out',
 			summary: `${m.name} checked out`
 		});
-		return { checkIn: row!, member: m, attended: 0, checkedOut: true, birthday: false };
+		return { checkIn: row!, member: m, attended: 0, checkedOut: true, birthday: false, visits: 0 };
 	}
 	const [row] = await db
 		.insert(checkIn)
@@ -305,7 +305,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
-	return { checkIn: row!, member: m, attended: attended.length, birthday };
+	return { checkIn: row!, member: m, attended: attended.length, birthday, visits: n };
 }
 
 export async function listCheckIns(

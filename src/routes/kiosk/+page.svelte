@@ -38,6 +38,15 @@
 	let upNext = $state(await getUpNext());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
+
+	const MILESTONES = new Set([10, 25, 50, 100, 250, 500, 1000]);
+	/** " — first visit!" / " — visit #100" suffix for the check-in flash. */
+	function visitNote(n: number | undefined) {
+		if (!n) return '';
+		if (n === 1) return ' — first visit!';
+		if (MILESTONES.has(n)) return ` — visit #${n}!`;
+		return '';
+	}
 	let suggestions = $state<
 		{
 			id: string;
@@ -104,7 +113,7 @@
 			});
 			showFlash(
 				true,
-				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : ''),
+				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : '') + visitNote(r.visits),
 				r.member.photoDocumentId
 			);
 			await getRoster(rosterSess!.session.id).refresh();
@@ -213,7 +222,8 @@
 					? `${r.member.name} checked out`
 					: `${r.member.name} checked in` +
 							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '') +
-							(r.birthday ? ' — happy birthday!' : ''),
+							(r.birthday ? ' — happy birthday!' : '') +
+							visitNote(r.visits),
 				r.member.photoDocumentId,
 				r.member.deskNote
 			);
