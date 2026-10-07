@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "max_bookings_per_day" integer;

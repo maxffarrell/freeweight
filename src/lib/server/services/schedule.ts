@@ -10,6 +10,7 @@ import {
 	inArray,
 	isNull,
 	lt,
+	ne,
 	or,
 	sql
 } from 'drizzle-orm';
@@ -471,9 +472,18 @@ export async function bookSession(
 	if (!ms) error(402, 'An active membership is required to book');
 	await assertCreditAvailable(ctx.orgId, input.memberId, ms);
 
+	const [st] = await db
+		.select({ tz: gymSettings.timezone, maxPerDay: gymSettings.maxBookingsPerDay })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+
 	const row = await db.transaction(async (tx) => {
 		const [s] = await tx
-			.select({ capacity: classSession.capacity, cancelledAt: classSession.cancelledAt })
+			.select({
+				capacity: classSession.capacity,
+				cancelledAt: classSession.cancelledAt,
+				startsAt: classSession.startsAt
+			})
 			.from(classSession)
 			.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, input.sessionId)))
 			.for('update');
@@ -490,6 +500,31 @@ export async function bookSession(
 			.select()
 			.from(booking)
 			.where(and(eq(booking.sessionId, input.sessionId), eq(booking.memberId, input.memberId)));
+
+		// Daily booking limit: the member can't hold more than N non-cancelled
+		// bookings on sessions in the same local day. (An existing live booking
+		// falls through to the 'Already booked' check below instead.)
+		if (st?.maxPerDay != null && !(existing && existing.status !== 'cancelled')) {
+			const tz = st.tz ?? 'UTC';
+			const day = localDate(s.startsAt, tz);
+			const dayStart = zonedToUtc(`${day}T00:00`, tz);
+			const dayEnd = zonedToUtc(`${addDays(day, 1)}T00:00`, tz);
+			const [{ dayCount }] = await tx
+				.select({ dayCount: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(booking.memberId, input.memberId),
+						ne(booking.status, 'cancelled'),
+						gte(classSession.startsAt, dayStart),
+						lt(classSession.startsAt, dayEnd)
+					)
+				);
+			if (dayCount >= st.maxPerDay)
+				error(409, `Daily booking limit reached (${st.maxPerDay} per day)`);
+		}
+
 		const status = count >= s.capacity ? 'waitlisted' : 'booked';
 		if (existing) {
 			if (existing.status !== 'cancelled') error(409, 'Already booked');

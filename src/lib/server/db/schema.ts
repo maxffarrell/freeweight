@@ -64,6 +64,8 @@ export const gymSettings = pgTable('gym_settings', {
 	cancelCutoffMin: integer('cancel_cutoff_min'),
 	/** Stop promoting waitlisted members within this many minutes of start; null/0 = always promote. */
 	waitlistCutoffMin: integer('waitlist_cutoff_min'),
+	/** Max sessions a member may hold bookings for on a single local day; null = unlimited. */
+	maxBookingsPerDay: integer('max_bookings_per_day'),
 	/** Open charge posted per auto-marked no-show, in minor units; null/0 = no fee. */
 	noShowFee: integer('no_show_fee'),
 	/** Charged when a booking is cancelled inside cancelCutoffMin; also lets members late-cancel. */

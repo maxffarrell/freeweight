@@ -64,6 +64,7 @@
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
 	let waitlistCutoffMin = $state<number | null>(settings.waitlistCutoffMin);
+	let maxBookingsPerDay = $state<number | null>(settings.maxBookingsPerDay);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
@@ -85,6 +86,7 @@
 				bookingWindowDays,
 				cancelCutoffMin,
 				waitlistCutoffMin,
+				maxBookingsPerDay,
 				noShowFee,
 				lateCancelFee,
 				suspendAfterDays,
@@ -307,6 +309,16 @@
 									min={0}
 									bind:value={waitlistCutoffMin}
 									placeholder="Always promote"
+								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label for="daycap">Max bookings per day</Field.Label>
+								<Input
+									id="daycap"
+									type="number"
+									min={1}
+									bind:value={maxBookingsPerDay}
+									placeholder="Unlimited"
 								/>
 							</Field.Field>
 						</div>
