@@ -56,6 +56,24 @@
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
 	const d = $derived(await getPortalOverview(memberId));
+	let avatarInput = $state<HTMLInputElement>();
+	let photoBusy = $state(false);
+	async function uploadPhoto(file: File | null | undefined) {
+		if (!file || photoBusy) return;
+		photoBusy = true;
+		const body = new FormData();
+		body.append('memberId', memberId);
+		body.append('file', file);
+		const res = await fetch('/api/portal/photo', { method: 'POST', body });
+		photoBusy = false;
+		if (!res.ok) {
+			toast.error((await res.json().catch(() => null))?.message ?? 'Upload failed');
+			return;
+		}
+		toast.success('Photo updated');
+		await getPortalOverview(memberId).refresh();
+		if (avatarInput) avatarInput.value = '';
+	}
 	const bookable = $derived(await getBookable(memberId));
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
@@ -496,6 +514,13 @@
 				<div class="size-36 animate-pulse rounded-lg bg-muted"></div>
 			{/if}
 			<div class="flex items-center gap-4">
+				<input
+					bind:this={avatarInput}
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/gif"
+					class="hidden"
+					onchange={(e) => uploadPhoto(e.currentTarget.files?.[0])}
+				/>
 				{#if d.member.photoDocumentId}
 					<img
 						src="/api/portal/documents/{d.member.photoDocumentId}?m={d.member.id}"
@@ -526,6 +551,17 @@
 					<p class="mt-1 text-xs">
 						<button class="text-muted-foreground underline" onclick={openProfile}
 							>Edit profile</button
+						>
+						·
+						<button
+							class="text-muted-foreground underline"
+							disabled={photoBusy}
+							onclick={() => avatarInput?.click()}
+							>{photoBusy
+								? 'Uploading…'
+								: d.member.photoDocumentId
+									? 'Change photo'
+									: 'Add photo'}</button
 						>
 					</p>
 					{#if profileOpen}
