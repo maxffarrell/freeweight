@@ -122,9 +122,10 @@ export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: st
 
 export async function getMember(orgId: string, id: string) {
 	const [row] = await db
-		.select({ member: gymMember, locationName: location.name })
+		.select({ member: gymMember, locationName: location.name, orgName: organization.name })
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
+		.innerJoin(organization, eq(gymMember.organizationId, organization.id))
 		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, id)));
 	if (!row) error(404, 'Member not found');
 

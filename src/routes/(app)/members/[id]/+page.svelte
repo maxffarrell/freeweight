@@ -18,6 +18,7 @@
 		getMember,
 		updateMember,
 		getPortalInvite,
+		getCheckInCode,
 		recordCheckIn,
 		logGuestVisit,
 		getMemberNotes,
@@ -47,6 +48,7 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
@@ -312,11 +314,27 @@
 			toast.error(errMsg(err, 'Check-in failed'));
 		}
 	}
+
+	// ------- member card -------
+	let cardOpen = $state(false);
+	let cardQr = $state('');
+	async function openCard() {
+		cardOpen = true;
+		if (cardQr) return;
+		try {
+			const code = await getCheckInCode(id);
+			const QRCode = (await import('qrcode')).default;
+			cardQr = await QRCode.toDataURL(code, { width: 220, margin: 1 });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not load card'));
+		}
+	}
 </script>
 
 <PageHeader title={m.member.name} crumbs={[{ label: 'Members', href: '/members' }]}>
 	{#snippet actions()}
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
+		<Button variant="outline" size="sm" onclick={openCard}><Printer /> Card</Button>
 		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
 		<Button variant="outline" size="sm" onclick={() => (guestOpen = true)}
 			><UserPlus /> Guest</Button
@@ -1002,3 +1020,56 @@
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
+
+<Dialog.Root bind:open={cardOpen}>
+	<Dialog.Content class="sm:max-w-xs">
+		<Dialog.Header>
+			<Dialog.Title>Member card</Dialog.Title>
+			<Dialog.Description>Print a check-in card for {m.member.name}.</Dialog.Description>
+		</Dialog.Header>
+		<div class="mx-auto w-64 rounded-xl border p-4 text-center">
+			<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">{m.orgName}</p>
+			<p class="mt-1 text-lg font-semibold">{m.member.name}</p>
+			{#if cardQr}
+				<img src={cardQr} alt="Check-in QR" class="mx-auto mt-3 size-44" />
+			{:else}
+				<div class="mx-auto mt-3 size-44 animate-pulse rounded bg-muted"></div>
+			{/if}
+			<p class="mt-2 text-xs text-muted-foreground">Show at the front desk to check in</p>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => window.print()} disabled={!cardQr}
+				><Printer class="mr-1 h-3.5 w-3.5" /> Print card</Button
+			>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<div id="member-card-print" class="hidden print:block">
+	<div class="mx-auto w-80 rounded-xl border-2 border-black p-6 text-center">
+		<p class="text-sm font-medium tracking-wide uppercase">{m.orgName}</p>
+		<p class="mt-1 text-2xl font-bold">{m.member.name}</p>
+		{#if cardQr}<img src={cardQr} alt="Check-in QR" class="mx-auto mt-4" />{/if}
+		<p class="mt-3 text-sm">Show at the front desk to check in</p>
+	</div>
+</div>
+
+<svelte:head>
+	<style>
+		@media print {
+			body * {
+				visibility: hidden;
+			}
+			#member-card-print,
+			#member-card-print * {
+				visibility: visible;
+			}
+			#member-card-print {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+			}
+		}
+	</style>
+</svelte:head>
