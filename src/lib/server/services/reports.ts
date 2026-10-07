@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
+	charge,
 	checkIn,
 	classSession,
 	classType,
@@ -118,6 +119,27 @@ async function paymentsByMethod(orgId: string) {
 			)
 		)
 		.groupBy(payment.method)
+		.orderBy(desc(sql`sum(${payment.amount})`));
+}
+
+/** Collected payments by charge kind over the last 90 days ('unapplied' = payments not tied to a charge). */
+async function revenueByKind(orgId: string) {
+	return db
+		.select({
+			kind: sql<string>`coalesce(${charge.kind}, 'unapplied')`,
+			count: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
+		})
+		.from(payment)
+		.leftJoin(charge, eq(payment.chargeId, charge.id))
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
+				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
+			)
+		)
+		.groupBy(sql`coalesce(${charge.kind}, 'unapplied')`)
 		.orderBy(desc(sql`sum(${payment.amount})`));
 }
 
@@ -448,7 +470,8 @@ export async function getReports(orgId: string) {
 		trials,
 		visit,
 		retention,
-		waivers
+		waivers,
+		kinds
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -466,7 +489,8 @@ export async function getReports(orgId: string) {
 		trialConversion(orgId),
 		avgVisitMinutes(orgId),
 		retentionByCohort(orgId),
-		waiverStatus(orgId)
+		waiverStatus(orgId),
+		revenueByKind(orgId)
 	]);
 	return {
 		checkIns,
@@ -485,6 +509,7 @@ export async function getReports(orgId: string) {
 		trials,
 		visit,
 		retention,
-		waivers
+		waivers,
+		kinds
 	};
 }
