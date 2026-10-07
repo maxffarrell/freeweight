@@ -14,7 +14,7 @@ import {
 	memberInput,
 	memberUpdate
 } from '#lib/schemas.ts';
-import { sendAnnouncement } from '#lib/server/services/notifications.ts';
+import { listRecentAnnouncements, sendAnnouncement } from '#lib/server/services/notifications.ts';
 
 export const getMembers = query(v.optional(v.object({ q: v.optional(v.string()) })), async (opts) =>
 	svc.listMembers((await requireOrg()).orgId, opts?.q)
@@ -71,6 +71,18 @@ export const getCheckInCode = query(idSchema, async (memberId) => {
 	return checkins.checkInToken(memberId);
 });
 
-export const emailAllMembers = command(announcementInput, async (input) =>
-	sendAnnouncement((await requireOrg()).orgId, input.subject, input.message, input.memberIds)
+/** Last few staff announcements — shown under the Members table and in the send dialog. */
+export const getRecentAnnouncements = query(async () =>
+	listRecentAnnouncements((await requireOrg()).orgId)
 );
+
+export const emailAllMembers = command(announcementInput, async (input) => {
+	const r = await sendAnnouncement(
+		(await requireOrg()).orgId,
+		input.subject,
+		input.message,
+		input.memberIds
+	);
+	void getRecentAnnouncements().refresh();
+	return r;
+});

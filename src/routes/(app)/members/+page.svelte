@@ -17,6 +17,7 @@
 		getMembers,
 		createMember,
 		emailAllMembers,
+		getRecentAnnouncements,
 		importMembers
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
@@ -30,6 +31,7 @@
 	import Upload from '@lucide/svelte/icons/upload';
 
 	const currency = await getCurrency();
+	const announcements = $derived(await getRecentAnnouncements());
 	let q = $state('');
 	let members = $state(await getMembers());
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -287,6 +289,21 @@
 				Goes to every active member with an email on file — closures, schedule changes, news.
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if announcements.length}
+			<div class="rounded-md border bg-muted/40 p-3 text-sm">
+				<p class="mb-2 font-medium text-muted-foreground">Recently sent</p>
+				<ul class="space-y-1.5">
+					{#each announcements as a (a.id)}
+						<li class="flex items-baseline justify-between gap-3">
+							<span class="truncate">{a.subject}</span>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{formatDate(a.createdAt)} · {a.sent} sent
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		<form class="space-y-4" onsubmit={submitAnnouncement}>
 			<Field.Field>
 				<Field.Label for="a-subject">Subject</Field.Label>

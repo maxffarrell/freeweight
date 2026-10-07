@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	activity,
 	booking,
 	charge,
 	checkIn,
@@ -19,6 +20,7 @@ import {
 	plan,
 	user
 } from '#lib/server/db/schema.ts';
+import { emit } from './events.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
@@ -608,7 +610,34 @@ export async function sendAnnouncement(
 		await sendMemberEmail(m.id, { to: m.email, subject: `${name}: ${subject}`, text, html });
 		sent++;
 	}
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'announcement',
+		entityId,
+		action: 'sent',
+		summary: `Announcement sent to ${sent} member${sent === 1 ? '' : 's'}: ${subject}`,
+		data: { subject, message, sent, total: members.length }
+	});
 	return { sent, total: members.length };
+}
+
+/** Recent staff announcements, most recent first — surfaced on the Members page. */
+export async function listRecentAnnouncements(orgId: string, limit = 5) {
+	const rows = await db
+		.select({
+			id: activity.id,
+			createdAt: activity.createdAt,
+			subject: sql<string>`${activity.data}->>'subject'`,
+			message: sql<string>`${activity.data}->>'message'`,
+			sent: sql<number>`(${activity.data}->>'sent')::int`,
+			total: sql<number>`(${activity.data}->>'total')::int`
+		})
+		.from(activity)
+		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'announcement')))
+		.orderBy(desc(activity.createdAt))
+		.limit(limit);
+	return rows;
 }
 
 /** "Invoice ready" when a charge posts — membership billing, first period, anything else. */
