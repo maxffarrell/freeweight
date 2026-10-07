@@ -27,7 +27,8 @@ import {
 	createMembership,
 	getPlan,
 	memberBalance,
-	nextPeriod
+	nextPeriod,
+	proratePlanChange
 } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
@@ -40,7 +41,7 @@ import {
 	notifyPlanChanged
 } from './notifications.ts';
 import { addDays, localDate } from '#lib/tz.ts';
-import { todayISO } from '#lib/format.ts';
+import { formatMoney, todayISO } from '#lib/format.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -765,9 +766,11 @@ export async function memberBuyPack(orgId: string, memberId: string, planId: str
 /**
  * Member switches their active membership to another listed plan from the
  * portal. Takes effect immediately for access/credits; billing reads the plan
- * at charge time, so the next scheduled bill is at the new price (no
- * proration, no signup fee, no new trial). Packs are excluded — a pack is a
- * one-time purchase, not a switchable plan.
+ * at charge time, so the next scheduled bill is at the new price (no signup
+ * fee, no new trial). The price difference for the rest of the current period
+ * is prorated: an upgrade posts a charge due today, a downgrade posts an
+ * account credit. Packs are excluded — a pack is a one-time purchase, not a
+ * switchable plan.
  */
 export async function memberChangePlan(orgId: string, memberId: string, planId: string) {
 	const [ms] = await db
@@ -793,13 +796,19 @@ export async function memberChangePlan(orgId: string, memberId: string, planId: 
 		.set({ planId })
 		.where(eq(membership.id, ms.membership.id))
 		.returning();
+	const prorated = await proratePlanChange(
+		{ orgId },
+		ms.membership,
+		{ name: ms.plan.name, amount: ms.plan.amount, interval: ms.plan.interval },
+		p
+	);
 	await emit({
 		orgId,
 		entityType: 'membership',
 		entityId: ms.membership.id,
 		action: 'plan_changed',
-		summary: `Plan changed from ${ms.plan.name} to ${p.name} (member self-serve)`
+		summary: `Plan changed from ${ms.plan.name} to ${p.name} (member self-serve)${prorated ? ` — prorated ${formatMoney(prorated)}` : ''}`
 	});
 	notifyPlanChanged(orgId, ms.membership.id, ms.plan.name).catch(() => {});
-	return row;
+	return { row, prorated };
 }

@@ -648,7 +648,9 @@ export const paymentMethod = pgEnum('payment_method', [
 	'bank',
 	'stripe',
 	'other',
-	'gift_card'
+	'gift_card',
+	/** System-posted account credit (e.g. plan-change proration) — not money received. */
+	'credit'
 ]);
 
 /** Money received from a member, applied to a charge or held as credit. */

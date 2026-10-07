@@ -13,6 +13,7 @@ import {
 	lt,
 	lte,
 	ne,
+	notInArray,
 	or,
 	sql
 } from 'drizzle-orm';
@@ -1952,7 +1953,7 @@ export async function sendWeeklyDigest(orgId: string) {
 			and(
 				eq(payment.organizationId, orgId),
 				isNull(payment.refundedAt),
-				ne(payment.method, 'gift_card'),
+				notInArray(payment.method, ['gift_card', 'credit']),
 				gte(payment.createdAt, new Date(`${weekAgo}T00:00:00Z`))
 			)
 		);
