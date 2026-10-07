@@ -6,6 +6,7 @@ import { organization } from '#lib/server/db/schema.ts';
 import { runBilling } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { sendClassReminders, sendPastDueNotices } from '#lib/server/services/notifications.ts';
+import { markPastNoShows } from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -15,13 +16,14 @@ const authorized = (header: string | null) => {
 	return a.length === b.length && timingSafeEqual(a, b);
 };
 
-/** Daily job: posts due membership charges, sends class reminders + past-due notices, deletes expired demos. */
+/** Daily job: posts due membership charges, sends reminders + past-due notices, marks no-shows, deletes expired demos. */
 export const GET: RequestHandler = async ({ request }) => {
 	if (!authorized(request.headers.get('authorization'))) error(401, 'Unauthorized');
 	const orgs = await db.select({ id: organization.id }).from(organization);
 	let failed = 0;
 	let reminders = 0;
 	let pastDue = 0;
+	let noShows = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -41,9 +43,15 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`past-due cron failed for ${o.id}`, err);
 		}
+		try {
+			noShows += await markPastNoShows(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`no-show cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
-	return json({ workspaces: orgs.length, failed, reminders, pastDue });
+	return json({ workspaces: orgs.length, failed, reminders, pastDue, noShows });
 };
 
 export const POST = GET;

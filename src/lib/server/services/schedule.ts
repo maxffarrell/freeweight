@@ -268,6 +268,27 @@ async function activeMembership(orgId: string, memberId: string) {
 	return row;
 }
 
+/**
+ * Daily housekeeping: 'booked' rows for sessions that already ended become 'no_show'
+ * (check-ins have already flipped attendees to 'attended'). Cancelled sessions skip.
+ */
+export async function markPastNoShows(orgId: string) {
+	const res = await db
+		.update(booking)
+		.set({ status: 'no_show' })
+		.from(classSession)
+		.where(
+			and(
+				eq(booking.sessionId, classSession.id),
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'booked'),
+				lt(classSession.endsAt, new Date()),
+				isNull(classSession.cancelledAt)
+			)
+		);
+	return res.count;
+}
+
 /** Bookings that consume a class credit (cancelled doesn't). */
 const CREDIT_STATUSES = ['booked', 'attended', 'no_show'] as const;
 
