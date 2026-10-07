@@ -496,6 +496,7 @@ export async function updateSession(
 			locationId: set.locationId,
 			instructorId: set.instructorId,
 			note: set.note,
+			workout: set.workout,
 			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null,
 			// A new instructor means the cover is filled; otherwise honor the flag.
 			coverRequestedAt:

@@ -269,7 +269,9 @@ export const sessionUpdate = v.object({
 	cancelled: v.optional(v.boolean()),
 	/** Flag/unflag the session as needing a substitute instructor. */
 	needsCover: v.optional(v.boolean()),
-	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
+	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+	/** Workout of the day shown to booked members (multi-line ok). */
+	workout: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))))
 });
 
 /** Live instructor double-booking check for the session dialogs. */

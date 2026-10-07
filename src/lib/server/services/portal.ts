@@ -111,7 +111,8 @@ export async function portalOverview(memberId: string) {
 			startsAt: classSession.startsAt,
 			endsAt: classSession.endsAt,
 			className: classType.name,
-			locationName: location.name
+			locationName: location.name,
+			workout: classSession.workout
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
@@ -202,7 +203,8 @@ export async function portalOverview(memberId: string) {
 			startsAt: classSession.startsAt,
 			classTypeId: classSession.classTypeId,
 			className: classType.name,
-			locationName: location.name
+			locationName: location.name,
+			workout: classSession.workout
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
