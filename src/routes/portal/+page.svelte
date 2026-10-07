@@ -213,6 +213,24 @@
 					{/each}
 				</ul>
 			{/if}
+			{#if d.payments.length}
+				<div>
+					<p class="mb-1 text-xs font-medium text-muted-foreground uppercase">Recent payments</p>
+					<ul class="space-y-1 text-sm">
+						{#each d.payments as p (p.payment.id)}
+							<li class="flex justify-between gap-2">
+								<span class="truncate text-muted-foreground">
+									{p.chargeDescription ?? p.chargeKind ?? 'Payment'} · {localDate(
+										p.payment.paidAt,
+										tz
+									)}
+								</span>
+								<span class="tabular-nums">{formatMoney(p.payment.amount, currency)}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 		</Card.Content>
 		{#if d.balance > 0 && providers.length}
 			<Card.Footer class="flex flex-col gap-2">

@@ -155,6 +155,19 @@ export async function portalOverview(memberId: string) {
 		.where(eq(waiver.memberId, memberId))
 		.orderBy(desc(waiver.signedAt))
 		.limit(1);
+
+	// Recent payments for the portal's billing history (most recent first).
+	const payments = await db
+		.select({
+			payment,
+			chargeDescription: charge.description,
+			chargeKind: charge.kind
+		})
+		.from(payment)
+		.leftJoin(charge, eq(payment.chargeId, charge.id))
+		.where(eq(payment.memberId, memberId))
+		.orderBy(desc(payment.paidAt))
+		.limit(10);
 	return {
 		member: m,
 		settings,
@@ -162,6 +175,7 @@ export async function portalOverview(memberId: string) {
 		upcoming: upcomingWithPos,
 		balance,
 		openCharges,
+		payments,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		waiverRequired: !!settings?.waiver,
