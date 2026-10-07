@@ -7,6 +7,7 @@ import * as schedule from '#lib/server/services/schedule.ts';
 import * as events from '#lib/server/services/gym-events.ts';
 import * as challenges from '#lib/server/services/challenges.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
+import * as amenities from '#lib/server/services/resources.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
@@ -195,6 +196,33 @@ export const resources: Record<string, Resource> = {
 		list: (ctx) => challenges.listChallenges(ctx.orgId),
 		create: { schema: s.challengeInput, run: challenges.createChallenge as never },
 		update: { schema: s.challengeUpdate, run: challenges.updateChallenge as never }
+	},
+	amenities: {
+		description:
+			'Bookable amenities (sauna, court, child care). slotMin = slot length, capacity = concurrent bookings per slot, openFrom/openTo = daily bookable window',
+		list: (ctx) => amenities.listResources(ctx.orgId),
+		create: { schema: s.resourceInput, run: amenities.createResource as never },
+		update: { schema: s.resourceUpdate, run: amenities.updateResource as never }
+	},
+	amenity_bookings: {
+		description:
+			'Upcoming amenity reservations with resource + member names. POST books a member into a slot ({memberId, resourceId, day, time, note}); DELETE cancels',
+		list: (ctx) => amenities.listResourceBookings(ctx.orgId),
+		create: {
+			schema: s.resourceBookInput,
+			run: async (ctx, input) => {
+				const { timezone } = await settings.getSettings(ctx.orgId);
+				const { memberId, resourceId, day, time, note } = input as {
+					memberId: string;
+					resourceId: string;
+					day: string;
+					time: string;
+					note?: string;
+				};
+				return amenities.bookResource(ctx.orgId, memberId, resourceId, day, time, note, timezone);
+			}
+		},
+		delete: (ctx, id) => amenities.cancelResourceBooking(ctx.orgId, id)
 	},
 	shop_items: {
 		description: 'Front-desk retail items (name, price, optional stock count)',

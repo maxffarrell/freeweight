@@ -190,6 +190,8 @@ export const eventUpdate = v.object({
 export const challengeInput = v.object({
 	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name required'), v.maxLength(80)),
 	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+	/** What finishers win — e.g. "a free month". */
+	prize: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
 	/** Check-ins needed to finish. */
 	goal: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)),
 	startDate: isoDate,

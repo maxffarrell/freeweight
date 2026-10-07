@@ -804,6 +804,8 @@ export const challenge = pgTable(
 		organizationId: orgId(),
 		name: text('name').notNull(),
 		description: text('description').notNull().default(''),
+		/** What finishers win — free text ("a free month", "hoodie"). Shown in invites/portal. */
+		prize: text('prize').notNull().default(''),
 		/** Check-ins needed to finish the challenge. */
 		goal: integer('goal').notNull(),
 		startDate: date('start_date', { mode: 'string' }).notNull(),

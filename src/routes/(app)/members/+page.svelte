@@ -174,6 +174,7 @@
 	let cName = $state('');
 	let cDesc = $state('');
 	let cGoal = $state(30);
+	let cPrize = $state('');
 	let cStart = $state(new Date().toISOString().slice(0, 10));
 	let cEnd = $state('');
 	let cPending = $state(false);
@@ -185,12 +186,13 @@
 			await createChallenge({
 				name: cName.trim(),
 				description: cDesc.trim() || undefined,
+				prize: cPrize.trim() || undefined,
 				goal: cGoal,
 				startDate: cStart,
 				endDate: cEnd
 			});
 			toast.success('Challenge created — members can join in the portal');
-			cName = cDesc = '';
+			cName = cDesc = cPrize = '';
 			await getChallenges().refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not create challenge'));
@@ -781,7 +783,8 @@
 								>
 								<p class="text-xs text-muted-foreground">
 									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
-									{c.challenge.goal} check-ins · {c.joined} joined · {c.finished} finished
+									{c.challenge.goal} check-ins · {c.joined} joined · {c.finished}
+									finished{c.challenge.prize ? ` · prize: ${c.challenge.prize}` : ''}
 								</p>
 							</div>
 							<Switch
@@ -813,6 +816,10 @@
 			<Field.Field>
 				<Field.Label for="c-desc">Description (optional)</Field.Label>
 				<Input id="c-desc" bind:value={cDesc} placeholder="Check in 30 times this month" />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="c-prize">Prize (optional)</Field.Label>
+				<Input id="c-prize" bind:value={cPrize} placeholder="A free month, gym hoodie…" />
 			</Field.Field>
 			<div class="grid grid-cols-3 gap-3">
 				<Field.Field>

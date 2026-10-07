@@ -1212,7 +1212,7 @@ export async function sendChallengeInvites(orgId: string) {
 					lines: [
 						c.description ||
 							`Check in ${c.goal} times between ${c.startDate} and ${c.endDate} to finish.`,
-						`Goal: ${c.goal} check-ins, ${c.startDate} → ${c.endDate}. Join in the member portal.`
+						`Goal: ${c.goal} check-ins, ${c.startDate} → ${c.endDate}.${c.prize ? ` Prize: ${c.prize}.` : ''} Join in the member portal.`
 					],
 					action: { label: 'Join the challenge', url: `${appOrigin()}/portal` }
 				})

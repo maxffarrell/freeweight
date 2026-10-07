@@ -1,0 +1,1 @@
+ALTER TABLE "challenge" ADD COLUMN "prize" text DEFAULT '' NOT NULL;
