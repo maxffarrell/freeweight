@@ -165,6 +165,9 @@
 								>{p.commitmentMonths}-mo commitment</Badge
 							>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
+						{#if p.activeMembers > 0}<Badge variant="outline"
+								>{p.activeMembers} member{p.activeMembers === 1 ? '' : 's'}</Badge
+							>{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
 				</Card.Content>
