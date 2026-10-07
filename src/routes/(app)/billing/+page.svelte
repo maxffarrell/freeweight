@@ -139,6 +139,24 @@
 		URL.revokeObjectURL(a.href);
 	}
 
+	function exportPayments() {
+		const csv = toCsv([
+			['Member', 'Paid at', 'Method', 'Amount', 'Refunded'],
+			...payments.map((p) => [
+				p.memberName,
+				p.payment.paidAt.toISOString(),
+				p.payment.method,
+				(p.payment.amount / 100).toFixed(2),
+				p.payment.refundedAt ? p.payment.refundedAt.toISOString() : ''
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `payments-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+
 	async function voidCharge(id: string) {
 		try {
 			await updateCharge({ id, status: 'void' });
@@ -314,6 +332,9 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="payments">
+			<div class="mb-3 flex justify-end">
+				<Button size="sm" variant="outline" onclick={exportPayments}><Download /> Export</Button>
+			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
 					<Table.Root>
