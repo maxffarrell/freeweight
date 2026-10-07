@@ -130,6 +130,33 @@ export const classTypeInput = v.object({
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
 
+/** A bookable amenity (sauna, court, child care). */
+const timeHM = v.pipe(v.string(), v.regex(/^\d{2}:\d{2}$/, 'Use HH:MM'));
+export const resourceInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1, 'Name required'), v.maxLength(80)),
+	kind: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40))),
+	description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
+	slotMin: v.pipe(v.number(), v.integer(), v.minValue(5), v.maxValue(480)),
+	capacity: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50)),
+	openFrom: timeHM,
+	openTo: timeHM,
+	locationId: v.optional(v.nullable(idSchema)),
+	active: v.optional(v.boolean(), true)
+});
+export const resourceUpdate = v.object({ id: idSchema, ...v.partial(resourceInput).entries });
+
+/** Slot availability for one org-local date. */
+export const resourceDayInput = v.object({ resourceId: idSchema, day: isoDate });
+
+/** Member self-booking a resource slot. */
+export const resourceBookInput = v.object({
+	memberId: idSchema,
+	resourceId: idSchema,
+	day: isoDate,
+	time: timeHM,
+	note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
+});
+
 /** A gym closure day. */
 export const closureInput = v.object({
 	date: isoDate,

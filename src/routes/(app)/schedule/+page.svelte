@@ -33,7 +33,10 @@
 		getInstructorUpcoming,
 		handoffInstructor,
 		claimCover,
-		getInstructorConflicts
+		getInstructorConflicts,
+		getResources,
+		createResource,
+		updateResource
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -58,6 +61,7 @@
 	const memberList = await getMembers();
 	const classTypes = $derived(await getClassTypes());
 	const templates = $derived(await getTemplates());
+	const resources = $derived(await getResources());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
@@ -392,6 +396,47 @@
 
 	// ------- class types -------
 	let typeOpen = $state(false);
+
+	// ------- amenities (bookable resources) -------
+	let resOpen = $state(false);
+	let rName = $state('');
+	let rKind = $state('');
+	let rSlot = $state(30);
+	let rCap = $state(1);
+	let rFrom = $state('06:00');
+	let rTo = $state('22:00');
+	let rLoc = $state<string>('');
+
+	async function submitResource(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			await createResource({
+				name: rName.trim(),
+				kind: rKind.trim() || undefined,
+				slotMin: rSlot,
+				capacity: rCap,
+				openFrom: rFrom,
+				openTo: rTo,
+				locationId: rLoc || undefined
+			});
+			toast.success('Amenity added — members can book it in the portal');
+			rName = rKind = '';
+			await getResources().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add amenity'));
+		}
+		pending = false;
+	}
+
+	async function toggleResource(id: string, active: boolean) {
+		try {
+			await updateResource({ id, active });
+			await getResources().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 	let editTypeId = $state<string | null>(null);
 	let tName = $state('');
 	let tColor = $state('#6366f1');
@@ -475,6 +520,7 @@
 		<Button variant="outline" size="sm" onclick={() => (typeOpen = true)}
 			><Plus /> Class type</Button
 		>
+		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 	{/snippet}
 </PageHeader>
@@ -1359,6 +1405,89 @@
 			>
 				{hoAction === 'cancel' ? 'Cancel sessions' : 'Reassign sessions'}
 			</Button>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={resOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Amenities</Dialog.Title>
+			<Dialog.Description>
+				Bookable resources — sauna, court, child care. Members pick a slot in the portal.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if resources.length}
+			<div class="mb-4 divide-y rounded-lg border">
+				{#each resources as r (r.resource.id)}
+					<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+						<div class="min-w-0">
+							<span class="font-medium">{r.resource.name}</span>
+							{#if r.resource.kind}
+								<span class="text-muted-foreground"> · {r.resource.kind}</span>{/if}
+							<p class="text-xs text-muted-foreground">
+								{r.resource.openFrom}–{r.resource.openTo} · {r.resource.slotMin} min ·
+								{r.resource.capacity} spot{r.resource.capacity === 1 ? '' : 's'}
+								{#if r.locationName}
+									· {r.locationName}{/if}
+							</p>
+						</div>
+						<Switch
+							checked={r.resource.active}
+							onCheckedChange={(v) => toggleResource(r.resource.id, v)}
+						/>
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<form class="space-y-4" onsubmit={submitResource}>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="r-name">Name</Field.Label>
+					<Input id="r-name" required bind:value={rName} placeholder="Sauna" />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="r-kind">Kind (optional)</Field.Label>
+					<Input id="r-kind" bind:value={rKind} placeholder="Recovery" />
+				</Field.Field>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="r-slot">Slot length (min)</Field.Label>
+					<Input id="r-slot" type="number" min={5} max={480} bind:value={rSlot} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="r-cap">Spots per slot</Field.Label>
+					<Input id="r-cap" type="number" min={1} max={50} bind:value={rCap} />
+				</Field.Field>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="r-from">Bookable from</Field.Label>
+					<Input id="r-from" type="time" required bind:value={rFrom} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="r-to">Until</Field.Label>
+					<Input id="r-to" type="time" required bind:value={rTo} />
+				</Field.Field>
+			</div>
+			{#if locations.filter((l) => !l.archivedAt).length}
+				<Field.Field>
+					<Field.Label>Location (optional)</Field.Label>
+					<select
+						bind:value={rLoc}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="">Any location</option>
+						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+							<option value={l.id}>{l.name}</option>
+						{/each}
+					</select>
+				</Field.Field>
+			{/if}
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>Add amenity</Button>
+			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>

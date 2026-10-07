@@ -431,6 +431,55 @@ export const booking = pgTable(
 	]
 );
 
+/** Bookable amenity — sauna, court, child-care room. Members self-book slots in the portal. */
+export const facilityResource = pgTable(
+	'facility_resource',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		/** Freeform label — "Sauna", "Court", "Child care". */
+		kind: text('kind').notNull().default(''),
+		description: text('description').notNull().default(''),
+		/** Slot length in minutes. */
+		slotMin: integer('slot_min').notNull().default(30),
+		/** Concurrent bookings allowed per slot. */
+		capacity: integer('capacity').notNull().default(1),
+		/** Org-local bookable window each day, `HH:MM`. */
+		openFrom: text('open_from').notNull().default('06:00'),
+		openTo: text('open_to').notNull().default('22:00'),
+		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('facility_resource_org_idx').on(t.organizationId)]
+);
+
+export const resourceBookingStatus = pgEnum('resource_booking_status', ['booked', 'cancelled']);
+
+export const resourceBooking = pgTable(
+	'resource_booking',
+	{
+		id: id(),
+		organizationId: orgId(),
+		resourceId: text('resource_id')
+			.notNull()
+			.references(() => facilityResource.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+		endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+		status: resourceBookingStatus('status').notNull().default('booked'),
+		note: text('note').notNull().default(''),
+		...timestamps
+	},
+	(t) => [
+		index('resource_booking_resource_idx').on(t.resourceId, t.startsAt),
+		index('resource_booking_member_idx').on(t.memberId)
+	]
+);
+
 export const checkInMethod = pgEnum('check_in_method', ['qr', 'manual']);
 
 /** A front-desk check-in, via the member's QR code or a staff search. */
