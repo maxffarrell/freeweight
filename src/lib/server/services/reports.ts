@@ -354,7 +354,7 @@ async function fillByWeekday(orgId: string) {
  * Active members whose last check-in was 30+ days ago (or who have never checked in).
  * Churn signal — a follow-up list for the front desk, capped at 50.
  */
-async function atRiskMembers(orgId: string) {
+export async function atRiskMembers(orgId: string) {
 	const rows = await db
 		.select({
 			memberId: gymMember.id,
