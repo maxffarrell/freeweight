@@ -388,6 +388,8 @@ export const classSession = pgTable(
 		coverRequestedAt: timestamp('cover_requested_at', { withTimezone: true }),
 		/** Staff note on this session ("pool closed — bring mats"); shown on the roster. */
 		note: text('note'),
+		/** Short code the instructor announces at class; booked members self-check-in via the portal. */
+		checkinCode: text('checkin_code'),
 		...timestamps
 	},
 	(t) => [
@@ -545,6 +547,8 @@ export const checkIn = pgTable(
 		method: checkInMethod('method').notNull().default('manual'),
 		/** Set on guest visits — the check-in belongs to the member who brought them. */
 		guestName: text('guest_name'),
+		/** Set on class-code check-ins — the session the member attended. */
+		sessionId: text('session_id').references(() => classSession.id, { onDelete: 'set null' }),
 		checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
 		/** When they left — null while they're still in the gym. */
 		checkedOutAt: timestamp('checked_out_at', { withTimezone: true })

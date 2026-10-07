@@ -11,6 +11,8 @@ import {
 	isNotNull,
 	isNull,
 	lt,
+	lte,
+	ne,
 	or,
 	sql
 } from 'drizzle-orm';
@@ -20,6 +22,7 @@ import {
 	booking,
 	checkIn,
 	classSession,
+	classType,
 	gymMember,
 	gymSettings,
 	location,
@@ -410,4 +413,77 @@ export async function closeStaleCheckIns(orgId: string) {
 		)
 		.returning({ id: checkIn.id });
 	return rows.length;
+}
+
+/**
+ * Portal self check-in: the instructor announces the session's `checkinCode` at
+ * class; a booked member types it into the portal to mark their booking
+ * attended and log a check-in. Window: 15 min before start until the session ends.
+ */
+export async function checkInWithCode(orgId: string, memberId: string, rawCode: string) {
+	const code = rawCode.trim().toUpperCase();
+	const now = new Date();
+	const [row] = await db
+		.select({ session: classSession, className: classType.name })
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.checkinCode, code),
+				isNull(classSession.cancelledAt),
+				lte(classSession.startsAt, new Date(now.getTime() + 15 * 60_000)),
+				gte(classSession.endsAt, now)
+			)
+		)
+		.orderBy(classSession.startsAt)
+		.limit(1);
+	if (!row) error(404, "That code doesn't match a class in session right now");
+	const [b] = await db
+		.select()
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.sessionId, row.session.id),
+				eq(booking.memberId, memberId),
+				ne(booking.status, 'cancelled')
+			)
+		);
+	if (!b) error(409, `You're not booked into ${row.className}`);
+	if (b.status === 'waitlisted') error(409, `You're waitlisted for ${row.className}, not booked`);
+	if (b.status === 'attended') return { className: row.className, already: true };
+	const [m] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId));
+	await db.update(booking).set({ status: 'attended' }).where(eq(booking.id, b.id));
+	const [open] = await db
+		.select({ id: checkIn.id })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.checkedOutAt)
+			)
+		)
+		.limit(1);
+	if (!open)
+		await db.insert(checkIn).values({
+			organizationId: orgId,
+			memberId,
+			locationId: row.session.locationId,
+			method: 'manual',
+			sessionId: row.session.id
+		});
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'booking',
+		entityId: b.id,
+		action: 'checked-in',
+		summary: `${m?.name ?? 'Member'} checked in to ${row.className} with the class code`
+	});
+	return { className: row.className, already: false };
 }

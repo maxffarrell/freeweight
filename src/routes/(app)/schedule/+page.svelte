@@ -711,6 +711,15 @@
 				{focus.session.note}
 			</p>
 		{/if}
+		{#if focus?.session.checkinCode}
+			<p class="border-b px-4 py-2 text-sm text-muted-foreground">
+				Announce check-in code
+				<span class="font-mono font-semibold tracking-widest text-foreground"
+					>{focus.session.checkinCode}</span
+				>
+				— members enter it in the portal to mark themselves attended.
+			</p>
+		{/if}
 		<div class="space-y-4 overflow-y-auto p-4">
 			<Table.Root>
 				<Table.Body>
