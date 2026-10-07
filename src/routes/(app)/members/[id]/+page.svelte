@@ -579,6 +579,9 @@
 	{#snippet actions()}
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
 		<Button variant="outline" size="sm" onclick={openCard}><Printer /> Card</Button>
+		<Button variant="outline" size="sm" href="/members/{m.member.id}/statement"
+			><FileText /> Statement</Button
+		>
 		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
 		{#if m.member.email}
 			<Button variant="outline" size="sm" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
