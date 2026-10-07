@@ -173,3 +173,16 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 
 /** The instructor's own upcoming sessions — powers the "My classes" page. */
 export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));
+
+/** Org-wide open cover requests — the "Needs cover" card on My classes. */
+export const getCoverNeeded = query(async () => svc.sessionsNeedingCover(await requireOrg()));
+
+/** Staff claims a cover request — they become the session's instructor. */
+export const claimCover = command(idSchema, async (sessionId) => {
+	const r = await svc.claimCover(await requireOrg(), await tz(), sessionId);
+	void getSessions().refresh();
+	void getSession(sessionId).refresh();
+	void getCoverNeeded().refresh();
+	void getMyClasses().refresh();
+	return r;
+});

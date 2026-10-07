@@ -186,6 +186,68 @@ export async function myTeachingSessions(ctx: OrgContext, days = 14) {
 		.orderBy(asc(classSession.startsAt));
 }
 
+/** Org-wide open cover requests (future, uncancelled) — powers the "Needs
+ * cover" card on My classes; excludes sessions the viewer already teaches. */
+export async function sessionsNeedingCover(ctx: OrgContext) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	return db
+		.select({
+			session: classSession,
+			className: classType.name,
+			color: classType.color,
+			locationName: location.name,
+			instructorName: user.name,
+			booked: sql<number>`(select count(*)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				isNotNull(classSession.coverRequestedAt),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				me ? ne(classSession.instructorId, me.id) : undefined
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(10);
+}
+
+/** Staff claims a cover request: they become the session's instructor, which
+ * clears the flag and emails booked members — all inside updateSession. */
+export async function claimCover(ctx: OrgContext, tz: string, sessionId: string) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	if (!me) error(403, 'Only staff can cover classes');
+	const [s] = await db
+		.select({
+			coverRequestedAt: classSession.coverRequestedAt,
+			startsAt: classSession.startsAt,
+			cancelledAt: classSession.cancelledAt,
+			instructorId: classSession.instructorId,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, sessionId)));
+	if (!s) error(404, 'Session not found');
+	if (s.cancelledAt) error(409, 'That session was cancelled');
+	if (s.startsAt <= new Date()) error(409, 'That session already started');
+	if (!s.coverRequestedAt) error(409, 'Already covered');
+	if (s.instructorId === me.id) error(409, 'You already teach it');
+	const row = await updateSession(ctx, tz, { id: sessionId, instructorId: me.id });
+	return { session: row, className: s.className };
+}
+
 export async function getSession(orgId: string, id: string) {
 	const [row] = await db
 		.select({
