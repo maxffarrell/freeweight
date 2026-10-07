@@ -57,6 +57,14 @@
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let members = $state(await getMembers());
 	const dupes = await getDuplicates();
+	const initials = (name: string) =>
+		name
+			.split(/\s+/)
+			.map((w) => w[0])
+			.filter(Boolean)
+			.slice(0, 2)
+			.join('')
+			.toUpperCase();
 
 	// ------- bulk selection + tag -------
 	const selected = new SvelteSet<string>();
@@ -411,7 +419,21 @@
 								/>
 							</Table.Cell>
 							<Table.Cell class="font-medium">
-								{m.name}
+								<span class="flex items-center gap-2.5">
+									{#if m.photoDocumentId}
+										<img
+											src="/api/documents/{m.photoDocumentId}"
+											alt=""
+											class="size-8 shrink-0 rounded-full object-cover"
+										/>
+									{:else}
+										<span
+											class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground"
+											>{initials(m.name)}</span
+										>
+									{/if}
+									{m.name}
+								</span>
 								{#if m.tags.length}
 									<span class="ml-1.5 inline-flex gap-1">
 										{#each m.tags.slice(0, 3) as t (t)}

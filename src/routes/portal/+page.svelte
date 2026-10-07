@@ -322,209 +322,219 @@
 			{:else}
 				<div class="size-36 animate-pulse rounded-lg bg-muted"></div>
 			{/if}
-			<div>
-				<h1 class="text-xl font-semibold">Hi {d.member.name.split(' ')[0]}</h1>
-				<p class="text-sm text-muted-foreground">Show this code at the front desk to check in.</p>
-				<div class="mt-3 flex flex-wrap gap-1.5">
+			<div class="flex items-center gap-4">
+				{#if d.member.photoDocumentId}
+					<img
+						src="/api/portal/documents/{d.member.photoDocumentId}?m={d.member.id}"
+						alt={d.member.name}
+						class="size-16 shrink-0 rounded-full object-cover"
+					/>
+				{/if}
+				<div>
+					<h1 class="text-xl font-semibold">Hi {d.member.name.split(' ')[0]}</h1>
+					<p class="text-sm text-muted-foreground">Show this code at the front desk to check in.</p>
+					<div class="mt-3 flex flex-wrap gap-1.5">
+						{#each d.memberships as mm (mm.membership.id)}
+							{#if mm.membership.status === 'active'}
+								<Badge
+									>{mm.plan.name}{mm.plan.isPack
+										? ''
+										: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
+								>
+							{/if}
+						{/each}
+						{#if !d.memberships.some((mm) => mm.membership.status === 'active')}
+							<Badge variant="secondary">No active membership</Badge>
+						{/if}
+						{#if d.credits}
+							<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
+						{/if}
+					</div>
+					<p class="mt-1 text-xs">
+						<button class="text-muted-foreground underline" onclick={openProfile}
+							>Edit profile</button
+						>
+					</p>
+					{#if profileOpen}
+						<form class="mt-1 w-full max-w-xs space-y-2" onsubmit={saveProfile}>
+							<Input bind:value={pName} required placeholder="Name" class="h-8 text-sm" />
+							<Input bind:value={pPhone} placeholder="Phone" class="h-8 text-sm" />
+							<Input bind:value={pBirthday} type="date" aria-label="Birthday" class="h-8 text-sm" />
+							<div class="flex gap-2">
+								<Button size="sm" class="h-7 px-3 text-xs" type="submit" disabled={pSaving}
+									>{pSaving ? 'Saving…' : 'Save'}</Button
+								>
+								<Button
+									size="sm"
+									variant="outline"
+									class="h-7 px-3 text-xs"
+									type="button"
+									onclick={() => (profileOpen = false)}>Cancel</Button
+								>
+							</div>
+							<p class="text-xs text-muted-foreground">Email changes go through the front desk.</p>
+						</form>
+					{/if}
+					{#if !d.memberships.some((mm) => mm.membership.status === 'active') && joinablePlans.length}
+						<div class="mt-2 w-full space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">Join a plan</p>
+							{#each joinablePlans as p (p.id)}
+								<div class="flex items-center justify-between gap-2 text-sm">
+									<div class="min-w-0">
+										<span class="font-medium">{p.name}</span>
+										<span class="text-muted-foreground">
+											— {formatMoney(p.amount, currency)}{p.isPack
+												? ` · ${p.classCredits} classes`
+												: `/${p.interval}`}{p.trialDays
+												? ` · ${p.trialDays}-day free trial`
+												: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
+										</span>
+									</div>
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={joining === p.id}
+										onclick={() => join(p.id)}>{joining === p.id ? 'Joining…' : 'Join'}</Button
+									>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					{#if d.memberships.some((mm) => mm.membership.status === 'active') && buyablePacks.length}
+						<div class="mt-2 w-full space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">Class packs</p>
+							{#each buyablePacks as p (p.id)}
+								<div class="flex items-center justify-between gap-2 text-sm">
+									<div class="min-w-0">
+										<span class="font-medium">{p.name}</span>
+										<span class="text-muted-foreground">
+											— {formatMoney(p.amount, currency)} · {p.classCredits} classes{p.packDays
+												? ` · expires in ${p.packDays} days`
+												: ''}
+										</span>
+									</div>
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={joining === p.id}
+										onclick={() => buy(p.id)}>{joining === p.id ? 'Adding…' : 'Buy'}</Button
+									>
+								</div>
+							{/each}
+						</div>
+					{/if}
 					{#each d.memberships as mm (mm.membership.id)}
 						{#if mm.membership.status === 'active'}
-							<Badge
-								>{mm.plan.name}{mm.plan.isPack
-									? ''
-									: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
-							>
-						{/if}
-					{/each}
-					{#if !d.memberships.some((mm) => mm.membership.status === 'active')}
-						<Badge variant="secondary">No active membership</Badge>
-					{/if}
-					{#if d.credits}
-						<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
-					{/if}
-				</div>
-				<p class="mt-1 text-xs">
-					<button class="text-muted-foreground underline" onclick={openProfile}>Edit profile</button
-					>
-				</p>
-				{#if profileOpen}
-					<form class="mt-1 w-full max-w-xs space-y-2" onsubmit={saveProfile}>
-						<Input bind:value={pName} required placeholder="Name" class="h-8 text-sm" />
-						<Input bind:value={pPhone} placeholder="Phone" class="h-8 text-sm" />
-						<Input bind:value={pBirthday} type="date" aria-label="Birthday" class="h-8 text-sm" />
-						<div class="flex gap-2">
-							<Button size="sm" class="h-7 px-3 text-xs" type="submit" disabled={pSaving}
-								>{pSaving ? 'Saving…' : 'Save'}</Button
-							>
-							<Button
-								size="sm"
-								variant="outline"
-								class="h-7 px-3 text-xs"
-								type="button"
-								onclick={() => (profileOpen = false)}>Cancel</Button
-							>
-						</div>
-						<p class="text-xs text-muted-foreground">Email changes go through the front desk.</p>
-					</form>
-				{/if}
-				{#if !d.memberships.some((mm) => mm.membership.status === 'active') && joinablePlans.length}
-					<div class="mt-2 w-full space-y-1.5">
-						<p class="text-xs font-medium text-muted-foreground">Join a plan</p>
-						{#each joinablePlans as p (p.id)}
-							<div class="flex items-center justify-between gap-2 text-sm">
-								<div class="min-w-0">
-									<span class="font-medium">{p.name}</span>
-									<span class="text-muted-foreground">
-										— {formatMoney(p.amount, currency)}{p.isPack
-											? ` · ${p.classCredits} classes`
-											: `/${p.interval}`}{p.trialDays
-											? ` · ${p.trialDays}-day free trial`
-											: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
-									</span>
-								</div>
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={joining === p.id}
-									onclick={() => join(p.id)}>{joining === p.id ? 'Joining…' : 'Join'}</Button
-								>
-							</div>
-						{/each}
-					</div>
-				{/if}
-				{#if d.memberships.some((mm) => mm.membership.status === 'active') && buyablePacks.length}
-					<div class="mt-2 w-full space-y-1.5">
-						<p class="text-xs font-medium text-muted-foreground">Class packs</p>
-						{#each buyablePacks as p (p.id)}
-							<div class="flex items-center justify-between gap-2 text-sm">
-								<div class="min-w-0">
-									<span class="font-medium">{p.name}</span>
-									<span class="text-muted-foreground">
-										— {formatMoney(p.amount, currency)} · {p.classCredits} classes{p.packDays
-											? ` · expires in ${p.packDays} days`
-											: ''}
-									</span>
-								</div>
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={joining === p.id}
-									onclick={() => buy(p.id)}>{joining === p.id ? 'Adding…' : 'Buy'}</Button
-								>
-							</div>
-						{/each}
-					</div>
-				{/if}
-				{#each d.memberships as mm (mm.membership.id)}
-					{#if mm.membership.status === 'active'}
-						<p class="mt-1 text-xs text-muted-foreground">
-							{#if mm.membership.cancelRequestedAt}
-								{mm.plan.name}: cancellation requested — staff will confirm shortly.
-								<button class="underline" onclick={() => withdrawCancel(mm.membership.id)}
-									>Withdraw request</button
-								>
-							{:else if mm.membership.pauseRequestedAt}
-								{mm.plan.name}: pause requested{mm.membership.pauseUntil
-									? ` until ${formatDate(mm.membership.pauseUntil)}`
-									: ''} — staff will confirm shortly.
-								<button class="underline" onclick={() => withdrawPause(mm.membership.id)}
-									>Withdraw request</button
-								>
-							{:else}
-								{#if !mm.plan.isPack && joinablePlans.some((p) => !p.isPack && p.id !== mm.plan.id)}
-									<button class="underline" onclick={() => (changeOpen = !changeOpen)}
-										>Change plan</button
+							<p class="mt-1 text-xs text-muted-foreground">
+								{#if mm.membership.cancelRequestedAt}
+									{mm.plan.name}: cancellation requested — staff will confirm shortly.
+									<button class="underline" onclick={() => withdrawCancel(mm.membership.id)}
+										>Withdraw request</button
 									>
-									·
-								{/if}
-								{#if !mm.plan.isPack}
+								{:else if mm.membership.pauseRequestedAt}
+									{mm.plan.name}: pause requested{mm.membership.pauseUntil
+										? ` until ${formatDate(mm.membership.pauseUntil)}`
+										: ''} — staff will confirm shortly.
+									<button class="underline" onclick={() => withdrawPause(mm.membership.id)}
+										>Withdraw request</button
+									>
+								{:else}
+									{#if !mm.plan.isPack && joinablePlans.some((p) => !p.isPack && p.id !== mm.plan.id)}
+										<button class="underline" onclick={() => (changeOpen = !changeOpen)}
+											>Change plan</button
+										>
+										·
+									{/if}
+									{#if !mm.plan.isPack}
+										<button
+											class="underline"
+											onclick={() =>
+												(pauseReqId = pauseReqId === mm.membership.id ? '' : mm.membership.id)}
+											>Request pause</button
+										>
+										·
+									{/if}
 									<button
 										class="underline"
 										onclick={() =>
-											(pauseReqId = pauseReqId === mm.membership.id ? '' : mm.membership.id)}
-										>Request pause</button
+											(cancelReqId = cancelReqId === mm.membership.id ? '' : mm.membership.id)}
+										>Request cancellation of {mm.plan.name}</button
 									>
-									·
 								{/if}
-								<button
-									class="underline"
-									onclick={() =>
-										(cancelReqId = cancelReqId === mm.membership.id ? '' : mm.membership.id)}
-									>Request cancellation of {mm.plan.name}</button
-								>
+							</p>
+							{#if pauseReqId === mm.membership.id}
+								<form class="mt-1 flex flex-wrap items-center gap-2" onsubmit={requestPause}>
+									<label class="text-xs text-muted-foreground" for="pause-date">Resume on</label>
+									<Input
+										id="pause-date"
+										type="date"
+										required
+										class="h-7 w-auto text-xs"
+										bind:value={pauseResumeOn}
+									/>
+									<select
+										bind:value={requestReason}
+										class="h-7 rounded-md border bg-transparent px-1 text-xs"
+									>
+										<option value="">Reason (optional)</option>
+										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
+									</select>
+									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
+										>Request pause</Button
+									>
+								</form>
 							{/if}
-						</p>
-						{#if pauseReqId === mm.membership.id}
-							<form class="mt-1 flex flex-wrap items-center gap-2" onsubmit={requestPause}>
-								<label class="text-xs text-muted-foreground" for="pause-date">Resume on</label>
-								<Input
-									id="pause-date"
-									type="date"
-									required
-									class="h-7 w-auto text-xs"
-									bind:value={pauseResumeOn}
-								/>
-								<select
-									bind:value={requestReason}
-									class="h-7 rounded-md border bg-transparent px-1 text-xs"
+							{#if cancelReqId === mm.membership.id}
+								<form
+									class="mt-1 flex flex-wrap items-center gap-2"
+									onsubmit={(e) => {
+										e.preventDefault();
+										void requestCancel(mm.membership.id);
+									}}
 								>
-									<option value="">Reason (optional)</option>
-									{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-								</select>
-								<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
-									>Request pause</Button
-								>
-							</form>
+									<select
+										bind:value={requestReason}
+										class="h-7 rounded-md border bg-transparent px-1 text-xs"
+									>
+										<option value="">Reason (optional)</option>
+										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
+									</select>
+									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
+										>Confirm cancellation request</Button
+									>
+								</form>
+							{/if}
 						{/if}
-						{#if cancelReqId === mm.membership.id}
-							<form
-								class="mt-1 flex flex-wrap items-center gap-2"
-								onsubmit={(e) => {
-									e.preventDefault();
-									void requestCancel(mm.membership.id);
-								}}
-							>
-								<select
-									bind:value={requestReason}
-									class="h-7 rounded-md border bg-transparent px-1 text-xs"
-								>
-									<option value="">Reason (optional)</option>
-									{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-								</select>
-								<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
-									>Confirm cancellation request</Button
-								>
-							</form>
-						{/if}
-					{/if}
-				{/each}
-				{#if changeOpen}
-					<div class="mt-2 w-full space-y-1.5">
-						<p class="text-xs font-medium text-muted-foreground">
-							Switch plans — takes effect now, billed at your next charge
-						</p>
-						{#each joinablePlans.filter((p) => !p.isPack && !d.memberships.some((mm) => mm.plan.id === p.id && mm.membership.status === 'active')) as p (p.id)}
-							<div class="flex items-center justify-between gap-2 text-sm">
-								<div class="min-w-0">
-									<span class="font-medium">{p.name}</span>
-									<span class="text-muted-foreground">
-										— {formatMoney(p.amount, currency)}/{p.interval}{p.classCredits
-											? ` · ${p.classCredits} classes`
-											: ''}{p.trialDays
-											? ` · ${p.trialDays}-day free trial`
-											: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
-									</span>
+					{/each}
+					{#if changeOpen}
+						<div class="mt-2 w-full space-y-1.5">
+							<p class="text-xs font-medium text-muted-foreground">
+								Switch plans — takes effect now, billed at your next charge
+							</p>
+							{#each joinablePlans.filter((p) => !p.isPack && !d.memberships.some((mm) => mm.plan.id === p.id && mm.membership.status === 'active')) as p (p.id)}
+								<div class="flex items-center justify-between gap-2 text-sm">
+									<div class="min-w-0">
+										<span class="font-medium">{p.name}</span>
+										<span class="text-muted-foreground">
+											— {formatMoney(p.amount, currency)}/{p.interval}{p.classCredits
+												? ` · ${p.classCredits} classes`
+												: ''}{p.trialDays
+												? ` · ${p.trialDays}-day free trial`
+												: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
+										</span>
+									</div>
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={joining === p.id}
+										onclick={() => switchPlan(p.id)}
+										>{joining === p.id ? 'Switching…' : 'Switch'}</Button
+									>
 								</div>
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={joining === p.id}
-									onclick={() => switchPlan(p.id)}
-									>{joining === p.id ? 'Switching…' : 'Switch'}</Button
-								>
-							</div>
-						{/each}
-					</div>
-				{/if}
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
 		</Card.Content>
 	</Card.Root>
