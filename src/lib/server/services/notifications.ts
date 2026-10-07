@@ -1540,6 +1540,36 @@ export async function sendDueAnnouncements(orgId: string) {
 	return sent;
 }
 
+/**
+ * Announcements this member actually received — notification_log 'announcement'
+ * rows for their email. The portal shows these as a News feed so a member who
+ * deleted the email can still read the notice.
+ */
+export async function memberAnnouncements(orgId: string, email: string, limit = 10) {
+	const rows = await db
+		.select({ entityId: notificationLog.entityId, sentAt: notificationLog.createdAt })
+		.from(notificationLog)
+		.where(
+			and(
+				eq(notificationLog.organizationId, orgId),
+				eq(notificationLog.kind, 'announcement'),
+				eq(notificationLog.recipient, email)
+			)
+		)
+		.orderBy(desc(notificationLog.createdAt))
+		.limit(limit);
+	// entityId is `announcement:${subject}::${message}` — parse both back out.
+	return rows.map((r) => {
+		const rest = r.entityId.slice('announcement:'.length);
+		const sep = rest.indexOf('::');
+		return {
+			subject: rest.slice(0, sep),
+			message: rest.slice(sep + 2).slice(0, 500),
+			sentAt: r.sentAt
+		};
+	});
+}
+
 /** Recent staff announcements, most recent first — surfaced on the Members page. */
 export async function listRecentAnnouncements(orgId: string, limit = 5) {
 	const rows = await db

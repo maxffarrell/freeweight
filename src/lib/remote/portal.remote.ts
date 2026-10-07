@@ -11,6 +11,7 @@ import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
+import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
@@ -363,6 +364,13 @@ export const checkInWithCode = command(
 export const getPortalChallenges = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return chalSvc.portalChallenges(m.organizationId, m.id);
+});
+
+/** Announcements this member was actually sent — the portal's News feed. */
+export const getPortalAnnouncements = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!m.email) return [];
+	return notif.memberAnnouncements(m.organizationId, m.email);
 });
 
 export const joinChallenge = command(
