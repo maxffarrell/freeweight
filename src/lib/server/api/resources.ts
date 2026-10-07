@@ -5,7 +5,7 @@ import * as members from '#lib/server/services/members.ts';
 import * as billing from '#lib/server/services/billing.ts';
 import * as schedule from '#lib/server/services/schedule.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
-import { getSettings } from '#lib/server/services/settings.ts';
+import * as settings from '#lib/server/services/settings.ts';
 import * as s from '#lib/schemas.ts';
 
 type Resource = {
@@ -18,6 +18,18 @@ type Resource = {
 
 /** Public REST surface, mirrored by the OpenAPI document. Mutations go through the same services as the UI. */
 export const resources: Record<string, Resource> = {
+	locations: {
+		description: 'Gym branches',
+		list: (ctx) => settings.listLocations(ctx.orgId, true),
+		create: { schema: s.locationInput, run: settings.createLocation as never },
+		update: { schema: s.locationUpdate, run: settings.updateLocation as never }
+	},
+	class_types: {
+		description: 'Class templates (name, color, capacity, drop-in price)',
+		list: (ctx) => schedule.listClassTypes(ctx.orgId),
+		create: { schema: s.classTypeInput, run: schedule.createClassType as never },
+		update: { schema: s.classTypeUpdate, run: schedule.updateClassType as never }
+	},
 	members: {
 		description: 'Gym members (`?q=` to search)',
 		list: (ctx, url) => members.listMembers(ctx.orgId, url.searchParams.get('q') ?? undefined),
@@ -52,8 +64,8 @@ export const resources: Record<string, Resource> = {
 		create: {
 			schema: s.sessionInput,
 			run: async (ctx: OrgContext, input: never) => {
-				const settings = await getSettings(ctx.orgId);
-				return schedule.createSession(ctx, settings.timezone, input as never);
+				const st = await settings.getSettings(ctx.orgId);
+				return schedule.createSession(ctx, st.timezone, input as never);
 			}
 		}
 	},

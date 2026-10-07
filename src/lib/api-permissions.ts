@@ -1,6 +1,8 @@
 import * as v from 'valibot';
 
 export const API_RESOURCES = [
+	'locations',
+	'class_types',
 	'members',
 	'plans',
 	'memberships',
@@ -20,6 +22,8 @@ export type AccessLevel = 'none' | 'read' | 'write';
 type RawPermissions = Record<string, readonly string[] | undefined> | null | undefined;
 
 export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
+	locations: 'Locations',
+	class_types: 'Class types',
 	members: 'Members',
 	plans: 'Membership plans',
 	memberships: 'Memberships',
