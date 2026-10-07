@@ -90,6 +90,7 @@ export async function createClassType(
 			payRate: input.payRate ?? null,
 			minEnrollment: input.minEnrollment ?? null,
 			bookCutoffMin: input.bookCutoffMin ?? null,
+			memberBookable: input.memberBookable,
 			active: input.active
 		})
 		.returning();

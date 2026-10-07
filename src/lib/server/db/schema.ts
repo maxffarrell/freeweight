@@ -291,6 +291,8 @@ export const classType = pgTable(
 		minEnrollment: integer('min_enrollment'),
 		/** Minutes before start that member booking closes; null = the gym-wide setting. */
 		bookCutoffMin: integer('book_cutoff_min'),
+		/** false = staff-only: members can't self-book in the portal (desk bookings still work). */
+		memberBookable: boolean('member_bookable').notNull().default(true),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

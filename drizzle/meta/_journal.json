@@ -337,6 +337,13 @@
       "when": 1791383353297,
       "tag": "0047_class-book-cutoff",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791384104197,
+      "tag": "0048_member-bookable",
+      "breakpoints": true
     }
   ]
 }

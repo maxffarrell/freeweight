@@ -308,6 +308,7 @@ export async function bookableSessions(memberId: string, days = 14) {
 			className: classType.name,
 			color: classType.color,
 			locationName: location.name,
+			memberBookable: classType.memberBookable,
 			booked:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
 					Number
@@ -347,11 +348,16 @@ export async function memberBook(
 ) {
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
-		.select({ startsAt: classSession.startsAt, classCutoff: classType.bookCutoffMin })
+		.select({
+			startsAt: classSession.startsAt,
+			classCutoff: classType.bookCutoffMin,
+			memberBookable: classType.memberBookable
+		})
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
+	if (!s.memberBookable) error(409, 'This class is booked at the front desk');
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
 	if (
 		bookingWindowDays != null &&

@@ -122,6 +122,8 @@ export const classTypeInput = v.object({
 	minEnrollment: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	/** Minutes before start that member booking closes; null = the gym-wide setting. */
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
+	/** false = members can't self-book in the portal; staff bookings unaffected. */
+	memberBookable: v.optional(v.boolean(), true),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
