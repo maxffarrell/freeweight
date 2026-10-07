@@ -146,6 +146,7 @@
 	let editDate = $state('');
 	let editTime = $state('');
 	let editCapacity = $state<number | null>(null);
+	let editDuration = $state<number | null>(null);
 	let editLocationId = $state('');
 	let editInstructorId = $state('');
 	let editNote = $state('');
@@ -154,6 +155,9 @@
 		editDate = localDate(focus.session.startsAt, tz);
 		editTime = localTime(focus.session.startsAt, tz);
 		editCapacity = focus.session.capacity;
+		editDuration = Math.round(
+			(focus.session.endsAt.getTime() - focus.session.startsAt.getTime()) / 60_000
+		);
 		editLocationId = focus.session.locationId ?? '';
 		editInstructorId = focus.session.instructorId ?? '';
 		editNote = focus.session.note ?? '';
@@ -167,6 +171,7 @@
 				id: focusId,
 				startsAt: `${editDate}T${editTime}`,
 				capacity: editCapacity ?? undefined,
+				durationMin: editDuration ?? undefined,
 				locationId: editLocationId || null,
 				instructorId: editInstructorId || null,
 				note: editNote.trim() || null
@@ -213,9 +218,12 @@
 	let sessStart = $state(localDate(new Date(), tz));
 	let sessStartTime = $state('17:30');
 	let sessRepeatUntil = $state('');
-	// Prefill seats from the chosen class type; staff can still override per session.
+	// Prefill seats + duration from the chosen class type; staff can override per session.
 	let sessCapacity = $derived<number | null>(
 		classTypes.find((c) => c.id === sessTypeId)?.capacity ?? null
+	);
+	let sessDuration = $derived<number | null>(
+		classTypes.find((c) => c.id === sessTypeId)?.durationMin ?? null
 	);
 	let sessNote = $state('');
 	let pending = $state(false);
@@ -229,6 +237,7 @@
 				instructorId: sessInstructorId || undefined,
 				startsAt: `${sessStart}T${sessStartTime}`,
 				capacity: sessCapacity ?? undefined,
+				durationMin: sessDuration ?? undefined,
 				repeatUntil: sessRepeatUntil || undefined,
 				note: sessNote.trim() || undefined
 			});
@@ -670,13 +679,19 @@
 					<Input id="edit-time" type="time" required bind:value={editTime} />
 				</Field.Field>
 			</div>
-			<Field.Field>
-				<Field.Label for="edit-cap">Capacity</Field.Label>
-				<Input id="edit-cap" type="number" min={1} required bind:value={editCapacity} />
-				<p class="text-xs text-muted-foreground">
-					Raising it promotes waitlisted members in order.
-				</p>
-			</Field.Field>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="edit-cap">Capacity</Field.Label>
+					<Input id="edit-cap" type="number" min={1} required bind:value={editCapacity} />
+					<p class="text-xs text-muted-foreground">
+						Raising it promotes waitlisted members in order.
+					</p>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="edit-dur">Duration (min)</Field.Label>
+					<Input id="edit-dur" type="number" min={1} required bind:value={editDuration} />
+				</Field.Field>
+			</div>
 			<Field.Field>
 				<Field.Label>Location</Field.Label>
 				<Select.Root type="single" bind:value={editLocationId}>
@@ -779,10 +794,16 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Field.Field>
-				<Field.Label for="sess-cap">Capacity</Field.Label>
-				<Input id="sess-cap" type="number" min={1} required bind:value={sessCapacity} />
-			</Field.Field>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="sess-cap">Capacity</Field.Label>
+					<Input id="sess-cap" type="number" min={1} required bind:value={sessCapacity} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="sess-dur">Duration (min)</Field.Label>
+					<Input id="sess-dur" type="number" min={1} required bind:value={sessDuration} />
+				</Field.Field>
+			</div>
 			<Field.Field>
 				<Field.Label for="sess-repeat">Repeat weekly until (optional)</Field.Label>
 				<Input id="sess-repeat" type="date" bind:value={sessRepeatUntil} />

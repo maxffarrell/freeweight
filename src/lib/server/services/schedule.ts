@@ -229,7 +229,7 @@ export async function createSession(
 	if (!ct) error(404, 'Class not found');
 
 	const start = zonedToUtc(input.startsAt, tz);
-	const end = new Date(start.getTime() + ct.durationMin * 60_000);
+	const end = new Date(start.getTime() + (input.durationMin ?? ct.durationMin) * 60_000);
 	const dates: Date[] = [start];
 	if (input.repeatUntil) {
 		let day = input.startsAt.slice(0, 10);
@@ -363,15 +363,19 @@ export async function updateSession(
 				});
 		}
 	}
-	// Keep endsAt in step with the class duration when the start moves.
-	if (set.startsAt) {
+	// Keep endsAt in step when the start moves or a per-session duration is set.
+	if (set.startsAt || set.durationMin != null) {
 		const [ct] = await db
 			.select({ durationMin: classType.durationMin })
 			.from(classType)
 			.where(eq(classType.id, row.classTypeId));
 		await db
 			.update(classSession)
-			.set({ endsAt: new Date(row.startsAt.getTime() + (ct?.durationMin ?? 60) * 60_000) })
+			.set({
+				endsAt: new Date(
+					row.startsAt.getTime() + (set.durationMin ?? ct?.durationMin ?? 60) * 60_000
+				)
+			})
 			.where(eq(classSession.id, id));
 	}
 	return row;
