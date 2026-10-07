@@ -231,7 +231,7 @@
 		onchange={(e) => goto(`/portal?m=${e.currentTarget.value}`, { invalidateAll: true })}
 	>
 		{#each data.options as o (o.memberId)}
-			<option value={o.memberId} selected={o.memberId === memberId}>{o.gymName}</option>
+			<option value={o.memberId} selected={o.memberId === memberId}>{o.label}</option>
 		{/each}
 	</select>
 {/if}

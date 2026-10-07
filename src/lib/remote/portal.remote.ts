@@ -8,14 +8,21 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import { idSchema } from '#lib/schemas.ts';
 
-/** Resolves the member record the signed-in user is acting as, and checks it belongs to them. */
+/** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
 	const { user } = requireUser();
-	const [m] = await db
-		.select()
-		.from(gymMember)
-		.where(and(eq(gymMember.id, memberId), eq(gymMember.portalUserId, user.id)));
+	const [m] = await db.select().from(gymMember).where(eq(gymMember.id, memberId));
 	if (!m) error(403, 'Not your member record');
+	if (m.portalUserId !== user.id) {
+		const [guardian] = m.guardianId
+			? await db
+					.select({ id: gymMember.id })
+					.from(gymMember)
+					.where(and(eq(gymMember.id, m.guardianId), eq(gymMember.portalUserId, user.id)))
+					.limit(1)
+			: [];
+		if (!guardian) error(403, 'Not your member record');
+	}
 	return m;
 }
 

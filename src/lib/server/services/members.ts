@@ -421,9 +421,24 @@ export async function deleteMemberNote(ctx: OrgContext, noteId: string) {
 
 /** Members whose portal login is this user — one user can belong to several gyms. */
 export async function portalMembers(userId: string) {
-	return db
+	const own = await db
 		.select({ member: gymMember, orgName: organization.name, orgSlug: organization.slug })
 		.from(gymMember)
 		.innerJoin(organization, eq(organization.id, gymMember.organizationId))
 		.where(eq(gymMember.portalUserId, userId));
+	const mine = own.map((o) => ({ ...o, dependent: false }));
+	if (!own.length) return mine;
+	// Dependents billing under this member show up in the portal switcher too,
+	// so a parent can book and manage for the kids.
+	const deps = await db
+		.select({ member: gymMember, orgName: organization.name, orgSlug: organization.slug })
+		.from(gymMember)
+		.innerJoin(organization, eq(organization.id, gymMember.organizationId))
+		.where(
+			inArray(
+				gymMember.guardianId,
+				own.map((o) => o.member.id)
+			)
+		);
+	return [...mine, ...deps.map((d) => ({ ...d, dependent: true }))];
 }
