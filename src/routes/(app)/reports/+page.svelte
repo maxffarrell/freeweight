@@ -236,6 +236,31 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Fill by weekday</Card.Title>
+			<Card.Description>Booked vs capacity per day, sessions in the last 90 days</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div class="flex h-24 items-end gap-1.5">
+				{#each r.weekdays as w (w.day)}
+					<div
+						class="flex-1 rounded-t bg-primary/80"
+						style="height: {w.capacity > 0 ? Math.max(2, (w.booked / w.capacity) * 100) : 0}%"
+						title="{w.day} — {w.capacity > 0
+							? Math.round((w.booked / w.capacity) * 100)
+							: 0}% ({w.booked}/{w.capacity})"
+					></div>
+				{/each}
+			</div>
+			<div class="mt-1 flex justify-between gap-1.5 text-center text-xs text-muted-foreground">
+				{#each r.weekdays as w (w.day)}
+					<span class="flex-1">{w.day}</span>
+				{/each}
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header>
 			<Card.Title class="text-base">Instructors — last 30 days</Card.Title>

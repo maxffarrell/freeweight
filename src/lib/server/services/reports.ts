@@ -159,6 +159,44 @@ async function fillByClass(orgId: string) {
 		.orderBy(desc(sql`count(distinct ${classSession.id})`));
 }
 
+/** Fill rate by weekday (gym timezone) over the last 90 days — which days actually fill. */
+async function fillByWeekday(orgId: string) {
+	const [s] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = s?.timezone ?? 'UTC';
+	const rows = await db
+		.select({
+			dow: sql<number>`extract(dow from ${classSession.startsAt} at time zone ${tz})`.mapWith(
+				Number
+			),
+			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
+			booked:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','no_show'))), 0)`.mapWith(
+					Number
+				),
+			capacity: sql<number>`coalesce(sum(${classSession.capacity}), 0)`.mapWith(Number)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, new Date(Date.now() - 90 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(sql`extract(dow from ${classSession.startsAt} at time zone ${tz})`);
+	const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const byDow = new Map(rows.map((r) => [r.dow, r]));
+	return [1, 2, 3, 4, 5, 6, 0].map((d) => ({
+		day: names[d],
+		sessions: byDow.get(d)?.sessions ?? 0,
+		booked: byDow.get(d)?.booked ?? 0,
+		capacity: byDow.get(d)?.capacity ?? 0
+	}));
+}
+
 /**
  * Active members whose last check-in was 30+ days ago (or who have never checked in).
  * Churn signal — a follow-up list for the front desk, capped at 50.
@@ -298,7 +336,8 @@ export async function getReports(orgId: string) {
 		instructors,
 		top,
 		referrers,
-		hours
+		hours,
+		weekdays
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -310,7 +349,8 @@ export async function getReports(orgId: string) {
 		instructorStats(orgId),
 		topAttendees(orgId),
 		topReferrers(orgId),
-		checkInsByHour(orgId)
+		checkInsByHour(orgId),
+		fillByWeekday(orgId)
 	]);
 	return {
 		checkIns,
@@ -323,6 +363,7 @@ export async function getReports(orgId: string) {
 		instructors,
 		top,
 		referrers,
-		hours
+		hours,
+		weekdays
 	};
 }
