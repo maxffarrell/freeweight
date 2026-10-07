@@ -1099,6 +1099,44 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 	});
 }
 
+/**
+ * Member email when a booking is marked no-show by the daily cron —
+ * a gentle rebook nudge. Deduped per booking.
+ */
+export async function notifyNoShow(
+	orgId: string,
+	bookingId: string,
+	memberId: string,
+	className: string,
+	startsAt: Date
+) {
+	const [m, name, tz] = await Promise.all([
+		db
+			.select({ email: gymMember.email, name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
+			.then((r) => r[0]),
+		orgName(orgId),
+		orgTimezone(orgId)
+	]);
+	if (!m?.email) return;
+	if (!(await logOnce(orgId, 'noshow', bookingId, m.email))) return;
+	const when = `${localDate(startsAt, tz)} ${localTime(startsAt, tz)}`;
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `We missed you at ${className}`,
+		...renderEmail({
+			orgName: name,
+			heading: 'We missed you',
+			lines: [
+				`Hi ${m.name} — you were booked into ${className} on ${when} but didn't make it. Life happens.`,
+				'Spots go fast, so grab your next one now.'
+			],
+			action: { label: 'Book your next class', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "You've hit N check-ins!" — retention nudge fired when a visit crosses a milestone. */
 export async function notifyCheckInMilestone(orgId: string, memberId: string, count: number) {
 	const [m] = await db

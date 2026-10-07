@@ -36,6 +36,7 @@ import {
 	notifyBookingConfirmed,
 	notifyChargePosted,
 	notifyInstructorChanged,
+	notifyNoShow,
 	notifySessionChanged,
 	notifySessionCancelled,
 	notifyWaitlistPromoted
@@ -347,6 +348,8 @@ export async function markPastNoShows(orgId: string) {
 			if (c) notifyChargePosted(orgId, c.id).catch(() => {});
 		}
 	}
+	for (const r of rows)
+		notifyNoShow(orgId, r.id, r.memberId, r.className, r.startsAt).catch(() => {});
 	return rows.length;
 }
 
