@@ -101,7 +101,11 @@
 				code: memberId,
 				locationId: rosterSess?.session.locationId ?? null
 			});
-			showFlash(true, `${memberName} checked in`, r.member.photoDocumentId);
+			showFlash(
+				true,
+				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : ''),
+				r.member.photoDocumentId
+			);
 			await getRoster(rosterSess!.session.id).refresh();
 		} catch (err) {
 			showFlash(false, errMsg(err, 'Could not check in'));
@@ -115,7 +119,8 @@
 			showFlash(
 				true,
 				r.checkedIn
-					? `Checked in ${r.checkedIn} member${r.checkedIn === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped)` : ''}`
+					? `Checked in ${r.checkedIn} member${r.checkedIn === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped)` : ''}` +
+							(r.birthdays.length ? ` — happy birthday, ${r.birthdays.join(' + ')}!` : '')
 					: 'Nobody left to check in'
 			);
 			await getRoster(rosterSess!.session.id).refresh();
@@ -206,7 +211,8 @@
 				r.checkedOut
 					? `${r.member.name} checked out`
 					: `${r.member.name} checked in` +
-							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : ''),
+							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '') +
+							(r.birthday ? ' — happy birthday!' : ''),
 				r.member.photoDocumentId,
 				r.member.deskNote
 			);

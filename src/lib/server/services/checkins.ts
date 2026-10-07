@@ -183,7 +183,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			action: 'checked-out',
 			summary: `${m.name} checked out`
 		});
-		return { checkIn: row!, member: m, attended: 0, checkedOut: true };
+		return { checkIn: row!, member: m, attended: 0, checkedOut: true, birthday: false };
 	}
 	const [row] = await db
 		.insert(checkIn)
@@ -241,7 +241,9 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 	if (n === 1) notifyFirstVisit(ctx.orgId, memberId).catch(() => {});
 	else if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
 
-	return { checkIn: row!, member: m, attended: attended.length };
+	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
+	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
+	return { checkIn: row!, member: m, attended: attended.length, birthday };
 }
 
 export async function listCheckIns(
@@ -284,7 +286,7 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 		getRoster(ctx.orgId, sessionId)
 	]);
 	const booked = roster.filter((r) => r.booking.status === 'booked');
-	if (!booked.length) return { checkedIn: 0, skipped: 0 };
+	if (!booked.length) return { checkedIn: 0, skipped: 0, birthdays: [] as string[] };
 	const open = await db
 		.select({ memberId: checkIn.memberId })
 		.from(checkIn)
@@ -301,22 +303,24 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 	const inside = new Set(open.map((o) => o.memberId));
 	let checkedIn = 0;
 	let skipped = 0;
+	const birthdays: string[] = [];
 	for (const r of booked) {
 		if (inside.has(r.booking.memberId)) {
 			skipped++;
 			continue;
 		}
 		try {
-			await recordCheckIn(ctx, {
+			const res = await recordCheckIn(ctx, {
 				code: r.booking.memberId,
 				locationId: sess.session.locationId
 			});
 			checkedIn++;
+			if (res.birthday) birthdays.push(r.memberName);
 		} catch {
 			skipped++;
 		}
 	}
-	return { checkedIn, skipped };
+	return { checkedIn, skipped, birthdays };
 }
 
 /**
