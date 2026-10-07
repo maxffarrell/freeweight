@@ -183,6 +183,13 @@
       "when": 1791361805587,
       "tag": "0025_comp_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791362850180,
+      "tag": "0026_handy_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }

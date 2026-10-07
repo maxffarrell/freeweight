@@ -167,10 +167,26 @@
 		busy = null;
 	}
 
+	const CANCEL_REASONS = [
+		'Too expensive',
+		'Moving',
+		'Injury or health',
+		'Too busy',
+		'Schedule conflicts',
+		'Other'
+	];
+	let cancelReqId = $state('');
+	let requestReason = $state('');
 	async function requestCancel(membershipId: string) {
 		try {
-			await requestMembershipCancel({ memberId, membershipId });
+			await requestMembershipCancel({
+				memberId,
+				membershipId,
+				reason: requestReason || undefined
+			});
 			toast.success('Cancellation requested — staff will confirm');
+			cancelReqId = '';
+			requestReason = '';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not request'));
 		}
@@ -191,11 +207,13 @@
 			await requestMembershipPause({
 				memberId,
 				membershipId: pauseReqId,
-				resumeOn: pauseResumeOn
+				resumeOn: pauseResumeOn,
+				reason: requestReason || undefined
 			});
 			toast.success('Pause requested — staff will confirm');
 			pauseReqId = '';
 			pauseResumeOn = '';
+			requestReason = '';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not request'));
 		}
@@ -357,13 +375,16 @@
 									>
 									·
 								{/if}
-								<button class="underline" onclick={() => requestCancel(mm.membership.id)}
+								<button
+									class="underline"
+									onclick={() =>
+										(cancelReqId = cancelReqId === mm.membership.id ? '' : mm.membership.id)}
 									>Request cancellation of {mm.plan.name}</button
 								>
 							{/if}
 						</p>
 						{#if pauseReqId === mm.membership.id}
-							<form class="mt-1 flex items-center gap-2" onsubmit={requestPause}>
+							<form class="mt-1 flex flex-wrap items-center gap-2" onsubmit={requestPause}>
 								<label class="text-xs text-muted-foreground" for="pause-date">Resume on</label>
 								<Input
 									id="pause-date"
@@ -372,8 +393,35 @@
 									class="h-7 w-auto text-xs"
 									bind:value={pauseResumeOn}
 								/>
+								<select
+									bind:value={requestReason}
+									class="h-7 rounded-md border bg-transparent px-1 text-xs"
+								>
+									<option value="">Reason (optional)</option>
+									{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
+								</select>
 								<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 									>Request pause</Button
+								>
+							</form>
+						{/if}
+						{#if cancelReqId === mm.membership.id}
+							<form
+								class="mt-1 flex flex-wrap items-center gap-2"
+								onsubmit={(e) => {
+									e.preventDefault();
+									void requestCancel(mm.membership.id);
+								}}
+							>
+								<select
+									bind:value={requestReason}
+									class="h-7 rounded-md border bg-transparent px-1 text-xs"
+								>
+									<option value="">Reason (optional)</option>
+									{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
+								</select>
+								<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
+									>Confirm cancellation request</Button
 								>
 							</form>
 						{/if}

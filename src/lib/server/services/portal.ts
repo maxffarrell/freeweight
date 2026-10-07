@@ -396,7 +396,12 @@ export async function availableProviders(orgId: string, currency: string) {
 }
 
 /** Member asks to cancel a membership — staff confirm from the member page. */
-export async function requestCancellation(orgId: string, memberId: string, membershipId: string) {
+export async function requestCancellation(
+	orgId: string,
+	memberId: string,
+	membershipId: string,
+	reason?: string
+) {
 	const [ms] = await db
 		.select({ membership, commitmentMonths: plan.commitmentMonths })
 		.from(membership)
@@ -421,7 +426,7 @@ export async function requestCancellation(orgId: string, memberId: string, membe
 	}
 	const [row] = await db
 		.update(membership)
-		.set({ cancelRequestedAt: new Date() })
+		.set({ cancelRequestedAt: new Date(), requestReason: reason?.trim() || null })
 		.where(eq(membership.id, membershipId))
 		.returning();
 	if (!row) error(404, 'Membership not found');
@@ -432,7 +437,7 @@ export async function requestCancellation(orgId: string, memberId: string, membe
 		entityId: membershipId,
 		action: 'cancel_requested',
 		summary: 'Member requested cancellation',
-		data: { memberId }
+		data: { memberId, reason }
 	});
 	notifyCancellationRequested(orgId, membershipId).catch(() => {});
 	return row;
@@ -447,7 +452,8 @@ export async function requestPause(
 	orgId: string,
 	memberId: string,
 	membershipId: string,
-	resumeOn: string
+	resumeOn: string,
+	reason?: string
 ) {
 	const [st] = await db
 		.select({ timezone: gymSettings.timezone })
@@ -458,7 +464,11 @@ export async function requestPause(
 	if (resumeOn > addDays(today, 366)) error(400, 'Pick a resume date within a year');
 	const [row] = await db
 		.update(membership)
-		.set({ pauseRequestedAt: new Date(), pauseUntil: resumeOn })
+		.set({
+			pauseRequestedAt: new Date(),
+			pauseUntil: resumeOn,
+			requestReason: reason?.trim() || null
+		})
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
@@ -476,7 +486,7 @@ export async function requestPause(
 		entityId: membershipId,
 		action: 'pause_requested',
 		summary: `Member requested a pause until ${resumeOn}`,
-		data: { memberId, resumeOn }
+		data: { memberId, resumeOn, reason }
 	});
 	notifyPauseRequested(orgId, membershipId).catch(() => {});
 	return row;
@@ -486,7 +496,7 @@ export async function requestPause(
 export async function withdrawPause(orgId: string, memberId: string, membershipId: string) {
 	const [row] = await db
 		.update(membership)
-		.set({ pauseRequestedAt: null, pauseUntil: null })
+		.set({ pauseRequestedAt: null, pauseUntil: null, requestReason: null })
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
@@ -503,7 +513,7 @@ export async function withdrawPause(orgId: string, memberId: string, membershipI
 export async function withdrawCancellation(orgId: string, memberId: string, membershipId: string) {
 	const [row] = await db
 		.update(membership)
-		.set({ cancelRequestedAt: null })
+		.set({ cancelRequestedAt: null, requestReason: null })
 		.where(
 			and(
 				eq(membership.organizationId, orgId),

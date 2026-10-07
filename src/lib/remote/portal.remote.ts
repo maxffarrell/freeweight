@@ -67,11 +67,13 @@ export const memberCancel = command(
 	}
 );
 
+const reasonField = v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100)));
+
 export const requestMembershipCancel = command(
-	v.object({ memberId: idSchema, membershipId: idSchema }),
-	async ({ memberId, membershipId }) => {
+	v.object({ memberId: idSchema, membershipId: idSchema, reason: reasonField }),
+	async ({ memberId, membershipId, reason }) => {
 		const m = await myMember(memberId);
-		const r = await svc.requestCancellation(m.organizationId, m.id, membershipId);
+		const r = await svc.requestCancellation(m.organizationId, m.id, membershipId, reason);
 		void getPortalOverview(memberId).refresh();
 		return r;
 	}
@@ -81,11 +83,12 @@ export const requestMembershipPause = command(
 	v.object({
 		memberId: idSchema,
 		membershipId: idSchema,
-		resumeOn: v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD'))
+		resumeOn: v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD')),
+		reason: reasonField
 	}),
-	async ({ memberId, membershipId, resumeOn }) => {
+	async ({ memberId, membershipId, resumeOn, reason }) => {
 		const m = await myMember(memberId);
-		const r = await svc.requestPause(m.organizationId, m.id, membershipId, resumeOn);
+		const r = await svc.requestPause(m.organizationId, m.id, membershipId, resumeOn, reason);
 		void getPortalOverview(memberId).refresh();
 		return r;
 	}

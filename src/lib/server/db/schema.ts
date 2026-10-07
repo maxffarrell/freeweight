@@ -214,6 +214,8 @@ export const membership = pgTable(
 		pauseUntil: date('pause_until', { mode: 'string' }),
 		/** Staff-granted comp classes on top of the plan's classCredits (per period / per pack). */
 		bonusCredits: integer('bonus_credits').notNull().default(0),
+		/** The member's stated reason on a pending cancel/pause request. */
+		requestReason: text('request_reason'),
 		...timestamps
 	},
 	(t) => [

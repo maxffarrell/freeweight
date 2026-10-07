@@ -480,14 +480,17 @@
 							</p>
 							{#if mm.membership.cancelRequestedAt}
 								<p class="text-xs text-amber-600 dark:text-amber-400">
-									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}
+									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}{mm.membership
+										.requestReason
+										? ` — “${mm.membership.requestReason}”`
+										: ''}
 								</p>
 							{/if}
 							{#if mm.membership.pauseRequestedAt}
 								<p class="text-xs text-amber-600 dark:text-amber-400">
 									Pause requested{mm.membership.pauseUntil
 										? ` — resume ${formatDate(mm.membership.pauseUntil)}`
-										: ''}
+										: ''}{mm.membership.requestReason ? ` — “${mm.membership.requestReason}”` : ''}
 								</p>
 							{/if}
 						</div>

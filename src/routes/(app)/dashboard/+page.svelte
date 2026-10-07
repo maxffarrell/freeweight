@@ -107,12 +107,17 @@
 						<ul class="space-y-2">
 							{#each d.pendingRequests as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
+									<a
+										href="/members/{r.memberId}"
+										class="truncate hover:underline"
+										title={r.requestReason ?? undefined}>{r.memberName}</a
 									>
 									<Badge variant="outline" class="shrink-0">
 										{r.kind === 'cancel'
 											? `cancel ${r.planName}`
-											: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}
+											: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+											? ` · ${r.requestReason}`
+											: ''}
 									</Badge>
 								</li>
 							{/each}

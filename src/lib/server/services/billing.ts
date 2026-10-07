@@ -262,11 +262,16 @@ export async function updateMembership(
 		// Any status change resolves (or supersedes) a pending pause request.
 		set.pauseRequestedAt = null;
 		set.pauseUntil = null;
+		set.requestReason = null;
 	}
 	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
 	if (input.clearPauseRequest) {
 		set.pauseRequestedAt = null;
 		set.pauseUntil = null;
+	}
+	// Any status change or request resolution clears the member's stated reason.
+	if (input.status || input.clearCancelRequest || input.clearPauseRequest) {
+		set.requestReason = null;
 	}
 	const [row] = await db
 		.update(membership)

@@ -127,7 +127,8 @@ export async function dashboard(orgId: string) {
 				'cancel' | 'pause'
 			>`case when ${membership.cancelRequestedAt} is not null then 'cancel' else 'pause' end`,
 			requestedAt: sql<Date>`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`,
-			pauseUntil: membership.pauseUntil
+			pauseUntil: membership.pauseUntil,
+			requestReason: membership.requestReason
 		})
 		.from(membership)
 		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
