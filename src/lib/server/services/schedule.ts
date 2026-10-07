@@ -1601,3 +1601,37 @@ export async function materializeTemplates(orgId: string) {
 	if (rows.length) await db.insert(classSession).values(rows);
 	return rows.length;
 }
+
+/** Non-cancelled sessions one instructor is already teaching that overlap any given interval. */
+export async function instructorConflicts(
+	orgId: string,
+	instructorId: string,
+	intervals: { start: Date; end: Date }[],
+	excludeSessionId?: string
+) {
+	if (!intervals.length) return [];
+	return db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			endsAt: classSession.endsAt,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.instructorId, instructorId),
+				isNull(classSession.cancelledAt),
+				excludeSessionId ? ne(classSession.id, excludeSessionId) : undefined,
+				or(
+					...intervals.map((i) =>
+						and(lt(classSession.startsAt, i.end), gt(classSession.endsAt, i.start))
+					)
+				)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(6);
+}
