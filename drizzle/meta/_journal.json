@@ -281,6 +281,13 @@
       "when": 1791374121975,
       "tag": "0039_shop-stock",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791374682134,
+      "tag": "0040_member-photo",
+      "breakpoints": true
     }
   ]
 }

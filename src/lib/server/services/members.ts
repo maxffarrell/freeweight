@@ -492,14 +492,14 @@ export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: stri
 			.update(booking)
 			.set({ memberId: keepId })
 			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.memberId, dropId)));
-		// Documents are entity-typed, not FK'd.
+		// Documents are entity-typed, not FK'd ('member' files + 'member_avatar' photo).
 		await tx
 			.update(document)
 			.set({ entityId: keepId })
 			.where(
 				and(
 					eq(document.organizationId, ctx.orgId),
-					eq(document.entityType, 'member'),
+					inArray(document.entityType, ['member', 'member_avatar']),
 					eq(document.entityId, dropId)
 				)
 			);
@@ -535,7 +535,8 @@ export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: stri
 			'locationId',
 			'portalUserId',
 			'referralSource',
-			'unsubscribedAt'
+			'unsubscribedAt',
+			'photoDocumentId'
 		] as const) {
 			if (keep[f] == null && drop[f] != null) Object.assign(patch, { [f]: drop[f] });
 		}
