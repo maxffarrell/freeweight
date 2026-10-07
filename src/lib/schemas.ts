@@ -429,6 +429,17 @@ export const joinInput = v.object({
 	website: v.optional(v.string(), '')
 });
 
+/** "Not ready to join — keep me posted" form on the public page. */
+export const leadInput = v.object({
+	name: requiredText('Name'),
+	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+	phone: v.optional(optionalText),
+	/** What they asked about — stored as a staff note on the new member. */
+	interest: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+	/** Honeypot: must stay empty. */
+	website: v.optional(v.string(), '')
+});
+
 /** Visitor buying a single class on the public page. */
 export const dropInInput = v.object({
 	sessionId: idSchema,

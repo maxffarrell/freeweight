@@ -9,7 +9,12 @@
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
-	import { bookDropInForm, getReferrerName, joinGymForm } from '#lib/remote/public.remote.ts';
+	import {
+		bookDropInForm,
+		captureLeadForm,
+		getReferrerName,
+		joinGymForm
+	} from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -121,6 +126,37 @@
 			toast.error(errMsg(err, 'Could not book — try again'));
 		}
 		dPending = false;
+	}
+
+	// ------- lead capture -------
+	let leadOpen = $state(false);
+	let lName = $state('');
+	let lEmail = $state('');
+	let lPhone = $state('');
+	let lInterest = $state('');
+	let lWebsite = $state(''); // honeypot
+	let lPending = $state(false);
+	let leadDone = $state(false);
+
+	async function submitLead(e: SubmitEvent) {
+		e.preventDefault();
+		lPending = true;
+		try {
+			await captureLeadForm({
+				slug: org.slug,
+				input: {
+					name: lName,
+					email: lEmail,
+					phone: lPhone || undefined,
+					interest: lInterest || undefined,
+					website: lWebsite
+				}
+			});
+			leadDone = true;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send — try again'));
+		}
+		lPending = false;
 	}
 </script>
 
@@ -376,6 +412,13 @@
 							<Button type="submit" class="w-full" disabled={pending}>
 								{pending ? 'Joining…' : `Join ${org.name}`}
 							</Button>
+							<button
+								type="button"
+								class="w-full pt-1 text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
+								onclick={() => (leadOpen = true)}
+							>
+								Not ready to join? Leave your info and we'll reach out.
+							</button>
 						</form>
 					</Card.Content>
 				</Card.Root>
@@ -440,6 +483,67 @@
 					<Dialog.Footer>
 						<Button type="submit" disabled={dPending}
 							>{dPending ? 'Booking…' : 'Book this class'}</Button
+						>
+					</Dialog.Footer>
+				</form>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
+
+	<Dialog.Root bind:open={leadOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>Keep me posted</Dialog.Title>
+				<Dialog.Description>
+					Not ready to join yet — leave your info and {org.name} will reach out.
+				</Dialog.Description>
+			</Dialog.Header>
+			{#if leadDone}
+				<div class="space-y-3 py-2 text-sm">
+					<p class="font-medium">Thanks — we'll be in touch.</p>
+					<p class="text-muted-foreground">
+						The gym has your details and will reach out when you're ready.
+					</p>
+				</div>
+			{:else}
+				<form class="space-y-4" onsubmit={submitLead}>
+					<Field.Field>
+						<Field.Label for="l-name">Name</Field.Label>
+						<Input id="l-name" required bind:value={lName} autocomplete="name" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="l-email">Email</Field.Label>
+						<Input id="l-email" type="email" required bind:value={lEmail} autocomplete="email" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="l-phone"
+							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
+						>
+						<Input id="l-phone" type="tel" bind:value={lPhone} autocomplete="tel" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="l-interest"
+							>What are you interested in? <span class="text-muted-foreground">(optional)</span
+							></Field.Label
+						>
+						<Input
+							id="l-interest"
+							bind:value={lInterest}
+							placeholder="e.g. trial week, personal training"
+						/>
+					</Field.Field>
+					<!-- honeypot -->
+					<input
+						type="text"
+						name="website"
+						tabindex="-1"
+						autocomplete="off"
+						class="hidden"
+						bind:value={lWebsite}
+					/>
+					<Dialog.Footer>
+						<Button type="submit" disabled={lPending}
+							>{lPending ? 'Sending…' : 'Send my info'}</Button
 						>
 					</Dialog.Footer>
 				</form>
