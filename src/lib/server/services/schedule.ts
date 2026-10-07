@@ -87,6 +87,7 @@ export async function createClassType(
 			instructorId: input.instructorId ?? null,
 			dropInPrice: input.dropInPrice ?? null,
 			payRate: input.payRate ?? null,
+			minEnrollment: input.minEnrollment ?? null,
 			active: input.active
 		})
 		.returning();
@@ -484,6 +485,59 @@ export async function expireWaitlists(orgId: string) {
 		)
 		.returning({ id: booking.id });
 	return rows.length;
+}
+
+/**
+ * Daily cron: cancels sessions starting within 24h whose class type sets a
+ * minimum enrollment and is still under it — gyms decide the day before, not
+ * at door time. Same aftermath as a manual cancel: attendees and the
+ * instructor are emailed (notifySessionCancelled), open drop-in charges are
+ * voided, and credit usage ignores cancelled sessions automatically.
+ */
+export async function autoCancelUnderEnrolled(orgId: string) {
+	const until = new Date(Date.now() + 24 * 3600_000);
+	const rows = await db
+		.select({
+			id: classSession.id,
+			min: classType.minEnrollment,
+			booked: bookedCount(classSession.id)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				isNotNull(classType.minEnrollment),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, until)
+			)
+		);
+	let cancelled = 0;
+	for (const s of rows) {
+		if (s.min == null || s.booked >= s.min) continue;
+		const [row] = await db
+			.update(classSession)
+			.set({ cancelledAt: new Date(), updatedAt: new Date() })
+			.where(and(eq(classSession.id, s.id), isNull(classSession.cancelledAt)))
+			.returning({ id: classSession.id });
+		if (!row) continue;
+		await emit({
+			orgId,
+			entityType: 'session',
+			entityId: s.id,
+			action: 'auto_cancelled',
+			summary: `Under-enrolled (${s.booked}/${s.min})`
+		});
+		notifySessionCancelled(orgId, s.id).catch(() => {});
+		await db.execute(
+			sql`update ${charge} c set status = 'void', updated_at = now()
+				from ${booking} b
+				where b.charge_id = c.id and b.session_id = ${s.id} and c.status = 'open'`
+		);
+		cancelled++;
+	}
+	return cancelled;
 }
 
 /** Bookings that consume a class credit (cancelled doesn't). */

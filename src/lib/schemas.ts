@@ -118,6 +118,8 @@ export const classTypeInput = v.object({
 	dropInPrice: v.optional(v.nullable(cents)),
 	/** Minor units the instructor earns per session; null = unrated. */
 	payRate: v.optional(v.nullable(cents)),
+	/** Cron cancels sessions below this enrollment the day before; null = never. */
+	minEnrollment: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
