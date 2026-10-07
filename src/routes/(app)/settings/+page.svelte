@@ -48,6 +48,8 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import Printer from '@lucide/svelte/icons/printer';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import Map from '@lucide/svelte/icons/map';
+	import { tour } from '#lib/tour.svelte.ts';
 
 	let settings = $state(await getSettings());
 	let locations = $state(await getLocations());
@@ -964,6 +966,20 @@
 							}
 							pending = false;
 						}}><Sparkles /> Load demo data</Button
+					>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Product tour</Card.Title>
+					<Card.Description
+						>The guided walkthrough from your first login — replay it anytime.</Card.Description
+					>
+				</Card.Header>
+				<Card.Content class="px-6">
+					<Button variant="secondary" onclick={() => (tour.open = true)}
+						><Map /> Take the tour</Button
 					>
 				</Card.Content>
 			</Card.Root>
