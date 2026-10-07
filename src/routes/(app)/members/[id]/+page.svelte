@@ -34,10 +34,10 @@
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
-	const m = await getMember(id);
-	const plans = await getPlans();
-	const settings = await getSettings();
-	const currency = await getCurrency();
+	const m = $derived(await getMember(id));
+	const plans = $derived(await getPlans());
+	const settings = $derived(await getSettings());
+	const currency = $derived(await getCurrency());
 	const tz = settings.timezone;
 
 	const balance = m.charges

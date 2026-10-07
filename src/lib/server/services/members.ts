@@ -32,7 +32,7 @@ export async function listMembers(orgId: string, q?: string) {
 			joinedAt: gymMember.joinedAt,
 			locationName: location.name,
 			openBalance:
-				sql<number>`coalesce((select sum(c.amount) - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id), 0) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.status = 'open'), 0)`.mapWith(
+				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id), 0)) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.status = 'open'), 0)`.mapWith(
 					Number
 				),
 			planName: sql<

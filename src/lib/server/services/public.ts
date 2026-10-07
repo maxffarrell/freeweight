@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, sql , lt} from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -52,7 +52,7 @@ export async function getPublicGym(slug: string) {
 			and(
 				eq(classSession.organizationId, org.id),
 				gte(classSession.startsAt, now),
-				sql`${outer(classSession.startsAt)} < ${week}`,
+				lt(classSession.startsAt, week),
 				isNull(classSession.cancelledAt)
 			)
 		)

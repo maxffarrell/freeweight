@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, sql , lt} from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -145,7 +145,7 @@ export async function bookableSessions(memberId: string, days = 14) {
 			and(
 				eq(classSession.organizationId, m.organizationId),
 				gte(classSession.startsAt, now),
-				sql`${outer(classSession.startsAt)} < ${until}`,
+				lt(classSession.startsAt, until),
 				isNull(classSession.cancelledAt)
 			)
 		)

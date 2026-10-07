@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
+import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
 	bookingInput,
@@ -67,10 +68,14 @@ export const bookSession = command(bookingInput, async (input) => {
 	void getSessions().refresh();
 	void getSession(input.sessionId).refresh();
 	void getRoster(input.sessionId).refresh();
+	void getMember(input.memberId).refresh();
 	return b;
 });
 export const updateBooking = command(bookingUpdate, async (input) => {
 	const b = await svc.updateBooking(await requireOrg(), input);
 	void getSessions().refresh();
+	void getSession(b.sessionId).refresh();
+	void getRoster(b.sessionId).refresh();
+	void getMember(b.memberId).refresh();
 	return b;
 });

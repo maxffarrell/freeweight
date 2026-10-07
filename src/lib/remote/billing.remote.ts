@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/billing.ts';
+import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
 	chargeInput,
@@ -34,11 +35,13 @@ export const createMembership = command(membershipInput, async (input) => {
 	const m = await svc.createMembership(await requireOrg(), input);
 	void getMemberships().refresh();
 	void getCharges().refresh();
+	void getMember(input.memberId).refresh();
 	return m;
 });
 export const updateMembership = command(membershipUpdate, async (input) => {
 	const m = await svc.updateMembership(await requireOrg(), input);
 	void getMemberships().refresh();
+	void getMember(m.memberId).refresh();
 	return m;
 });
 
@@ -49,11 +52,13 @@ export const getCharges = query(
 export const addCharge = command(chargeInput, async (input) => {
 	const c = await svc.addCharge(await requireOrg(), input);
 	void getCharges().refresh();
+	void getMember(input.memberId).refresh();
 	return c;
 });
 export const updateCharge = command(chargeUpdate, async (input) => {
 	const c = await svc.updateCharge(await requireOrg(), input);
 	void getCharges().refresh();
+	void getMember(c.memberId).refresh();
 	return c;
 });
 
@@ -62,6 +67,7 @@ export const recordPayment = command(paymentInput, async (input) => {
 	const p = await svc.recordPayment(await requireOrg(), input);
 	void getPayments().refresh();
 	void getCharges().refresh();
+	void getMember(input.memberId).refresh();
 	return p;
 });
 

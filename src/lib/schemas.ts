@@ -82,7 +82,7 @@ export const classTypeInput = v.object({
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
 
 /** Local wall-clock time (`YYYY-MM-DDTHH:mm`) in the workspace timezone. */
-const localDateTime = v.pipe(v.string(), v.isoTimestamp('Use YYYY-MM-DDTHH:mm'));
+const localDateTime = v.pipe(v.string(), v.isoDateTime('Use YYYY-MM-DDTHH:mm'));
 
 export const sessionInput = v.object({
 	classTypeId: idSchema,
