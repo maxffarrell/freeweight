@@ -217,12 +217,27 @@ export async function updateMembership(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.membershipUpdate>
 ) {
+	const [current] = await db
+		.select({ status: membership.status, planId: membership.planId })
+		.from(membership)
+		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)));
+	if (!current) error(404, 'Membership not found');
+
+	// Pausing/cancelling stops billing. Resuming restarts it one plan interval out —
+	// leaving nextChargeAt null on resume would bill the member never again.
+	let nextChargeAt: Date | null | undefined;
+	if (input.status === 'active' && current.status !== 'active') {
+		const [p] = await db.select({ interval: plan.interval }).from(plan).where(eq(plan.id, current.planId));
+		nextChargeAt = new Date(`${nextPeriod(todayISO(), p?.interval ?? 'month')}T00:00:00Z`);
+	} else if (input.status && input.status !== 'active') {
+		nextChargeAt = null;
+	}
 	const [row] = await db
 		.update(membership)
 		.set({
 			status: input.status,
 			cancelledAt: input.status === 'cancelled' ? new Date() : null,
-			nextChargeAt: input.status === 'active' ? undefined : null
+			nextChargeAt
 		})
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
