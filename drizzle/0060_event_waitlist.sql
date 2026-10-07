@@ -1,0 +1,1 @@
+ALTER TABLE "event_registration" ADD COLUMN "waitlisted" boolean DEFAULT false NOT NULL;

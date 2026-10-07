@@ -126,9 +126,11 @@
 		try {
 			const r = await registerEvent({ memberId, eventId });
 			toast.success(
-				r.registration.chargeId
-					? `Registered — ${formatMoney(r.event.price ?? 0, currency)} added to your balance`
-					: `You're registered for ${r.event.name}`
+				r.registration.waitlisted
+					? `Added to the ${r.event.name} waitlist — we'll email you if a spot opens`
+					: r.registration.chargeId
+						? `Registered — ${formatMoney(r.event.price ?? 0, currency)} added to your balance`
+						: `You're registered for ${r.event.name}`
 			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not register'));
@@ -862,13 +864,15 @@
 			</Card.Header>
 			<Card.Content class="divide-y px-6 pb-4">
 				{#each portalEvents as ev (ev.event.id)}
-					{@const full = ev.registered >= ev.event.capacity && !ev.myRegistration}
+					{@const full = ev.registered >= ev.event.capacity}
 					<div class="flex items-center gap-3 py-3">
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
 								<span class="truncate font-medium">{ev.event.name}</span>
 								{#if ev.myRegistration}
-									<Badge>Registered</Badge>
+									<Badge variant={ev.myRegistration.waitlisted ? 'secondary' : 'default'}>
+										{ev.myRegistration.waitlisted ? 'Waitlist' : 'Registered'}
+									</Badge>
 								{/if}
 							</div>
 							<p class="text-sm text-muted-foreground">
@@ -890,11 +894,11 @@
 							<Button
 								size="sm"
 								variant={full ? 'outline' : 'default'}
-								disabled={full || evBusy === ev.event.id}
+								disabled={evBusy === ev.event.id}
 								onclick={() => registerEv(ev.event.id)}
 							>
 								{full
-									? 'Full'
+									? 'Join waitlist'
 									: ev.event.price
 										? `Register — ${formatMoney(ev.event.price, currency)}`
 										: 'Register'}

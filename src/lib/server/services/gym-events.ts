@@ -4,7 +4,11 @@ import { error } from '@sveltejs/kit';
 import { charge, eventRegistration, gymEvent, gymMember, location } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyEventCancelled, notifyEventRegistered } from './notifications.ts';
+import {
+	notifyEventCancelled,
+	notifyEventRegistered,
+	notifyEventWaitlisted
+} from './notifications.ts';
 import { todayISO } from '#lib/format.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -23,7 +27,11 @@ export async function listEvents(orgId: string) {
 		})
 		.from(eventRegistration)
 		.where(
-			and(eq(eventRegistration.organizationId, orgId), ne(eventRegistration.status, 'cancelled'))
+			and(
+				eq(eventRegistration.organizationId, orgId),
+				ne(eventRegistration.status, 'cancelled'),
+				eq(eventRegistration.waitlisted, false)
+			)
 		)
 		.groupBy(eventRegistration.eventId);
 	const byId = new Map(counts.map((c) => [c.eventId, c.n]));
@@ -63,6 +71,7 @@ export async function updateEvent(ctx: OrgContext, input: v.InferOutput<typeof s
 		.where(and(eq(gymEvent.organizationId, ctx.orgId), eq(gymEvent.id, id)))
 		.returning();
 	if (!row) error(404, 'Event not found');
+	if (set.capacity !== undefined) await promoteWaitlisted(ctx.orgId, id);
 	return row;
 }
 
@@ -93,7 +102,11 @@ export async function memberEvents(orgId: string, memberId: string) {
 			.select({ eventId: eventRegistration.eventId, n: sql<number>`count(*)`.mapWith(Number) })
 			.from(eventRegistration)
 			.where(
-				and(eq(eventRegistration.organizationId, orgId), ne(eventRegistration.status, 'cancelled'))
+				and(
+					eq(eventRegistration.organizationId, orgId),
+					ne(eventRegistration.status, 'cancelled'),
+					eq(eventRegistration.waitlisted, false)
+				)
 			)
 			.groupBy(eventRegistration.eventId)
 	]);
@@ -124,13 +137,6 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 			.from(gymMember)
 			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
 		if (!m) error(404, 'Member not found');
-		const [{ n }] = await tx
-			.select({ n: sql<number>`count(*)`.mapWith(Number) })
-			.from(eventRegistration)
-			.where(
-				and(eq(eventRegistration.eventId, eventId), ne(eventRegistration.status, 'cancelled'))
-			);
-		if (n >= ev.capacity) error(409, `${ev.name} is full`);
 		const [existing] = await tx
 			.select({ id: eventRegistration.id })
 			.from(eventRegistration)
@@ -143,8 +149,20 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 			);
 		if (existing) error(409, `${m.name} is already registered`);
 
+		const [{ n }] = await tx
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(eventRegistration)
+			.where(
+				and(
+					eq(eventRegistration.eventId, eventId),
+					ne(eventRegistration.status, 'cancelled'),
+					eq(eventRegistration.waitlisted, false)
+				)
+			);
+		const waitlisted = n >= ev.capacity;
+
 		let chargeId: string | null = null;
-		if (ev.price && ev.price > 0) {
+		if (!waitlisted && ev.price && ev.price > 0) {
 			const payerId = m.guardianId ?? m.id;
 			const forDependent = payerId !== m.id ? ` — ${m.name}` : '';
 			const [c] = await tx
@@ -162,7 +180,7 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 		}
 		const [row] = await tx
 			.insert(eventRegistration)
-			.values({ organizationId: orgId, eventId, memberId, chargeId })
+			.values({ organizationId: orgId, eventId, memberId, chargeId, waitlisted })
 			.returning();
 		return { registration: row, event: ev, memberName: m.name };
 	});
@@ -173,7 +191,8 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 		action: 'created',
 		summary: `${r.memberName} → ${r.event.name}`
 	});
-	notifyEventRegistered(orgId, r.registration.id).catch(() => {});
+	if (r.registration.waitlisted) notifyEventWaitlisted(orgId, r.registration.id).catch(() => {});
+	else notifyEventRegistered(orgId, r.registration.id).catch(() => {});
 	return r;
 }
 
@@ -240,9 +259,9 @@ export async function setEventAttended(orgId: string, registrationId: string, at
 	return row;
 }
 
-/** Cancel a registration; an unpaid signup charge is voided with it. */
+/** Cancel a registration; an unpaid signup charge is voided and the waitlist promotes. */
 export async function cancelRegistration(orgId: string, registrationId: string, memberId?: string) {
-	return db.transaction(async (tx) => {
+	const { row, promoted } = await db.transaction(async (tx) => {
 		const [row] = await tx
 			.update(eventRegistration)
 			.set({ status: 'cancelled' })
@@ -261,8 +280,85 @@ export async function cancelRegistration(orgId: string, registrationId: string, 
 				.update(charge)
 				.set({ status: 'void', updatedAt: new Date() })
 				.where(and(eq(charge.id, row.chargeId), eq(charge.status, 'open')));
-		return row;
+		const promoted = row.waitlisted ? [] : await promoteInTx(tx, orgId, row.eventId);
+		return { row, promoted };
 	});
+	for (const id of promoted) notifyEventRegistered(orgId, id).catch(() => {});
+	return row;
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Fill freed seats from the waitlist, oldest first. Each promoted member gets
+ * their signup charge posted (guardian-aware) and a registration email — same
+ * path as a fresh signup.
+ */
+async function promoteInTx(tx: Tx, orgId: string, eventId: string) {
+	const [ev] = await tx
+		.select()
+		.from(gymEvent)
+		.where(and(eq(gymEvent.organizationId, orgId), eq(gymEvent.id, eventId)))
+		.for('update');
+	if (!ev) return [];
+	const [{ n }] = await tx
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(eventRegistration)
+		.where(
+			and(
+				eq(eventRegistration.eventId, eventId),
+				ne(eventRegistration.status, 'cancelled'),
+				eq(eventRegistration.waitlisted, false)
+			)
+		);
+	const seats = ev.capacity - n;
+	if (seats <= 0) return [];
+	const waiting = await tx
+		.select({ reg: eventRegistration, guardianId: gymMember.guardianId, name: gymMember.name })
+		.from(eventRegistration)
+		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
+		.where(
+			and(
+				eq(eventRegistration.eventId, eventId),
+				ne(eventRegistration.status, 'cancelled'),
+				eq(eventRegistration.waitlisted, true)
+			)
+		)
+		.orderBy(asc(eventRegistration.createdAt))
+		.limit(seats);
+	const promoted: string[] = [];
+	for (const w of waiting) {
+		let chargeId: string | null = null;
+		if (ev.price && ev.price > 0) {
+			const payerId = w.guardianId ?? w.reg.memberId;
+			const forDependent = payerId !== w.reg.memberId ? ` — ${w.name}` : '';
+			const [c] = await tx
+				.insert(charge)
+				.values({
+					organizationId: orgId,
+					memberId: payerId,
+					kind: 'other',
+					description: `Event: ${ev.name}${forDependent}`,
+					amount: ev.price,
+					dueDate: todayISO()
+				})
+				.returning({ id: charge.id });
+			chargeId = c.id;
+		}
+		await tx
+			.update(eventRegistration)
+			.set({ waitlisted: false, chargeId })
+			.where(eq(eventRegistration.id, w.reg.id));
+		promoted.push(w.reg.id);
+	}
+	return promoted;
+}
+
+/** Promote waitlisted members into open seats (called after a cancel or a capacity bump). */
+export async function promoteWaitlisted(orgId: string, eventId: string) {
+	const promoted = await db.transaction((tx) => promoteInTx(tx, orgId, eventId));
+	for (const id of promoted) notifyEventRegistered(orgId, id).catch(() => {});
+	return promoted.length;
 }
 
 /** Staff roster view for one event. */
