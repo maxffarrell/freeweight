@@ -104,6 +104,7 @@
 	let phone = $state(settings.phone);
 	let website = $state(settings.website);
 	let waiver = $state(settings.waiver);
+	let portalNotice = $state(settings.portalNotice);
 	let bookingWindowDays = $state<number | null>(settings.bookingWindowDays);
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
 	let bookCutoffMin = $state<number | null>(settings.bookCutoffMin);
@@ -128,6 +129,7 @@
 				phone,
 				website,
 				waiver,
+				portalNotice,
 				bookingWindowDays,
 				cancelCutoffMin,
 				bookCutoffMin,
@@ -325,6 +327,15 @@
 								rows={5}
 								bind:value={waiver}
 								placeholder="Leave blank to skip waivers. When set, joiners, drop-ins and portal members must agree before visiting."
+							/>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="pnotice">Portal notice</Field.Label>
+							<Textarea
+								id="pnotice"
+								rows={2}
+								bind:value={portalNotice}
+								placeholder="Shown at the top of every member's portal — 'Closed Thanksgiving', 'Parking lot closed'. Blank hides it."
 							/>
 						</Field.Field>
 						<div class="grid gap-4 sm:grid-cols-2">
