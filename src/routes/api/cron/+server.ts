@@ -6,6 +6,7 @@ import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import {
+	sendAnniversaryGreetings,
 	sendBirthdayGreetings,
 	sendClassReminders,
 	sendPastDueNotices,
@@ -32,6 +33,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let pastDue = 0;
 	let trials = 0;
 	let birthdays = 0;
+	let anniversaries = 0;
 	let noShows = 0;
 	let suspended = 0;
 	let generated = 0;
@@ -70,6 +72,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`birthday cron failed for ${o.id}`, err);
 		}
 		try {
+			anniversaries += await sendAnniversaryGreetings(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`anniversary cron failed for ${o.id}`, err);
+		}
+		try {
 			noShows += await markPastNoShows(o.id);
 		} catch (err) {
 			failed++;
@@ -102,6 +110,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		pastDue,
 		trials,
 		birthdays,
+		anniversaries,
 		noShows,
 		suspended,
 		generated,

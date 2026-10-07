@@ -423,6 +423,56 @@ export async function sendBirthdayGreetings(orgId: string) {
 	return sent;
 }
 
+/**
+ * Daily cron: "N years at the gym" on each member's join-date anniversary
+ * (skipped on the join day itself — years >= 1 only). Once per year per member.
+ */
+export async function sendAnniversaryGreetings(orgId: string) {
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	const mmdd = today.slice(5);
+	const year = Number(today.slice(0, 4));
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			joinYear: sql<number>`to_char(${gymMember.joinedAt}, 'YYYY')`.mapWith(Number)
+		})
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`to_char(${gymMember.joinedAt}, 'MM-DD') = ${mmdd}`,
+				sql`to_char(${gymMember.joinedAt}, 'YYYY-MM-DD') < ${today}`
+			)
+		);
+	if (!rows.length) return 0;
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email) continue;
+		if (!(await logOnce(orgId, 'anniversary', `${r.memberId}:${year}`, r.email))) continue;
+		const years = year - r.joinYear;
+		if (years < 1) continue;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `${years} ${years === 1 ? 'year' : 'years'} at ${name} — happy anniversary, ${r.memberName.split(' ')[0]}`,
+			...renderEmail({
+				orgName: name,
+				heading: `Happy ${years}-year anniversary`,
+				lines: [
+					`Hi ${r.memberName} — ${years} ${years === 1 ? 'year' : 'years'} ago today you joined ${name}, and we're glad you did.`,
+					'Thanks for being part of the community.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
 /** "You just referred someone" to the member behind a ?ref= join. One email per referred member. */
 export async function notifyReferralJoin(orgId: string, referrerId: string, newMemberId: string) {
 	const [[referrer], [joined]] = await Promise.all([
