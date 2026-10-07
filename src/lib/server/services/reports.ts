@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -180,6 +180,35 @@ async function fillByClass(orgId: string) {
 		)
 		.groupBy(classType.name)
 		.orderBy(desc(sql`count(distinct ${classSession.id})`));
+}
+
+/** No-show rate per class type over the last 90 days — which classes flake. */
+async function noShowByClass(orgId: string) {
+	const rows = await db
+		.select({
+			className: classType.name,
+			color: classType.color,
+			attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(Number),
+			noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number)
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(booking.status, ['attended', 'no_show']),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date(Date.now() - 90 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(classType.name, classType.color)
+		.orderBy(desc(sql`count(*) filter (where ${booking.status} = 'no_show')`));
+	return rows.map((r) => ({
+		...r,
+		rate: r.attended + r.noShows ? Math.round((r.noShows / (r.attended + r.noShows)) * 100) : 0
+	}));
 }
 
 /** Fill rate by weekday (gym timezone) over the last 90 days — which days actually fill. */
@@ -542,7 +571,8 @@ export async function getReports(orgId: string) {
 		kinds,
 		sources,
 		payrollDetail,
-		churn
+		churn,
+		noShows
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -564,7 +594,8 @@ export async function getReports(orgId: string) {
 		revenueByKind(orgId),
 		leadSources(orgId),
 		instructorPayrollDetail(orgId),
-		churnReasons(orgId)
+		churnReasons(orgId),
+		noShowByClass(orgId)
 	]);
 	return {
 		checkIns,
@@ -587,6 +618,7 @@ export async function getReports(orgId: string) {
 		kinds,
 		sources,
 		payrollDetail,
-		churn
+		churn,
+		noShows
 	};
 }
