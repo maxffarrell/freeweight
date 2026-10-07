@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -140,6 +140,56 @@ export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof 
 		summary: `${input.name} joined`
 	});
 	return row;
+}
+
+/** Bulk-creates members from CSV rows; skips rows whose email already belongs to a member (or is repeated). */
+export async function importMembers(
+	ctx: OrgContext,
+	rows: v.InferOutput<typeof s.memberImportInput>
+) {
+	const emails = rows.map((r) => r.email?.toLowerCase()).filter((e): e is string => !!e);
+	const taken = new Set(
+		emails.length
+			? (
+					await db
+						.select({ email: sql<string>`lower(${gymMember.email})` })
+						.from(gymMember)
+						.where(
+							and(
+								eq(gymMember.organizationId, ctx.orgId),
+								inArray(sql`lower(${gymMember.email})`, emails)
+							)
+						)
+				).map((r) => r.email)
+			: []
+	);
+	const seen = new Set<string>();
+	const toInsert = rows.filter((r) => {
+		const e = r.email?.toLowerCase();
+		if (!e) return true;
+		if (taken.has(e) || seen.has(e)) return false;
+		seen.add(e);
+		return true;
+	});
+	if (toInsert.length)
+		await db.insert(gymMember).values(
+			toInsert.map((r) => ({
+				organizationId: ctx.orgId,
+				name: r.name,
+				email: r.email || null,
+				phone: r.phone ?? null
+			}))
+		);
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: 'csv-import',
+		action: 'imported',
+		summary: `Imported ${toInsert.length} member${toInsert.length === 1 ? '' : 's'}`,
+		data: { skipped: rows.length - toInsert.length }
+	});
+	return { created: toInsert.length, skipped: rows.length - toInsert.length };
 }
 
 export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberUpdate>) {

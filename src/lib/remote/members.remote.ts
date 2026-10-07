@@ -5,7 +5,13 @@ import * as svc from '#lib/server/services/members.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
-import { checkInInput, idSchema, memberInput, memberUpdate } from '#lib/schemas.ts';
+import {
+	checkInInput,
+	idSchema,
+	memberImportInput,
+	memberInput,
+	memberUpdate
+} from '#lib/schemas.ts';
 
 export const getMembers = query(v.optional(v.object({ q: v.optional(v.string()) })), async (opts) =>
 	svc.listMembers((await requireOrg()).orgId, opts?.q)
@@ -17,6 +23,11 @@ export const createMember = command(memberInput, async (input) => {
 	const m = await svc.createMember(await requireOrg(), input);
 	void getMembers().refresh();
 	return m;
+});
+export const importMembers = command(memberImportInput, async (rows) => {
+	const r = await svc.importMembers(await requireOrg(), rows);
+	void getMembers().refresh();
+	return r;
 });
 export const updateMember = command(memberUpdate, async (input) => {
 	const m = await svc.updateMember(await requireOrg(), input);

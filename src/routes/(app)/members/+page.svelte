@@ -10,16 +10,18 @@
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getMembers, createMember } from '#lib/remote/members.remote.ts';
+	import { getMembers, createMember, importMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
-	import { toCsv } from '#lib/csv.ts';
+	import { parseCsv, toCsv } from '#lib/csv.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Users from '@lucide/svelte/icons/users';
 	import Search from '@lucide/svelte/icons/search';
 	import Download from '@lucide/svelte/icons/download';
+	import Upload from '@lucide/svelte/icons/upload';
 
 	const currency = await getCurrency();
 	let q = $state('');
@@ -36,6 +38,44 @@
 	let email = $state('');
 	let phone = $state('');
 	let status = $state<'active' | 'inactive'>('active');
+
+	// ------- csv import -------
+	let importOpen = $state(false);
+	let importText = $state('');
+	let importPending = $state(false);
+	/** Parsed rows — a leading header row (name,email,phone,…) is dropped, blank names skipped. */
+	const importRows = $derived.by(() => {
+		let rows = parseCsv(importText).map((r) => ({
+			name: r[0]?.trim() ?? '',
+			email: r[1]?.trim() ?? '',
+			phone: r[2]?.trim() ?? ''
+		}));
+		if (rows.length && rows[0]!.name.toLowerCase() === 'name') rows = rows.slice(1);
+		return rows.filter((r) => r.name);
+	});
+
+	function onImportFile(e: Event) {
+		const file = (e.target as HTMLInputElement).files?.[0];
+		file?.text().then((t) => (importText = t));
+	}
+
+	async function runImport() {
+		importPending = true;
+		try {
+			const r = await importMembers(
+				importRows.map((row) => ({ name: row.name, email: row.email, phone: row.phone || null }))
+			);
+			toast.success(
+				`Imported ${r.created} member${r.created === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} duplicate${r.skipped === 1 ? '' : 's'}` : ''}`
+			);
+			importOpen = false;
+			importText = '';
+			members = await getMembers({ q });
+		} catch (err) {
+			toast.error(errMsg(err, 'Import failed'));
+		}
+		importPending = false;
+	}
 
 	function exportCsv() {
 		const csv = toCsv([
@@ -81,6 +121,9 @@
 
 <PageHeader title="Members">
 	{#snippet actions()}
+		<Button size="sm" variant="outline" onclick={() => (importOpen = true)}
+			><Upload /> Import</Button
+		>
 		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
@@ -176,5 +219,37 @@
 				<Button type="submit" disabled={pending}>{pending ? 'Adding…' : 'Add member'}</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={importOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Import members</Dialog.Title>
+			<Dialog.Description>
+				Paste CSV or pick a file — columns: name, email, phone (header row optional). Members whose
+				email is already in use are skipped.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="space-y-3">
+			<Input type="file" accept=".csv,text/csv,text/plain" onchange={onImportFile} />
+			<Textarea
+				rows={6}
+				class="font-mono text-xs"
+				placeholder="name,email,phone&#10;Jane Doe,jane@example.com,555-1234"
+				bind:value={importText}
+			/>
+			{#if importText.trim()}
+				<p class="text-xs text-muted-foreground">
+					{importRows.length} member{importRows.length === 1 ? '' : 's'} ready to import
+				</p>
+			{/if}
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (importOpen = false)}>Cancel</Button>
+			<Button onclick={runImport} disabled={importPending || !importRows.length}>
+				{importPending ? 'Importing…' : `Import ${importRows.length || ''}`}
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

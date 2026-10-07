@@ -35,6 +35,17 @@ export const memberInput = v.object({
 	notes: optionalText,
 	joinedAt: v.optional(v.nullable(isoDate))
 });
+export const memberImportRow = v.object({
+	name: requiredText('Name'),
+	email: emailField,
+	phone: optionalText
+});
+export const memberImportInput = v.pipe(
+	v.array(memberImportRow),
+	v.minLength(1),
+	v.maxLength(2000)
+);
+
 export const memberUpdate = v.object({ id: idSchema, ...v.partial(memberInput).entries });
 
 export const planInput = v.object({
