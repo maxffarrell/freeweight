@@ -168,6 +168,8 @@ export const sessionUpdate = v.object({
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
 	cancelled: v.optional(v.boolean()),
+	/** Flag/unflag the session as needing a substitute instructor. */
+	needsCover: v.optional(v.boolean()),
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 

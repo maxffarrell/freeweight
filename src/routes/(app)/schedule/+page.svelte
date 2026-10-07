@@ -152,6 +152,7 @@
 	let editLocationId = $state('');
 	let editInstructorId = $state('');
 	let editNote = $state('');
+	let editNeedsCover = $state(false);
 	function openEdit() {
 		if (!focus) return;
 		editDate = localDate(focus.session.startsAt, tz);
@@ -163,6 +164,7 @@
 		editLocationId = focus.session.locationId ?? '';
 		editInstructorId = focus.session.instructorId ?? '';
 		editNote = focus.session.note ?? '';
+		editNeedsCover = !!focus.session.coverRequestedAt;
 		editOpen = true;
 	}
 	async function submitEdit(e: SubmitEvent) {
@@ -176,7 +178,8 @@
 				durationMin: editDuration ?? undefined,
 				locationId: editLocationId || null,
 				instructorId: editInstructorId || null,
-				note: editNote.trim() || null
+				note: editNote.trim() || null,
+				needsCover: editNeedsCover
 			});
 			toast.success('Session updated');
 			editOpen = false;
@@ -470,6 +473,10 @@
 							{#if s.session.cancelledAt}<Badge variant="destructive" class="text-xs"
 									>cancelled</Badge
 								>{/if}
+							{#if s.session.coverRequestedAt && !s.session.cancelledAt}<Badge
+									variant="outline"
+									class="border-amber-500/60 text-xs text-amber-600">cover</Badge
+								>{/if}
 						</div>
 					</button>
 				{:else}
@@ -746,6 +753,15 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
+			<div class="flex items-center justify-between rounded-lg border px-3 py-2.5">
+				<div>
+					<p class="text-sm font-medium">Needs cover</p>
+					<p class="text-xs text-muted-foreground">
+						Flags this session on the dashboard until a new instructor is assigned.
+					</p>
+				</div>
+				<Switch bind:checked={editNeedsCover} />
+			</div>
 			<Field.Field>
 				<Field.Label for="edit-note">Note (optional)</Field.Label>
 				<Input
