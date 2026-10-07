@@ -233,7 +233,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 export async function listCheckIns(orgId: string, opts: { since: Date; until?: Date; q?: string }) {
 	const term = opts.q?.trim();
 	return db
-		.select({ checkIn, memberName: gymMember.name, locationName: location.name })
+		.select({
+			checkIn,
+			memberName: gymMember.name,
+			memberPhotoId: gymMember.photoDocumentId,
+			locationName: location.name
+		})
 		.from(checkIn)
 		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
 		.leftJoin(location, eq(checkIn.locationId, location.id))

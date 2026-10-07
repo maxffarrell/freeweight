@@ -54,6 +54,7 @@ export async function listMembers(
 			phone: gymMember.phone,
 			status: gymMember.status,
 			joinedAt: gymMember.joinedAt,
+			photoDocumentId: gymMember.photoDocumentId,
 			locationName: location.name,
 			tags: sql<
 				string[]
