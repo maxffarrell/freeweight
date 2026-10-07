@@ -15,6 +15,8 @@ import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { emit } from '#lib/server/services/events.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
+import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
+import { workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -428,3 +430,31 @@ export const addDependent = command(
 		return { member: dep };
 	}
 );
+
+// ------- AI workout plan (Enterprise) -------
+/** Generates a one-week workout plan for the member (or their dependent). EE + provider-gated. */
+export const aiWorkoutPlan = command(
+	v.object({
+		memberId: idSchema,
+		goal: v.pipe(v.string(), v.trim(), v.nonEmpty('Goal is required'), v.maxLength(200)),
+		daysPerWeek: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(7)),
+		minutesPerSession: v.pipe(v.number(), v.integer(), v.minValue(10), v.maxValue(240)),
+		notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)))
+	}),
+	async (input) => {
+		const m = await myMember(input.memberId);
+		requireAi();
+		return workoutPlan(m.name, {
+			goal: input.goal,
+			daysPerWeek: input.daysPerWeek,
+			minutesPerSession: input.minutesPerSession,
+			notes: input.notes
+		});
+	}
+);
+
+/** Whether the portal workout-plan generator is on (Enterprise + provider configured). */
+export const getPortalAi = query(async () => {
+	requireUser();
+	return { configured: aiAvailable() };
+});

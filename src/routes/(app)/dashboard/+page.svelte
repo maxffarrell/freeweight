@@ -14,8 +14,18 @@
 	import TrendingUp from '@lucide/svelte/icons/trending-up';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import { goto } from '$app/navigation';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import { getAiInsights, getAiStatus } from '#lib/remote/ai.remote.ts';
 
 	const d = await getDashboard();
+	const ai = await getAiStatus();
+	let insights = $state<string[] | null | 'error'>(null);
+	$effect(() => {
+		if (!ai.configured || insights !== null) return;
+		void getAiInsights()
+			.then((r) => (insights = r.bullets.length ? r.bullets : 'error'))
+			.catch(() => (insights = 'error'));
+	});
 	const kpis = [
 		{ label: 'Active members', value: String(d.activeMembers), icon: Users, href: '/members' },
 		{ label: 'New this month', value: String(d.newThisMonth), icon: TrendingUp, href: '/members' },
@@ -64,6 +74,37 @@
 			</Card.Root>
 		{/each}
 	</div>
+
+	{#if ai.licensed}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"
+					><Sparkles class="size-4" /> AI insights</Card.Title
+				>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#if !ai.configured}
+					<p class="text-sm text-muted-foreground">
+						Enterprise AI is licensed but no provider is connected — set
+						<code>FREEWEIGHT_AI_PROVIDER</code>, <code>FREEWEIGHT_AI_MODEL</code> and
+						<code>FREEWEIGHT_AI_KEY</code> on the server to turn it on.
+					</p>
+				{:else if insights === null}
+					<p class="text-sm text-muted-foreground">Reading this week's numbers…</p>
+				{:else if insights === 'error' || !insights.length}
+					<p class="text-sm text-muted-foreground">
+						No insights right now — the AI provider may be unreachable.
+					</p>
+				{:else}
+					<ul class="list-disc space-y-1.5 pl-5 text-sm">
+						{#each insights as i (i)}
+							<li>{i}</li>
+						{/each}
+					</ul>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<div class="grid gap-6 xl:grid-cols-3">
 		<Card.Root class="xl:col-span-2">
