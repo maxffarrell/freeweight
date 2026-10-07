@@ -81,6 +81,8 @@ export const gymSettings = pgTable('gym_settings', {
 	suspendAfterDays: integer('suspend_after_days'),
 	/** Bonus class credits a referrer earns when a referred member first pays; null/0 = off. */
 	referralCredits: integer('referral_credits'),
+	/** Max people allowed inside at once (fire-code cap); kiosk warns past it. null = no cap. */
+	occupancyCap: integer('occupancy_cap'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

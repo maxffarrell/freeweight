@@ -281,7 +281,9 @@ export const settingsInput = v.object({
 	noShowFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	lateCancelFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	suspendAfterDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
-	referralCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	referralCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Max people inside at once; null = no cap. */
+	occupancyCap: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });
 
 export const webhookInput = v.object({
