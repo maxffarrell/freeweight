@@ -262,6 +262,7 @@
 	let tplWeekday = $state('1');
 	let tplTime = $state('06:00');
 	let tplCapacity = $state<number | null>(null);
+	let tplUntil = $state('');
 	let editTplId = $state<string | null>(null);
 	function editTemplate(t: (typeof templates)[number]) {
 		editTplId = t.template.id;
@@ -269,6 +270,7 @@
 		tplWeekday = String(t.template.weekday);
 		tplTime = t.template.startTime;
 		tplCapacity = t.template.capacity;
+		tplUntil = t.template.until ?? '';
 	}
 	async function submitTemplate(e: SubmitEvent) {
 		e.preventDefault();
@@ -280,7 +282,8 @@
 					classTypeId: tplTypeId,
 					weekday: Number(tplWeekday),
 					startTime: tplTime,
-					capacity: tplCapacity ?? null
+					capacity: tplCapacity ?? null,
+					until: tplUntil || null
 				});
 				toast.success('Template updated — applies to future sessions');
 				editTplId = null;
@@ -289,7 +292,8 @@
 					classTypeId: tplTypeId,
 					weekday: Number(tplWeekday),
 					startTime: tplTime,
-					capacity: tplCapacity ?? null
+					capacity: tplCapacity ?? null,
+					until: tplUntil || null
 				});
 				toast.success('Recurring template added — sessions generated 2 weeks out');
 			}
@@ -1064,6 +1068,12 @@
 					</Field.Label>
 					<Input id="tpl-cap" type="number" min={1} bind:value={tplCapacity} />
 				</Field.Field>
+				<Field.Field>
+					<Field.Label for="tpl-until">
+						Runs until <span class="text-muted-foreground">(opt.)</span>
+					</Field.Label>
+					<Input id="tpl-until" type="date" bind:value={tplUntil} />
+				</Field.Field>
 				<Button type="submit" disabled={pending || !tplTypeId}>
 					{editTplId ? 'Save changes' : 'Add template'}
 				</Button>
@@ -1075,6 +1085,7 @@
 							editTplId = null;
 							tplTypeId = '';
 							tplCapacity = null;
+							tplUntil = '';
 						}}>Cancel edit</Button
 					>
 				{/if}
@@ -1090,7 +1101,10 @@
 								<strong>{WEEKDAYS[t.template.weekday]}s {t.template.startTime}</strong>
 								{t.className}{t.instructorName ? ` · ${t.instructorName}` : ''}{t.locationName
 									? ` · ${t.locationName}`
-									: ''}{t.template.capacity ? ` · ${t.template.capacity} seats` : ''}
+									: ''}{t.template.capacity ? ` · ${t.template.capacity} seats` : ''}{t.template
+									.until
+									? ` · ends ${formatDate(t.template.until)}`
+									: ''}
 							</span>
 						</div>
 						<div class="flex gap-1">

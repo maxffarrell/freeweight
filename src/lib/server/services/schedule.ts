@@ -1136,7 +1136,8 @@ export async function createTemplate(
 			instructorId: input.instructorId ?? null,
 			weekday: input.weekday,
 			startTime: input.startTime,
-			capacity: input.capacity ?? null
+			capacity: input.capacity ?? null,
+			until: input.until ?? null
 		})
 		.returning();
 	await emit({
@@ -1176,6 +1177,7 @@ export async function updateTemplate(
 			weekday: set.weekday,
 			startTime: set.startTime,
 			capacity: set.capacity ?? null,
+			until: set.until ?? null,
 			updatedAt: new Date()
 		})
 		.where(and(eq(classTemplate.organizationId, ctx.orgId), eq(classTemplate.id, id)))
@@ -1412,6 +1414,8 @@ export async function materializeTemplates(orgId: string) {
 		const weekday = localWeekday(zonedToUtc(`${day}T12:00`, tz), tz);
 		for (const { template: tpl, classType: ct } of templates) {
 			if (tpl.weekday !== weekday) continue;
+			// Seasonal classes stop generating past their end date.
+			if (tpl.until && day > tpl.until) continue;
 			const startsAt = zonedToUtc(`${day}T${tpl.startTime}`, tz);
 			if (startsAt.getTime() < now || have.has(`${tpl.id}|${startsAt.getTime()}`)) continue;
 			have.add(`${tpl.id}|${startsAt.getTime()}`);

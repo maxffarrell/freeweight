@@ -351,6 +351,13 @@
       "when": 1791384281991,
       "tag": "0049_occupancy-cap",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791384674858,
+      "tag": "0050_template-until",
+      "breakpoints": true
     }
   ]
 }

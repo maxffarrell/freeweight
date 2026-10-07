@@ -1,0 +1,1 @@
+ALTER TABLE "class_template" ADD COLUMN "until" date;
