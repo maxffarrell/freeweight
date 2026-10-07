@@ -17,7 +17,8 @@ import {
 	notifyMembershipResumed,
 	notifyMembershipSuspended,
 	notifyPaymentReceived,
-	notifyPaymentRefunded
+	notifyPaymentRefunded,
+	notifyPlanChanged
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
@@ -241,6 +242,15 @@ export async function updateMembership(
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)));
 	if (!current) error(404, 'Membership not found');
 
+	// Staff plan change: moves the membership to another plan; the new price
+	// applies from the next charge (no proration).
+	let newPlan: { id: string; name: string } | null = null;
+	if (input.planId && input.planId !== current.planId) {
+		const p = await getPlan(ctx.orgId, input.planId);
+		if (!p.active || p.isPack) error(404, 'Plan not available');
+		newPlan = p;
+	}
+
 	// Pausing/cancelling stops billing. Resuming restarts it one plan interval out —
 	// leaving nextChargeAt null on resume would bill the member never again.
 	let nextChargeAt: Date | null | undefined;
@@ -273,12 +283,27 @@ export async function updateMembership(
 	if (input.status || input.clearCancelRequest || input.clearPauseRequest) {
 		set.requestReason = null;
 	}
+	if (newPlan) set.planId = newPlan.id;
 	const [row] = await db
 		.update(membership)
 		.set(set)
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
 	if (!row) error(404, 'Membership not found');
+	if (newPlan) {
+		const [oldPlan] = await db
+			.select({ name: plan.name })
+			.from(plan)
+			.where(eq(plan.id, current.planId));
+		await emit({
+			orgId: ctx.orgId,
+			entityType: 'membership',
+			entityId: row.id,
+			action: 'plan_changed',
+			summary: `Plan changed from ${oldPlan?.name ?? '?'} to ${newPlan.name}`
+		});
+		notifyPlanChanged(ctx.orgId, row.id, oldPlan?.name ?? '?').catch(() => {});
+	}
 	return row;
 }
 

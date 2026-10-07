@@ -249,6 +249,25 @@
 	let pauseOpen = $state(false);
 	let pauseId = $state('');
 	let pauseResumeAt = $state('');
+
+	let planOpen = $state(false);
+	let planChangeId = $state('');
+	let planChangePlanId = $state('');
+	let planChangeCurrent = $state('');
+	async function submitPlanChange(e: SubmitEvent) {
+		e.preventDefault();
+		if (!planChangePlanId) return;
+		pending = true;
+		try {
+			await updateMembership({ id: planChangeId, planId: planChangePlanId });
+			toast.success('Plan changed');
+			planOpen = false;
+			planChangePlanId = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not change plan'));
+		}
+		pending = false;
+	}
 	async function submitPause(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -515,6 +534,19 @@
 						<div class="flex items-center gap-2">
 							<StatusBadge status={mm.membership.status} />
 							{#if mm.membership.status === 'active'}
+								{#if !mm.isPack}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() => (
+											(planChangeId = mm.membership.id),
+											(planChangeCurrent = mm.membership.planId),
+											(planChangePlanId = ''),
+											(planOpen = true)
+										)}>Plan</Button
+									>
+								{/if}
 								<Button
 									variant="ghost"
 									size="sm"
@@ -839,6 +871,37 @@
 			>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>Pause membership</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={planOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Change plan</Dialog.Title>
+			<Dialog.Description>
+				The new price applies from the next charge — no proration.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitPlanChange}>
+			<Field.Field>
+				<Field.Label>New plan</Field.Label>
+				<Select.Root type="single" bind:value={planChangePlanId}>
+					<Select.Trigger class="w-full">
+						{plans.find((p) => p.id === planChangePlanId)?.name ?? 'Choose a plan'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each plans.filter((p) => p.active && !p.isPack && p.id !== planChangeCurrent) as p (p.id)}
+							<Select.Item value={p.id}
+								>{p.name} — {formatMoney(p.amount, currency)}/{p.interval}</Select.Item
+							>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending || !planChangePlanId}>Change plan</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

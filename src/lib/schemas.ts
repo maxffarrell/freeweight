@@ -81,7 +81,9 @@ export const membershipUpdate = v.object({
 	/** Staff: clear a member's cancellation request. */
 	clearCancelRequest: v.optional(v.boolean()),
 	/** Staff: clear a member's pause request. */
-	clearPauseRequest: v.optional(v.boolean())
+	clearPauseRequest: v.optional(v.boolean()),
+	/** Staff: move the membership to another plan; new price applies from the next charge. */
+	planId: v.optional(v.nullable(idSchema))
 });
 
 export const grantCreditsInput = v.object({
