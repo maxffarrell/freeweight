@@ -353,6 +353,24 @@ export async function markPastNoShows(orgId: string) {
 	return rows.length;
 }
 
+/** Waitlist spots die when the session starts — flips them to cancelled in the daily sweep. */
+export async function expireWaitlists(orgId: string) {
+	const rows = await db
+		.update(booking)
+		.set({ status: 'cancelled', cancelledAt: new Date() })
+		.from(classSession)
+		.where(
+			and(
+				eq(booking.sessionId, classSession.id),
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'waitlisted'),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.returning({ id: booking.id });
+	return rows.length;
+}
+
 /** Bookings that consume a class credit (cancelled doesn't). */
 const CREDIT_STATUSES = ['booked', 'attended', 'no_show'] as const;
 

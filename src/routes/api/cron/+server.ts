@@ -15,7 +15,11 @@ import {
 	sendWeeklyDigest,
 	sendWinBackNudges
 } from '#lib/server/services/notifications.ts';
-import { markPastNoShows, materializeTemplates } from '#lib/server/services/schedule.ts';
+import {
+	expireWaitlists,
+	markPastNoShows,
+	materializeTemplates
+} from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -36,6 +40,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let birthdays = 0;
 	let anniversaries = 0;
 	let noShows = 0;
+	let waitlistExpired = 0;
 	let suspended = 0;
 	let generated = 0;
 	let digests = 0;
@@ -86,6 +91,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`no-show cron failed for ${o.id}`, err);
 		}
 		try {
+			waitlistExpired += await expireWaitlists(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`waitlist-expiry cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -120,6 +131,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		birthdays,
 		anniversaries,
 		noShows,
+		waitlistExpired,
 		suspended,
 		generated,
 		digests,
