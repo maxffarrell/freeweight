@@ -128,13 +128,17 @@ export const getUpNext = query(async () => {
 
 /** Check-ins for one local day, optionally filtered by member/guest name. */
 export const getCheckIns = query(
-	v.object({ date: v.pipe(v.string(), v.isoDate()), q: v.optional(v.string()) }),
-	async ({ date, q }) => {
+	v.object({
+		date: v.pipe(v.string(), v.isoDate()),
+		q: v.optional(v.string()),
+		inside: v.optional(v.boolean())
+	}),
+	async ({ date, q, inside }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
 		const until = new Date(since.getTime() + 86400_000);
-		return checkins.listCheckIns(orgId, { since, until, q });
+		return checkins.listCheckIns(orgId, { since, until, q, inside });
 	}
 );
 export const recordCheckIn = command(checkInInput, async (input) => {
