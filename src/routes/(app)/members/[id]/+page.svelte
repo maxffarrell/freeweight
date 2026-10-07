@@ -248,6 +248,7 @@
 	let phone = $state(m.member.phone ?? '');
 	let status = $state<'active' | 'inactive'>(m.member.status);
 	let birthday = $state(m.member.birthday ?? '');
+	let deskNote = $state(m.member.deskNote ?? '');
 	let guardianId = $state(m.member.guardianId ?? 'none');
 	let pending = $state(false);
 	async function saveMember(e: SubmitEvent) {
@@ -261,6 +262,7 @@
 				phone: phone || undefined,
 				status,
 				birthday: birthday || null,
+				deskNote: deskNote || null,
 				guardianId: guardianId === 'none' ? null : guardianId
 			});
 			toast.success('Member updated');
@@ -576,6 +578,11 @@
 				<Card.Title class="text-base">Details</Card.Title>
 			</Card.Header>
 			<Card.Content class="space-y-2 text-sm">
+				{#if m.member.deskNote}
+					<div class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-700 dark:text-amber-400">
+						{m.member.deskNote}
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Status</span><StatusBadge status={m.member.status} />
 				</div>
@@ -1248,6 +1255,16 @@
 					type="date"
 					bind:value={birthday}
 				/></Field.Field
+			>
+			<Field.Field
+				><Field.Label for="e-desk">Front-desk flag (optional)</Field.Label><Input
+					id="e-desk"
+					bind:value={deskNote}
+					maxlength={120}
+					placeholder="e.g. Owes $50 · Injury: no jumping"
+				/><Field.Description
+					>Shown at the kiosk when this member checks in.</Field.Description
+				></Field.Field
 			>
 			<Field.Field>
 				<Field.Label>Guardian (household payer)</Field.Label>

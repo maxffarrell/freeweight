@@ -57,6 +57,7 @@ export async function listMembers(
 			status: gymMember.status,
 			joinedAt: gymMember.joinedAt,
 			photoDocumentId: gymMember.photoDocumentId,
+			deskNote: gymMember.deskNote,
 			locationName: location.name,
 			tags: sql<
 				string[]
@@ -558,6 +559,7 @@ export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: stri
 			'phone',
 			'birthday',
 			'notes',
+			'deskNote',
 			'locationId',
 			'portalUserId',
 			'referralSource',
@@ -597,6 +599,7 @@ export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			locationId: set.locationId,
 			status: set.status,
 			notes: set.notes,
+			deskNote: set.deskNote === undefined ? undefined : set.deskNote || null,
 			joinedAt: set.joinedAt,
 			birthday: set.birthday,
 			guardianId: set.guardianId === undefined ? undefined : set.guardianId || null
