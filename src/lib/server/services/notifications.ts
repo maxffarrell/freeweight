@@ -1012,6 +1012,55 @@ export async function sendWaiverReminders(orgId: string) {
 	return sent;
 }
 
+/**
+ * Staff-prompted "you owe $X" email — member-page "Request payment" button.
+ * At most one per member per day (notification_log keyed on member+date), and
+ * skipped entirely when the balance is already ≤0. Balance math mirrors
+ * billing.ts memberBalance (open charge remainders minus unapplied payments);
+ * duplicated here because billing.ts already imports this module.
+ */
+export async function requestPaymentNotice(orgId: string, memberId: string) {
+	const [m] = await db
+		.select({ name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email) return false;
+	const [b] = await db
+		.select({
+			balance:
+				sql<number>`coalesce(sum(case when ${charge.status} = 'open' then ${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(charge)
+		.where(and(eq(charge.organizationId, orgId), eq(charge.memberId, memberId)));
+	const amount = b?.balance ?? 0;
+	if (amount <= 0) return false;
+	const day = new Date().toISOString().slice(0, 10);
+	if (!(await logOnce(orgId, 'payment_request', `${memberId}:${day}`, m.email))) return false;
+	const name = await orgName(orgId);
+	const [st] = await db
+		.select({ currency: gymSettings.currency })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const first = m.name.split(' ')[0] ?? m.name;
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${name}: you have a balance due`,
+		...renderEmail({
+			orgName: name,
+			heading: 'You have a balance due',
+			lines: [
+				`Hi ${first},`,
+				`Your open balance at ${name} is ${formatMoney(amount, st?.currency ?? 'usd')}.`,
+				'You can pay it anytime from the member portal.'
+			],
+			action: { label: 'Pay online', url: `${appOrigin()}/portal` }
+		})
+	});
+	return true;
+}
+
 /** Replaces {name} and {first_name} merge tags in an announcement draft. */
 export function mergeTags(t: string, memberName: string) {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;
