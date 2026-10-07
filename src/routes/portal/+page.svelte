@@ -160,7 +160,7 @@
 					{#if mm.membership.status === 'active'}
 						<p class="mt-1 text-xs text-muted-foreground">
 							{#if mm.membership.cancelRequestedAt}
-								{mm.plan.name}: cancellation requested — staff will confirm shortly.{' '}
+								{mm.plan.name}: cancellation requested — staff will confirm shortly.
 								<button class="underline" onclick={() => withdrawCancel(mm.membership.id)}
 									>Withdraw request</button
 								>
