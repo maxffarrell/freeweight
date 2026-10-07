@@ -12,7 +12,8 @@
 		getMembers,
 		getUpNext,
 		createMember,
-		logGuestVisit
+		logGuestVisit,
+		getDependents
 	} from '#lib/remote/members.remote.ts';
 	import { getRoster, checkInRoster } from '#lib/remote/schedule.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
@@ -59,6 +60,19 @@
 			tags: string[];
 		}[]
 	>([]);
+	/** Dependents per suggested member — family check-in rows under each result. */
+	let families = $state<
+		Record<
+			string,
+			{
+				id: string;
+				name: string;
+				status: string;
+				deskNote: string | null;
+				photoDocumentId: string | null;
+			}[]
+		>
+	>({});
 	let flash = $state<{
 		ok: boolean;
 		text: string;
@@ -183,6 +197,10 @@
 		searchTimer = setTimeout(async () => {
 			suggestions = (await getMembers({ q })).slice(0, 5);
 			searched = true;
+			families = {};
+			for (const m of suggestions) {
+				families[m.id] = await getDependents(m.id).catch(() => []);
+			}
 		}, 150);
 	}
 
@@ -395,6 +413,44 @@
 								>
 							{/if}
 						</div>
+						{#each families[m.id] ?? [] as dep (dep.id)}
+							<button
+								type="button"
+								class="flex w-full items-center justify-between gap-3 border-l-2 border-primary/30 bg-muted/30 px-4 py-2 text-left hover:bg-muted disabled:opacity-50"
+								disabled={pending || dep.status !== 'active'}
+								onclick={() => checkIn(dep.id)}
+							>
+								<span class="flex min-w-0 items-center gap-3">
+									{#if dep.photoDocumentId}
+										<img
+											src="/api/documents/{dep.photoDocumentId}"
+											alt=""
+											class="size-7 shrink-0 rounded-full object-cover"
+										/>
+									{:else}
+										<span
+											class="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground"
+											>{initials(dep.name)}</span
+										>
+									{/if}
+									<span class="min-w-0">
+										<span class="block truncate text-sm font-medium">
+											{dep.name}
+											<span class="ml-1.5 text-xs font-normal text-muted-foreground">family</span>
+										</span>
+										{#if dep.deskNote}
+											<span
+												class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+												>{dep.deskNote}</span
+											>
+										{/if}
+									</span>
+								</span>
+								{#if dep.status !== 'active'}
+									<Badge variant="outline">{dep.status}</Badge>
+								{/if}
+							</button>
+						{/each}
 					{/each}
 				</div>
 			{:else if searched}

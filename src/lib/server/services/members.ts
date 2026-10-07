@@ -39,6 +39,21 @@ const MEMBER_ORDER = {
 	balance: sql`"openBalance" desc`
 } as const;
 
+/** Dependents billing under a member — the kiosk's family check-in rows. */
+export async function listDependents(orgId: string, memberId: string) {
+	return db
+		.select({
+			id: gymMember.id,
+			name: gymMember.name,
+			status: gymMember.status,
+			deskNote: gymMember.deskNote,
+			photoDocumentId: gymMember.photoDocumentId
+		})
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.guardianId, memberId)))
+		.orderBy(asc(gymMember.name));
+}
+
 export async function listMembers(
 	orgId: string,
 	q?: string,
