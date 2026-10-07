@@ -225,6 +225,13 @@
       "when": 1791365860931,
       "tag": "0031_membership_price_override",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791366027095,
+      "tag": "0032_class_pay_rate",
+      "breakpoints": true
     }
   ]
 }

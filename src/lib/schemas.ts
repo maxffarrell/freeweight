@@ -113,6 +113,8 @@ export const classTypeInput = v.object({
 	instructorId: v.optional(v.nullable(idSchema)),
 	/** Minor units; null/undefined = drop-in bookings aren't sold online. */
 	dropInPrice: v.optional(v.nullable(cents)),
+	/** Minor units the instructor earns per session; null = unrated. */
+	payRate: v.optional(v.nullable(cents)),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });

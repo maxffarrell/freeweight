@@ -81,6 +81,7 @@ export async function createClassType(
 			locationId: input.locationId ?? null,
 			instructorId: input.instructorId ?? null,
 			dropInPrice: input.dropInPrice ?? null,
+			payRate: input.payRate ?? null,
 			active: input.active
 		})
 		.returning();

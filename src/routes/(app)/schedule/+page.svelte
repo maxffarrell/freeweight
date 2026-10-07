@@ -265,6 +265,7 @@
 	let tDuration = $state(60);
 	let tCapacity = $state(20);
 	let tDropIn = $state('');
+	let tPayRate = $state('');
 	let tDescription = $state('');
 	let tActive = $state(true);
 	function editType(c: (typeof classTypes)[number]) {
@@ -275,6 +276,7 @@
 		tDuration = c.durationMin;
 		tCapacity = c.capacity;
 		tDropIn = c.dropInPrice != null ? (c.dropInPrice / 100).toFixed(2) : '';
+		tPayRate = c.payRate != null ? (c.payRate / 100).toFixed(2) : '';
 		tActive = c.active;
 	}
 	function resetTypeForm() {
@@ -284,6 +286,7 @@
 		tDuration = 60;
 		tCapacity = 20;
 		tDropIn = '';
+		tPayRate = '';
 		tActive = true;
 	}
 	async function submitType(e: SubmitEvent) {
@@ -296,6 +299,7 @@
 				durationMin: tDuration,
 				capacity: tCapacity,
 				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : null,
+				payRate: tPayRate ? Math.round(parseFloat(tPayRate) * 100) : null,
 				description: tDescription || undefined,
 				active: tActive
 			};
@@ -807,6 +811,19 @@
 				<Field.Description>
 					Visitors can book single classes on your public page at this price.
 				</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-payrate">
+					Instructor pay / class <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-payrate"
+					type="number"
+					min={0}
+					step="0.01"
+					bind:value={tPayRate}
+					placeholder="0.00 — feeds the payroll report"
+				/>
 			</Field.Field>
 			{#if editTypeId}
 				<div class="flex items-center justify-between rounded-lg border px-3 py-2">
