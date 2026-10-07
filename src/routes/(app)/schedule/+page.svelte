@@ -32,8 +32,9 @@
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Repeat from '@lucide/svelte/icons/repeat';
+	import Printer from '@lucide/svelte/icons/printer';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
-	import { errMsg } from '#lib/format.ts';
+	import { errMsg, formatDate } from '#lib/format.ts';
 
 	const tz = (await getSettings()).timezone;
 	const locations = await getLocations();
@@ -69,6 +70,10 @@
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
 	const roster = $derived(focusId ? await getRoster(focusId) : []);
 	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
+	const printBooked = $derived(
+		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
+	);
+	const printWaitlist = $derived(roster.filter((r) => r.booking.status === 'waitlisted'));
 	function openRoster(id: string) {
 		focusId = id;
 		rosterOpen = true;
@@ -314,6 +319,11 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
+			<div class="flex justify-end">
+				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
+					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
+				>
+			</div>
 			<div class="flex gap-2 border-t pt-4">
 				<Select.Root type="single" bind:value={bookMemberId}>
 					<Select.Trigger class="w-full">
@@ -348,6 +358,67 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+{#if focus}
+	<div id="roster-print" class="hidden print:block">
+		<h1 class="text-2xl font-bold">{focus.className}</h1>
+		<p class="mt-1 text-sm">
+			{formatDate(focus.session.startsAt)} · {localTime(
+				focus.session.startsAt,
+				tz
+			)}{#if focus.instructorName}
+				· {focus.instructorName}{/if}{#if focus.locationName}
+				· {focus.locationName}{/if}
+			· {focus.session.capacity} spots
+		</p>
+		<table class="mt-6 w-full border-collapse text-left text-sm">
+			<thead>
+				<tr class="border-b-2 border-black">
+					<th class="py-1">Member</th>
+					<th class="w-24">Status</th>
+					<th class="w-48">Sign-in</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each printBooked as r (r.booking.id)}
+					<tr class="border-b">
+						<td class="py-2">{r.memberName}</td>
+						<td class="capitalize">{r.booking.status.replace('_', ' ')}</td>
+						<td><span class="block h-6 border-b"></span></td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+		{#if printWaitlist.length}
+			<h2 class="mt-8 font-semibold">Waitlist</h2>
+			<ol class="mt-1 list-decimal pl-6 text-sm">
+				{#each printWaitlist as r (r.booking.id)}
+					<li class="py-0.5">{r.memberName}</li>
+				{/each}
+			</ol>
+		{/if}
+	</div>
+{/if}
+
+<svelte:head>
+	<style>
+		@media print {
+			body * {
+				visibility: hidden;
+			}
+			#roster-print,
+			#roster-print * {
+				visibility: visible;
+			}
+			#roster-print {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+			}
+		}
+	</style>
+</svelte:head>
 
 <Dialog.Root bind:open={sessOpen}>
 	<Dialog.Content>
