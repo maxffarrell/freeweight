@@ -10,7 +10,8 @@ import {
 	sendClassReminders,
 	sendPastDueNotices,
 	sendTrialEndingNotices,
-	sendWeeklyDigest
+	sendWeeklyDigest,
+	sendWinBackNudges
 } from '#lib/server/services/notifications.ts';
 import { markPastNoShows, materializeTemplates } from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
@@ -35,6 +36,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let suspended = 0;
 	let generated = 0;
 	let digests = 0;
+	let winbacks = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -85,6 +87,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`digest cron failed for ${o.id}`, err);
 		}
+		try {
+			winbacks += await sendWinBackNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`win-back cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
 	return json({
@@ -97,7 +105,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		noShows,
 		suspended,
 		generated,
-		digests
+		digests,
+		winbacks
 	});
 };
 

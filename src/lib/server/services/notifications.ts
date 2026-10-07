@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -1097,6 +1097,59 @@ export async function notifyPauseRequested(orgId: string, membershipId: string) 
 			]
 		})
 	});
+}
+
+/**
+ * Daily cron: nudge active members whose last check-in (or signup, if never)
+ * was 30+ days ago. At most one email per member per calendar month.
+ * Returns emails sent.
+ */
+export async function sendWinBackNudges(orgId: string) {
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			email: gymMember.email,
+			joined: gymMember.createdAt,
+			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+		})
+		.from(gymMember)
+		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email)
+			)
+		)
+		.groupBy(gymMember.id, gymMember.name, gymMember.email, gymMember.createdAt)
+		.limit(200);
+	const cutoff = Date.now() - 30 * 86400_000;
+	const month = new Date().toISOString().slice(0, 7);
+	const name = await orgName(orgId);
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email) continue;
+		const since = r.lastVisit ?? r.joined;
+		if (since.getTime() > cutoff) continue;
+		if (!(await logOnce(orgId, 'winback', `${r.memberId}:${month}`, r.email))) continue;
+		const days = Math.floor((Date.now() - since.getTime()) / 86400_000);
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `We miss you at ${name}`,
+			...renderEmail({
+				orgName: name,
+				heading: 'We miss you',
+				lines: [
+					`Hi ${r.name} — it's been ${days} days since your last visit to ${name}.`,
+					'Your spot is still here. Book a class and get back into the rhythm.'
+				],
+				action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
 
 /**
