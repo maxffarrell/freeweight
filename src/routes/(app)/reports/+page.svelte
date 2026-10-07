@@ -156,6 +156,27 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Trial conversion</Card.Title>
+			<Card.Description>Trial memberships that became paying members</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			{#if r.trials.trials > 0}
+				<p class="text-4xl font-bold tabular-nums">
+					{Math.round((r.trials.converted / r.trials.trials) * 100)}%
+				</p>
+				<p class="mt-1 text-sm text-muted-foreground">
+					{r.trials.converted} of {r.trials.trials} trials converted
+				</p>
+			{:else}
+				<p class="text-sm text-muted-foreground">
+					No trial memberships yet — set free-trial days on a plan to use trials.
+				</p>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Memberships by plan</Card.Title>
 			<Card.Description>Active memberships right now</Card.Description>
 		</Card.Header>

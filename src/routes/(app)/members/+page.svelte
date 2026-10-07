@@ -41,13 +41,15 @@
 	let q = $state('');
 	let tag = $state('__all');
 	let statusFilter = $state('__all');
+	let planFilter = $state('__all');
 	let members = $state(await getMembers());
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
 		members = await getMembers({
 			q,
 			tag: tag === '__all' ? undefined : tag,
-			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive')
+			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
+			planId: planFilter === '__all' ? undefined : planFilter
 		});
 	}
 	function search() {
@@ -238,6 +240,21 @@
 					<Select.Item value="__all">All tags</Select.Item>
 					{#each allTags as t (t)}
 						<Select.Item value={t}>{t}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+		{/if}
+		{#if audiencePlans.length}
+			<Select.Root type="single" bind:value={planFilter} onValueChange={() => void refilter()}>
+				<Select.Trigger class="w-40"
+					>{planFilter === '__all'
+						? 'All plans'
+						: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}</Select.Trigger
+				>
+				<Select.Content>
+					<Select.Item value="__all">All plans</Select.Item>
+					{#each audiencePlans as p (p.id)}
+						<Select.Item value={p.id}>{p.name}</Select.Item>
 					{/each}
 				</Select.Content>
 			</Select.Root>

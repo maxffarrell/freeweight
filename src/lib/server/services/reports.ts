@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -350,6 +350,25 @@ async function instructorPayroll(orgId: string) {
 	return { rows, total: rows.reduce((a, r) => a + r.pay, 0) };
 }
 
+/**
+ * Of memberships that started on a free-trial plan, how many became paying
+ * members — still subscribed past the trial end, or cancelled only after it.
+ */
+async function trialConversion(orgId: string) {
+	const [row] = await db
+		.select({
+			trials: sql<number>`count(*)`.mapWith(Number),
+			converted:
+				sql<number>`count(*) filter (where ${membership.cancelledAt} > ${membership.startsAt} + ${plan.trialDays} * interval '1 day' or (${membership.cancelledAt} is null and ${membership.startsAt} + ${plan.trialDays} * interval '1 day' < now()))`.mapWith(
+					Number
+				)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), gt(plan.trialDays, 0)));
+	return row;
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -364,7 +383,8 @@ export async function getReports(orgId: string) {
 		referrers,
 		hours,
 		weekdays,
-		payroll
+		payroll,
+		trials
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -378,7 +398,8 @@ export async function getReports(orgId: string) {
 		topReferrers(orgId),
 		checkInsByHour(orgId),
 		fillByWeekday(orgId),
-		instructorPayroll(orgId)
+		instructorPayroll(orgId),
+		trialConversion(orgId)
 	]);
 	return {
 		checkIns,
@@ -393,6 +414,7 @@ export async function getReports(orgId: string) {
 		referrers,
 		hours,
 		weekdays,
-		payroll
+		payroll,
+		trials
 	};
 }
