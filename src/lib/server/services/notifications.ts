@@ -381,6 +381,36 @@ export async function sendTrialEndingNotices(orgId: string) {
 	return sent;
 }
 
+/** "You just referred someone" to the member behind a ?ref= join. One email per referred member. */
+export async function notifyReferralJoin(orgId: string, referrerId: string, newMemberId: string) {
+	const [[referrer], [joined]] = await Promise.all([
+		db
+			.select({ name: gymMember.name, email: gymMember.email })
+			.from(gymMember)
+			.where(and(eq(gymMember.id, referrerId), eq(gymMember.organizationId, orgId))),
+		db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.id, newMemberId), eq(gymMember.organizationId, orgId)))
+	]);
+	if (!referrer?.email || !joined) return;
+	if (!(await logOnce(orgId, 'referral_join', newMemberId, referrer.email))) return;
+	const name = await orgName(orgId);
+	await sendMemberEmail(referrerId, {
+		to: referrer.email,
+		subject: `${joined.name} just joined ${name} from your link`,
+		...renderEmail({
+			orgName: name,
+			heading: 'Your referral worked',
+			lines: [
+				`Hi ${referrer.name} — ${joined.name} just signed up at ${name} using your referral link.`,
+				'Thanks for spreading the word — keep sharing your link from the member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "Class cancelled" to every booked/waitlisted member of the session. One email per member. */
 export async function notifySessionCancelled(orgId: string, sessionId: string) {
 	const rows = await db

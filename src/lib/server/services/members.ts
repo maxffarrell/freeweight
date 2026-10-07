@@ -196,6 +196,19 @@ export async function getMember(orgId: string, id: string) {
 				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
 			)
 		);
+	const [referredBy, [referralCount]] = await Promise.all([
+		row.member.referredByMemberId
+			? db
+					.select({ id: gymMember.id, name: gymMember.name })
+					.from(gymMember)
+					.where(eq(gymMember.id, row.member.referredByMemberId))
+					.limit(1)
+			: Promise.resolve([]),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(gymMember)
+			.where(eq(gymMember.referredByMemberId, id))
+	]);
 	return {
 		...row,
 		memberships,
@@ -206,6 +219,8 @@ export async function getMember(orgId: string, id: string) {
 		credits,
 		signedWaiver,
 		tags: await memberTags(orgId, id),
+		referredBy: referredBy[0] ?? null,
+		referralCount: referralCount?.n ?? 0,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0
 	};

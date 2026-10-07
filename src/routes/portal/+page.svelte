@@ -29,6 +29,7 @@
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
+	import Copy from '@lucide/svelte/icons/copy';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -51,6 +52,13 @@
 	}
 	const tz = $derived(d.settings?.timezone ?? 'UTC');
 	const currency = $derived(d.settings?.currency ?? 'usd');
+	const refLink = $derived(`${page.url.origin}/j/${d.orgSlug}?ref=${memberId}`);
+	function copyRefLink() {
+		navigator.clipboard
+			.writeText(refLink)
+			.then(() => toast.success('Referral link copied'))
+			.catch(() => toast.error('Could not copy'));
+	}
 
 	let qrUrl = $state('');
 	$effect(() => {
@@ -239,6 +247,25 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
+
+	{#if d.orgSlug}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Refer a friend</Card.Title>
+				<Card.Description>
+					Share your link — anyone who joins from it counts toward you
+					{#if d.referralCount}
+						({d.referralCount} joined so far){/if}.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex items-center gap-2 px-6">
+				<code class="flex-1 truncate rounded-md border bg-muted/40 px-3 py-2 text-xs"
+					>{refLink}</code
+				>
+				<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	{#if d.waiverRequired && !d.signedWaiver}
 		<Card.Root class="sm:col-span-2">

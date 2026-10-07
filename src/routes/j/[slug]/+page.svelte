@@ -9,7 +9,7 @@
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
-	import { bookDropInForm, joinGymForm } from '#lib/remote/public.remote.ts';
+	import { bookDropInForm, getReferrerName, joinGymForm } from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -35,6 +35,8 @@
 	let joined = $state(false);
 	let checkoutUrl = $state<string | null>(null);
 	const paid = page.url.searchParams.get('paid') === '1';
+	const refId = page.url.searchParams.get('ref');
+	const invitedBy = $derived(refId ? await getReferrerName({ slug: org.slug, ref: refId }) : null);
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -47,6 +49,7 @@
 					email,
 					phone: phone || undefined,
 					referralSource: referralSource || null,
+					referredById: refId || undefined,
 					planId: planId || undefined,
 					agreedWaiver,
 					website
@@ -222,7 +225,13 @@
 		{/if}
 
 		<section class="space-y-3">
-			<h2 class="text-lg font-semibold">Join</h2>
+			<h2 class="text-lg font-semibold">
+				Join{#if invitedBy}
+					<span class="ml-2 text-sm font-normal text-muted-foreground"
+						>— invited by {invitedBy}</span
+					>
+				{/if}
+			</h2>
 			{#if dropPaid}
 				<Card.Root class="border-green-500">
 					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">

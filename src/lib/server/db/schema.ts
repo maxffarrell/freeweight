@@ -103,6 +103,10 @@ export const gymMember = pgTable(
 		notes: text('notes'),
 		/** "How did you hear about us?" — set from the public join form. */
 		referralSource: text('referral_source'),
+		/** Member who sent them the ?ref= join link; null = not referred. */
+		referredByMemberId: text('referred_by_member_id').references((): AnyPgColumn => gymMember.id, {
+			onDelete: 'set null'
+		}),
 		/** Set via the signed /unsubscribe link in member-facing emails. */
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		joinedAt: date('joined_at', { mode: 'string' }),

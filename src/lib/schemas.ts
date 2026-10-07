@@ -214,6 +214,8 @@ export const joinInput = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
 	phone: optionalText,
 	referralSource: v.optional(v.nullable(v.picklist(referralSources))),
+	/** Member id from a ?ref= referral link. */
+	referredById: v.optional(v.nullable(idSchema)),
 	planId: v.optional(v.nullable(idSchema)),
 	agreedWaiver: v.optional(v.boolean(), false),
 	/** Honeypot: must stay empty. */

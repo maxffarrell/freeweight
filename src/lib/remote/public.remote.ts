@@ -1,6 +1,6 @@
-import { command, getRequestEvent } from '$app/server';
+import { command, getRequestEvent, query } from '$app/server';
 import { dropInInput, joinInput } from '#lib/schemas.ts';
-import { bookDropIn, joinGym } from '#lib/server/services/public.ts';
+import { bookDropIn, joinGym, referrerName } from '#lib/server/services/public.ts';
 import * as v from 'valibot';
 
 /** Public join form on /j/[slug] — unauthenticated by design (rate-limited + honeypot inside). */
@@ -16,6 +16,12 @@ export const joinGymForm = command(
 		}
 		return joinGym(slug, ip, input);
 	}
+);
+
+/** First name behind a ?ref= link so the join page can say "Invited by X". Public-safe. */
+export const getReferrerName = query(
+	v.object({ slug: v.string(), ref: v.string() }),
+	({ slug, ref }) => referrerName(slug, ref)
 );
 
 /** Public drop-in purchase on /j/[slug] — same unauthenticated + rate-limited treatment. */

@@ -13,6 +13,7 @@ import {
 	gymSettings,
 	location,
 	membership,
+	organization,
 	payment,
 	plan,
 	waiver,
@@ -156,6 +157,14 @@ export async function portalOverview(memberId: string) {
 		.orderBy(desc(waiver.signedAt))
 		.limit(1);
 
+	const [[org], [referred]] = await Promise.all([
+		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(gymMember)
+			.where(eq(gymMember.referredByMemberId, memberId))
+	]);
+
 	// Recent payments for the portal's billing history (most recent first).
 	const payments = await db
 		.select({
@@ -178,6 +187,8 @@ export async function portalOverview(memberId: string) {
 		payments,
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
+		orgSlug: org?.slug ?? '',
+		referralCount: referred?.n ?? 0,
 		waiverRequired: !!settings?.waiver,
 		signedWaiver,
 		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC')

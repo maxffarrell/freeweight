@@ -16,6 +16,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
 import { createMembership, getPlan } from './billing.ts';
+import { notifyReferralJoin } from './notifications.ts';
 import { providers } from '../payments/index.ts';
 import { providerRow } from '../payments/settings.ts';
 import type * as s from '#lib/schemas.ts';
@@ -68,6 +69,17 @@ export async function getPublicGym(slug: string) {
 	return { org, settings, plans, sessions };
 }
 
+/** First name of the member behind a ?ref= link, for the "Invited by X" line. Public-safe. */
+export async function referrerName(slug: string, ref: string) {
+	const { org } = await getPublicGym(slug);
+	const [r] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, ref), eq(gymMember.organizationId, org.id)))
+		.limit(1);
+	return r?.name.split(' ')[0] ?? null;
+}
+
 const joinRate = new Map<string, number[]>();
 
 /**
@@ -97,6 +109,16 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		return { member: existing, existing: true };
 	}
 
+	// ?ref=<memberId> referral link — only counts when the referrer is a member of this gym.
+	let referrer: { id: string; name: string; email: string | null } | undefined;
+	if (input.referredById) {
+		[referrer] = await db
+			.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+			.from(gymMember)
+			.where(and(eq(gymMember.id, input.referredById), eq(gymMember.organizationId, org.id)))
+			.limit(1);
+	}
+
 	const [m] = await db
 		.insert(gymMember)
 		.values({
@@ -104,7 +126,8 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			name: input.name,
 			email: input.email,
 			phone: input.phone ?? null,
-			referralSource: input.referralSource ?? null,
+			referralSource: input.referralSource ?? (referrer ? 'Friend or family' : null),
+			referredByMemberId: referrer?.id ?? null,
 			joinedAt: new Date().toISOString().slice(0, 10)
 		})
 		.returning();
@@ -124,6 +147,17 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		action: 'joined',
 		summary: `${input.name} joined from the public page`
 	});
+	if (referrer) {
+		await emit({
+			orgId: org.id,
+			entityType: 'member',
+			entityId: referrer.id,
+			action: 'referred',
+			summary: `${referrer.name} referred ${input.name}`,
+			data: { newMemberId: m!.id }
+		});
+		notifyReferralJoin(org.id, referrer.id, m!.id).catch(() => {});
+	}
 	return { member: m!, existing: false, checkoutUrl };
 }
 

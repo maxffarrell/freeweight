@@ -324,6 +324,19 @@
 						>{m.member.referralSource ?? '—'}</span
 					>
 				</div>
+				{#if m.referredBy || m.referralCount}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Referrals</span>
+						<span class="text-right">
+							{#if m.referredBy}
+								Joined via <a class="underline" href="/members/{m.referredBy.id}"
+									>{m.referredBy.name}</a
+								>{m.referralCount ? ' · ' : ''}
+							{/if}
+							{#if m.referralCount}referred {m.referralCount}{/if}
+						</span>
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Waiver</span>
 					<span
