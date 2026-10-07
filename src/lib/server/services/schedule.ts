@@ -919,6 +919,72 @@ export async function deleteTemplate(ctx: OrgContext, id: string) {
 	return row;
 }
 
+/**
+ * Copies a local week's sessions into another week (default: the next).
+ * Cancelled sessions aren't copied; sessions landing on a closed day are skipped.
+ */
+export async function copyWeek(
+	ctx: OrgContext,
+	tz: string,
+	weekStart: string,
+	targetStart?: string
+) {
+	const from = zonedToUtc(`${weekStart}T00:00`, tz);
+	const to = zonedToUtc(`${addDays(weekStart, 7)}T00:00`, tz);
+	const target = targetStart ?? addDays(weekStart, 7);
+	const shiftMs = zonedToUtc(`${target}T00:00`, tz).getTime() - from.getTime();
+	const closed = new Set(
+		(
+			await db
+				.select({ date: closure.date })
+				.from(closure)
+				.where(
+					and(
+						eq(closure.organizationId, ctx.orgId),
+						gte(closure.date, target),
+						lt(closure.date, addDays(target, 7))
+					)
+				)
+		).map((c) => c.date)
+	);
+	const src = await db
+		.select()
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				gte(classSession.startsAt, from),
+				lt(classSession.startsAt, to),
+				isNull(classSession.cancelledAt)
+			)
+		);
+	const rows = src
+		.filter((s) => !closed.has(localDate(new Date(s.startsAt.getTime() + shiftMs), tz)))
+		.map((s) => ({
+			organizationId: ctx.orgId,
+			classTypeId: s.classTypeId,
+			locationId: s.locationId,
+			instructorId: s.instructorId,
+			startsAt: new Date(s.startsAt.getTime() + shiftMs),
+			endsAt: new Date(s.endsAt.getTime() + shiftMs),
+			capacity: s.capacity,
+			note: s.note
+		}));
+	const inserted = rows.length
+		? await db.insert(classSession).values(rows).returning({ id: classSession.id })
+		: [];
+	if (inserted.length)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'class_session',
+			entityId: inserted[0]!.id,
+			action: 'copied',
+			summary: `Copied ${inserted.length} session${inserted.length === 1 ? '' : 's'} to week of ${target}${src.length - rows.length ? ` — ${src.length - rows.length} skipped (closed)` : ''}`
+		});
+	return { created: inserted.length, skipped: src.length - rows.length };
+}
+
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 /** Sessions templates keep ahead of today (org-local). */
 // ------- Closures -------

@@ -79,6 +79,19 @@ export const updateSession = command(sessionUpdate, async (input) => {
 	return s;
 });
 
+/** Duplicates a viewed week's sessions into the next week (or a target week). */
+export const copyWeek = command(
+	v.object({
+		week: v.pipe(v.string(), v.isoDate()),
+		target: v.optional(v.pipe(v.string(), v.isoDate()))
+	}),
+	async (input) => {
+		const r = await svc.copyWeek(await requireOrg(), await tz(), input.week, input.target);
+		void getSessions().refresh();
+		return r;
+	}
+);
+
 export const getClosures = query(async () => svc.listClosures((await requireOrg()).orgId));
 export const addClosure = command(closureInput, async (input) => {
 	const c = await svc.addClosure(await requireOrg(), input);

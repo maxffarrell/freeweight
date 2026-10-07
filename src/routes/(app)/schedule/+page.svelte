@@ -27,7 +27,8 @@
 		getTemplates,
 		createTemplate,
 		deleteTemplate,
-		emailSessionRoster
+		emailSessionRoster,
+		copyWeek
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -36,6 +37,7 @@
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Repeat from '@lucide/svelte/icons/repeat';
+	import Copy from '@lucide/svelte/icons/copy';
 	import Printer from '@lucide/svelte/icons/printer';
 	import Mail from '@lucide/svelte/icons/mail';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -348,6 +350,27 @@
 			><ChevronRight /></Button
 		>
 		<span class="ml-2 text-sm text-muted-foreground">Week of {weekStart}</span>
+		<Button
+			variant="outline"
+			size="sm"
+			disabled={pending}
+			onclick={async () => {
+				pending = true;
+				try {
+					const r = await copyWeek({ week: weekStart });
+					toast.success(
+						r.created
+							? `Copied ${r.created} session${r.created === 1 ? '' : 's'} to next week` +
+									(r.skipped ? ` — ${r.skipped} skipped (gym closed)` : '')
+							: 'No sessions to copy'
+					);
+					await reload();
+				} catch (err) {
+					toast.error(errMsg(err, 'Could not copy week'));
+				}
+				pending = false;
+			}}><Copy /> Copy week</Button
+		>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
 			<select bind:value={fType} class="h-8 rounded-md border bg-transparent px-2 text-sm">
 				<option value="">All classes</option>
