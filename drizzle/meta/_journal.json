@@ -484,6 +484,13 @@
       "when": 1791404314538,
       "tag": "0068_shifts",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1791405439436,
+      "tag": "0069_gift_cards",
+      "breakpoints": true
     }
   ]
 }

@@ -356,6 +356,11 @@ export const paymentInput = v.object({
 	notes: optionalText
 });
 
+export const giftCardSale = v.object({
+	memberId: idSchema,
+	amount: cents,
+	note: v.optional(v.string(), '')
+});
 export const shopItemInput = v.object({
 	name: requiredText('Item name'),
 	price: cents,

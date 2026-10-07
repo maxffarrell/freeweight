@@ -642,7 +642,14 @@ export const charge = pgTable(
 	]
 );
 
-export const paymentMethod = pgEnum('payment_method', ['card', 'cash', 'bank', 'stripe', 'other']);
+export const paymentMethod = pgEnum('payment_method', [
+	'card',
+	'cash',
+	'bank',
+	'stripe',
+	'other',
+	'gift_card'
+]);
 
 /** Money received from a member, applied to a charge or held as credit. */
 export const payment = pgTable(
@@ -670,6 +677,40 @@ export const payment = pgTable(
 		index('payment_org_paid_idx').on(t.organizationId, t.paidAt),
 		uniqueIndex('payment_external_idx').on(t.externalId),
 		index('payment_member_idx').on(t.memberId)
+	]
+);
+
+/**
+ * A sold gift card — store credit keyed by a human-typed code.
+ * The sale is a normal `other` charge on the buyer (that's the revenue).
+ * Redeeming drains the card into `gift_card`-method payments on the
+ * redeemer's charges (+ unapplied credit) — excluded from revenue sums so
+ * the money isn't counted twice. `balance` hits 0 on first redemption.
+ */
+export const giftCard = pgTable(
+	'gift_card',
+	{
+		id: id(),
+		organizationId: orgId(),
+		/** Human-typed redemption code, e.g. GC-4K7M-9Q2X. Unique per org. */
+		code: text('code').notNull(),
+		/** Face value in minor units. */
+		amount: integer('amount').notNull(),
+		/** Remaining value — redeeming always drains it onto the member's account. */
+		balance: integer('balance').notNull(),
+		purchaserMemberId: text('purchaser_member_id').references(() => gymMember.id, {
+			onDelete: 'set null'
+		}),
+		redeemedByMemberId: text('redeemed_by_member_id').references(() => gymMember.id, {
+			onDelete: 'set null'
+		}),
+		redeemedAt: timestamp('redeemed_at', { withTimezone: true }),
+		note: text('note').notNull().default(''),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('gift_card_org_code_idx').on(t.organizationId, t.code),
+		index('gift_card_org_idx').on(t.organizationId)
 	]
 );
 

@@ -28,7 +28,9 @@
 		getShopItems,
 		createShopItem,
 		updateShopItem,
-		sellItem
+		sellItem,
+		getGiftCards,
+		sellGiftCard
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
@@ -36,6 +38,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import Download from '@lucide/svelte/icons/download';
+	import Gift from '@lucide/svelte/icons/gift';
 	import { toCsv } from '#lib/csv.ts';
 
 	const currency = await getCurrency();
@@ -45,6 +48,7 @@
 	);
 	let memberships = $state(await getMemberships());
 	let payments = $state(await getPayments());
+	let giftCards = $state(await getGiftCards());
 	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
 
@@ -103,6 +107,33 @@
 	}
 
 	let pending = $state(false);
+
+	// ------- gift cards -------
+	let gcOpen = $state(false);
+	let gcMemberId = $state('');
+	let gcAmount = $state<number | null>(null);
+	let gcNote = $state('');
+	async function submitGiftCard(e: SubmitEvent) {
+		e.preventDefault();
+		if (!gcAmount) return;
+		pending = true;
+		try {
+			const card = await sellGiftCard({ memberId: gcMemberId, amount: gcAmount, note: gcNote });
+			giftCards = await getGiftCards();
+			await navigator.clipboard.writeText(card.code).catch(() => {});
+			toast.success(`Card ${card.code} sold — code copied`);
+			gcOpen = false;
+			gcNote = '';
+			gcAmount = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not sell card'));
+		}
+		pending = false;
+	}
+	async function copyCode(code: string) {
+		await navigator.clipboard.writeText(code).catch(() => {});
+		toast.success('Code copied');
+	}
 
 	// ------- record payment -------
 	let payOpen = $state(page.url.searchParams.get('new') === 'payment');
@@ -670,6 +701,67 @@
 					</Card.Content>
 				</Card.Root>
 			</div>
+
+			<Card.Root class="mt-4">
+				<Card.Header class="flex flex-row items-center justify-between space-y-0">
+					<div>
+						<Card.Title class="flex items-center gap-2 text-base"><Gift /> Gift cards</Card.Title>
+						<Card.Description>
+							Sell store credit with a desk-typed code; members redeem it in their portal.
+						</Card.Description>
+					</div>
+					<Button size="sm" variant="outline" onclick={() => (gcOpen = true)}
+						><Plus /> Sell a card</Button
+					>
+				</Card.Header>
+				<Card.Content class="px-0">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Code</Table.Head>
+								<Table.Head>Sold to</Table.Head>
+								<Table.Head class="text-right">Face value</Table.Head>
+								<Table.Head>Status</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each giftCards as g (g.card.id)}
+								<Table.Row>
+									<Table.Cell>
+										<button
+											class="font-mono text-xs hover:underline"
+											title="Copy code"
+											onclick={() => copyCode(g.card.code)}>{g.card.code}</button
+										>
+									</Table.Cell>
+									<Table.Cell class="text-muted-foreground">
+										{g.purchaserName ?? '—'}
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums"
+										>{formatMoney(g.card.amount, currency)}</Table.Cell
+									>
+									<Table.Cell>
+										{#if g.card.balance > 0}
+											<StatusBadge status="open" />
+										{:else}
+											<span class="text-xs text-muted-foreground"
+												>redeemed {g.redeemerName ? `by ${g.redeemerName}` : ''}
+												{formatDate(g.card.redeemedAt)}</span
+											>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{:else}
+								<Table.Row
+									><Table.Cell colspan={4} class="text-muted-foreground"
+										>No gift cards sold yet.</Table.Cell
+									></Table.Row
+								>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Card.Content>
+			</Card.Root>
 		</Tabs.Content>
 	</Tabs.Root>
 </div>
@@ -851,6 +943,46 @@
 					>{cAll ? `Post to ${activeCount} members` : 'Add charge'}</Button
 				></Dialog.Footer
 			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={gcOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Sell a gift card</Dialog.Title>
+			<Dialog.Description>
+				Posts the card's face value as a charge on the buyer. Hand them the code — the recipient
+				redeems it in their portal and it pays down their charges, any leftover becoming credit.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitGiftCard}>
+			<Field.Field>
+				<Field.Label>Buyer</Field.Label>
+				<Select.Root type="single" bind:value={gcMemberId}>
+					<Select.Trigger class="w-full">
+						{memberList.find((m) => m.id === gcMemberId)?.name ?? 'Pick a member'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each memberList as m (m.id)}
+							<Select.Item value={m.id}>{m.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>Amount</Field.Label>
+				<MoneyInput bind:value={gcAmount} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="gc-note">Note — optional</Field.Label>
+				<Input id="gc-note" bind:value={gcNote} placeholder="Birthday gift for Sam" />
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending || !gcAmount || !gcMemberId}>
+					{gcAmount ? `Sell for ${formatMoney(gcAmount, currency)}` : 'Sell card'}
+				</Button>
+			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>

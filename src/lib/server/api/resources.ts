@@ -9,6 +9,7 @@ import * as challenges from '#lib/server/services/challenges.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as amenities from '#lib/server/services/resources.ts';
 import * as shifts from '#lib/server/services/shifts.ts';
+import * as giftcards from '#lib/server/services/giftcards.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
@@ -256,6 +257,12 @@ export const resources: Record<string, Resource> = {
 		list: (ctx) => billing.listPromoCodes(ctx.orgId),
 		create: { schema: s.promoCodeInput, run: billing.createPromoCode as never },
 		update: { schema: s.promoCodeUpdate, run: billing.updatePromoCode as never }
+	},
+	gift_cards: {
+		description:
+			'Gift cards — code-keyed store credit; POST sells a card (memberId + amount in cents, posts an `other` charge to the buyer)',
+		list: (ctx) => giftcards.listGiftCards(ctx.orgId),
+		create: { schema: s.giftCardSale, run: giftcards.sellGiftCard as never }
 	}
 };
 
