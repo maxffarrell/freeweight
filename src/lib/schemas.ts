@@ -164,7 +164,9 @@ export const sessionUpdate = v.object({
 
 export const bookingInput = v.object({
 	sessionId: idSchema,
-	memberId: idSchema
+	memberId: idSchema,
+	/** Staff: sell a drop-in — posts the class's drop-in charge; no membership required. */
+	dropIn: v.optional(v.boolean())
 });
 /** Book a member into every upcoming session of a class type for N weeks. */
 export const seriesBookingInput = v.object({
