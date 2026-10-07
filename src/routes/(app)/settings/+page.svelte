@@ -65,6 +65,7 @@
 	let cancelCutoffMin = $state<number | null>(settings.cancelCutoffMin);
 	let waitlistCutoffMin = $state<number | null>(settings.waitlistCutoffMin);
 	let noShowFee = $state<number | null>(settings.noShowFee);
+	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
@@ -85,6 +86,7 @@
 				cancelCutoffMin,
 				waitlistCutoffMin,
 				noShowFee,
+				lateCancelFee,
 				suspendAfterDays,
 				publicPage
 			});
@@ -313,6 +315,14 @@
 							<MoneyInput bind:value={noShowFee} />
 							<Field.Description
 								>Charged to the member for every class they skip without checking in.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Late-cancel fee</Field.Label>
+							<MoneyInput bind:value={lateCancelFee} />
+							<Field.Description
+								>When set, members can cancel inside the cancel cutoff — for this fee. Leave empty
+								to block late cancels entirely.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>

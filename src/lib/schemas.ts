@@ -198,6 +198,7 @@ export const settingsInput = v.object({
 	cancelCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	waitlistCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	noShowFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	lateCancelFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	suspendAfterDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });
 

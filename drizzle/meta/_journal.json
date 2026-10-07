@@ -169,6 +169,13 @@
       "when": 1791358082277,
       "tag": "0023_family_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791359807268,
+      "tag": "0024_glamorous_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

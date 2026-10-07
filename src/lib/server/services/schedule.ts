@@ -520,7 +520,7 @@ export async function bookSession(
 
 /** Cancels a booking and promotes the longest-waiting member, if any. */
 export async function cancelBooking(ctx: OrgContext, id: string, actorId?: string | null) {
-	const promoted = await db.transaction(async (tx) => {
+	const { promoted, lateCancel } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
 			.select({ status: booking.status })
@@ -533,22 +533,47 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 			.set({ status: 'cancelled', cancelledAt: new Date() })
 			.where(eq(booking.id, id))
 			.returning();
-		if (prev.status !== 'booked') return null;
+		if (prev.status !== 'booked') return { promoted: null, lateCancel: null };
 
-		// Don't promote when the class is about to start — the member can't
-		// realistically make it. The spot just opens for walk-in booking.
 		const [[sess], [st]] = await Promise.all([
 			tx
-				.select({ startsAt: classSession.startsAt })
+				.select({
+					startsAt: classSession.startsAt,
+					cancelledAt: classSession.cancelledAt,
+					className: classType.name
+				})
 				.from(classSession)
+				.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 				.where(eq(classSession.id, b.sessionId)),
 			tx
-				.select({ cutoff: gymSettings.waitlistCutoffMin })
+				.select({
+					cutoff: gymSettings.waitlistCutoffMin,
+					cancelCutoffMin: gymSettings.cancelCutoffMin,
+					lateCancelFee: gymSettings.lateCancelFee,
+					timezone: gymSettings.timezone
+				})
 				.from(gymSettings)
 				.where(eq(gymSettings.organizationId, ctx.orgId))
 		]);
+		const lateCancel =
+			sess &&
+			!sess.cancelledAt &&
+			st?.cancelCutoffMin != null &&
+			st.lateCancelFee &&
+			st.lateCancelFee > 0 &&
+			sess.startsAt.getTime() - Date.now() < st.cancelCutoffMin * 60_000
+				? {
+						className: sess.className,
+						startsAt: sess.startsAt,
+						fee: st.lateCancelFee,
+						tz: st.timezone ?? 'UTC'
+					}
+				: null;
+
+		// Don't promote when the class is about to start — the member can't
+		// realistically make it. The spot just opens for walk-in booking.
 		if (st?.cutoff && sess && sess.startsAt.getTime() - Date.now() < st.cutoff * 60_000)
-			return null;
+			return { promoted: null, lateCancel };
 
 		const [next] = await tx
 			.select()
@@ -556,9 +581,9 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 			.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'waitlisted')))
 			.orderBy(asc(booking.createdAt))
 			.limit(1);
-		if (!next) return null;
+		if (!next) return { promoted: null, lateCancel };
 		await tx.update(booking).set({ status: 'booked' }).where(eq(booking.id, next.id));
-		return next;
+		return { promoted: next, lateCancel };
 	});
 	const [b] = await db.select().from(booking).where(eq(booking.id, id));
 	await emit({
@@ -572,7 +597,21 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 	});
 	notifyBookingCancelled(ctx.orgId, id).catch(() => {});
 	if (promoted) await notifyWaitlistPromoted(ctx.orgId, promoted.id).catch(() => {});
-	return b;
+	if (lateCancel) {
+		const [c] = await db
+			.insert(charge)
+			.values({
+				organizationId: ctx.orgId,
+				memberId: b!.memberId,
+				kind: 'other',
+				description: `Late-cancel fee — ${lateCancel.className} ${localDate(lateCancel.startsAt, lateCancel.tz)}`,
+				amount: lateCancel.fee,
+				dueDate: todayISO()
+			})
+			.returning({ id: charge.id });
+		if (c) notifyChargePosted(ctx.orgId, c.id).catch(() => {});
+	}
+	return { ...b, lateFeeApplied: lateCancel != null };
 }
 
 export async function updateBooking(ctx: OrgContext, input: v.InferOutput<typeof s.bookingUpdate>) {

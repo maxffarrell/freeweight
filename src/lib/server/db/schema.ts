@@ -66,6 +66,8 @@ export const gymSettings = pgTable('gym_settings', {
 	waitlistCutoffMin: integer('waitlist_cutoff_min'),
 	/** Open charge posted per auto-marked no-show, in minor units; null/0 = no fee. */
 	noShowFee: integer('no_show_fee'),
+	/** Charged when a booking is cancelled inside cancelCutoffMin; also lets members late-cancel. */
+	lateCancelFee: integer('late_cancel_fee'),
 	/** Auto-suspend a membership once a charge is this many days overdue; null = off. */
 	suspendAfterDays: integer('suspend_after_days'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })

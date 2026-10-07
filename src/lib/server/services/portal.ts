@@ -335,15 +335,20 @@ export async function memberBook(
 }
 
 export async function memberCancel(orgId: string, userId: string, bookingId: string) {
-	// Cancel cutoff: no last-minute member cancels (staff can still cancel from the roster).
+	// Cancel cutoff: no last-minute member cancels unless a late-cancel fee is set
+	// (staff can still cancel from the roster regardless).
 	const [b] = await db
 		.select({ startsAt: classSession.startsAt })
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
 		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
 	if (!b) error(404, 'Booking not found');
-	const { cancelCutoffMin } = await bookingRules(orgId);
-	if (cancelCutoffMin != null && b.startsAt.getTime() - Date.now() < cancelCutoffMin * 60_000)
+	const { cancelCutoffMin, lateCancelFee } = await bookingRules(orgId);
+	if (
+		cancelCutoffMin != null &&
+		!(lateCancelFee != null && lateCancelFee > 0) &&
+		b.startsAt.getTime() - Date.now() < cancelCutoffMin * 60_000
+	)
 		error(409, `Cancelling closes ${cancelCutoffMin} minutes before class`);
 	return cancelBooking(memberCtx(orgId, userId), bookingId, userId);
 }
@@ -352,11 +357,12 @@ async function bookingRules(orgId: string) {
 	const [st] = await db
 		.select({
 			bookingWindowDays: gymSettings.bookingWindowDays,
-			cancelCutoffMin: gymSettings.cancelCutoffMin
+			cancelCutoffMin: gymSettings.cancelCutoffMin,
+			lateCancelFee: gymSettings.lateCancelFee
 		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
-	return st ?? { bookingWindowDays: null, cancelCutoffMin: null };
+	return st ?? { bookingWindowDays: null, cancelCutoffMin: null, lateCancelFee: null };
 }
 
 /** Starts a provider checkout for the member's full open balance. */

@@ -157,8 +157,10 @@
 	async function cancel(bookingId: string, sessionId: string) {
 		busy = sessionId;
 		try {
-			await memberCancel({ memberId, bookingId });
-			toast.success('Booking cancelled');
+			const b = await memberCancel({ memberId, bookingId });
+			toast.success(
+				b.lateFeeApplied ? 'Cancelled — a late-cancel fee was charged' : 'Booking cancelled'
+			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
 		}

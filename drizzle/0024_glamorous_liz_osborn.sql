@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "late_cancel_fee" integer;
