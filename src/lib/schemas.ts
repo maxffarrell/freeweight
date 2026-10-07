@@ -34,7 +34,9 @@ export const memberInput = v.object({
 	status: v.optional(v.picklist(memberStatuses), 'active'),
 	notes: optionalText,
 	joinedAt: v.optional(v.nullable(isoDate)),
-	birthday: v.optional(v.nullable(isoDate))
+	birthday: v.optional(v.nullable(isoDate)),
+	/** Household payer — membership charges post under this member instead. */
+	guardianId: v.optional(v.nullable(idSchema))
 });
 export const memberImportRow = v.object({
 	name: requiredText('Name'),

@@ -156,6 +156,7 @@
 	let phone = $state(m.member.phone ?? '');
 	let status = $state<'active' | 'inactive'>(m.member.status);
 	let birthday = $state(m.member.birthday ?? '');
+	let guardianId = $state(m.member.guardianId ?? 'none');
 	let pending = $state(false);
 	async function saveMember(e: SubmitEvent) {
 		e.preventDefault();
@@ -167,7 +168,8 @@
 				email: email || undefined,
 				phone: phone || undefined,
 				status,
-				birthday: birthday || null
+				birthday: birthday || null,
+				guardianId: guardianId === 'none' ? null : guardianId
 			});
 			toast.success('Member updated');
 			editOpen = false;
@@ -367,6 +369,23 @@
 							: 'None on this plan'}</span
 					>
 				</div>
+				{#if m.guardian}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Billed under</span>
+						<a class="underline" href="/members/{m.guardian.id}">{m.guardian.name}</a>
+					</div>
+				{/if}
+				{#if m.dependents.length}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Dependents</span>
+						<span class="text-right">
+							{#each m.dependents as dep, i (dep.id)}
+								{#if i},
+								{/if}<a class="underline" href="/members/{dep.id}">{dep.name}</a>
+							{/each}
+						</span>
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Visits</span>
 					<span class="tabular-nums"
@@ -831,6 +850,24 @@
 					bind:value={birthday}
 				/></Field.Field
 			>
+			<Field.Field>
+				<Field.Label>Guardian (household payer)</Field.Label>
+				<Select.Root type="single" bind:value={guardianId}>
+					<Select.Trigger class="w-full"
+						>{guardianId === 'none'
+							? 'Bills to this member'
+							: (m.memberOptions.find((o) => o.id === guardianId)?.name ??
+								'Choose')}</Select.Trigger
+					>
+					<Select.Content>
+						<Select.Item value="none">Bills to this member</Select.Item>
+						{#each m.memberOptions as o (o.id)}
+							<Select.Item value={o.id}>{o.name}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				<Field.Description>Their membership charges post under the guardian.</Field.Description>
+			</Field.Field>
 			<Field.Field>
 				<Field.Label>Status</Field.Label>
 				<Select.Root type="single" bind:value={status}>

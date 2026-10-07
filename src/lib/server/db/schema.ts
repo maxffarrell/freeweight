@@ -109,6 +109,10 @@ export const gymMember = pgTable(
 		referredByMemberId: text('referred_by_member_id').references((): AnyPgColumn => gymMember.id, {
 			onDelete: 'set null'
 		}),
+		/** Household payer: membership charges post under the guardian (e.g. a parent). null = bills to self. */
+		guardianId: text('guardian_id').references((): AnyPgColumn => gymMember.id, {
+			onDelete: 'set null'
+		}),
 		/** Set via the signed /unsubscribe link in member-facing emails. */
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		joinedAt: date('joined_at', { mode: 'string' }),

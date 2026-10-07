@@ -168,13 +168,15 @@ export async function createMembership(
 		})
 		.returning();
 
+	const payerId = m.guardianId ?? input.memberId;
+	const forDependent = payerId !== input.memberId ? ` — ${m.name}` : '';
 	if (p.signupFee > 0) {
 		await db.insert(charge).values({
 			organizationId: ctx.orgId,
-			memberId: input.memberId,
+			memberId: payerId,
 			membershipId: row!.id,
 			kind: 'signup',
-			description: `Signup fee — ${p.name}`,
+			description: `Signup fee — ${p.name}${forDependent}`,
 			dueDate: start,
 			amount: p.signupFee
 		});
@@ -201,19 +203,24 @@ async function postMembershipCharge(
 	periodStart: string,
 	p: { name: string; amount: number }
 ) {
+	const [ms] = await db
+		.select({
+			memberId: membership.memberId,
+			guardianId: gymMember.guardianId,
+			memberName: gymMember.name
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.where(eq(membership.id, membershipId));
+	const payerId = ms!.guardianId ?? ms!.memberId;
 	const [row] = await db
 		.insert(charge)
 		.values({
 			organizationId: orgId,
-			memberId: (
-				await db
-					.select({ memberId: membership.memberId })
-					.from(membership)
-					.where(eq(membership.id, membershipId))
-			)[0]!.memberId,
+			memberId: payerId,
 			membershipId,
 			kind: 'membership',
-			description: `${p.name} — period starting ${periodStart}`,
+			description: `${p.name} — period starting ${periodStart}${payerId !== ms!.memberId ? ` — ${ms!.memberName}` : ''}`,
 			periodStart,
 			dueDate: periodStart,
 			amount: p.amount

@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -196,39 +196,58 @@ export async function getMember(orgId: string, id: string) {
 				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
 			)
 		);
-	const [[att], [noShows], referredBy, [referralCount]] = await Promise.all([
-		db
-			.select({
-				visits: sql<number>`count(*) filter (where ${checkIn.guestName} is null)`.mapWith(Number),
-				thisMonth:
-					sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
-						Number
+	const [[att], [noShows], referredBy, [referralCount], guardian, dependents, memberOptions] =
+		await Promise.all([
+			db
+				.select({
+					visits: sql<number>`count(*) filter (where ${checkIn.guestName} is null)`.mapWith(Number),
+					thisMonth:
+						sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
+							Number
+						)
+				})
+				.from(checkIn)
+				.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.where(
+					and(
+						eq(booking.organizationId, orgId),
+						eq(booking.memberId, id),
+						eq(booking.status, 'no_show')
 					)
-			})
-			.from(checkIn)
-			.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
-		db
-			.select({ n: sql<number>`count(*)`.mapWith(Number) })
-			.from(booking)
-			.where(
-				and(
-					eq(booking.organizationId, orgId),
-					eq(booking.memberId, id),
-					eq(booking.status, 'no_show')
-				)
-			),
-		row.member.referredByMemberId
-			? db
-					.select({ id: gymMember.id, name: gymMember.name })
-					.from(gymMember)
-					.where(eq(gymMember.id, row.member.referredByMemberId))
-					.limit(1)
-			: Promise.resolve([]),
-		db
-			.select({ n: sql<number>`count(*)`.mapWith(Number) })
-			.from(gymMember)
-			.where(eq(gymMember.referredByMemberId, id))
-	]);
+				),
+			row.member.referredByMemberId
+				? db
+						.select({ id: gymMember.id, name: gymMember.name })
+						.from(gymMember)
+						.where(eq(gymMember.id, row.member.referredByMemberId))
+						.limit(1)
+				: Promise.resolve([]),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(gymMember)
+				.where(eq(gymMember.referredByMemberId, id)),
+			row.member.guardianId
+				? db
+						.select({ id: gymMember.id, name: gymMember.name })
+						.from(gymMember)
+						.where(eq(gymMember.id, row.member.guardianId))
+						.limit(1)
+				: Promise.resolve([]),
+			db
+				.select({ id: gymMember.id, name: gymMember.name })
+				.from(gymMember)
+				.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.guardianId, id)))
+				.orderBy(asc(gymMember.name)),
+			db
+				.select({ id: gymMember.id, name: gymMember.name })
+				.from(gymMember)
+				.where(and(eq(gymMember.organizationId, orgId), ne(gymMember.id, id)))
+				.orderBy(asc(gymMember.name))
+				.limit(500)
+		]);
 	return {
 		...row,
 		memberships,
@@ -241,6 +260,9 @@ export async function getMember(orgId: string, id: string) {
 		tags: await memberTags(orgId, id),
 		referredBy: referredBy[0] ?? null,
 		referralCount: referralCount?.n ?? 0,
+		guardian: guardian[0] ?? null,
+		dependents,
+		memberOptions,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {
@@ -263,7 +285,8 @@ export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			status: input.status,
 			notes: input.notes ?? null,
 			joinedAt: input.joinedAt ?? null,
-			birthday: input.birthday ?? null
+			birthday: input.birthday ?? null,
+			guardianId: input.guardianId ?? null
 		})
 		.returning();
 	await emit({
@@ -329,6 +352,7 @@ export async function importMembers(
 
 export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberUpdate>) {
 	const { id, ...set } = input;
+	if (set.guardianId === id) error(400, "A member can't be their own guardian");
 	const [row] = await db
 		.update(gymMember)
 		.set({
@@ -339,7 +363,8 @@ export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			status: set.status,
 			notes: set.notes,
 			joinedAt: set.joinedAt,
-			birthday: set.birthday
+			birthday: set.birthday,
+			guardianId: set.guardianId === undefined ? undefined : set.guardianId || null
 		})
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, id)))
 		.returning();
