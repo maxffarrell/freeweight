@@ -127,6 +127,7 @@
 	let tColor = $state('#6366f1');
 	let tDuration = $state(60);
 	let tCapacity = $state(20);
+	let tDropIn = $state('');
 	let tDescription = $state('');
 	async function submitType(e: SubmitEvent) {
 		e.preventDefault();
@@ -137,6 +138,7 @@
 				color: tColor,
 				durationMin: tDuration,
 				capacity: tCapacity,
+				dropInPrice: tDropIn ? Math.round(parseFloat(tDropIn) * 100) : undefined,
 				description: tDescription || undefined
 			});
 			await getClassTypes().refresh();
@@ -408,6 +410,22 @@
 					<Input id="t-cap" type="number" min={1} bind:value={tCapacity} />
 				</Field.Field>
 			</div>
+			<Field.Field>
+				<Field.Label for="t-dropin">
+					Drop-in price <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-dropin"
+					type="number"
+					min={0}
+					step="0.01"
+					bind:value={tDropIn}
+					placeholder="0.00 — leave empty to not sell drop-ins"
+				/>
+				<Field.Description>
+					Visitors can book single classes on your public page at this price.
+				</Field.Description>
+			</Field.Field>
 			<Dialog.Footer><Button type="submit" disabled={pending}>Create</Button></Dialog.Footer>
 		</form>
 	</Dialog.Content>

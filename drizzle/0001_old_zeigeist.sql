@@ -1,0 +1,1 @@
+ALTER TABLE "class_type" ADD COLUMN "drop_in_price" integer;

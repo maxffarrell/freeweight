@@ -88,6 +88,8 @@ export const classTypeInput = v.object({
 	capacity: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 20),
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
+	/** Minor units; null/undefined = drop-in bookings aren't sold online. */
+	dropInPrice: v.optional(v.nullable(cents)),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
@@ -175,4 +177,12 @@ export const joinInput = v.object({
 	planId: v.optional(v.nullable(idSchema)),
 	/** Honeypot: must stay empty. */
 	website: v.optional(v.string(), '')
+});
+
+/** Visitor buying a single class on the public page. */
+export const dropInInput = v.object({
+	sessionId: idSchema,
+	name: requiredText('Name'),
+	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+	phone: v.optional(optionalText)
 });

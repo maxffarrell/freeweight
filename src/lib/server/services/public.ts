@@ -3,6 +3,7 @@ import { and, asc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
+	charge,
 	classSession,
 	classType,
 	gymMember,
@@ -43,6 +44,7 @@ export async function getPublicGym(slug: string) {
 			className: classType.name,
 			color: classType.color,
 			locationName: location.name,
+			dropInPrice: classType.dropInPrice,
 			booked:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
 					Number
@@ -118,6 +120,33 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 	return { member: m!, existing: false, checkoutUrl };
 }
 
+/** First live online provider's checkout URL for a one-off amount, or null when none is ready. */
+async function onlineCheckout(
+	orgId: string,
+	settings: { currency: string } | undefined,
+	item: { amount: number; description: string; memberId: string; email: string | null },
+	paths: { success: string; cancel: string }
+) {
+	if (item.amount <= 0) return null;
+	const currency = settings?.currency ?? 'usd';
+	for (const provider of providers) {
+		if (!provider.configured() || !provider.supportsCurrency(currency)) continue;
+		const row = await providerRow(orgId, provider.id);
+		if (!provider.ready(row)) continue;
+		return provider.checkout({
+			orgId,
+			memberId: item.memberId,
+			email: item.email,
+			amount: item.amount,
+			currency,
+			description: item.description,
+			paths,
+			row
+		});
+	}
+	return null;
+}
+
 /**
  * When the chosen plan has a signup fee and an online provider is live for the workspace,
  * returns a checkout URL so the new member can pay it right on the join page.
@@ -130,22 +159,131 @@ async function signupCheckout(
 	memberId: string,
 	email: string | null
 ) {
-	if (p.signupFee <= 0) return null;
-	const currency = settings?.currency ?? 'usd';
-	for (const provider of providers) {
-		if (!provider.configured() || !provider.supportsCurrency(currency)) continue;
-		const row = await providerRow(orgId, provider.id);
-		if (!provider.ready(row)) continue;
-		return provider.checkout({
-			orgId,
-			memberId,
-			email,
-			amount: p.signupFee,
-			currency,
-			description: `Signup fee — ${p.name}`,
-			paths: { success: `/j/${slug}?paid=1`, cancel: `/j/${slug}` },
-			row
+	return onlineCheckout(
+		orgId,
+		settings,
+		{ amount: p.signupFee, description: `Signup fee — ${p.name}`, memberId, email },
+		{ success: `/j/${slug}?paid=1`, cancel: `/j/${slug}` }
+	);
+}
+
+const dropInRate = new Map<string, number[]>();
+
+/**
+ * Visitor books one class on the public page: member (reused by email), `dropin` charge,
+ * `booked` row, and — when a provider is live — a checkout link to pay for it now.
+ * Without a provider the booking still lands; the member pays at the desk.
+ */
+export async function bookDropIn(
+	slug: string,
+	ip: string,
+	input: v.InferOutput<typeof s.dropInInput>
+) {
+	const now = Date.now();
+	const hits = (dropInRate.get(ip) ?? []).filter((t) => now - t < 3600_000);
+	if (hits.length >= 10) error(429, 'Too many attempts — try again later');
+	dropInRate.set(ip, [...hits, now]);
+
+	const { org, settings } = await getPublicGym(slug);
+	const email = input.email!.toLowerCase();
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.limit(1);
+	const member =
+		m ??
+		(
+			await db
+				.insert(gymMember)
+				.values({
+					organizationId: org.id,
+					name: input.name,
+					email,
+					phone: input.phone ?? null,
+					joinedAt: new Date().toISOString().slice(0, 10)
+				})
+				.returning()
+		)[0];
+
+	const { b, className, price } = await db.transaction(async (tx) => {
+		const [sess] = await tx
+			.select({
+				id: classSession.id,
+				capacity: classSession.capacity,
+				startsAt: classSession.startsAt,
+				cancelledAt: classSession.cancelledAt,
+				price: classType.dropInPrice,
+				className: classType.name
+			})
+			.from(classSession)
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(and(eq(classSession.organizationId, org.id), eq(classSession.id, input.sessionId)))
+			.for('update');
+		if (!sess) error(404, 'Class not found');
+		if (sess.cancelledAt || sess.startsAt.getTime() <= Date.now())
+			error(409, 'This class is not open for drop-ins');
+		if (sess.price == null || sess.price <= 0) error(409, 'This class is not sold online');
+
+		const [existing] = await tx
+			.select()
+			.from(booking)
+			.where(and(eq(booking.sessionId, sess.id), eq(booking.memberId, member.id)));
+		if (existing && existing.status !== 'cancelled') error(409, 'Already booked into this class');
+
+		const [{ count }] = await tx
+			.select({ count: sql<number>`count(*)`.mapWith(Number) })
+			.from(booking)
+			.where(and(eq(booking.sessionId, sess.id), eq(booking.status, 'booked')));
+		if (count >= sess.capacity) error(409, 'This class is full');
+
+		let row;
+		if (existing) {
+			[row] = await tx
+				.update(booking)
+				.set({ status: 'booked', cancelledAt: null, createdAt: new Date() })
+				.where(eq(booking.id, existing.id))
+				.returning();
+		} else {
+			[row] = await tx
+				.insert(booking)
+				.values({
+					organizationId: org.id,
+					sessionId: sess.id,
+					memberId: member.id,
+					status: 'booked'
+				})
+				.returning();
+		}
+		await tx.insert(charge).values({
+			organizationId: org.id,
+			memberId: member.id,
+			kind: 'dropin',
+			description: `Drop-in — ${sess.className} ${sess.startsAt.toISOString().slice(0, 10)}`,
+			dueDate: sess.startsAt.toISOString().slice(0, 10),
+			amount: sess.price
 		});
-	}
-	return null;
+		return { b: row, className: sess.className, price: sess.price };
+	});
+
+	const checkoutUrl = await onlineCheckout(
+		org.id,
+		settings,
+		{
+			amount: price ?? 0,
+			description: `Drop-in — ${className}`,
+			memberId: member.id,
+			email
+		},
+		{ success: `/j/${slug}?dropin=paid`, cancel: `/j/${slug}` }
+	);
+
+	await emit({
+		orgId: org.id,
+		entityType: 'booking',
+		entityId: b.id,
+		action: 'dropin',
+		summary: `${input.name} booked a drop-in for ${className}`
+	});
+	return { member, bookingId: b.id, checkoutUrl };
 }

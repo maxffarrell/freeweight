@@ -167,6 +167,8 @@ export const classType = pgTable(
 		capacity: integer('capacity').notNull().default(20),
 		/** Staff member (org `member` row) who usually teaches it. */
 		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
+		/** Price in minor units for one drop-in booking; null = no online drop-in sales. */
+		dropInPrice: integer('drop_in_price'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

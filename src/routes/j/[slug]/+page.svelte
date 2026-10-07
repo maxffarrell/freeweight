@@ -1,13 +1,15 @@
 <script lang="ts">
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { page } from '$app/state';
-	import { joinGymForm } from '#lib/remote/public.remote.ts';
+	import { bookDropInForm, joinGymForm } from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -45,6 +47,55 @@
 			toast.error(errMsg(err, 'Could not join — try again'));
 		}
 		pending = false;
+	}
+
+	// ------- drop-in -------
+	const dropPaid = page.url.searchParams.get('dropin') === 'paid';
+	let dropOpen = $state(false);
+	let dropSessionId = $state('');
+	let dropTitle = $state('');
+	let dropPrice = $state(0);
+	let dName = $state('');
+	let dEmail = $state('');
+	let dPhone = $state('');
+	let dPending = $state(false);
+	let dropCheckoutUrl = $state<string | null>(null);
+	let dropDone = $state(false);
+	const dropBooked = new SvelteSet<string>();
+
+	function openDropIn(s: {
+		session: { id: string };
+		className: string;
+		dropInPrice: number | null;
+	}) {
+		dropSessionId = s.session.id;
+		dropTitle = s.className;
+		dropPrice = s.dropInPrice ?? 0;
+		dropDone = dropBooked.has(s.session.id);
+		dropCheckoutUrl = null;
+		dropOpen = true;
+	}
+
+	async function submitDropIn(e: SubmitEvent) {
+		e.preventDefault();
+		dPending = true;
+		try {
+			const r = await bookDropInForm({
+				slug: org.slug,
+				input: {
+					sessionId: dropSessionId,
+					name: dName,
+					email: dEmail,
+					phone: dPhone || undefined
+				}
+			});
+			dropCheckoutUrl = r.checkoutUrl ?? null;
+			dropDone = true;
+			dropBooked.add(dropSessionId);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book — try again'));
+		}
+		dPending = false;
 	}
 </script>
 
@@ -133,8 +184,21 @@
 										>· {s.locationName}</span
 									>{/if}
 							</div>
-							<span class="shrink-0 text-muted-foreground">
-								{localDate(s.session.startsAt, tz)} · {localTime(s.session.startsAt, tz)}
+							<span class="flex shrink-0 items-center gap-2 text-muted-foreground">
+								<span>
+									{localDate(s.session.startsAt, tz)} · {localTime(s.session.startsAt, tz)}
+								</span>
+								{#if s.dropInPrice}
+									{#if s.booked >= s.session.capacity}
+										<Badge variant="outline">Full</Badge>
+									{:else if dropBooked.has(s.session.id)}
+										<Badge variant="secondary">Booked</Badge>
+									{:else}
+										<Button size="sm" variant="outline" onclick={() => openDropIn(s)}>
+											Drop in · {formatMoney(s.dropInPrice, currency)}
+										</Button>
+									{/if}
+								{/if}
 							</span>
 						</div>
 					{/each}
@@ -144,6 +208,13 @@
 
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">Join</h2>
+			{#if dropPaid}
+				<Card.Root class="border-green-500">
+					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">
+						Drop-in paid — see you in class.
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if paid}
 				<Card.Root class="border-green-500">
 					<Card.Content class="px-6 py-4 text-sm text-green-700 dark:text-green-400">
@@ -232,4 +303,50 @@
 			>
 		</p>
 	</main>
+
+	<Dialog.Root bind:open={dropOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>Drop in — {dropTitle}</Dialog.Title>
+				<Dialog.Description>
+					One class, {formatMoney(dropPrice, currency)}. No membership needed.
+				</Dialog.Description>
+			</Dialog.Header>
+			{#if dropDone}
+				<div class="space-y-3 py-2 text-sm">
+					<p class="font-medium">You're booked in.</p>
+					{#if dropCheckoutUrl}
+						<p class="text-muted-foreground">Pay now to lock it in:</p>
+						<Button class="w-full" href={dropCheckoutUrl}
+							>Pay {formatMoney(dropPrice, currency)}</Button
+						>
+					{:else}
+						<p class="text-muted-foreground">Pay at the front desk when you arrive.</p>
+					{/if}
+				</div>
+			{:else}
+				<form class="space-y-4" onsubmit={submitDropIn}>
+					<Field.Field>
+						<Field.Label for="d-name">Name</Field.Label>
+						<Input id="d-name" required bind:value={dName} autocomplete="name" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="d-email">Email</Field.Label>
+						<Input id="d-email" type="email" required bind:value={dEmail} autocomplete="email" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="d-phone"
+							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
+						>
+						<Input id="d-phone" type="tel" bind:value={dPhone} autocomplete="tel" />
+					</Field.Field>
+					<Dialog.Footer>
+						<Button type="submit" disabled={dPending}
+							>{dPending ? 'Booking…' : 'Book this class'}</Button
+						>
+					</Dialog.Footer>
+				</form>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
 </div>
