@@ -88,6 +88,7 @@ export async function createClassType(
 			dropInPrice: input.dropInPrice ?? null,
 			payRate: input.payRate ?? null,
 			minEnrollment: input.minEnrollment ?? null,
+			bookCutoffMin: input.bookCutoffMin ?? null,
 			active: input.active
 		})
 		.returning();

@@ -330,6 +330,13 @@
       "when": 1791382595535,
       "tag": "0046_cover-request",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791383353297,
+      "tag": "0047_class-book-cutoff",
+      "breakpoints": true
     }
   ]
 }
