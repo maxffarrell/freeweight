@@ -49,17 +49,17 @@
 			d60: { n: 0, sum: 0 },
 			d60plus: { n: 0, sum: 0 }
 		};
-		const debtors = new Set<string>();
+		const debtors: Record<string, true> = {};
 		for (const c of openCharges) {
 			const balance = c.charge.amount - c.paid;
 			if (balance <= 0) continue;
-			debtors.add(c.charge.memberId);
+			debtors[c.charge.memberId] = true;
 			const days = Math.floor((Date.parse(today) - Date.parse(c.charge.dueDate)) / 86400000);
 			const bucket = days <= 0 ? b.current : days <= 30 ? b.d30 : days <= 60 ? b.d60 : b.d60plus;
 			bucket.n++;
 			bucket.sum += balance;
 		}
-		return { ...b, debtors: debtors.size };
+		return { ...b, debtors: Object.keys(debtors).length };
 	});
 
 	async function filterCharges() {
