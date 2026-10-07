@@ -88,7 +88,7 @@ export const resources: Record<string, Resource> = {
 		list: async (ctx) => {
 			const since = new Date();
 			since.setHours(0, 0, 0, 0);
-			return checkins.listTodayCheckIns(ctx.orgId, since);
+			return checkins.listCheckIns(ctx.orgId, { since });
 		},
 		create: { schema: s.checkInInput, run: checkins.recordCheckIn as never }
 	},

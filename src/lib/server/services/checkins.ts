@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
-import { and, desc, eq, gte, isNotNull, isNull, lt, or, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNotNull, isNull, lt, or, gt, sql } from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -170,12 +170,22 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 	return { checkIn: row!, member: m, attended: attended.length };
 }
 
-export async function listTodayCheckIns(orgId: string, since: Date) {
+export async function listCheckIns(orgId: string, opts: { since: Date; until?: Date; q?: string }) {
+	const term = opts.q?.trim();
 	return db
 		.select({ checkIn, memberName: gymMember.name, locationName: location.name })
 		.from(checkIn)
 		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
 		.leftJoin(location, eq(checkIn.locationId, location.id))
-		.where(and(eq(checkIn.organizationId, orgId), gte(checkIn.checkedAt, since)))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, opts.since),
+				opts.until ? lt(checkIn.checkedAt, opts.until) : undefined,
+				term
+					? or(ilike(gymMember.name, `%${term}%`), ilike(checkIn.guestName, `%${term}%`))
+					: undefined
+			)
+		)
 		.orderBy(desc(checkIn.checkedAt));
 }

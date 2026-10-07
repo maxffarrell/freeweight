@@ -7,9 +7,9 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getTodayCheckIns, recordCheckIn } from '#lib/remote/members.remote.ts';
+	import { getCheckIns, recordCheckIn } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { localTime } from '#lib/tz.ts';
+	import { localDate, localTime } from '#lib/tz.ts';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
 	import { errMsg } from '#lib/format.ts';
@@ -17,7 +17,19 @@
 
 	const settings = await getSettings();
 	const locations = await getLocations();
-	let checkIns = $state(await getTodayCheckIns());
+	const today = localDate(new Date(), settings.timezone);
+
+	let viewDate = $state(today);
+	let q = $state('');
+	let checkIns = $state(await getCheckIns({ date: viewDate }));
+	async function refilter() {
+		checkIns = await getCheckIns({ date: viewDate, q: q.trim() || undefined });
+	}
+	let searchTimer: ReturnType<typeof setTimeout>;
+	function search() {
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => void refilter(), 250);
+	}
 
 	let code = $state('');
 	let locationId = $state('');
@@ -37,7 +49,7 @@
 						: '')
 			);
 			code = '';
-			checkIns = await getTodayCheckIns();
+			await refilter();
 		} catch (err) {
 			toast.error(errMsg(err, 'Check-in failed'));
 		}
@@ -101,12 +113,23 @@
 
 	<Card.Root class="lg:col-span-2">
 		<Card.Header>
-			<Card.Title class="text-base">Today</Card.Title>
+			<Card.Title class="text-base">{viewDate === today ? 'Today' : viewDate}</Card.Title>
 			<Card.Description
-				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'} so far.</Card.Description
+				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
+					? ' so far'
+					: ''}.</Card.Description
 			>
 		</Card.Header>
 		<Card.Content class="px-4">
+			<div class="mb-3 flex gap-2">
+				<Input type="date" class="w-40" bind:value={viewDate} onchange={() => void refilter()} />
+				<Input
+					placeholder="Search member or guest…"
+					class="flex-1"
+					bind:value={q}
+					oninput={search}
+				/>
+			</div>
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
@@ -138,7 +161,9 @@
 					{:else}
 						<Table.Row
 							><Table.Cell colspan={4} class="text-muted-foreground"
-								>No check-ins yet today.</Table.Cell
+								>No check-ins{q.trim() ? ' match that search' : ''}{viewDate === today
+									? ' yet today'
+									: ' that day'}.</Table.Cell
 							></Table.Row
 						>
 					{/each}

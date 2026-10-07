@@ -17,6 +17,8 @@ import {
 	memberUpdate
 } from '#lib/schemas.ts';
 import { listRecentAnnouncements, sendAnnouncement } from '#lib/server/services/notifications.ts';
+import * as settingsSvc from '#lib/server/services/settings.ts';
+import { localDate, zonedToUtc } from '#lib/tz.ts';
 
 export const getMembers = query(
 	v.optional(v.object({ q: v.optional(v.string()), tag: v.optional(v.string()) })),
@@ -62,10 +64,22 @@ export const getPortalInvite = query(idSchema, async (memberId) => {
 
 export const getTodayCheckIns = query(async () => {
 	const { orgId } = await requireOrg();
-	const since = new Date();
-	since.setHours(0, 0, 0, 0);
-	return checkins.listTodayCheckIns(orgId, since);
+	const tz = (await settingsSvc.getSettings(orgId)).timezone;
+	const since = zonedToUtc(`${localDate(new Date(), tz)}T00:00`, tz);
+	return checkins.listCheckIns(orgId, { since });
 });
+
+/** Check-ins for one local day, optionally filtered by member/guest name. */
+export const getCheckIns = query(
+	v.object({ date: v.pipe(v.string(), v.isoDate()), q: v.optional(v.string()) }),
+	async ({ date, q }) => {
+		const { orgId } = await requireOrg();
+		const tz = (await settingsSvc.getSettings(orgId)).timezone;
+		const since = zonedToUtc(`${date}T00:00`, tz);
+		const until = new Date(since.getTime() + 86400_000);
+		return checkins.listCheckIns(orgId, { since, until, q });
+	}
+);
 export const recordCheckIn = command(checkInInput, async (input) => {
 	const r = await checkins.recordCheckIn(await requireOrg(), input);
 	void getTodayCheckIns().refresh();
