@@ -30,6 +30,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import {
 	notifyChargePosted,
+	notifyMembershipCancelled,
 	notifyMembershipResumed,
 	notifyMembershipSuspended,
 	notifyPaymentReceived,
@@ -84,6 +85,7 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 			trialDays: input.trialDays,
 			guestPasses: input.guestPasses ?? null,
 			commitmentMonths: input.commitmentMonths ?? null,
+			earlyCancelFeeCents: input.earlyCancelFeeCents ?? null,
 			memberLimit: input.memberLimit ?? null,
 			bookAheadDays: input.bookAheadDays ?? null,
 			listed: input.listed,
@@ -424,6 +426,7 @@ export async function updateMembership(
 			planId: membership.planId,
 			requestReason: membership.requestReason,
 			memberId: membership.memberId,
+			createdAt: membership.createdAt,
 			nextChargeAt: membership.nextChargeAt,
 			price: membership.price
 		})
@@ -485,6 +488,33 @@ export async function updateMembership(
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
 	if (!row) error(404, 'Membership not found');
+	// A staff cancel inside the plan's commitment window posts the plan's
+	// early-termination fee; the member gets a confirmation email either way.
+	if (input.status === 'cancelled' && current.status !== 'cancelled') {
+		const [p] = await db
+			.select({
+				name: plan.name,
+				commitmentMonths: plan.commitmentMonths,
+				earlyCancelFeeCents: plan.earlyCancelFeeCents
+			})
+			.from(plan)
+			.where(eq(plan.id, row.planId));
+		let earlyFee = 0;
+		if (p?.commitmentMonths && p.earlyCancelFeeCents) {
+			let end = current.createdAt.toISOString().slice(0, 10);
+			for (let i = 0; i < p.commitmentMonths; i++) end = nextPeriod(end, 'month');
+			if (end > todayISO()) earlyFee = p.earlyCancelFeeCents;
+		}
+		if (earlyFee > 0)
+			await addCharge(ctx, {
+				memberId: row.memberId,
+				kind: 'other',
+				description: `Early cancellation fee — ${p!.name}`,
+				amount: earlyFee,
+				dueDate: todayISO()
+			});
+		notifyMembershipCancelled(ctx.orgId, row.id, earlyFee).catch(() => {});
+	}
 	if (newPlan) {
 		const [oldPlan] = await db
 			.select({ name: plan.name, amount: plan.amount, interval: plan.interval })

@@ -540,6 +540,13 @@
       "when": 1791410087059,
       "tag": "0076_setup_dismissed",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1791410634715,
+      "tag": "0077_early_cancel_fee",
+      "breakpoints": true
     }
   ]
 }

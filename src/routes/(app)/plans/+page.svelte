@@ -54,6 +54,7 @@
 	let trialDays = $state(0);
 	let guestPasses = $state<number | null>(null);
 	let commitmentMonths = $state<number | null>(null);
+	let earlyCancelFee = $state<number | null>(null);
 	let memberLimit = $state<number | null>(null);
 	let bookAheadDays = $state<number | null>(null);
 	let grandfather = $state(false);
@@ -73,6 +74,7 @@
 		trialDays = p.trialDays;
 		guestPasses = p.guestPasses;
 		commitmentMonths = p.commitmentMonths;
+		earlyCancelFee = p.earlyCancelFeeCents;
 		memberLimit = p.memberLimit;
 		bookAheadDays = p.bookAheadDays;
 		listed = p.listed;
@@ -92,6 +94,7 @@
 		trialDays = 0;
 		guestPasses = null;
 		commitmentMonths = null;
+		earlyCancelFee = null;
 		memberLimit = null;
 		bookAheadDays = null;
 		listed = active = true;
@@ -117,6 +120,7 @@
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
+					earlyCancelFeeCents: isPack ? null : earlyCancelFee || null,
 					memberLimit: isPack ? null : memberLimit || null,
 					bookAheadDays: isPack ? null : bookAheadDays || null,
 					listed,
@@ -137,6 +141,7 @@
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
+					earlyCancelFeeCents: isPack ? null : earlyCancelFee || null,
 					memberLimit: isPack ? null : memberLimit || null,
 					bookAheadDays: isPack ? null : bookAheadDays || null,
 					listed,
@@ -481,6 +486,11 @@
 						placeholder="None"
 						disabled={isPack}
 					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="p-etf">Early-cancel fee</Field.Label>
+					<MoneyInput bind:value={earlyCancelFee} id="p-etf" />
+					<Field.Description>Charged if cancelled inside the commitment window</Field.Description>
 				</Field.Field>
 			</div>
 			<div class="grid grid-cols-2 gap-3">
