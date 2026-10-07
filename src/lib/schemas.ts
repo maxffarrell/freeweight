@@ -71,7 +71,9 @@ export const membershipInput = v.object({
 });
 export const membershipUpdate = v.object({
 	id: idSchema,
-	status: v.optional(v.picklist(membershipStatuses))
+	status: v.optional(v.picklist(membershipStatuses)),
+	/** With status 'paused': auto-resume on this date. */
+	resumeAt: v.optional(v.nullable(isoDate))
 });
 
 export const locationInput = v.object({

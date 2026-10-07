@@ -91,13 +91,29 @@
 		pending = false;
 	}
 
-	async function setMembership(membershipId: string, status: 'paused' | 'cancelled' | 'active') {
+	async function setMembership(
+		membershipId: string,
+		status: 'paused' | 'cancelled' | 'active',
+		resumeAt?: string
+	) {
 		try {
-			await updateMembership({ id: membershipId, status });
+			await updateMembership({ id: membershipId, status, resumeAt: resumeAt || null });
 			toast.success(`Membership ${status}`);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update'));
 		}
+	}
+
+	let pauseOpen = $state(false);
+	let pauseId = $state('');
+	let pauseResumeAt = $state('');
+	async function submitPause(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		await setMembership(pauseId, 'paused', pauseResumeAt || undefined);
+		pending = false;
+		pauseOpen = false;
+		pauseResumeAt = '';
 	}
 
 	// ------- guest visit -------
@@ -234,7 +250,10 @@
 							<p class="text-xs text-muted-foreground">
 								{formatMoney(mm.amount, currency)}{mm.isPack ? ' pack' : `/${mm.interval}`} · from {formatDate(
 									mm.membership.startsAt
-								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}
+								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}{mm
+									.membership.frozenUntil
+									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
+									: ''}
 							</p>
 						</div>
 						<div class="flex items-center gap-2">
@@ -244,7 +263,7 @@
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs"
-									onclick={() => setMembership(mm.membership.id, 'paused')}>Pause</Button
+									onclick={() => ((pauseId = mm.membership.id), (pauseOpen = true))}>Pause</Button
 								>
 								<Button
 									variant="ghost"
@@ -401,6 +420,29 @@
 		</Tabs.Root>
 	</Card.Root>
 </div>
+
+<Dialog.Root bind:open={pauseOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Pause membership</Dialog.Title>
+			<Dialog.Description>
+				The member can't book while paused. Optionally pick a date to resume automatically.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitPause}>
+			<Field.Field
+				><Field.Label for="pause-until">Resume on (optional)</Field.Label><Input
+					id="pause-until"
+					type="date"
+					bind:value={pauseResumeAt}
+				/></Field.Field
+			>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>Pause membership</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={guestOpen}>
 	<Dialog.Content>

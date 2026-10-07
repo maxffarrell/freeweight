@@ -1,0 +1,1 @@
+ALTER TABLE "membership" ADD COLUMN "frozen_until" date;

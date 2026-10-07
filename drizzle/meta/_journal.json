@@ -50,6 +50,13 @@
       "when": 1791347203896,
       "tag": "0006_mighty_union_jack",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791347837769,
+      "tag": "0007_outgoing_psynapse",
+      "breakpoints": true
     }
   ]
 }

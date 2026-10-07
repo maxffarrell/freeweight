@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, lt, lte, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	charge,
@@ -240,7 +240,8 @@ export async function updateMembership(
 		.set({
 			status: input.status,
 			cancelledAt: input.status === 'cancelled' ? new Date() : null,
-			nextChargeAt
+			nextChargeAt,
+			frozenUntil: input.status === 'paused' ? (input.resumeAt ?? null) : null
 		})
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
@@ -280,7 +281,37 @@ export async function runBilling(orgId: string) {
 			.set({ nextChargeAt: new Date(`${period}T00:00:00Z`) })
 			.where(eq(membership.id, m.id));
 	}
+	await resumeFrozenMemberships(orgId);
 	return posted;
+}
+
+/**
+ * Paused memberships whose freeze date has passed flip back to active and restart
+ * billing one plan interval out. Runs inside runBilling (daily cron).
+ */
+async function resumeFrozenMemberships(orgId: string) {
+	const rows = await db
+		.select({ id: membership.id, interval: plan.interval })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'paused'),
+				lte(membership.frozenUntil, todayISO())
+			)
+		);
+	for (const r of rows) {
+		await db
+			.update(membership)
+			.set({
+				status: 'active',
+				frozenUntil: null,
+				nextChargeAt: new Date(`${nextPeriod(todayISO(), r.interval)}T00:00:00Z`)
+			})
+			.where(eq(membership.id, r.id));
+	}
+	return rows.length;
 }
 
 // ---------- Charges & payments ----------

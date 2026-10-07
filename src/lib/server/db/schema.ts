@@ -176,6 +176,8 @@ export const membership = pgTable(
 		nextChargeAt: timestamp('next_charge_at', { withTimezone: true }),
 		/** Pack expiry; null = recurring membership or a pack that never expires. */
 		endsAt: timestamp('ends_at', { withTimezone: true }),
+		/** Paused memberships auto-resume on this date (billing restarts); null = manual resume. */
+		frozenUntil: date('frozen_until', { mode: 'string' }),
 		...timestamps
 	},
 	(t) => [
