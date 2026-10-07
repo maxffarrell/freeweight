@@ -1,11 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, isNull, sql, lt } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
 	charge,
+	checkIn,
 	classSession,
 	classType,
 	gymMember,
@@ -24,6 +25,7 @@ import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
 import { emit } from './events.ts';
+import { localDate } from '#lib/tz.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -135,8 +137,53 @@ export async function portalOverview(memberId: string) {
 		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId),
 		waiverRequired: !!settings?.waiver,
-		signedWaiver
+		signedWaiver,
+		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC')
 	};
+}
+
+/**
+ * Member-facing engagement numbers: own check-ins this calendar month and the run of
+ * consecutive ISO weeks with at least one visit (guest visits don't count).
+ */
+async function attendanceStats(orgId: string, memberId: string, tz: string) {
+	const rows = await db
+		.select({ checkedAt: checkIn.checkedAt })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, new Date(Date.now() - 180 * 24 * 3600_000))
+			)
+		)
+		.orderBy(desc(checkIn.checkedAt));
+	const days = new Set(rows.map((r) => localDate(r.checkedAt, tz)));
+	const month = localDate(new Date(), tz).slice(0, 7);
+	const visitsThisMonth = rows.filter((r) => localDate(r.checkedAt, tz).startsWith(month)).length;
+	// Week bucket = the Monday of that week's ISO date string.
+	const weekOf = (iso: string) => {
+		const d = new Date(`${iso}T12:00:00Z`);
+		d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+		return d.toISOString().slice(0, 10);
+	};
+	const weeks = new Set([...days].map(weekOf));
+	let weekStreak = 0;
+	let w = weekOf(localDate(new Date(), tz));
+	if (!weeks.has(w)) {
+		// This week isn't over — count from last week so a streak isn't lost mid-week.
+		const prev = new Date(`${w}T12:00:00Z`);
+		prev.setUTCDate(prev.getUTCDate() - 7);
+		w = prev.toISOString().slice(0, 10);
+	}
+	while (weeks.has(w)) {
+		weekStreak++;
+		const prev = new Date(`${w}T12:00:00Z`);
+		prev.setUTCDate(prev.getUTCDate() - 7);
+		w = prev.toISOString().slice(0, 10);
+	}
+	return { visitsThisMonth, weekStreak, totalVisits: rows.length };
 }
 
 /**

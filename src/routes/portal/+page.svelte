@@ -21,6 +21,7 @@
 	import { localDate, localTime } from '#lib/tz.ts';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
+	import Flame from '@lucide/svelte/icons/flame';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -187,6 +188,27 @@
 				{/each}
 			</Card.Footer>
 		{/if}
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2 text-base"><Flame /> Attendance</Card.Title>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<p class="text-3xl font-semibold tabular-nums">{d.attendance.visitsThisMonth}</p>
+					<p class="text-xs text-muted-foreground">visits this month</p>
+				</div>
+				<div>
+					<p class="text-3xl font-semibold tabular-nums">{d.attendance.weekStreak}</p>
+					<p class="text-xs text-muted-foreground">week streak</p>
+				</div>
+			</div>
+			<p class="text-xs text-muted-foreground">
+				{d.attendance.totalVisits} visits in the last 6 months
+			</p>
+		</Card.Content>
 	</Card.Root>
 
 	<Card.Root>
