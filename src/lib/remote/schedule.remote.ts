@@ -285,6 +285,13 @@ export const cancelEventRegistration = command(idSchema, async (id) => {
 	void getEvents().refresh();
 	void getEventRoster(r.eventId).refresh();
 });
+/** Cancel an event — voids unpaid signup charges and emails every registrant. */
+export const cancelEvent = command(idSchema, async (id) => {
+	const r = await evt.cancelEvent((await requireOrg()).orgId, id);
+	void getEvents().refresh();
+	void getEventRoster(id).refresh();
+	return r;
+});
 /** Mark/unmark a registered member as attended at the event. */
 export const setEventAttended = command(
 	v.object({ eventId: idSchema, id: idSchema, attended: v.boolean() }),
