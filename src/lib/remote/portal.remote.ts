@@ -10,6 +10,7 @@ import * as memberSvc from '#lib/server/services/members.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
+import * as chalSvc from '#lib/server/services/challenges.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { idSchema, measurementInput, resourceBookInput } from '#lib/schemas.ts';
 
@@ -353,6 +354,33 @@ export const checkInWithCode = command(
 		const r = await checkinSvc.checkInWithCode(m.organizationId, m.id, code);
 		void getPortalOverview(memberId).refresh();
 		void getBookable(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- Challenges ----------
+
+export const getPortalChallenges = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return chalSvc.portalChallenges(m.organizationId, m.id);
+});
+
+export const joinChallenge = command(
+	v.object({ memberId: idSchema, challengeId: idSchema }),
+	async ({ memberId, challengeId }) => {
+		const m = await myMember(memberId);
+		const r = await chalSvc.joinChallenge(m.organizationId, challengeId, m.id);
+		void getPortalChallenges(memberId).refresh();
+		return r;
+	}
+);
+
+export const leaveChallenge = command(
+	v.object({ memberId: idSchema, challengeId: idSchema }),
+	async ({ memberId, challengeId }) => {
+		const m = await myMember(memberId);
+		const r = await chalSvc.leaveChallenge(m.organizationId, challengeId, m.id);
+		void getPortalChallenges(memberId).refresh();
 		return r;
 	}
 );

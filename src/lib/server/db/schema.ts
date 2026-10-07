@@ -793,3 +793,40 @@ export const activity = pgTable(
 		index('activity_entity_idx').on(t.entityType, t.entityId)
 	]
 );
+
+/** Member challenge — "30 visits in 30 days". Progress = the member's check-ins inside the window. */
+export const challenge = pgTable(
+	'challenge',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		description: text('description').notNull().default(''),
+		/** Check-ins needed to finish the challenge. */
+		goal: integer('goal').notNull(),
+		startDate: date('start_date', { mode: 'string' }).notNull(),
+		endDate: date('end_date', { mode: 'string' }).notNull(),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('challenge_org_idx').on(t.organizationId)]
+);
+
+export const challengeEntry = pgTable(
+	'challenge_entry',
+	{
+		id: id(),
+		organizationId: orgId(),
+		challengeId: text('challenge_id')
+			.notNull()
+			.references(() => challenge.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('challenge_entry_challenge_idx').on(t.challengeId),
+		uniqueIndex('challenge_entry_member_key').on(t.challengeId, t.memberId)
+	]
+);

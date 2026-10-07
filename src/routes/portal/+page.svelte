@@ -6,6 +6,8 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Progress } from '#lib/components/ui/progress/index.js';
+	import Trophy from '@lucide/svelte/icons/trophy';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { toast } from 'svelte-sonner';
@@ -40,7 +42,10 @@
 		getPortalEvents,
 		registerEvent,
 		cancelEventReg,
-		checkInWithCode
+		checkInWithCode,
+		getPortalChallenges,
+		joinChallenge,
+		leaveChallenge
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -144,6 +149,30 @@
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
 		}
+	}
+
+	// ------- challenges -------
+	const portalChallenges = $derived(await getPortalChallenges(memberId));
+	let chalBusy = $state('');
+	async function joinChal(challengeId: string) {
+		chalBusy = challengeId;
+		try {
+			await joinChallenge({ memberId, challengeId });
+			toast.success("You're in — every check-in counts");
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not join'));
+		}
+		chalBusy = '';
+	}
+	async function leaveChal(challengeId: string) {
+		chalBusy = challengeId;
+		try {
+			await leaveChallenge({ memberId, challengeId });
+			toast.success('Left the challenge');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not leave'));
+		}
+		chalBusy = '';
 	}
 
 	// ------- class check-in code -------
@@ -903,6 +932,73 @@
 										? `Register — ${formatMoney(ev.event.price, currency)}`
 										: 'Register'}
 							</Button>
+						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if portalChallenges.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"><Trophy /> Challenges</Card.Title>
+				<Card.Description>Hit the check-in goal before the window ends.</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6 pb-4">
+				{#each portalChallenges as c (c.challenge.id)}
+					<div class="py-3">
+						<div class="flex items-center gap-3">
+							<div class="min-w-0 flex-1">
+								<div class="flex items-center gap-2">
+									<span class="truncate font-medium">{c.challenge.name}</span>
+									{#if c.state === 'upcoming'}
+										<Badge variant="secondary">Starts {formatDate(c.challenge.startDate)}</Badge>
+									{:else if c.mine && c.mine.count >= c.challenge.goal}
+										<Badge>Finished</Badge>
+									{/if}
+								</div>
+								<p class="text-sm text-muted-foreground">
+									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
+									{c.challenge.goal} check-ins · {c.joined} in
+								</p>
+								{#if c.challenge.description}
+									<p class="mt-0.5 truncate text-xs text-muted-foreground">
+										{c.challenge.description}
+									</p>
+								{/if}
+							</div>
+							{#if c.mine}
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={chalBusy === c.challenge.id}
+									onclick={() => leaveChal(c.challenge.id)}>Leave</Button
+								>
+							{:else}
+								<Button
+									size="sm"
+									disabled={chalBusy === c.challenge.id}
+									onclick={() => joinChal(c.challenge.id)}>Join</Button
+								>
+							{/if}
+						</div>
+						{#if c.mine}
+							<div class="mt-2 flex items-center gap-3">
+								<Progress
+									value={Math.min(c.mine.count, c.challenge.goal)}
+									max={c.challenge.goal}
+									class="flex-1"
+								/>
+								<span class="text-sm text-muted-foreground tabular-nums"
+									>{c.mine.count}/{c.challenge.goal}</span
+								>
+							</div>
+						{/if}
+						{#if c.leaders.length}
+							<p class="mt-1.5 truncate text-xs text-muted-foreground">
+								{c.leaders.map((l, i) => `${i + 1}. ${l.name} (${l.count})`).join(' · ')}
+							</p>
 						{/if}
 					</div>
 				{/each}

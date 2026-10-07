@@ -29,6 +29,13 @@
 		tagMembers
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
+	import {
+		getChallenges,
+		createChallenge,
+		updateChallenge
+	} from '#lib/remote/challenges.remote.ts';
+	import { Switch } from '#lib/components/ui/switch/index.js';
+	import Trophy from '@lucide/svelte/icons/trophy';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
 	import { getCurrency, getPlans } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -159,6 +166,45 @@
 			toast.error(errMsg(err, 'Import failed'));
 		}
 		importPending = false;
+	}
+
+	// ------- challenges -------
+	const challenges = $derived(await getChallenges());
+	let chalOpen = $state(false);
+	let cName = $state('');
+	let cDesc = $state('');
+	let cGoal = $state(30);
+	let cStart = $state(new Date().toISOString().slice(0, 10));
+	let cEnd = $state('');
+	let cPending = $state(false);
+
+	async function submitChallenge(e: SubmitEvent) {
+		e.preventDefault();
+		cPending = true;
+		try {
+			await createChallenge({
+				name: cName.trim(),
+				description: cDesc.trim() || undefined,
+				goal: cGoal,
+				startDate: cStart,
+				endDate: cEnd
+			});
+			toast.success('Challenge created — members can join in the portal');
+			cName = cDesc = '';
+			await getChallenges().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not create challenge'));
+		}
+		cPending = false;
+	}
+
+	async function toggleChallenge(id: string, active: boolean) {
+		try {
+			await updateChallenge({ id, active });
+			await getChallenges().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
 	}
 
 	function exportCsv() {
@@ -295,6 +341,9 @@
 				emailAudience = selected.size ? '__sel' : '__all';
 				emailOpen = true;
 			}}><Mail /> Email</Button
+		>
+		<Button size="sm" variant="outline" onclick={() => (chalOpen = true)}
+			><Trophy /> Challenges</Button
 		>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
@@ -707,6 +756,83 @@
 					</Button>
 				</div></Dialog.Footer
 			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={chalOpen}>
+	<Dialog.Content class="sm:max-w-xl">
+		<Dialog.Header>
+			<Dialog.Title>Challenges</Dialog.Title>
+			<Dialog.Description>
+				Members join in the portal — progress counts their check-ins inside the window.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if challenges.length}
+			<div class="mb-4 space-y-3">
+				{#each challenges as c (c.challenge.id)}
+					<div class="rounded-lg border p-3">
+						<div class="flex items-center justify-between gap-2">
+							<div class="min-w-0">
+								<span class="font-medium">{c.challenge.name}</span>
+								<Badge
+									variant={c.state === 'live' ? 'default' : 'secondary'}
+									class="ml-2 align-middle">{c.state}</Badge
+								>
+								<p class="text-xs text-muted-foreground">
+									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
+									{c.challenge.goal} check-ins · {c.joined} joined · {c.finished} finished
+								</p>
+							</div>
+							<Switch
+								checked={c.challenge.active}
+								onCheckedChange={(v) => toggleChallenge(c.challenge.id, v)}
+							/>
+						</div>
+						{#if c.entries.length}
+							<div class="mt-2 space-y-0.5 text-sm">
+								{#each c.entries.slice(0, 5) as e, i (e.entry.id)}
+									<div class="flex justify-between gap-2">
+										<span class="truncate text-muted-foreground">
+											{i + 1}. {e.memberName}
+										</span>
+										<span class="tabular-nums">{e.count}/{c.challenge.goal}</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<form class="space-y-4" onsubmit={submitChallenge}>
+			<Field.Field>
+				<Field.Label for="c-name">Name</Field.Label>
+				<Input id="c-name" required bind:value={cName} placeholder="30 visits in 30 days" />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="c-desc">Description (optional)</Field.Label>
+				<Input id="c-desc" bind:value={cDesc} placeholder="Check in 30 times this month" />
+			</Field.Field>
+			<div class="grid grid-cols-3 gap-3">
+				<Field.Field>
+					<Field.Label for="c-goal">Goal (check-ins)</Field.Label>
+					<Input id="c-goal" type="number" min={1} max={1000} required bind:value={cGoal} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-start">Starts</Field.Label>
+					<Input id="c-start" type="date" required bind:value={cStart} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-end">Ends</Field.Label>
+					<Input id="c-end" type="date" required bind:value={cEnd} />
+				</Field.Field>
+			</div>
+			<Dialog.Footer>
+				<Button type="submit" disabled={cPending || !cName.trim() || !cEnd}
+					>{cPending ? 'Creating…' : 'Create challenge'}</Button
+				>
+			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
