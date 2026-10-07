@@ -193,6 +193,7 @@
 	let editLocationId = $state('');
 	let editInstructorId = $state('');
 	let editNote = $state('');
+	let editWorkout = $state('');
 	let editNeedsCover = $state(false);
 	function openEdit() {
 		if (!focus) return;
@@ -205,6 +206,7 @@
 		editLocationId = focus.session.locationId ?? '';
 		editInstructorId = focus.session.instructorId ?? '';
 		editNote = focus.session.note ?? '';
+		editWorkout = focus.session.workout ?? '';
 		editNeedsCover = !!focus.session.coverRequestedAt;
 		editOpen = true;
 	}
@@ -220,6 +222,7 @@
 				locationId: editLocationId || null,
 				instructorId: editInstructorId || null,
 				note: editNote.trim() || null,
+				workout: editWorkout.trim() || null,
 				needsCover: editNeedsCover
 			});
 			toast.success('Session updated');
@@ -860,6 +863,14 @@
 				{focus.session.note}
 			</p>
 		{/if}
+		{#if focus?.session.workout}
+			<div class="border-b px-4 py-2">
+				<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					Workout of the day
+				</p>
+				<p class="mt-0.5 text-sm whitespace-pre-line">{focus.session.workout}</p>
+			</div>
+		{/if}
 		{#if focus?.session.checkinCode}
 			<p class="border-b px-4 py-2 text-sm text-muted-foreground">
 				Announce check-in code
@@ -1145,6 +1156,17 @@
 					placeholder="Shown on the roster — e.g. pool closed, bring mats"
 					maxlength={500}
 				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="edit-wod">Workout of the day (optional)</Field.Label>
+				<Textarea
+					id="edit-wod"
+					bind:value={editWorkout}
+					placeholder={'3 rounds for time:\n12 deadlifts\n9 handstand push-ups\n400m run'}
+					rows={4}
+					maxlength={2000}
+				/>
+				<Field.Description>Booked members see this in their portal.</Field.Description>
 			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save changes'}</Button>

@@ -1507,6 +1507,11 @@
 							{localDate(u.startsAt, tz)}
 							{localTime(u.startsAt, tz)}
 						</p>
+						{#if u.workout}
+							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
+								{u.workout}
+							</p>
+						{/if}
 					</div>
 					<span class="flex items-center gap-1.5">
 						{#if u.waitlistPos}<span class="text-xs text-muted-foreground">#{u.waitlistPos}</span
@@ -1540,6 +1545,11 @@
 							{localDate(h.startsAt, tz)}{#if h.locationName}
 								· {h.locationName}{/if}
 						</p>
+						{#if h.workout}
+							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
+								{h.workout}
+							</p>
+						{/if}
 					</div>
 					<div class="flex shrink-0 items-center gap-2">
 						{#if h.booking.status === 'attended'}

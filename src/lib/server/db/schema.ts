@@ -416,6 +416,8 @@ export const classSession = pgTable(
 		coverRequestedAt: timestamp('cover_requested_at', { withTimezone: true }),
 		/** Staff note on this session ("pool closed — bring mats"); shown on the roster. */
 		note: text('note'),
+		/** Workout of the day — set by staff, shown to booked members in the portal. */
+		workout: text('workout'),
 		/** Short code the instructor announces at class; booked members self-check-in via the portal. */
 		checkinCode: text('checkin_code'),
 		...timestamps
