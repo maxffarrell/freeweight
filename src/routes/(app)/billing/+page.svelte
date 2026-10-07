@@ -38,10 +38,37 @@
 	);
 	let memberships = $state(await getMemberships());
 	let payments = $state(await getPayments());
+	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
+
+	const aging = $derived.by(() => {
+		const today = todayISO();
+		const b = {
+			current: { n: 0, sum: 0 },
+			d30: { n: 0, sum: 0 },
+			d60: { n: 0, sum: 0 },
+			d60plus: { n: 0, sum: 0 }
+		};
+		const debtors = new Set<string>();
+		for (const c of openCharges) {
+			const balance = c.charge.amount - c.paid;
+			if (balance <= 0) continue;
+			debtors.add(c.charge.memberId);
+			const days = Math.floor((Date.parse(today) - Date.parse(c.charge.dueDate)) / 86400000);
+			const bucket = days <= 0 ? b.current : days <= 30 ? b.d30 : days <= 60 ? b.d60 : b.d60plus;
+			bucket.n++;
+			bucket.sum += balance;
+		}
+		return { ...b, debtors: debtors.size };
+	});
 
 	async function filterCharges() {
 		charges = await getCharges({ status: chargeFilter || undefined });
+	}
+
+	async function refreshCharges() {
+		charges = await getCharges({ status: chargeFilter || undefined });
+		openCharges = await getCharges({ status: 'open' });
 	}
 
 	async function refund(paymentId: string, amount: number) {
@@ -79,7 +106,7 @@
 			payMemberId = '';
 			payAmount = null;
 			payNotes = '';
-			charges = await getCharges({ status: chargeFilter || undefined });
+			await refreshCharges();
 			payments = await getPayments();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not record payment'));
@@ -111,7 +138,7 @@
 			cMemberId = '';
 			cDesc = '';
 			cAmount = null;
-			charges = await getCharges({ status: chargeFilter || undefined });
+			await refreshCharges();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add charge'));
 		}
@@ -160,7 +187,7 @@
 	async function voidCharge(id: string) {
 		try {
 			await updateCharge({ id, status: 'void' });
-			charges = await getCharges({ status: chargeFilter || undefined });
+			await refreshCharges();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not void'));
 		}
@@ -191,6 +218,44 @@
 		</Tabs.List>
 
 		<Tabs.Content value="charges">
+			{#if aging.debtors}
+				<Card.Root class="mb-4">
+					<Card.Content class="flex flex-wrap items-center gap-x-8 gap-y-2 py-3">
+						<div>
+							<p class="text-xs text-muted-foreground">Members owing</p>
+							<p class="text-lg font-semibold">{aging.debtors}</p>
+						</div>
+						<div>
+							<p class="text-xs text-muted-foreground">Not yet due</p>
+							<p class="text-lg font-semibold">
+								{formatMoney(aging.current.sum, currency)}
+								<span class="text-xs font-normal text-muted-foreground">({aging.current.n})</span>
+							</p>
+						</div>
+						<div>
+							<p class="text-xs text-muted-foreground">1–30 days overdue</p>
+							<p class="text-lg font-semibold">
+								{formatMoney(aging.d30.sum, currency)}
+								<span class="text-xs font-normal text-muted-foreground">({aging.d30.n})</span>
+							</p>
+						</div>
+						<div>
+							<p class="text-xs text-muted-foreground">31–60 days</p>
+							<p class="text-lg font-semibold">
+								{formatMoney(aging.d60.sum, currency)}
+								<span class="text-xs font-normal text-muted-foreground">({aging.d60.n})</span>
+							</p>
+						</div>
+						<div>
+							<p class="text-xs text-muted-foreground">60+ days</p>
+							<p class="text-lg font-semibold text-destructive">
+								{formatMoney(aging.d60plus.sum, currency)}
+								<span class="text-xs font-normal">({aging.d60plus.n})</span>
+							</p>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			<div class="mb-3 flex items-center gap-2">
 				<select
 					bind:value={chargeFilter}
