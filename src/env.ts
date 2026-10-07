@@ -51,5 +51,24 @@ export const variables = defineEnvVars({
 		description:
 			'Set to `true` on Freeweight Cloud. Enables enterprise features and cloud-only behaviour.',
 		schema: (value) => value === 'true'
+	},
+	FREEWEIGHT_AI_PROVIDER: {
+		description:
+			'Enterprise: model provider for AI features — `openai` (default; also any OpenAI-compatible endpoint like Ollama, OpenRouter or LiteLLM) or `anthropic`.',
+		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_MODEL: {
+		description:
+			'Enterprise: model name for AI features. Defaults to `gpt-4o-mini` (openai) or `claude-sonnet-4-5` (anthropic).',
+		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_KEY: {
+		description: 'Enterprise: API key for the AI provider. Required for `openai`-provider setups.',
+		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_BASE_URL: {
+		description:
+			'Enterprise: override the provider endpoint, e.g. `http://localhost:11434` for Ollama or an OpenRouter/LiteLLM gateway URL.',
+		schema: (value) => value || undefined
 	}
 });

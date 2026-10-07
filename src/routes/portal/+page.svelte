@@ -48,7 +48,9 @@
 		joinChallenge,
 		leaveChallenge,
 		getPortalAnnouncements,
-		addDependent
+		addDependent,
+		getPortalAi,
+		aiWorkoutPlan
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -59,6 +61,9 @@
 	import TrendingUp from '@lucide/svelte/icons/trending-up';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -86,6 +91,33 @@
 	const providers = $derived(await getProviders(memberId));
 	const docs = $derived(await getMyDocuments(memberId));
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
+	const portalAi = $derived(await getPortalAi());
+
+	// ------- AI workout plan (Enterprise) -------
+	let wpOpen = $state(false);
+	let wpGoal = $state('');
+	let wpDays = $state(3);
+	let wpMinutes = $state(45);
+	let wpNotes = $state('');
+	let wpPending = $state(false);
+	let wpResult = $state<{ title: string; plan: string } | null>(null);
+	async function submitWorkoutPlan(e: SubmitEvent) {
+		e.preventDefault();
+		wpPending = true;
+		try {
+			wpResult = await aiWorkoutPlan({
+				memberId,
+				goal: wpGoal,
+				daysPerWeek: wpDays,
+				minutesPerSession: wpMinutes,
+				notes: wpNotes || undefined
+			});
+			wpOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not generate a plan'));
+		}
+		wpPending = false;
+	}
 
 	// ------- amenity reservations -------
 	const amenities = $derived(await getPortalResources(memberId));
@@ -1091,6 +1123,30 @@
 		</Card.Root>
 	{/if}
 
+	{#if portalAi.configured}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="flex items-center gap-2 text-base"
+					><Sparkles class="size-4" /> Workout plan</Card.Title
+				>
+				<Card.Description>An AI-generated weekly plan built around your goal</Card.Description>
+			</Card.Header>
+			<Card.Content class="px-6">
+				{#if wpResult}
+					<p class="text-sm font-medium">{wpResult.title}</p>
+					<p class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">{wpResult.plan}</p>
+					<Button size="sm" variant="outline" class="mt-3" onclick={() => (wpOpen = true)}
+						><Sparkles /> New plan</Button
+					>
+				{:else}
+					<Button size="sm" variant="outline" onclick={() => (wpOpen = true)}
+						><Sparkles /> Generate my plan</Button
+					>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if d.waiverRequired && (!d.signedWaiver || d.waiverStale)}
 		<Card.Root class="sm:col-span-2">
 			<Card.Header>
@@ -1459,6 +1515,54 @@
 			<Dialog.Footer>
 				<Button type="submit" disabled={depPending}
 					>{depPending ? 'Adding…' : 'Add family member'}</Button
+				>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={wpOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Generate a workout plan</Dialog.Title>
+			<Dialog.Description>
+				Answer a couple of questions — the AI writes a one-week plan for you.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitWorkoutPlan}>
+			<Field.Field>
+				<Field.Label for="wp-goal">Your goal</Field.Label>
+				<Input
+					id="wp-goal"
+					required
+					bind:value={wpGoal}
+					placeholder="e.g. Build strength, lose weight, get fitter"
+				/>
+			</Field.Field>
+			<div class="grid grid-cols-2 gap-4">
+				<Field.Field>
+					<Field.Label for="wp-days">Days / week</Field.Label>
+					<Input id="wp-days" type="number" min={1} max={7} bind:value={wpDays} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="wp-min">Minutes / session</Field.Label>
+					<Input id="wp-min" type="number" min={10} max={240} bind:value={wpMinutes} />
+				</Field.Field>
+			</div>
+			<Field.Field>
+				<Field.Label for="wp-notes">
+					Anything to work around? <span class="font-normal text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Textarea
+					id="wp-notes"
+					bind:value={wpNotes}
+					rows={2}
+					placeholder="e.g. bad knees, no barbell"
+				/>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={wpPending}
+					>{wpPending ? 'Generating…' : 'Generate plan'}</Button
 				>
 			</Dialog.Footer>
 		</form>

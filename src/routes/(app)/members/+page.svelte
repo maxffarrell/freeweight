@@ -45,9 +45,12 @@
 	import Mail from '@lucide/svelte/icons/mail';
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import Upload from '@lucide/svelte/icons/upload';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { aiDraftEmail, getAiStatus } from '#lib/remote/ai.remote.ts';
 
 	const currency = await getCurrency();
+	const ai = await getAiStatus();
 	const announcements = $derived(await getRecentAnnouncements());
 	const allTags = $derived(await getTags());
 	const audiencePlans = $derived((await getPlans()).filter((p) => p.active));
@@ -318,6 +321,26 @@
 		}
 	}
 	let testPending = $state(false);
+	// ------- AI draft (Enterprise) -------
+	let aiDraftOpen = $state(false);
+	let aiGoal = $state('');
+	let aiPending = $state(false);
+	async function runAiDraft() {
+		aiPending = true;
+		try {
+			const r = await aiDraftEmail({
+				goal: aiGoal,
+				audience: emailAudience === '__sel' ? `${selected.size} selected members` : audLabel
+			});
+			emailSubject = r.subject;
+			emailBody = r.body;
+			aiDraftOpen = false;
+			toast.success('Draft ready — review before sending');
+		} catch (err) {
+			toast.error(errMsg(err, 'AI draft failed'));
+		}
+		aiPending = false;
+	}
 	async function sendTest() {
 		testPending = true;
 		try {
@@ -659,6 +682,41 @@
 				Goes to active members with an email on file — closures, schedule changes, news.
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if ai.licensed}
+			<div class="rounded-md border bg-muted/40 p-3">
+				{#if ai.configured}
+					{#if aiDraftOpen}
+						<div class="flex items-center gap-2">
+							<Input bind:value={aiGoal} placeholder="e.g. Closed July 4, reopen Monday" />
+							<Button
+								type="button"
+								size="sm"
+								disabled={aiPending || !aiGoal.trim()}
+								onclick={runAiDraft}>{aiPending ? 'Drafting…' : 'Draft'}</Button
+							>
+							<Button type="button" variant="ghost" size="sm" onclick={() => (aiDraftOpen = false)}
+								>Cancel</Button
+							>
+						</div>
+						<p class="mt-1.5 text-xs text-muted-foreground">
+							Describe the announcement — AI writes the subject + body for review.
+						</p>
+					{:else}
+						<button
+							type="button"
+							class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+							onclick={() => (aiDraftOpen = true)}
+							><Sparkles class="size-3.5" /> Draft with AI</button
+						>
+					{/if}
+				{:else}
+					<p class="text-xs text-muted-foreground">
+						AI drafting is available — set FREEWEIGHT_AI_PROVIDER/_MODEL/_KEY on the server to
+						enable it.
+					</p>
+				{/if}
+			</div>
+		{/if}
 		{#if announcements.length}
 			<div class="rounded-md border bg-muted/40 p-3 text-sm">
 				<p class="mb-2 font-medium text-muted-foreground">Recently sent</p>
