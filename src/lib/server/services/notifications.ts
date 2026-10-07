@@ -268,6 +268,44 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 }
 
 /**
+ * "Your booking was cancelled" — confirms the cancel to the member, whether they
+ * cancelled in the portal or staff pulled their spot. One email per booking (idempotent).
+ */
+export async function notifyBookingCancelled(orgId: string, bookingId: string) {
+	const [row] = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			locationName: location.name
+		})
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(eq(booking.id, bookingId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'booking_cancelled', bookingId, row.email))) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+	await sendEmail({
+		to: row.email,
+		subject: `Cancelled: ${row.className} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: `Your ${row.className} booking is cancelled`,
+			lines: [
+				`Hi ${row.memberName} — your ${row.className} spot on ${when}${row.locationName ? ` at ${row.locationName}` : ''} has been cancelled.`,
+				'Any class credit it used is back on your membership.'
+			],
+			action: { label: 'Rebook in the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/**
  * "Your instructor changed" — one email per booked/waitlisted member when a session's
  * instructor is swapped. Dedup key includes the new instructor id so a re-sub notifies again.
  */

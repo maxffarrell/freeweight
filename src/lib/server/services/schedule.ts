@@ -29,6 +29,7 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import {
+	notifyBookingCancelled,
 	notifyBookingConfirmed,
 	notifyInstructorChanged,
 	notifySessionChanged,
@@ -490,6 +491,7 @@ export async function cancelBooking(ctx: OrgContext, id: string, actorId?: strin
 		summary: 'Booking cancelled',
 		data: { sessionId: b!.sessionId, memberId: b!.memberId, promotedId: promoted?.memberId }
 	});
+	notifyBookingCancelled(ctx.orgId, id).catch(() => {});
 	if (promoted) await notifyWaitlistPromoted(ctx.orgId, promoted.id).catch(() => {});
 	return b;
 }
