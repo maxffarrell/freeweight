@@ -5,6 +5,7 @@ import * as members from '#lib/server/services/members.ts';
 import * as billing from '#lib/server/services/billing.ts';
 import * as schedule from '#lib/server/services/schedule.ts';
 import * as events from '#lib/server/services/gym-events.ts';
+import * as challenges from '#lib/server/services/challenges.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as settings from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
@@ -187,6 +188,26 @@ export const resources: Record<string, Resource> = {
 			}
 		},
 		delete: (ctx, id) => events.cancelRegistration(ctx.orgId, id)
+	},
+	challenges: {
+		description:
+			'Check-in challenges (members race to N check-ins inside a date window). List includes live progress per entrant',
+		list: (ctx) => challenges.listChallenges(ctx.orgId),
+		create: { schema: s.challengeInput, run: challenges.createChallenge as never },
+		update: { schema: s.challengeUpdate, run: challenges.updateChallenge as never }
+	},
+	shop_items: {
+		description: 'Front-desk retail items (name, price, optional stock count)',
+		list: (ctx) => billing.listShopItems(ctx.orgId),
+		create: { schema: s.shopItemInput, run: billing.createShopItem as never },
+		update: { schema: s.shopItemUpdate, run: billing.updateShopItem as never }
+	},
+	promo_codes: {
+		description:
+			'Join-page discount codes (percentOff or amountOff in cents, optional maxUses/expiresAt; PATCH toggles active)',
+		list: (ctx) => billing.listPromoCodes(ctx.orgId),
+		create: { schema: s.promoCodeInput, run: billing.createPromoCode as never },
+		update: { schema: s.promoCodeUpdate, run: billing.updatePromoCode as never }
 	}
 };
 

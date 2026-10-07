@@ -47,6 +47,11 @@
 		getSessions,
 		bookSession
 	} from '#lib/remote/schedule.remote.ts';
+	import {
+		getChallenges,
+		joinMemberChallenge,
+		removeMemberChallenge
+	} from '#lib/remote/challenges.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
@@ -65,6 +70,39 @@
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
 	const memberNotes = $derived(await getMemberNotes(id));
+	const challenges = $derived(await getChallenges());
+	const memberChallenges = $derived(
+		challenges
+			.map((c) => ({ ...c, mine: c.entries.find((e) => e.entry.memberId === id) }))
+			.filter((c) => c.mine)
+	);
+	const joinableChallenges = $derived(
+		challenges.filter(
+			(c) =>
+				c.challenge.active && c.state !== 'ended' && !c.entries.some((e) => e.entry.memberId === id)
+		)
+	);
+	let chalPending = $state('');
+	async function enrollChallenge(challengeId: string) {
+		chalPending = challengeId;
+		try {
+			await joinMemberChallenge({ challengeId, memberId: id });
+			toast.success('Enrolled');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not enroll'));
+		}
+		chalPending = '';
+	}
+	async function dropChallenge(challengeId: string) {
+		chalPending = challengeId;
+		try {
+			await removeMemberChallenge({ challengeId, memberId: id });
+			toast.success('Removed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
+		chalPending = '';
+	}
 	let noteBody = $state('');
 	let notePending = $state(false);
 	async function addNote() {
@@ -978,6 +1016,55 @@
 						Nothing logged yet — members add these in the portal.
 					</p>
 				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Challenges</Card.Title>
+				<Card.Description>Check-in challenges this member is in</Card.Description>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each memberChallenges as c (c.challenge.id)}
+					<div class="flex items-center justify-between gap-2 py-1 text-sm">
+						<span class="min-w-0 truncate font-medium">{c.challenge.name}</span>
+						<span class="shrink-0 text-xs text-muted-foreground"
+							>{c.mine!.count}/{c.challenge.goal} check-ins</span
+						>
+						<Badge variant={c.state === 'live' ? 'default' : 'outline'} class="shrink-0"
+							>{c.state}</Badge
+						>
+						<Button
+							size="sm"
+							variant="ghost"
+							class="h-6 px-2 text-xs text-muted-foreground"
+							disabled={chalPending === c.challenge.id}
+							onclick={() => dropChallenge(c.challenge.id)}>Remove</Button
+						>
+					</div>
+				{/each}
+				{#each joinableChallenges as c (c.challenge.id)}
+					<div class="flex items-center justify-between gap-2 py-1 text-sm text-muted-foreground">
+						<span class="min-w-0 truncate">
+							{c.challenge.name}
+							<span class="text-xs">
+								· {c.challenge.goal} check-ins · {formatDate(c.challenge.startDate)} – {formatDate(
+									c.challenge.endDate
+								)}</span
+							>
+						</span>
+						<Button
+							size="sm"
+							variant="outline"
+							class="h-6 shrink-0 px-2 text-xs"
+							disabled={chalPending === c.challenge.id}
+							onclick={() => enrollChallenge(c.challenge.id)}>Enroll</Button
+						>
+					</div>
+				{/each}
+				{#if !memberChallenges.length && !joinableChallenges.length}
+					<p class="text-sm text-muted-foreground">No open challenges.</p>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 

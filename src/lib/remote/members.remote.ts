@@ -32,6 +32,11 @@ import {
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 
+/** Dependents billing under a member — kiosk family check-in. */
+export const getDependents = query(idSchema, async (memberId) =>
+	svc.listDependents((await requireOrg()).orgId, memberId)
+);
+
 export const getMembers = query(
 	v.optional(
 		v.object({
