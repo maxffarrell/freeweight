@@ -444,11 +444,20 @@
 	let cPrice = $state('');
 	let cCap = $state('');
 	let cBookable = $state(true);
+	let cDays = $state<number[]>([]);
+	let cTime = $state('');
+	let cInstr = $state('');
+	let cLoc = $state('');
 
 	async function submitCourse(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
+			if (!cDays.length) {
+				toast.error('Pick at least one day of the week');
+				pending = false;
+				return;
+			}
 			await createCourse({
 				name: cName.trim(),
 				description: cDesc.trim() || undefined,
@@ -457,10 +466,15 @@
 				endsOn: cEnd,
 				priceCents: cPrice === '' ? 0 : Math.round(Number(cPrice) * 100),
 				capacity: cCap === '' ? null : Math.round(Number(cCap)),
-				memberBookable: cBookable
+				memberBookable: cBookable,
+				weekdays: cDays,
+				startTime: cTime,
+				instructorId: cInstr || null,
+				locationId: cLoc || null
 			});
-			toast.success('Course created — members can enroll in the portal');
-			cName = cDesc = cStart = cEnd = cPrice = cCap = '';
+			toast.success('Course created — sessions scheduled, members can enroll in the portal');
+			cName = cDesc = cStart = cEnd = cPrice = cCap = cTime = cInstr = cLoc = '';
+			cDays = [];
 			await getCourses().refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not create course'));
@@ -2060,8 +2074,9 @@
 		<Dialog.Header>
 			<Dialog.Title>Courses</Dialog.Title>
 			<Dialog.Description>
-				Multi-week programs ("6-week beginner lifting"). Enrolling books the member into every
-				session of the class type in the window — a paid course posts one signup charge.
+				Multi-week programs ("6-week beginner lifting"). A course generates its own weekly sessions
+				until it ends; enrolling books the member into all of them — a paid course posts one signup
+				charge.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if courses.length}
@@ -2083,7 +2098,9 @@
 									<Badge variant="outline" class="text-xs">staff enroll only</Badge>
 								{/if}
 								<p class="text-xs text-muted-foreground">
-									{c.className} · {formatDate(c.course.startsOn)}–{formatDate(c.course.endsOn)} ·
+									{c.className}{c.schedule ? ` · ${c.schedule}` : ''} · {formatDate(
+										c.course.startsOn
+									)}–{formatDate(c.course.endsOn)} ·
 									{c.sessionsLeft} sessions left
 								</p>
 							</div>
@@ -2183,6 +2200,59 @@
 					<Field.Label for="c-cap">Cap (optional)</Field.Label>
 					<Input id="c-cap" type="number" min={1} bind:value={cCap} />
 				</Field.Field>
+			</div>
+			<Field.Field>
+				<Field.Label>Weekly sessions</Field.Label>
+				<div class="flex items-center gap-2">
+					{#each WEEKDAYS as d, i (d)}
+						<label
+							class="cursor-pointer rounded-md border px-2 py-1 text-xs {cDays.includes(i)
+								? 'border-primary bg-primary/10 font-medium'
+								: 'text-muted-foreground'}"
+						>
+							<input
+								type="checkbox"
+								class="sr-only"
+								checked={cDays.includes(i)}
+								onchange={() =>
+									(cDays = cDays.includes(i) ? cDays.filter((x) => x !== i) : [...cDays, i])}
+							/>
+							{d.slice(0, 3)}
+						</label>
+					{/each}
+				</div>
+			</Field.Field>
+			<div class="grid grid-cols-3 gap-3">
+				<Field.Field>
+					<Field.Label for="c-time">Start time</Field.Label>
+					<Input id="c-time" type="time" required bind:value={cTime} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-instr">Instructor</Field.Label>
+					<select
+						id="c-instr"
+						bind:value={cInstr}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="">Class default</option>
+						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
+					</select>
+				</Field.Field>
+				{#if locations.filter((l) => !l.archivedAt).length}
+					<Field.Field>
+						<Field.Label for="c-loc">Location</Field.Label>
+						<select
+							id="c-loc"
+							bind:value={cLoc}
+							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+						>
+							<option value="">Class default</option>
+							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
+								<option value={l.id}>{l.name}</option>
+							{/each}
+						</select>
+					</Field.Field>
+				{/if}
 			</div>
 			<label class="flex items-center gap-2 text-sm">
 				<Switch bind:checked={cBookable} /> Members can enroll in the portal

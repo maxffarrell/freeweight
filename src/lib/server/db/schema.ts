@@ -393,6 +393,8 @@ export const classTemplate = pgTable(
 		capacity: integer('capacity'),
 		/** Last org-local date sessions may be generated for; null = runs forever. */
 		until: date('until', { mode: 'string' }),
+		/** Set when the template generates a course's sessions — enrollees auto-book each one. */
+		courseId: text('course_id').references(() => course.id, { onDelete: 'set null' }),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

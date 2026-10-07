@@ -638,5 +638,14 @@ export const courseInput = v.object({
 	priceCents: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** Program-wide enrollment cap; null = per-session capacities only. */
 	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
-	memberBookable: v.optional(v.boolean(), true)
+	memberBookable: v.optional(v.boolean(), true),
+	/** Weekly sessions generated for the course (0 = Sunday … 6 = Saturday). */
+	weekdays: v.pipe(
+		v.array(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6))),
+		v.minLength(1, 'Pick at least one day')
+	),
+	/** Org-local session start, `HH:MM` 24h. */
+	startTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')),
+	instructorId: v.optional(v.nullable(idSchema)),
+	locationId: v.optional(v.nullable(idSchema))
 });

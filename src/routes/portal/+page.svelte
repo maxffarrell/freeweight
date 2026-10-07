@@ -1233,7 +1233,11 @@
 								{/if}
 							</div>
 							<p class="text-sm text-muted-foreground">
-								{c.className} · {formatDate(c.course.startsOn)}–{formatDate(c.course.endsOn)}
+								{c.className}
+								{c.schedule ? ` · ${c.schedule}` : ''}
+								{#if c.locationName}· {c.locationName}{/if}
+								{#if c.instructorName}· with {c.instructorName}{/if}
+								· {formatDate(c.course.startsOn)}–{formatDate(c.course.endsOn)}
 								{#if c.course.capacity !== null}· {c.enrolled}/{c.course.capacity} enrolled{/if}
 							</p>
 							{#if c.course.description}

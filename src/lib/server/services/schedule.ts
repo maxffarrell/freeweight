@@ -25,6 +25,7 @@ import {
 	classTemplate,
 	classType,
 	closure,
+	courseEnrollment,
 	gymMember,
 	gymSettings,
 	instructorAvailability,
@@ -1759,12 +1760,44 @@ export async function materializeTemplates(orgId: string) {
 		}
 	}
 	if (!rows.length) return 0;
-	const inserted = await db
-		.insert(classSession)
-		.values(rows)
-		.returning({ id: classSession.id, coverRequestedAt: classSession.coverRequestedAt });
+	const inserted = await db.insert(classSession).values(rows).returning({
+		id: classSession.id,
+		templateId: classSession.templateId,
+		capacity: classSession.capacity,
+		coverRequestedAt: classSession.coverRequestedAt
+	});
 	for (const s of inserted)
 		if (s.coverRequestedAt) sendCoverRequests(orgId, s.id, s.coverRequestedAt).catch(() => {});
+
+	// Course-linked templates book every enrollee into each generated session —
+	// keeps a multi-week course full as the horizon window slides forward.
+	const courseByTpl = new Map(
+		templates
+			.filter((t) => t.template.courseId)
+			.map((t) => [t.template.id, t.template.courseId!] as const)
+	);
+	const courseSess = inserted.filter((s) => s.templateId && courseByTpl.has(s.templateId));
+	if (courseSess.length) {
+		const courseIds = [...new Set(courseSess.map((s) => courseByTpl.get(s.templateId!)!))];
+		const enrollees = await db
+			.select({ courseId: courseEnrollment.courseId, memberId: courseEnrollment.memberId })
+			.from(courseEnrollment)
+			.where(inArray(courseEnrollment.courseId, courseIds));
+		for (const sess of courseSess) {
+			const cid = courseByTpl.get(sess.templateId!)!;
+			let n = 0;
+			for (const e of enrollees) {
+				if (e.courseId !== cid) continue;
+				await db.insert(booking).values({
+					organizationId: orgId,
+					sessionId: sess.id,
+					memberId: e.memberId,
+					status: n < sess.capacity ? 'booked' : 'waitlisted'
+				});
+				n++;
+			}
+		}
+	}
 	return inserted.length;
 }
 
