@@ -41,7 +41,12 @@
 		getCurrency,
 		grantCredits
 	} from '#lib/remote/billing.remote.ts';
-	import { getClassTypes, bookSeries } from '#lib/remote/schedule.remote.ts';
+	import {
+		getClassTypes,
+		bookSeries,
+		getSessions,
+		bookSession
+	} from '#lib/remote/schedule.remote.ts';
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
@@ -416,6 +421,37 @@
 		} catch (err) {
 			toast.error(errMsg(err, 'Check-in failed'));
 		}
+	}
+
+	// ------- book into a session -------
+	let bookOpen = $state(false);
+	let bookSessions = $state<Awaited<ReturnType<typeof getSessions>>>([]);
+	let bookPending = $state<string | null>(null);
+	/** Upcoming, non-cancelled sessions the member isn't already booked/waitlisted on. */
+	const bookable = $derived(
+		bookSessions.filter(
+			(s) =>
+				!s.session.cancelledAt &&
+				!m.bookings.some(
+					(b) => b.booking.sessionId === s.session.id && b.booking.status !== 'cancelled'
+				)
+		)
+	);
+	async function openBook() {
+		bookSessions = await getSessions();
+		bookOpen = true;
+	}
+	async function bookInto(sessionId: string) {
+		bookPending = sessionId;
+		try {
+			const b = await bookSession({ sessionId, memberId: id });
+			toast.success(b.status === 'waitlisted' ? 'Class full — waitlisted' : 'Booked');
+			bookOpen = false;
+			await getMember(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book'));
+		}
+		bookPending = null;
 	}
 
 	// ------- book series -------
@@ -945,7 +981,10 @@
 					</Table.Root>
 				</Tabs.Content>
 				<Tabs.Content value="bookings">
-					<div class="mb-2 flex justify-end">
+					<div class="mb-2 flex justify-end gap-2">
+						<Button size="sm" variant="outline" onclick={() => void openBook()}>
+							Book a class…
+						</Button>
 						<Button size="sm" variant="outline" onclick={() => (seriesOpen = true)}
 							>Book into a series…</Button
 						>
@@ -1343,6 +1382,42 @@
 				<Button type="submit" disabled={!seriesTypeId || seriesPending}>Book series</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={bookOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Book {m.member.name} into a class</Dialog.Title>
+			<Dialog.Description
+				>Upcoming sessions in the next two weeks — full sessions go to the waitlist.</Dialog.Description
+			>
+		</Dialog.Header>
+		<div class="max-h-80 space-y-1 overflow-y-auto">
+			{#each bookable as s (s.session.id)}
+				<button
+					type="button"
+					class="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
+					disabled={bookPending !== null}
+					onclick={() => bookInto(s.session.id)}
+				>
+					<span class="min-w-0">
+						<span class="block truncate font-medium">{s.className}</span>
+						<span class="text-xs text-muted-foreground"
+							>{localDate(s.session.startsAt, tz)}
+							{localTime(s.session.startsAt, tz)}{s.locationName
+								? ` · ${s.locationName}`
+								: ''}</span
+						>
+					</span>
+					<span class="shrink-0 text-xs text-muted-foreground tabular-nums"
+						>{s.booked}/{s.session.capacity}{s.waitlisted ? ` (+${s.waitlisted} wl)` : ''}</span
+					>
+				</button>
+			{:else}
+				<p class="py-6 text-center text-sm text-muted-foreground">No upcoming sessions to book.</p>
+			{/each}
+		</div>
 	</Dialog.Content>
 </Dialog.Root>
 
