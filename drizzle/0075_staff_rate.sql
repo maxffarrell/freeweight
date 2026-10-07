@@ -1,0 +1,1 @@
+ALTER TABLE "member" ADD COLUMN "hourly_rate_cents" integer;

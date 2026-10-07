@@ -24,6 +24,7 @@
 		getRota,
 		getScheduledNow,
 		setRota,
+		setStaffRate,
 		clockIn,
 		clockOut,
 		closeShift,
@@ -96,11 +97,14 @@
 	}
 	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	let rotaStaff = $state('');
+	let rotaRate = $state('');
 	let rotaWindows = $state<{ weekday: string; startTime: string; endTime: string }[]>([]);
 	let rotaBusy = $state(false);
 
 	function pickRotaStaff(memberId: string) {
 		rotaStaff = memberId;
+		const s = staff.find((x) => x.id === memberId);
+		rotaRate = s?.hourlyRateCents != null ? (s.hourlyRateCents / 100).toFixed(2) : '';
 		rotaWindows = rota
 			.filter((r) => r.rota.memberId === memberId)
 			.map((r) => ({
@@ -111,8 +115,14 @@
 	}
 
 	async function saveRota() {
+		const cents = rotaRate.trim() === '' ? null : Math.round(Number(rotaRate) * 100);
+		if (cents !== null && !Number.isFinite(cents)) {
+			toast.error('Enter a valid hourly rate');
+			return;
+		}
 		rotaBusy = true;
 		try {
+			await setStaffRate({ memberId: rotaStaff, hourlyRateCents: cents });
 			await setRota({
 				memberId: rotaStaff,
 				windows: rotaWindows.map((w) => ({ ...w, weekday: Number(w.weekday) }))
@@ -595,6 +605,19 @@
 							>
 						</div>
 					{/each}
+					<div class="flex items-center gap-2">
+						<label class="flex items-center gap-2 text-sm text-muted-foreground"
+							>$/hour
+							<Input
+								type="number"
+								min="0"
+								step="0.25"
+								placeholder="—"
+								class="w-24"
+								bind:value={rotaRate}
+							/></label
+						>
+					</div>
 					<div class="flex items-center gap-2">
 						<Button
 							variant="outline"

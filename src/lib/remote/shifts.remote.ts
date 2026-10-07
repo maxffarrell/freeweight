@@ -81,3 +81,21 @@ export const setRota = command(rotaInput, async (input) => {
 	void getScheduledNow().refresh();
 	return rows;
 });
+
+/** Admin: set a staff member's hourly desk rate in cents (null clears). */
+export const setStaffRate = command(
+	v.object({
+		memberId: idSchema,
+		hourlyRateCents: v.nullable(
+			v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10_000_000))
+		)
+	}),
+	async (input) => {
+		const row = await svc.setStaffRate(
+			await requireOrg('admin'),
+			input.memberId,
+			input.hourlyRateCents
+		);
+		return row;
+	}
+);

@@ -634,6 +634,7 @@
 						<Table.Head>Staff</Table.Head>
 						<Table.Head class="text-right">Shifts</Table.Head>
 						<Table.Head class="text-right">Hours</Table.Head>
+						<Table.Head class="text-right">Est. pay</Table.Head>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
@@ -642,10 +643,15 @@
 							<Table.Cell class="font-medium">{s.staffName}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{s.shifts}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{(s.minutes / 60).toFixed(1)}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums"
+								>{s.hourlyRateCents != null
+									? formatMoney(Math.round((s.minutes / 60) * s.hourlyRateCents), currency)
+									: '—'}</Table.Cell
+							>
 						</Table.Row>
 					{:else}
 						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground"
+							><Table.Cell colspan={4} class="text-muted-foreground"
 								>No shifts yet — staff clock in from the dashboard.</Table.Cell
 							></Table.Row
 						>
@@ -656,6 +662,17 @@
 							<Table.Cell></Table.Cell>
 							<Table.Cell class="text-right tabular-nums"
 								>{(r.staffShifts.reduce((n, s) => n + s.minutes, 0) / 60).toFixed(1)}</Table.Cell
+							>
+							<Table.Cell class="text-right tabular-nums"
+								>{formatMoney(
+									r.staffShifts.reduce(
+										(n, s) =>
+											n +
+											(s.hourlyRateCents ? Math.round((s.minutes / 60) * s.hourlyRateCents) : 0),
+										0
+									),
+									currency
+								)}</Table.Cell
 							>
 						</Table.Row>
 					{/if}

@@ -526,6 +526,13 @@
       "when": 1791409211965,
       "tag": "0074_rota",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1791409764817,
+      "tag": "0075_staff_rate",
+      "breakpoints": true
     }
   ]
 }
