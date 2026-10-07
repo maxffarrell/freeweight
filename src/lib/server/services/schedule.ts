@@ -864,12 +864,35 @@ export async function cancelUpcomingBookings(ctx: OrgContext, memberId: string) 
 
 export async function updateBooking(ctx: OrgContext, input: v.InferOutput<typeof s.bookingUpdate>) {
 	if (input.status === 'cancelled') return cancelBooking(ctx, input.id);
-	const [row] = await db
-		.update(booking)
-		.set({ status: input.status })
-		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, input.id)))
-		.returning();
-	if (!row) error(404, 'Booking not found');
+	const { row, promoted } = await db.transaction(async (tx) => {
+		const [prev] = await tx
+			.select({ status: booking.status })
+			.from(booking)
+			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, input.id)))
+			.for('update');
+		if (!prev) error(404, 'Booking not found');
+		const [row] = await tx
+			.update(booking)
+			.set({ status: input.status })
+			.where(eq(booking.id, input.id))
+			.returning();
+		return { row, promoted: prev.status === 'waitlisted' && input.status === 'booked' };
+	});
+	// waitlisted → booked is a staff override of the auto-promote order (e.g.
+	// inside the promotion cutoff or picking someone other than first-in-line):
+	// audit it and send the member the same "you're in" email.
+	if (promoted) {
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'booking',
+			entityId: input.id,
+			action: 'promoted',
+			summary: 'Promoted off the waitlist',
+			data: { sessionId: row!.sessionId, memberId: row!.memberId }
+		});
+		notifyWaitlistPromoted(ctx.orgId, row!.id).catch(() => {});
+	}
 	return row;
 }
 
