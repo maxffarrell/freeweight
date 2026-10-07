@@ -1,15 +1,16 @@
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
 
-/** Message from a remote-function rejection (plain object, not always an Error). */
+/**
+ * Remote-function errors don't always arrive as Error instances: `error()` inside a
+ * command/form can surface as a plain `{ message }` or a serialized HttpError
+ * `{ status, body: { message } }`. This unwraps all three shapes.
+ */
 export function errMsg(err: unknown, fallback: string) {
 	if (err instanceof Error) return err.message;
-	if (
-		typeof err === 'object' &&
-		err !== null &&
-		'message' in err &&
-		typeof (err as { message: unknown }).message === 'string'
-	)
-		return (err as { message: string }).message;
+	if (typeof err !== 'object' || err === null) return fallback;
+	const e = err as { message?: unknown; body?: { message?: unknown } };
+	if (typeof e.message === 'string') return e.message;
+	if (typeof e.body?.message === 'string') return e.body.message;
 	return fallback;
 }
 
