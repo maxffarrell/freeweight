@@ -31,7 +31,8 @@
 		emailSessionRoster,
 		copyWeek,
 		getInstructorUpcoming,
-		handoffInstructor
+		handoffInstructor,
+		claimCover
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -113,6 +114,18 @@
 		rosterOpen = true;
 	}
 	if (focusId) void openRoster(focusId);
+
+	// "I'll cover it" links from cover-request emails land here and assign the
+	// session to the clicking staff member (attendees get the swap email).
+	// svelte-ignore state_referenced_locally
+	if (focusId && page.url.searchParams.get('claim') === '1') {
+		const u = new URL(page.url.href);
+		u.searchParams.delete('claim');
+		history.replaceState(history.state, '', u);
+		void claimCover(focusId)
+			.then((r) => toast.success(`You're covering ${r.className} — attendees are emailed`))
+			.catch((e) => toast.error(errMsg(e, 'Could not claim cover')));
+	}
 
 	let bookMemberId = $state('');
 	async function book() {

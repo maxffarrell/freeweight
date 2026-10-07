@@ -4,7 +4,12 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getMyClasses, updateSession } from '#lib/remote/schedule.remote.ts';
+	import {
+		getMyClasses,
+		updateSession,
+		getCoverNeeded,
+		claimCover
+	} from '#lib/remote/schedule.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
@@ -12,7 +17,21 @@
 	const settings = await getSettings();
 	const tz = settings.timezone;
 	const classes = await getMyClasses();
+	const cover = $derived(await getCoverNeeded());
 	let toggling = $state<string | null>(null);
+	let claiming = $state<string | null>(null);
+
+	async function claim(id: string) {
+		claiming = id;
+		try {
+			const r = await claimCover(id);
+			toast.success(`You're covering ${r.className} — attendees are emailed`);
+			await Promise.all([getCoverNeeded().refresh(), getMyClasses().refresh()]);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not claim cover'));
+		}
+		claiming = null;
+	}
 
 	async function toggleCover(id: string, on: boolean) {
 		toggling = id;
@@ -81,4 +100,45 @@
 			{/each}
 		</Card.Content>
 	</Card.Root>
+
+	{#if cover.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Needs cover</Card.Title>
+				<Card.Description>Open requests from other instructors</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6 pb-4">
+				{#each cover as row (row.session.id)}
+					<div class="flex items-center gap-3 py-3">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<span class="size-2.5 shrink-0 rounded-full" style:background={row.color ?? '#888'}
+								></span>
+								<a
+									href="/schedule?focus={row.session.id}"
+									class="truncate font-medium hover:underline">{row.className}</a
+								>
+							</div>
+							<div class="text-sm text-muted-foreground">
+								{formatDate(row.session.startsAt)} · {localTime(
+									row.session.startsAt,
+									tz
+								)}{#if row.locationName}
+									· {row.locationName}{/if}{#if row.instructorName}
+									· for {row.instructorName}{/if}
+							</div>
+						</div>
+						<div class="text-sm whitespace-nowrap text-muted-foreground">
+							{row.booked} booked
+						</div>
+						<Button
+							size="sm"
+							disabled={claiming === row.session.id}
+							onclick={() => claim(row.session.id)}>Cover it</Button
+						>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 </div>

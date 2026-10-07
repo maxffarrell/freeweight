@@ -2269,9 +2269,12 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 				heading: `${row.className} needs a sub`,
 				lines: [
 					`${row.instructorName ?? 'The assigned instructor'} can't make ${row.className} on ${formatDate(day)} at ${time}${row.locationName ? ` (${row.locationName})` : ''} — ${row.booked} booked.`,
-					'Claim it on the schedule — assigning a new instructor clears the flag and emails the booked members.'
+					'Tap below to claim it — you become the instructor, the flag clears, and booked members are emailed.'
 				],
-				action: { label: 'Open session', url: `${appOrigin()}/schedule?focus=${sessionId}` }
+				action: {
+					label: "I'll cover it",
+					url: `${appOrigin()}/schedule?focus=${sessionId}&claim=1`
+				}
 			})
 		});
 	}
