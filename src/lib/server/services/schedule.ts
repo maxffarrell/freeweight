@@ -31,6 +31,7 @@ import { emit } from './events.ts';
 import {
 	notifyBookingConfirmed,
 	notifyInstructorChanged,
+	notifySessionChanged,
 	notifySessionCancelled,
 	notifyWaitlistPromoted
 } from './notifications.ts';
@@ -217,7 +218,11 @@ export async function updateSession(
 ) {
 	const { id, ...set } = input;
 	const [prev] = await db
-		.select({ instructorId: classSession.instructorId })
+		.select({
+			instructorId: classSession.instructorId,
+			startsAt: classSession.startsAt,
+			locationId: classSession.locationId
+		})
 		.from(classSession)
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)));
 	if (!prev) error(404, 'Session not found');
@@ -236,6 +241,10 @@ export async function updateSession(
 	if (set.cancelled) notifySessionCancelled(ctx.orgId, id).catch(() => {});
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
+	const moved =
+		(set.startsAt && zonedToUtc(set.startsAt, tz).getTime() !== prev.startsAt.getTime()) ||
+		(set.locationId !== undefined && set.locationId !== prev.locationId);
+	if (moved && !set.cancelled) notifySessionChanged(ctx.orgId, id).catch(() => {});
 	// Keep endsAt in step with the class duration when the start moves.
 	if (set.startsAt) {
 		const [ct] = await db

@@ -329,6 +329,61 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 }
 
 /**
+ * "Your class moved" — one email per booked/waitlisted member when a session's start
+ * time or location changes. Dedup key carries the new values so each reschedule notifies once.
+ */
+export async function notifySessionChanged(orgId: string, sessionId: string) {
+	const [sess] = await db
+		.select({
+			startsAt: classSession.startsAt,
+			locationId: classSession.locationId,
+			className: classType.name,
+			locationName: location.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(eq(classSession.id, sessionId));
+	if (!sess) return;
+	const rows = await db
+		.select({ email: gymMember.email, memberName: gymMember.name })
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
+		);
+	if (!rows.length) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(sess.startsAt, tz)} at ${localTime(sess.startsAt, tz)}`;
+	const where = sess.locationName ? ` at ${sess.locationName}` : '';
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (
+			!(await logOnce(
+				orgId,
+				'session_changed',
+				`${sessionId}:${sess.startsAt.toISOString()}:${sess.locationId ?? ''}`,
+				row.email
+			))
+		)
+			continue;
+		await sendEmail({
+			to: row.email,
+			subject: `${sess.className} moved — now ${when}${where}`,
+			...renderEmail({
+				orgName: name,
+				heading: `${sess.className} has moved`,
+				lines: [
+					`Hi ${row.memberName} — your ${sess.className} at ${name} is now ${when}${where}.`,
+					'Your booking carries over — nothing to rebook.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
+}
+
+/**
  * "Your class is tomorrow" — one email per booked member for sessions starting in the
  * next ~24h (the cron runs daily, so each session is caught exactly once).
  * Returns the number of emails sent.
