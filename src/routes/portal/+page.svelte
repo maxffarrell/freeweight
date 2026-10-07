@@ -67,6 +67,7 @@
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
+	import Check from '@lucide/svelte/icons/check';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
@@ -534,6 +535,41 @@
 		}
 		signingWaiver = false;
 	}
+
+	const obItems = $derived.by(() => [
+		{
+			label: 'Sign your waiver',
+			done: d.onboarding.waiver,
+			action: 'Sign',
+			fn: () =>
+				document
+					.getElementById('portal-waiver')
+					?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+		},
+		{
+			label: 'Add a profile photo',
+			done: d.onboarding.photo,
+			action: 'Upload',
+			fn: () => avatarInput?.click()
+		},
+		{
+			label: 'Set a monthly visit goal',
+			done: d.onboarding.goal,
+			action: 'Set goal',
+			fn: editGoal
+		},
+		{
+			label: 'Book your first class',
+			done: d.onboarding.booked,
+			action: 'Browse',
+			fn: () =>
+				document
+					.getElementById('portal-book')
+					?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+		},
+		{ label: 'Check in at the front desk', done: d.onboarding.visited, action: null, fn: null }
+	]);
+	const obDoneCount = $derived(obItems.filter((i) => i.done).length);
 
 	let busy = $state<string | null>(null);
 	async function book(sessionId: string) {
@@ -1407,8 +1443,41 @@
 		</Card.Root>
 	{/if}
 
-	{#if d.waiverRequired && (!d.signedWaiver || d.waiverStale)}
+	{#if obDoneCount < obItems.length}
 		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"
+					><Sparkles class="size-4" /> Getting started</Card.Title
+				>
+				<Card.Description
+					>{obDoneCount} of {obItems.length} done — finish setting up your account</Card.Description
+				>
+			</Card.Header>
+			<Card.Content class="space-y-1 px-6">
+				<Progress max={obItems.length} value={obDoneCount} class="mb-3" />
+				{#each obItems as item (item.label)}
+					<div class="flex items-center gap-3 pt-1">
+						<span
+							class="flex size-5 shrink-0 items-center justify-center rounded-full border {item.done
+								? 'border-primary bg-primary text-primary-foreground'
+								: 'border-muted-foreground/30'}"
+						>
+							{#if item.done}<Check class="size-3" />{/if}
+						</span>
+						<span class="flex-1 text-sm {item.done ? 'text-muted-foreground line-through' : ''}"
+							>{item.label}</span
+						>
+						{#if !item.done && item.action}
+							<Button size="xs" variant="outline" onclick={item.fn}>{item.action}</Button>
+						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if d.waiverRequired && (!d.signedWaiver || d.waiverStale)}
+		<Card.Root class="sm:col-span-2" id="portal-waiver">
 			<Card.Header>
 				<Card.Title class="text-base"
 					>{d.waiverStale ? 'Our waiver changed — please re-sign' : 'Sign your waiver'}</Card.Title
@@ -1746,7 +1815,7 @@
 	</Card.Root>
 </div>
 
-<Card.Root>
+<Card.Root id="portal-book">
 	<Card.Header>
 		<Card.Title class="text-base">Book a class</Card.Title>
 		<Card.Description
