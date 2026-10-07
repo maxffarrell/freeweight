@@ -12,6 +12,7 @@ import {
 	closureInput,
 	emailRosterInput,
 	idSchema,
+	seriesBookingInput,
 	sessionInput,
 	sessionUpdate,
 	templateInput
@@ -100,6 +101,14 @@ export const createTemplate = command(templateInput, async (input) =>
 export const deleteTemplate = command(idSchema, async (id) =>
 	svc.deleteTemplate(await requireOrg(), id)
 );
+
+/** Book a member into all upcoming sessions of a class type for the next N weeks. */
+export const bookSeries = command(seriesBookingInput, async (input) => {
+	const r = await svc.bookSeries(await requireOrg(), input);
+	void getSessions().refresh();
+	void getMember(input.memberId).refresh();
+	return r;
+});
 
 export const bookSession = command(bookingInput, async (input) => {
 	const b = await svc.bookSession(await requireOrg(), input);

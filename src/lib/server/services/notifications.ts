@@ -191,6 +191,47 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 }
 
 /**
+ * One summary email when staff book a member into a recurring series — the
+ * per-session confirmation emails are suppressed, this replaces them.
+ */
+export async function notifySeriesBooked(
+	orgId: string,
+	memberId: string,
+	className: string,
+	counts: { booked: number; waitlisted: number },
+	weeks: number
+) {
+	const [row, name] = await Promise.all([
+		db
+			.select({ email: gymMember.email, memberName: gymMember.name })
+			.from(gymMember)
+			.where(eq(gymMember.id, memberId))
+			.limit(1),
+		orgName(orgId)
+	]);
+	const m = row[0];
+	if (!m?.email || (!counts.booked && !counts.waitlisted)) return;
+	const parts = counts.booked
+		? [
+				`We booked you into ${counts.booked} ${className} class${counts.booked === 1 ? '' : 'es'} over the next ${weeks} weeks.`
+			]
+		: [`All the upcoming ${className} classes are full — you're on the waitlist.`];
+	if (counts.booked && counts.waitlisted)
+		parts[0] += ` ${counts.waitlisted} more ${counts.waitlisted === 1 ? 'is' : 'are'} full — you're on the waitlist.`;
+	parts.push('See times and cancel any of them from your member portal.');
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `You're in: ${className} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: `You're booked in, ${m.memberName}`,
+			lines: parts,
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/**
  * Receipt for a recorded payment — one email per recordPayment call.
  * `paymentIds` covers the split rows a payment can allocate across; dedup on the first.
  */
