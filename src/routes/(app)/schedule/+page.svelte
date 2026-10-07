@@ -885,7 +885,14 @@
 				<Table.Body>
 					{#each roster.filter((r) => r.booking.status !== 'cancelled') as r (r.booking.id)}
 						<Table.Row>
-							<Table.Cell class="font-medium">{r.memberName}</Table.Cell>
+							<Table.Cell class="font-medium">
+								{r.memberName}
+								{#if r.resultScore}
+									<span class="ml-1 text-xs font-normal text-muted-foreground"
+										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span
+									>
+								{/if}
+							</Table.Cell>
 							<Table.Cell>
 								<StatusBadge status={r.booking.status} />
 								{#if r.booking.status === 'waitlisted'}

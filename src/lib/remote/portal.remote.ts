@@ -516,3 +516,25 @@ export const setVisitGoal = command(
 		return r;
 	}
 );
+
+/** Logs the member's score on a session's workout of the day (upserts on re-log). */
+export const logWorkoutResult = command(
+	v.object({
+		memberId: idSchema,
+		sessionId: idSchema,
+		score: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120)),
+		asRx: v.optional(v.boolean(), false)
+	}),
+	async (input) => {
+		const m = await myMember(input.memberId);
+		const r = await svc.logWorkoutResult(
+			m.organizationId,
+			m.id,
+			input.sessionId,
+			input.score,
+			input.asRx ?? false
+		);
+		void getPortalOverview(input.memberId).refresh();
+		return r;
+	}
+);

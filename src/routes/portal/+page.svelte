@@ -11,6 +11,7 @@
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import Star from '@lucide/svelte/icons/star';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -55,7 +56,8 @@
 		aiWorkoutPlan,
 		redeemGiftCard,
 		rateSession,
-		setVisitGoal
+		setVisitGoal,
+		logWorkoutResult
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -78,6 +80,35 @@
 	let rateValue = $state(0);
 	let rateComment = $state('');
 	let rateBusy = $state(false);
+
+	// Workout result logging — score + "as Rx" on attended sessions that have a WOD.
+	let resultFor = $state<{ sessionId: string; className: string } | null>(null);
+	let resultScore = $state('');
+	let resultRx = $state(false);
+	let resultBusy = $state(false);
+	function openResult(h: { sessionId: string; className: string }) {
+		resultFor = { sessionId: h.sessionId, className: h.className };
+		const r = d.results[h.sessionId];
+		resultScore = r?.score ?? '';
+		resultRx = r?.asRx ?? false;
+	}
+	async function submitResult() {
+		if (!resultFor || !resultScore.trim()) return;
+		resultBusy = true;
+		try {
+			await logWorkoutResult({
+				memberId,
+				sessionId: resultFor.sessionId,
+				score: resultScore.trim(),
+				asRx: resultRx
+			});
+			toast.success('Score logged');
+			resultFor = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log score'));
+		}
+		resultBusy = false;
+	}
 
 	function openRate(h: { sessionId: string; className: string }) {
 		rateFor = { sessionId: h.sessionId, className: h.className };
@@ -1552,6 +1583,21 @@
 						{/if}
 					</div>
 					<div class="flex shrink-0 items-center gap-2">
+						{#if h.booking.status === 'attended' && h.workout}
+							<Button
+								size="sm"
+								variant="ghost"
+								title="Log your score"
+								onclick={() => openResult(h)}
+							>
+								{#if d.results[h.sessionId]}
+									{d.results[h.sessionId].score}{#if d.results[h.sessionId].asRx}
+										Rx{/if}
+								{:else}
+									Log score
+								{/if}
+							</Button>
+						{/if}
 						{#if h.booking.status === 'attended'}
 							{#if d.feedback[h.sessionId]}
 								<Button
@@ -1838,6 +1884,29 @@
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (rateFor = null)}>Cancel</Button>
 			<Button onclick={submitRating} disabled={rateBusy || !rateValue}>Submit</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root open={!!resultFor} onOpenChange={(o) => !o && (resultFor = null)}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Log your score — {resultFor?.className}</Dialog.Title>
+			<Dialog.Description>How did the workout go? e.g. "12:34" or "185 lb"</Dialog.Description>
+		</Dialog.Header>
+		<Field.Field>
+			<Field.Label for="result-score">Score</Field.Label>
+			<Input id="result-score" bind:value={resultScore} maxlength={120} />
+		</Field.Field>
+		<label class="flex items-center gap-2 text-sm">
+			<Checkbox checked={resultRx} onCheckedChange={(v) => (resultRx = v === true)} />
+			As prescribed (Rx)
+		</label>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (resultFor = null)}>Cancel</Button>
+			<Button onclick={submitResult} disabled={resultBusy || !resultScore.trim()}>
+				Save score
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

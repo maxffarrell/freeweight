@@ -485,6 +485,31 @@ export const sessionFeedback = pgTable(
 	]
 );
 
+/**
+ * A member's logged score on a session that had a workout of the day —
+ * "12:34 RX". One row per member per session (upserted on re-log).
+ */
+export const workoutResult = pgTable(
+	'workout_result',
+	{
+		id: id(),
+		organizationId: orgId(),
+		sessionId: text('session_id')
+			.notNull()
+			.references(() => classSession.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		score: text('score').notNull(),
+		asRx: boolean('as_rx').notNull().default(false),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('workout_result_session_member_idx').on(t.sessionId, t.memberId),
+		index('workout_result_org_idx').on(t.organizationId)
+	]
+);
+
 /** Bookable amenity — sauna, court, child-care room. Members self-book slots in the portal. */
 export const facilityResource = pgTable(
 	'facility_resource',
