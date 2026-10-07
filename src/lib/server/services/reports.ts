@@ -6,6 +6,7 @@ import {
 	classSession,
 	classType,
 	gymMember,
+	gymSettings,
 	member,
 	membership,
 	payment,
@@ -161,6 +162,31 @@ async function topAttendees(orgId: string) {
 		.limit(10);
 }
 
+/** Check-ins by hour of day (gym timezone) over the last 90 days — staffing signal. */
+async function checkInsByHour(orgId: string) {
+	const [s] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = s?.timezone ?? 'UTC';
+	const rows = await db
+		.select({
+			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`.mapWith(Number),
+			count: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, new Date(Date.now() - 90 * 86400_000)),
+				isNull(checkIn.guestName)
+			)
+		)
+		.groupBy(sql`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`);
+	const byHour = new Map(rows.map((r) => [r.hour, r.count]));
+	return Array.from({ length: 24 }, (_, hour) => ({ hour, count: byHour.get(hour) ?? 0 }));
+}
+
 /** Sessions taught per instructor over the last 30 days, with attendance outcomes. */
 async function instructorStats(orgId: string) {
 	return db
@@ -195,15 +221,17 @@ async function instructorStats(orgId: string) {
 }
 
 export async function getReports(orgId: string) {
-	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top] = await Promise.all([
-		checkInsByDay(orgId),
-		newMembersByMonth(orgId),
-		revenueByMonth(orgId),
-		membershipsByPlan(orgId),
-		fillByClass(orgId),
-		atRiskMembers(orgId),
-		instructorStats(orgId),
-		topAttendees(orgId)
-	]);
-	return { checkIns, members, revenue, plans, fill, atRisk, instructors, top };
+	const [checkIns, members, revenue, plans, fill, atRisk, instructors, top, hours] =
+		await Promise.all([
+			checkInsByDay(orgId),
+			newMembersByMonth(orgId),
+			revenueByMonth(orgId),
+			membershipsByPlan(orgId),
+			fillByClass(orgId),
+			atRiskMembers(orgId),
+			instructorStats(orgId),
+			topAttendees(orgId),
+			checkInsByHour(orgId)
+		]);
+	return { checkIns, members, revenue, plans, fill, atRisk, instructors, top, hours };
 }

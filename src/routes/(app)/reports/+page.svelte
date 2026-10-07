@@ -22,6 +22,9 @@
 	const maxMembers = Math.max(1, ...r.members.map((m) => m.count));
 	const maxRevenue = Math.max(1, ...r.revenue.map((m) => m.total));
 	const maxMembersByPlan = Math.max(1, ...r.plans.map((p) => p.count));
+	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
+	const hourLabel = (h: number) =>
+		h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
 
 	function monthLabel(ym: string) {
 		return new Date(`${ym}-02T00:00:00Z`).toLocaleString('en', { month: 'short', year: '2-digit' });
@@ -74,6 +77,31 @@
 			<div class="mt-1 flex justify-between text-xs text-muted-foreground">
 				<span>{formatDate(r.checkIns[0]!.day)}</span>
 				<span>{formatDate(r.checkIns.at(-1)!.day)}</span>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">Busiest hours — last 90 days</Card.Title>
+			<Card.Description>Member check-ins by hour, gym timezone</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div class="flex h-24 items-end gap-px">
+				{#each r.hours as h (h.hour)}
+					<div
+						class="flex-1 rounded-t bg-primary/80"
+						style="height: {Math.max(2, (h.count / maxHours) * 100)}%"
+						title="{hourLabel(h.hour)} — {h.count}"
+					></div>
+				{/each}
+			</div>
+			<div class="mt-1 flex justify-between text-xs text-muted-foreground">
+				<span>12a</span>
+				<span>6a</span>
+				<span>12p</span>
+				<span>6p</span>
+				<span>11p</span>
 			</div>
 		</Card.Content>
 	</Card.Root>
