@@ -15,7 +15,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyCheckInMilestone } from './notifications.ts';
+import { notifyCheckInMilestone, notifyFirstVisit } from './notifications.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -164,7 +164,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				isNull(checkIn.guestName)
 			)
 		);
-	if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+	if (n === 1) notifyFirstVisit(ctx.orgId, memberId).catch(() => {});
+	else if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
 
 	return { checkIn: row!, member: m, attended: attended.length };
 }

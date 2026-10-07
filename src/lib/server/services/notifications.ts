@@ -1313,6 +1313,30 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 	});
 }
 
+/** Welcome note on a member's very first check-in. Deduped per member. */
+export async function notifyFirstVisit(orgId: string, memberId: string) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email) return;
+	if (!(await logOnce(orgId, 'first_visit', memberId, m.email))) return;
+	const name = await orgName(orgId);
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `First visit down at ${name} — nice work, ${m.name.split(' ')[0]}`,
+		...renderEmail({
+			orgName: name,
+			heading: 'Your first visit is in the books.',
+			lines: [
+				`Hi ${m.name} — welcome to ${name}. You just checked in for the first time, which is the hardest one.`,
+				'Book your next class in the portal and keep the streak going.'
+			],
+			action: { label: 'Book your next class', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /**
  * Daily cron: emails each staff instructor their roster for the day — class,
  * time, location, booked/waitlist counts. Staff mail, so no unsubscribe check.
