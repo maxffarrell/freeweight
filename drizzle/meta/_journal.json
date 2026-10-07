@@ -533,6 +533,13 @@
       "when": 1791409764817,
       "tag": "0075_staff_rate",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1791410087059,
+      "tag": "0076_setup_dismissed",
+      "breakpoints": true
     }
   ]
 }

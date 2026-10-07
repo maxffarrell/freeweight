@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "setup_dismissed" boolean DEFAULT false NOT NULL;

@@ -15,6 +15,7 @@ import {
 	member,
 	membership,
 	payment,
+	paymentProvider,
 	plan,
 	user,
 	outer
@@ -303,4 +304,113 @@ export async function listActivityTypes(orgId: string) {
 		.from(activity)
 		.where(eq(activity.organizationId, orgId));
 	return rows.map((r) => r.entityType).sort();
+}
+
+export interface ChecklistItem {
+	key: string;
+	label: string;
+	done: boolean;
+	href: string;
+}
+
+/**
+ * Launch checklist for a new gym — a fixed list of setup steps with live `done`
+ * flags. Returns null once dismissed or fully complete so the dashboard card
+ * disappears on its own.
+ */
+export async function setupChecklist(orgId: string): Promise<ChecklistItem[] | null> {
+	const [settings] = await db
+		.select({
+			address: gymSettings.address,
+			timezone: gymSettings.timezone,
+			logoDocumentId: gymSettings.logoDocumentId,
+			waiver: gymSettings.waiver,
+			setupDismissed: gymSettings.setupDismissed
+		})
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (!settings || settings.setupDismissed) return null;
+
+	const [[plans], [types], [sessions], [members], [staff], [providers]] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(plan)
+			.where(eq(plan.organizationId, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(classType)
+			.where(eq(classType.organizationId, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(classSession)
+			.where(eq(classSession.organizationId, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(gymMember)
+			.where(eq(gymMember.organizationId, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(member)
+			.where(eq(member.organizationId, orgId)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(paymentProvider)
+			.where(and(eq(paymentProvider.organizationId, orgId), eq(paymentProvider.enabled, true)))
+	]);
+
+	const items: ChecklistItem[] = [
+		{
+			key: 'details',
+			label: 'Set your address, phone and timezone',
+			done: settings.address !== '' && settings.timezone !== 'UTC',
+			href: '/settings'
+		},
+		{
+			key: 'logo',
+			label: 'Upload your logo',
+			done: settings.logoDocumentId != null,
+			href: '/settings'
+		},
+		{ key: 'plan', label: 'Create a membership plan', done: plans.n > 0, href: '/plans' },
+		{
+			key: 'class',
+			label: 'Create a class type',
+			done: types.n > 0,
+			href: '/schedule'
+		},
+		{
+			key: 'session',
+			label: 'Schedule a session',
+			done: sessions.n > 0,
+			href: '/schedule'
+		},
+		{
+			key: 'member',
+			label: 'Add your first member',
+			done: members.n > 0,
+			href: '/members'
+		},
+		{
+			key: 'waiver',
+			label: 'Add your liability waiver',
+			done: settings.waiver !== '',
+			href: '/settings'
+		},
+		{
+			key: 'payments',
+			label: 'Connect a payment provider',
+			done: providers.n > 0,
+			href: '/settings'
+		},
+		{ key: 'staff', label: 'Invite your team', done: staff.n > 1, href: '/settings' }
+	];
+	return items.every((i) => i.done) ? null : items;
+}
+
+/** Any staff member can dismiss the launch checklist (org-wide flag). */
+export async function dismissChecklist(orgId: string) {
+	await db
+		.update(gymSettings)
+		.set({ setupDismissed: true })
+		.where(eq(gymSettings.organizationId, orgId));
 }
