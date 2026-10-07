@@ -48,6 +48,8 @@
 	let tag = $state('__all');
 	let statusFilter = $state('__all');
 	let planFilter = $state('__all');
+	// Deep links like /members?owes=1 (billing aging card) preselect the balance filter.
+	const initOwes = page.url.searchParams.get('owes') === '1';
 	const SORT_LABELS = {
 		name: 'Name A–Z',
 		joined: 'Newest',
@@ -55,8 +57,8 @@
 		balance: 'Balance due'
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
-	let owesFilter = $state('any');
-	let members = $state(await getMembers());
+	let owesFilter = $state(initOwes ? 'owes' : 'any');
+	let members = $state(await getMembers({ owes: initOwes || undefined }));
 	const dupes = await getDuplicates();
 	const initials = (name: string) =>
 		name

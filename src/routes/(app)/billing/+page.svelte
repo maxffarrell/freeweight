@@ -331,10 +331,10 @@
 			{#if aging.debtors}
 				<Card.Root class="mb-4">
 					<Card.Content class="flex flex-wrap items-center gap-x-8 gap-y-2 py-3">
-						<div>
+						<a href="/members?owes=1" class="group">
 							<p class="text-xs text-muted-foreground">Members owing</p>
-							<p class="text-lg font-semibold">{aging.debtors}</p>
-						</div>
+							<p class="text-lg font-semibold group-hover:underline">{aging.debtors}</p>
+						</a>
 						<div>
 							<p class="text-xs text-muted-foreground">Not yet due</p>
 							<p class="text-lg font-semibold">
