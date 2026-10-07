@@ -3,9 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
-import { requireOrg } from '#lib/server/context.ts';
+import { requireOrg, requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { gymMember, member, user, webhook } from '#lib/server/db/schema.ts';
+import { gymMember, member, user, userPref, webhook } from '#lib/server/db/schema.ts';
 import { dashboard } from '#lib/server/services/dashboard.ts';
 import * as dashboardSvc from '#lib/server/services/dashboard.ts';
 import { search } from '#lib/server/services/search.ts';
@@ -133,6 +133,33 @@ export const deleteWebhook = command(idSchema, async (id) => {
 	const { orgId } = await requireOrg('admin');
 	await db.delete(webhook).where(and(eq(webhook.organizationId, orgId), eq(webhook.id, id)));
 	void getWebhooks().refresh();
+});
+
+// ------- onboarding tour -------
+const TOUR_KEY = 'app_tour';
+
+/** Whether this user has already dismissed the guided tour (per-user, cross-org). */
+export const getTourSeen = query(async () => {
+	const { user } = requireUser();
+	const [row] = await db
+		.select({ value: userPref.value })
+		.from(userPref)
+		.where(and(eq(userPref.userId, user.id), eq(userPref.key, TOUR_KEY)))
+		.limit(1);
+	return !!row;
+});
+
+/** Record the tour as seen — fired on finish or skip; replaying re-opens the dialog. */
+export const markTourSeen = command(async () => {
+	const { user } = requireUser();
+	await db
+		.insert(userPref)
+		.values({ userId: user.id, key: TOUR_KEY, value: 'seen' })
+		.onConflictDoUpdate({
+			target: [userPref.userId, userPref.key],
+			set: { value: 'seen', updatedAt: new Date() }
+		});
+	void getTourSeen().refresh();
 });
 
 export const seedDemo = command(async () => {

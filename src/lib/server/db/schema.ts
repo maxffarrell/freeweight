@@ -836,3 +836,20 @@ export const challengeEntry = pgTable(
 		uniqueIndex('challenge_entry_member_key').on(t.challengeId, t.memberId)
 	]
 );
+
+/** Per-user app prefs (tour seen, dismissals) — org-agnostic, keyed by string. */
+export const userPref = pgTable(
+	'user_pref',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		key: text('key').notNull(),
+		value: text('value').notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true })
+			.notNull()
+			.defaultNow()
+			.$onUpdate(() => new Date())
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.key] })]
+);

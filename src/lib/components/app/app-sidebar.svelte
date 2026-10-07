@@ -17,13 +17,15 @@
 	import Moon from '@lucide/svelte/icons/moon';
 	import Sun from '@lucide/svelte/icons/sun';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import Map from '@lucide/svelte/icons/map';
 
 	type Props = {
 		user: { name: string; email: string; image: string | null };
 		org: { name: string };
 		onsearch: () => void;
+		ontour: () => void;
 	};
-	let { user, org, onsearch }: Props = $props();
+	let { user, org, onsearch, ontour }: Props = $props();
 
 	const sidebar = Sidebar.useSidebar();
 	$effect(() => {
@@ -138,6 +140,7 @@
 						align="start"
 						class="w-(--bits-dropdown-menu-anchor-width) min-w-56"
 					>
+						<DropdownMenu.Item onclick={ontour}><Map /> Take the tour</DropdownMenu.Item>
 						<DropdownMenu.Item onclick={toggleMode}>
 							{#if mode.current === 'dark'}<Sun /> Light mode{:else}<Moon /> Dark mode{/if}
 						</DropdownMenu.Item>
