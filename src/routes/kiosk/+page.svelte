@@ -278,7 +278,14 @@
 										>
 									{/if}
 									<span class="min-w-0">
-										<span class="block truncate font-medium">{m.name}</span>
+										<span class="block truncate font-medium">
+											{m.name}
+											{#if m.planName}
+												<span class="ml-1.5 text-xs font-normal text-muted-foreground"
+													>{m.planName}</span
+												>
+											{/if}
+										</span>
 										{#if m.deskNote}
 											<span
 												class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
