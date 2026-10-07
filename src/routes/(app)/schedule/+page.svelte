@@ -42,7 +42,8 @@
 		getEventRoster,
 		registerMemberForEvent,
 		cancelEventRegistration,
-		setEventAttended
+		setEventAttended,
+		cancelEvent
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -466,6 +467,20 @@
 			await setEventAttended({ eventId, id, attended });
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
+	async function cancelWholeEvent(id: string) {
+		if (
+			!confirm(
+				'Cancel this event? Registered members are emailed and unpaid signup charges voided.'
+			)
+		)
+			return;
+		try {
+			await cancelEvent(id);
+			toast.success('Event cancelled — registrants notified');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
 		}
 	}
 
@@ -1592,6 +1607,9 @@
 						>
 							<div class="min-w-0">
 								<span class="font-medium">{ev.event.name}</span>
+								{#if ev.event.cancelledAt}
+									<Badge variant="destructive" class="text-xs">Cancelled</Badge>
+								{/if}
 								{#if ev.event.price}
 									<span class="text-muted-foreground">
 										· {formatMoney(ev.event.price, currency)}</span
@@ -1608,6 +1626,16 @@
 							</span>
 						</button>
 						{#if evRosterId === ev.event.id && evRoster}
+							{#if !ev.event.cancelledAt}
+								<div class="mb-1 flex justify-end">
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs text-destructive"
+										onclick={() => cancelWholeEvent(ev.event.id)}>Cancel event</Button
+									>
+								</div>
+							{/if}
 							<div class="mt-2 rounded-md border p-2">
 								{#each evRoster.rows as r (r.registration.id)}
 									<div class="flex items-center justify-between py-1 text-sm">
@@ -1640,21 +1668,24 @@
 								{:else}
 									<p class="py-1 text-xs text-muted-foreground">Nobody registered yet.</p>
 								{/each}
-								<div class="mt-2 flex gap-2">
-									<Select.Root type="single" bind:value={evMemberId}>
-										<Select.Trigger class="h-8 flex-1 text-sm">
-											{memberList.find((mm) => mm.id === evMemberId)?.name ?? 'Register a member…'}
-										</Select.Trigger>
-										<Select.Content>
-											{#each memberList.filter((mm) => !evRoster.rows.some((r) => r.registration.memberId === mm.id)) as mm (mm.id)}
-												<Select.Item value={mm.id}>{mm.name}</Select.Item>
-											{/each}
-										</Select.Content>
-									</Select.Root>
-									<Button size="sm" class="h-8" disabled={!evMemberId} onclick={registerMember}
-										>Add</Button
-									>
-								</div>
+								{#if !ev.event.cancelledAt}
+									<div class="mt-2 flex gap-2">
+										<Select.Root type="single" bind:value={evMemberId}>
+											<Select.Trigger class="h-8 flex-1 text-sm">
+												{memberList.find((mm) => mm.id === evMemberId)?.name ??
+													'Register a member…'}
+											</Select.Trigger>
+											<Select.Content>
+												{#each memberList.filter((mm) => !evRoster.rows.some((r) => r.registration.memberId === mm.id)) as mm (mm.id)}
+													<Select.Item value={mm.id}>{mm.name}</Select.Item>
+												{/each}
+											</Select.Content>
+										</Select.Root>
+										<Button size="sm" class="h-8" disabled={!evMemberId} onclick={registerMember}
+											>Add</Button
+										>
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>

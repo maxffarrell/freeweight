@@ -264,6 +264,42 @@ export async function notifyEventRegistered(orgId: string, registrationId: strin
 	});
 }
 
+/** "Event cancelled" to every registrant when staff cancels an event. */
+export async function notifyEventCancelled(orgId: string, registrationId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			eventName: gymEvent.name,
+			startsAt: gymEvent.startsAt,
+			price: gymEvent.price
+		})
+		.from(eventRegistration)
+		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
+		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
+		.where(eq(eventRegistration.id, registrationId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'event_cancelled', registrationId, row.email))) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Cancelled: ${row.eventName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `${row.eventName} is cancelled`,
+			lines: [
+				`Hi ${row.memberName} — ${row.eventName} on ${when} has been cancelled.`,
+				row.price
+					? "Any unpaid signup charge was voided; if you already paid, we'll sort a refund."
+					: 'Sorry for the change — hope to see you at the next one.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /**
  * One summary email when staff book a member into a recurring series — the
  * per-session confirmation emails are suppressed, this replaces them.
@@ -919,6 +955,57 @@ export async function sendClassReminders(orgId: string) {
 				lines: [
 					`You're booked into ${row.className} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
 					'Need to change it? Cancel or rebook in the member portal.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/** Daily cron: reminds registered members when their event starts within ~26h. */
+export async function sendEventReminders(orgId: string) {
+	const soon = new Date(Date.now() + 26 * 3600_000);
+	const rows = await db
+		.select({
+			registrationId: eventRegistration.id,
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			eventName: gymEvent.name,
+			startsAt: gymEvent.startsAt,
+			locationName: location.name
+		})
+		.from(eventRegistration)
+		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
+		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
+		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.where(
+			and(
+				eq(eventRegistration.organizationId, orgId),
+				eq(eventRegistration.status, 'registered'),
+				eq(gymEvent.active, true),
+				gte(gymEvent.startsAt, new Date()),
+				lte(gymEvent.startsAt, soon)
+			)
+		);
+	if (!rows.length) return 0;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	let sent = 0;
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (!(await logOnce(orgId, 'event_reminder', row.registrationId, row.email))) continue;
+		const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+		await sendMemberEmail(row.memberId, {
+			to: row.email,
+			subject: `Tomorrow: ${row.eventName} at ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `See you tomorrow, ${row.memberName}`,
+				lines: [
+					`You're registered for ${row.eventName} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
+					'Can’t make it? Cancel in the member portal so someone else gets the spot.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})

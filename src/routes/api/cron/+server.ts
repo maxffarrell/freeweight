@@ -11,6 +11,7 @@ import {
 	sendBirthdayGreetings,
 	sendClassReminders,
 	sendDueAnnouncements,
+	sendEventReminders,
 	sendInstructorRosters,
 	sendPastDueNotices,
 	sendStaffBriefing,
@@ -42,6 +43,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	const orgs = await db.select({ id: organization.id }).from(organization);
 	let failed = 0;
 	let reminders = 0;
+	let eventReminders = 0;
 	let pastDue = 0;
 	let trials = 0;
 	let birthdays = 0;
@@ -73,6 +75,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`reminder cron failed for ${o.id}`, err);
+		}
+		try {
+			eventReminders += await sendEventReminders(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`event-reminder cron failed for ${o.id}`, err);
 		}
 		try {
 			pastDue += await sendPastDueNotices(o.id);
@@ -182,6 +190,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		workspaces: orgs.length,
 		failed,
 		reminders,
+		eventReminders,
 		pastDue,
 		trials,
 		birthdays,

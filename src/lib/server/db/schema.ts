@@ -498,6 +498,7 @@ export const gymEvent = pgTable(
 		price: integer('price'),
 		/** Members can self-register in the portal. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

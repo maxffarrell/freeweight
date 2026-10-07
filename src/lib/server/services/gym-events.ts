@@ -1,10 +1,10 @@
-import { and, asc, eq, gte, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { error } from '@sveltejs/kit';
 import { charge, eventRegistration, gymEvent, gymMember, location } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyEventRegistered } from './notifications.ts';
+import { notifyEventCancelled, notifyEventRegistered } from './notifications.ts';
 import { todayISO } from '#lib/format.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -77,6 +77,7 @@ export async function memberEvents(orgId: string, memberId: string) {
 				eq(gymEvent.organizationId, orgId),
 				eq(gymEvent.active, true),
 				eq(gymEvent.memberBookable, true),
+				isNull(gymEvent.cancelledAt),
 				gte(gymEvent.endsAt, new Date())
 			)
 		)
@@ -174,6 +175,52 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 	});
 	notifyEventRegistered(orgId, r.registration.id).catch(() => {});
 	return r;
+}
+
+/**
+ * Staff cancel an event: voids every registrant's unpaid signup charge,
+ * marks registrations cancelled, and emails each member. Refunds for paid
+ * signups go through the normal refund flow.
+ */
+export async function cancelEvent(orgId: string, eventId: string) {
+	const { ev, regs } = await db.transaction(async (tx) => {
+		const [ev] = await tx
+			.update(gymEvent)
+			.set({ cancelledAt: new Date(), active: false, updatedAt: new Date() })
+			.where(
+				and(
+					eq(gymEvent.organizationId, orgId),
+					eq(gymEvent.id, eventId),
+					isNull(gymEvent.cancelledAt)
+				)
+			)
+			.returning();
+		if (!ev) error(404, 'Event not found');
+		const regs = await tx
+			.update(eventRegistration)
+			.set({ status: 'cancelled' })
+			.where(and(eq(eventRegistration.eventId, eventId), ne(eventRegistration.status, 'cancelled')))
+			.returning({
+				id: eventRegistration.id,
+				chargeId: eventRegistration.chargeId
+			});
+		const chargeIds = regs.map((r) => r.chargeId).filter((c): c is string => !!c);
+		if (chargeIds.length)
+			await tx
+				.update(charge)
+				.set({ status: 'void', updatedAt: new Date() })
+				.where(and(inArray(charge.id, chargeIds), eq(charge.status, 'open')));
+		return { ev, regs };
+	});
+	await emit({
+		orgId,
+		entityType: 'gym_event',
+		entityId: ev.id,
+		action: 'cancelled',
+		summary: `Event cancelled: ${ev.name} (${regs.length} registrants notified)`
+	});
+	for (const r of regs) notifyEventCancelled(orgId, r.id).catch(() => {});
+	return ev;
 }
 
 /** Mark/unmark a registered member as attended from the event roster. */
