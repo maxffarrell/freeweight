@@ -135,7 +135,11 @@
 <div class="min-h-svh bg-background">
 	<header class="border-b">
 		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
-			<Logo />
+			{#if settings.logoDocumentId}
+				<img src="/api/logo/{settings.logoDocumentId}" alt="" class="h-8 w-auto object-contain" />
+			{:else}
+				<Logo />
+			{/if}
 			<span class="truncate font-semibold">{org.name}</span>
 			{#if settings.address}
 				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex"

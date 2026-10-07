@@ -52,6 +52,10 @@ export const gymSettings = pgTable('gym_settings', {
 	currency: text('currency').notNull().default('usd'),
 	/** Public page at /j/[org-slug] with plans and the week's schedule. */
 	publicPage: boolean('public_page').notNull().default(true),
+	/** Uploaded logo shown on the public join page, portal and kiosk; null = name only. */
+	logoDocumentId: text('logo_document_id').references(() => document.id, {
+		onDelete: 'set null'
+	}),
 	/** Short pitch shown on the public page. */
 	tagline: text('tagline').notNull().default(''),
 	address: text('address').notNull().default(''),

@@ -1,0 +1,2 @@
+ALTER TABLE "gym_settings" ADD COLUMN "logo_document_id" text;--> statement-breakpoint
+ALTER TABLE "gym_settings" ADD CONSTRAINT "gym_settings_logo_document_id_document_id_fk" FOREIGN KEY ("logo_document_id") REFERENCES "public"."document"("id") ON DELETE set null ON UPDATE no action;
