@@ -1,0 +1,1 @@
+ALTER TABLE "shop_item" ADD COLUMN "stock" integer;
