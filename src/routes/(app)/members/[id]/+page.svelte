@@ -638,9 +638,17 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Waiver</span>
-					<span
-						>{m.signedWaiver ? `Signed ${formatDate(m.signedWaiver.signedAt)}` : 'Not signed'}</span
-					>
+					{#if m.signedWaiver && settings.waiver && m.signedWaiver.text !== settings.waiver}
+						<span class="text-amber-600"
+							>Signed older version {formatDate(m.signedWaiver.signedAt)}</span
+						>
+					{:else}
+						<span
+							>{m.signedWaiver
+								? `Signed ${formatDate(m.signedWaiver.signedAt)}`
+								: 'Not signed'}</span
+						>
+					{/if}
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Guest passes</span>

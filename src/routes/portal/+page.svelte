@@ -643,10 +643,12 @@
 		</Card.Root>
 	{/if}
 
-	{#if d.waiverRequired && !d.signedWaiver}
+	{#if d.waiverRequired && (!d.signedWaiver || d.waiverStale)}
 		<Card.Root class="sm:col-span-2">
 			<Card.Header>
-				<Card.Title class="text-base">Sign your waiver</Card.Title>
+				<Card.Title class="text-base"
+					>{d.waiverStale ? 'Our waiver changed — please re-sign' : 'Sign your waiver'}</Card.Title
+				>
 				<Card.Description>Your gym requires this before your next visit.</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3 px-6">

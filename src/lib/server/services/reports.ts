@@ -515,7 +515,7 @@ async function waiverStatus(orgId: string) {
 		.select({
 			total: sql<number>`count(*)`.mapWith(Number),
 			signed:
-				sql<number>`count(*) filter (where exists (select 1 from ${waiver} w where w.member_id = ${gymMember.id}))`.mapWith(
+				sql<number>`count(*) filter (where exists (select 1 from ${waiver} w where w.member_id = ${gymMember.id} and w.text = ${s?.waiver ?? ''}))`.mapWith(
 					Number
 				)
 		})

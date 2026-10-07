@@ -223,6 +223,7 @@ export async function portalOverview(memberId: string) {
 		referralCount: referred?.n ?? 0,
 		waiverRequired: !!settings?.waiver,
 		signedWaiver,
+		waiverStale: !!settings?.waiver && !!signedWaiver && signedWaiver.text !== settings.waiver,
 		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC')
 	};
 }
