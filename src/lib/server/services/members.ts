@@ -25,7 +25,12 @@ import { creditUsage } from './schedule.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
-export async function listMembers(orgId: string, q?: string, tag?: string) {
+export async function listMembers(
+	orgId: string,
+	q?: string,
+	tag?: string,
+	status?: 'active' | 'inactive'
+) {
 	const term = q?.trim();
 	return db
 		.select({
@@ -62,7 +67,8 @@ export async function listMembers(orgId: string, q?: string, tag?: string) {
 					: undefined,
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.tag = ${tag})`
-					: undefined
+					: undefined,
+				status ? eq(gymMember.status, status) : undefined
 			)
 		)
 		.orderBy(asc(gymMember.name));

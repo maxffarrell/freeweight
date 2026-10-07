@@ -21,8 +21,14 @@ import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 
 export const getMembers = query(
-	v.optional(v.object({ q: v.optional(v.string()), tag: v.optional(v.string()) })),
-	async (opts) => svc.listMembers((await requireOrg()).orgId, opts?.q, opts?.tag)
+	v.optional(
+		v.object({
+			q: v.optional(v.string()),
+			tag: v.optional(v.string()),
+			status: v.optional(v.picklist(['active', 'inactive']))
+		})
+	),
+	async (opts) => svc.listMembers((await requireOrg()).orgId, opts?.q, opts?.tag, opts?.status)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
 export const getTags = query(async () => svc.listTags((await requireOrg()).orgId));

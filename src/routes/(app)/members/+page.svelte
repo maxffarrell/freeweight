@@ -37,10 +37,15 @@
 	const allTags = $derived(await getTags());
 	let q = $state('');
 	let tag = $state('__all');
+	let statusFilter = $state('__all');
 	let members = $state(await getMembers());
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
-		members = await getMembers({ q, tag: tag === '__all' ? undefined : tag });
+		members = await getMembers({
+			q,
+			tag: tag === '__all' ? undefined : tag,
+			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive')
+		});
 	}
 	function search() {
 		clearTimeout(timer);
@@ -182,6 +187,20 @@
 				oninput={search}
 			/>
 		</div>
+		<Select.Root type="single" bind:value={statusFilter} onValueChange={() => void refilter()}>
+			<Select.Trigger class="w-32"
+				>{statusFilter === '__all'
+					? 'Any status'
+					: statusFilter === 'active'
+						? 'Active'
+						: 'Inactive'}</Select.Trigger
+			>
+			<Select.Content>
+				<Select.Item value="__all">Any status</Select.Item>
+				<Select.Item value="active">Active</Select.Item>
+				<Select.Item value="inactive">Inactive</Select.Item>
+			</Select.Content>
+		</Select.Root>
 		{#if allTags.length}
 			<Select.Root type="single" bind:value={tag} onValueChange={() => void refilter()}>
 				<Select.Trigger class="w-36">{tag === '__all' ? 'All tags' : tag}</Select.Trigger>
