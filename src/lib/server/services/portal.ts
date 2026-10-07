@@ -14,6 +14,7 @@ import {
 	membership,
 	payment,
 	plan,
+	waiver,
 	outer
 } from '#lib/server/db/schema.ts';
 import { checkInToken } from './checkins.ts';
@@ -22,6 +23,7 @@ import { memberBalance } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
+import { emit } from './events.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -117,6 +119,12 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(charge.memberId, memberId), eq(charge.status, 'open')))
 		.orderBy(asc(charge.dueDate));
 
+	const [signedWaiver] = await db
+		.select()
+		.from(waiver)
+		.where(eq(waiver.memberId, memberId))
+		.orderBy(desc(waiver.signedAt))
+		.limit(1);
 	return {
 		member: m,
 		settings,
@@ -125,8 +133,34 @@ export async function portalOverview(memberId: string) {
 		balance,
 		openCharges,
 		credits: await creditUsage(orgId, memberId),
-		checkInCode: checkInToken(memberId)
+		checkInCode: checkInToken(memberId),
+		waiverRequired: !!settings?.waiver,
+		signedWaiver
 	};
+}
+
+/**
+ * Records a member's signature for the workspace's current waiver text.
+ * Re-signing replaces the stored snapshot (staff edits warrant a fresh agreement).
+ */
+export async function signWaiver(orgId: string, memberId: string) {
+	const [settings] = await db
+		.select({ waiver: gymSettings.waiver })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (!settings?.waiver) error(400, 'This gym does not use a waiver');
+	const [row] = await db
+		.insert(waiver)
+		.values({ organizationId: orgId, memberId, text: settings.waiver })
+		.returning();
+	await emit({
+		orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'waiver_signed',
+		summary: 'Waiver signed'
+	});
+	return row;
 }
 
 /** Sessions open for booking in the next two weeks, with the member's own booking state. */

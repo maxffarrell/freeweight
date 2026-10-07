@@ -172,6 +172,12 @@
 					>
 				</div>
 				<div class="flex justify-between">
+					<span class="text-muted-foreground">Waiver</span>
+					<span
+						>{m.signedWaiver ? `Signed ${formatDate(m.signedWaiver.signedAt)}` : 'Not signed'}</span
+					>
+				</div>
+				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
 				</div>

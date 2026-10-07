@@ -41,6 +41,13 @@ export const memberBook = command(
 	}
 );
 
+export const signWaiver = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const w = await svc.signWaiver(m.organizationId, m.id);
+	void getPortalOverview(memberId).refresh();
+	return w;
+});
+
 export const memberCancel = command(
 	v.object({ memberId: idSchema, bookingId: idSchema }),
 	async ({ memberId, bookingId }) => {

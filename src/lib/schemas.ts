@@ -163,7 +163,8 @@ export const settingsInput = v.object({
 	tagline: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
 	address: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
 	phone: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50))),
-	website: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)))
+	website: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),
+	waiver: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(20000)))
 });
 
 export const webhookInput = v.object({
@@ -177,6 +178,7 @@ export const joinInput = v.object({
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
 	phone: optionalText,
 	planId: v.optional(v.nullable(idSchema)),
+	agreedWaiver: v.optional(v.boolean(), false),
 	/** Honeypot: must stay empty. */
 	website: v.optional(v.string(), '')
 });
@@ -186,7 +188,8 @@ export const dropInInput = v.object({
 	sessionId: idSchema,
 	name: requiredText('Name'),
 	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
-	phone: v.optional(optionalText)
+	phone: v.optional(optionalText),
+	agreedWaiver: v.optional(v.boolean(), false)
 });
 
 export const announcementInput = v.object({

@@ -11,6 +11,7 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
@@ -58,6 +59,7 @@
 	let address = $state(settings.address);
 	let phone = $state(settings.phone);
 	let website = $state(settings.website);
+	let waiver = $state(settings.waiver);
 	let publicPage = $state(settings.publicPage);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -72,6 +74,7 @@
 				address,
 				phone,
 				website,
+				waiver,
 				publicPage
 			});
 			toast.success('Settings saved');
@@ -253,6 +256,15 @@
 								<Input id="site" bind:value={website} />
 							</Field.Field>
 						</div>
+						<Field.Field>
+							<Field.Label for="waiver">Liability waiver</Field.Label>
+							<Textarea
+								id="waiver"
+								rows={5}
+								bind:value={waiver}
+								placeholder="Leave blank to skip waivers. When set, joiners, drop-ins and portal members must agree before visiting."
+							/>
+						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
 								<p class="font-medium">Public join page</p>

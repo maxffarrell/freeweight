@@ -28,6 +28,7 @@
 	let phone = $state('');
 	let planId = $state('');
 	let website = $state(''); // honeypot — must stay empty
+	let agreedWaiver = $state(false);
 	let pending = $state(false);
 	let joined = $state(false);
 	let checkoutUrl = $state<string | null>(null);
@@ -39,7 +40,14 @@
 		try {
 			const r = await joinGymForm({
 				slug: org.slug,
-				input: { name, email, phone: phone || undefined, planId: planId || undefined, website }
+				input: {
+					name,
+					email,
+					phone: phone || undefined,
+					planId: planId || undefined,
+					agreedWaiver,
+					website
+				}
 			});
 			checkoutUrl = r.checkoutUrl ?? null;
 			joined = true;
@@ -58,6 +66,7 @@
 	let dName = $state('');
 	let dEmail = $state('');
 	let dPhone = $state('');
+	let dAgreed = $state(false);
 	let dPending = $state(false);
 	let dropCheckoutUrl = $state<string | null>(null);
 	let dropDone = $state(false);
@@ -86,7 +95,8 @@
 					sessionId: dropSessionId,
 					name: dName,
 					email: dEmail,
-					phone: dPhone || undefined
+					phone: dPhone || undefined,
+					agreedWaiver: dAgreed
 				}
 			});
 			dropCheckoutUrl = r.checkoutUrl ?? null;
@@ -283,6 +293,19 @@
 									</Field.Field>
 								{/if}
 							</div>
+							{#if settings.waiver}
+								<div class="rounded-lg border bg-muted/40 p-3">
+									<p
+										class="mb-2 max-h-32 overflow-y-auto text-xs whitespace-pre-wrap text-muted-foreground"
+									>
+										{settings.waiver}
+									</p>
+									<label class="flex items-start gap-2 text-sm">
+										<input type="checkbox" required bind:checked={agreedWaiver} class="mt-0.5" />
+										<span>I have read and agree to the liability waiver.</span>
+									</label>
+								</div>
+							{/if}
 							<!-- honeypot -->
 							<input
 								type="text"
@@ -344,6 +367,19 @@
 						>
 						<Input id="d-phone" type="tel" bind:value={dPhone} autocomplete="tel" />
 					</Field.Field>
+					{#if settings.waiver}
+						<div class="rounded-lg border bg-muted/40 p-3">
+							<p
+								class="mb-2 max-h-32 overflow-y-auto text-xs whitespace-pre-wrap text-muted-foreground"
+							>
+								{settings.waiver}
+							</p>
+							<label class="flex items-start gap-2 text-sm">
+								<input type="checkbox" required bind:checked={dAgreed} class="mt-0.5" />
+								<span>I have read and agree to the liability waiver.</span>
+							</label>
+						</div>
+					{/if}
 					<Dialog.Footer>
 						<Button type="submit" disabled={dPending}
 							>{dPending ? 'Booking…' : 'Book this class'}</Button

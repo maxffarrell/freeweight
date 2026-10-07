@@ -12,6 +12,7 @@ import {
 	membership,
 	organization,
 	payment,
+	waiver,
 	plan,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -120,7 +121,13 @@ export async function getMember(orgId: string, id: string) {
 
 	const credits = await creditUsage(orgId, id);
 
-	return { ...row, memberships, charges, payments, bookings, checkIns, credits };
+	const [signedWaiver] = await db
+		.select()
+		.from(waiver)
+		.where(eq(waiver.memberId, id))
+		.orderBy(desc(waiver.signedAt))
+		.limit(1);
+	return { ...row, memberships, charges, payments, bookings, checkIns, credits, signedWaiver };
 }
 
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {

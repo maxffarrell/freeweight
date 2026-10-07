@@ -56,6 +56,8 @@ export const gymSettings = pgTable('gym_settings', {
 	address: text('address').notNull().default(''),
 	phone: text('phone').notNull().default(''),
 	website: text('website').notNull().default(''),
+	/** Liability waiver text; when non-empty, joiners and drop-ins must agree before signing up. */
+	waiver: text('waiver').notNull().default(''),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -127,6 +129,22 @@ export const plan = pgTable(
 		...timestamps
 	},
 	(t) => [index('plan_org_idx').on(t.organizationId)]
+);
+
+/** A member's signed liability waiver — stores the exact text they agreed to. */
+export const waiver = pgTable(
+	'waiver',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Snapshot of the waiver text at signing time. */
+		text: text('text').notNull(),
+		signedAt: timestamp('signed_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [index('waiver_member_idx').on(t.memberId)]
 );
 
 export const membershipStatus = pgEnum('membership_status', ['active', 'paused', 'cancelled']);

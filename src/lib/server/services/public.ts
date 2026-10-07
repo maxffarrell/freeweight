@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -8,6 +8,7 @@ import {
 	classType,
 	gymMember,
 	gymSettings,
+	waiver,
 	location,
 	organization,
 	plan,
@@ -90,7 +91,11 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 				.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, input.email)))
 				.limit(1)
 		: [];
-	if (existing) return { member: existing, existing: true };
+	if (settings?.waiver && !input.agreedWaiver) error(400, 'Please agree to the waiver');
+	if (existing) {
+		await recordWaiver(org.id, existing.id, settings!.waiver);
+		return { member: existing, existing: true };
+	}
 
 	const [m] = await db
 		.insert(gymMember)
@@ -110,6 +115,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			checkoutUrl = await signupCheckout(org.id, slug, settings, p, m!.id, input.email);
 		}
 	}
+	if (settings?.waiver) await recordWaiver(org.id, m!.id, settings.waiver);
 	await emit({
 		orgId: org.id,
 		entityType: 'member',
@@ -174,6 +180,19 @@ async function signupCheckout(
 	);
 }
 
+/** Stores the exact waiver text the member agreed to. */
+async function recordWaiver(orgId: string, memberId: string, text: string) {
+	const [signed] = await db
+		.select({ text: waiver.text })
+		.from(waiver)
+		.where(eq(waiver.memberId, memberId))
+		.orderBy(desc(waiver.signedAt))
+		.limit(1);
+	// Re-sign only when the gym's waiver text changed.
+	if (signed?.text === text) return;
+	await db.insert(waiver).values({ organizationId: orgId, memberId, text });
+}
+
 const dropInRate = new Map<string, number[]>();
 
 /**
@@ -192,6 +211,7 @@ export async function bookDropIn(
 	dropInRate.set(ip, [...hits, now]);
 
 	const { org, settings } = await getPublicGym(slug);
+	if (settings?.waiver && !input.agreedWaiver) error(400, 'Please agree to the waiver');
 	const email = input.email!.toLowerCase();
 	const [m] = await db
 		.select()
@@ -212,6 +232,7 @@ export async function bookDropIn(
 				})
 				.returning()
 		)[0];
+	if (settings?.waiver) await recordWaiver(org.id, member.id, settings.waiver);
 
 	const { b, className, price } = await db.transaction(async (tx) => {
 		const [sess] = await tx

@@ -14,7 +14,8 @@
 		memberBook,
 		memberCancel,
 		getProviders,
-		startCheckout
+		startCheckout,
+		signWaiver
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -54,6 +55,18 @@
 			paying = false;
 			toast.error(errMsg(err, 'Could not start payment'));
 		}
+	}
+
+	let signingWaiver = $state(false);
+	async function sign() {
+		signingWaiver = true;
+		try {
+			await signWaiver(memberId);
+			toast.success('Waiver signed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not sign'));
+		}
+		signingWaiver = false;
 	}
 
 	let busy = $state<string | null>(null);
@@ -126,6 +139,25 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
+
+	{#if d.waiverRequired && !d.signedWaiver}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Sign your waiver</Card.Title>
+				<Card.Description>Your gym requires this before your next visit.</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-3 px-6">
+				<p
+					class="max-h-40 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-xs whitespace-pre-wrap text-muted-foreground"
+				>
+					{d.settings?.waiver}
+				</p>
+				<Button onclick={sign} disabled={signingWaiver}
+					>{signingWaiver ? 'Signing…' : 'I agree — sign waiver'}</Button
+				>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<Card.Root>
 		<Card.Header>
