@@ -23,6 +23,8 @@ import {
 	checkIn,
 	classSession,
 	classType,
+	eventRegistration,
+	gymEvent,
 	gymMember,
 	gymSettings,
 	location,
@@ -211,6 +213,52 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 						"We'll email you the moment a spot opens."
 					]
 				: [`${row.className} on ${when}.`, 'You can cancel any time from your member portal.'],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/** "You're registered" right after an event signup lands. One email per registration. */
+export async function notifyEventRegistered(orgId: string, registrationId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			eventName: gymEvent.name,
+			startsAt: gymEvent.startsAt,
+			locationName: location.name,
+			price: gymEvent.price
+		})
+		.from(eventRegistration)
+		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
+		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
+		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.where(eq(eventRegistration.id, registrationId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'event_registered', registrationId, row.email))) return;
+	const [name, st] = await Promise.all([
+		orgBrand(orgId),
+		db
+			.select({ timezone: gymSettings.timezone, currency: gymSettings.currency })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, orgId))
+			.then((r) => r[0])
+	]);
+	const tz = st?.timezone ?? 'UTC';
+	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Registered: ${row.eventName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `You're registered, ${row.memberName}`,
+			lines: [
+				`${row.eventName} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
+				row.price
+					? `A ${formatMoney(row.price, st?.currency ?? 'usd')} signup charge was added to your balance.`
+					: 'See you there.'
+			],
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
