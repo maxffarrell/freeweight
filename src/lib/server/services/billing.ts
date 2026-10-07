@@ -74,7 +74,7 @@ export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 // ---------- Memberships ----------
 
 /** Adds the interval to a date, on the same calendar day for month/year. */
-function nextPeriod(startISO: string, interval: 'week' | 'month' | 'year') {
+export function nextPeriod(startISO: string, interval: 'week' | 'month' | 'year') {
 	if (interval === 'week') return addDays(startISO, 7);
 	const d = new Date(`${startISO}T00:00:00Z`);
 	if (interval === 'month') d.setUTCMonth(d.getUTCMonth() + 1);

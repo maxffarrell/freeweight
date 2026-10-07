@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, eq, getTableColumns, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -10,6 +10,7 @@ import {
 	location,
 	member,
 	membership,
+	plan,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -17,6 +18,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import { notifyWaitlistPromoted } from './notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
+import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -224,10 +226,11 @@ export async function updateSession(
 
 // ---------- Bookings ----------
 
-async function memberHasActiveMembership(orgId: string, memberId: string) {
+async function activeMembership(orgId: string, memberId: string) {
 	const [row] = await db
-		.select({ id: membership.id })
+		.select({ membership, classCredits: plan.classCredits, interval: plan.interval })
 		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(
 			and(
 				eq(membership.organizationId, orgId),
@@ -235,8 +238,47 @@ async function memberHasActiveMembership(orgId: string, memberId: string) {
 				eq(membership.status, 'active')
 			)
 		)
+		.orderBy(desc(membership.createdAt))
 		.limit(1);
-	return !!row;
+	return row;
+}
+
+/** Bookings that consume a class credit (cancelled doesn't). */
+const CREDIT_STATUSES = ['booked', 'attended', 'no_show'] as const;
+
+/**
+ * 402s when the member's plan caps classes per period and they've used them.
+ * The period rolls from `membership.startsAt` on the plan's interval.
+ */
+async function assertCreditAvailable(
+	orgId: string,
+	memberId: string,
+	ms: {
+		membership: { startsAt: Date };
+		classCredits: number | null;
+		interval: 'week' | 'month' | 'year';
+	}
+) {
+	if (ms.classCredits == null) return;
+	let periodStart = ms.membership.startsAt.toISOString().slice(0, 10);
+	while (nextPeriod(periodStart, ms.interval) <= new Date().toISOString().slice(0, 10))
+		periodStart = nextPeriod(periodStart, ms.interval);
+	const periodEnd = nextPeriod(periodStart, ms.interval);
+
+	const [{ count }] = await db
+		.select({ count: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				inArray(booking.status, [...CREDIT_STATUSES]),
+				gte(classSession.startsAt, new Date(`${periodStart}T00:00:00Z`)),
+				lt(classSession.startsAt, new Date(`${periodEnd}T00:00:00Z`))
+			)
+		);
+	if (count >= ms.classCredits) error(402, `All ${ms.classCredits} classes used for this period`);
 }
 
 /**
@@ -253,8 +295,9 @@ export async function bookSession(
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
-	if (!(await memberHasActiveMembership(ctx.orgId, input.memberId)))
-		error(402, 'An active membership is required to book');
+	const ms = await activeMembership(ctx.orgId, input.memberId);
+	if (!ms) error(402, 'An active membership is required to book');
+	await assertCreditAvailable(ctx.orgId, input.memberId, ms);
 
 	const row = await db.transaction(async (tx) => {
 		const [s] = await tx

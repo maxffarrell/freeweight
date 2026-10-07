@@ -34,6 +34,15 @@ export function portalToken(memberId: string) {
 	return `${Buffer.from(payload).toString('base64url')}.${sign(payload)}`;
 }
 
+export async function hasPortalMembership(userId: string) {
+	const [row] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(eq(gymMember.portalUserId, userId))
+		.limit(1);
+	return !!row;
+}
+
 export async function claimPortal(token: string, userId: string) {
 	const [encoded, sig] = token.split('.');
 	if (!encoded || !sig) error(400, 'Invalid link');
