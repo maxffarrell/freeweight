@@ -6,6 +6,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 import { getSettings } from './settings.ts';
 import { emit } from './events.ts';
+import { notifyResourceBooked } from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -186,6 +187,7 @@ export async function bookResource(
 		action: 'created',
 		summary: `${resourceName} reservation booked for ${day} ${time}`
 	}).catch(() => {});
+	notifyResourceBooked(orgId, row.id).catch(() => {});
 	return row;
 }
 

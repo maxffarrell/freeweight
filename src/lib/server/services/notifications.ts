@@ -222,6 +222,41 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 	});
 }
 
+/** "Slot reserved" right after an amenity booking lands. One email per reservation. */
+export async function notifyResourceBooked(orgId: string, resourceBookingId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			resourceName: facilityResource.name,
+			startsAt: resourceBooking.startsAt,
+			locationName: location.name
+		})
+		.from(resourceBooking)
+		.innerJoin(gymMember, eq(resourceBooking.memberId, gymMember.id))
+		.innerJoin(facilityResource, eq(resourceBooking.resourceId, facilityResource.id))
+		.leftJoin(location, eq(facilityResource.locationId, location.id))
+		.where(eq(resourceBooking.id, resourceBookingId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'resource_booked', resourceBookingId, row.email))) return;
+	const [name, settings] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(row.startsAt, settings)} at ${localTime(row.startsAt, settings)}`;
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Reserved: ${row.resourceName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `You're in, ${row.memberName}`,
+			lines: [
+				`${row.resourceName} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
+				'You can cancel any time from your member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "You're registered" right after an event signup lands. One email per registration. */
 export async function notifyEventRegistered(orgId: string, registrationId: string) {
 	const [row] = await db
