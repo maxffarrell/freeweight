@@ -44,6 +44,7 @@
 			planName: string | null;
 			photoDocumentId: string | null;
 			deskNote: string | null;
+			tags: string[];
 		}[]
 	>([]);
 	let flash = $state<{
@@ -285,6 +286,9 @@
 													>{m.planName}</span
 												>
 											{/if}
+											{#each m.tags.slice(0, 3) as t (t)}
+												<Badge variant="secondary" class="ml-1 px-1 py-0 text-[10px]">{t}</Badge>
+											{/each}
 										</span>
 										{#if m.deskNote}
 											<span
