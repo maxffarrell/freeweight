@@ -190,8 +190,9 @@ export async function portalOverview(memberId: string) {
  */
 async function attendanceStats(orgId: string, memberId: string, tz: string) {
 	const rows = await db
-		.select({ checkedAt: checkIn.checkedAt })
+		.select({ checkedAt: checkIn.checkedAt, locationName: location.name })
 		.from(checkIn)
+		.leftJoin(location, eq(checkIn.locationId, location.id))
 		.where(
 			and(
 				eq(checkIn.organizationId, orgId),
@@ -225,7 +226,7 @@ async function attendanceStats(orgId: string, memberId: string, tz: string) {
 		prev.setUTCDate(prev.getUTCDate() - 7);
 		w = prev.toISOString().slice(0, 10);
 	}
-	return { visitsThisMonth, weekStreak, totalVisits: rows.length };
+	return { visitsThisMonth, weekStreak, totalVisits: rows.length, recent: rows.slice(0, 10) };
 }
 
 /**

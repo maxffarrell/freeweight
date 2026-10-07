@@ -308,6 +308,18 @@
 			<p class="text-xs text-muted-foreground">
 				{d.attendance.totalVisits} visits in the last 6 months
 			</p>
+			{#if d.attendance.recent.length}
+				<ul class="space-y-1.5 border-t pt-3">
+					{#each d.attendance.recent as v (v.checkedAt)}
+						<li class="flex items-baseline justify-between gap-2 text-sm">
+							<span class="truncate">{v.locationName ?? 'Visit'}</span>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{localDate(v.checkedAt, tz)} · {localTime(v.checkedAt, tz)}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
