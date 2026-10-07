@@ -35,11 +35,19 @@ export const getMembers = query(
 			q: v.optional(v.string()),
 			tag: v.optional(v.string()),
 			status: v.optional(v.picklist(['active', 'inactive'])),
-			planId: v.optional(v.string())
+			planId: v.optional(v.string()),
+			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance']))
 		})
 	),
 	async (opts) =>
-		svc.listMembers((await requireOrg()).orgId, opts?.q, opts?.tag, opts?.status, opts?.planId)
+		svc.listMembers(
+			(await requireOrg()).orgId,
+			opts?.q,
+			opts?.tag,
+			opts?.status,
+			opts?.planId,
+			opts?.sort
+		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
 export const getTags = query(async () => svc.listTags((await requireOrg()).orgId));
