@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -70,4 +70,42 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/** "Class cancelled" to every booked/waitlisted member of the session. One email per member. */
+export async function notifySessionCancelled(orgId: string, sessionId: string) {
+	const rows = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
+		);
+	if (!rows.length) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (!(await logOnce(orgId, 'session_cancelled', sessionId, row.email))) continue;
+		const date = localDate(row.startsAt, tz);
+		await sendEmail({
+			to: row.email,
+			subject: `${row.className} on ${date} is cancelled`,
+			...renderEmail({
+				orgName: name,
+				heading: `${row.className} is cancelled`,
+				lines: [
+					`Hi ${row.memberName} — ${row.className} at ${name} on ${date} at ${localTime(row.startsAt, tz)} has been cancelled.`,
+					'Check the member portal for the rest of this week’s schedule.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
 }

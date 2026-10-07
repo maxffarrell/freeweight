@@ -15,7 +15,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyWaitlistPromoted } from './notifications.ts';
+import { notifySessionCancelled, notifyWaitlistPromoted } from './notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
 import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
@@ -209,6 +209,7 @@ export async function updateSession(
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, id)))
 		.returning();
 	if (!row) error(404, 'Session not found');
+	if (set.cancelled) notifySessionCancelled(ctx.orgId, id).catch(() => {});
 	// Keep endsAt in step with the class duration when the start moves.
 	if (set.startsAt) {
 		const [ct] = await db
