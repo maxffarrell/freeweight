@@ -524,7 +524,8 @@ export async function activeMembership(orgId: string, memberId: string) {
 			membership,
 			classCredits: plan.classCredits,
 			interval: plan.interval,
-			isPack: plan.isPack
+			isPack: plan.isPack,
+			bookAheadDays: plan.bookAheadDays
 		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))

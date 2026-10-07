@@ -182,6 +182,8 @@ export const plan = pgTable(
 		commitmentMonths: integer('commitment_months'),
 		/** Max active members on the plan; null = unlimited. Full plans can't be joined. */
 		memberLimit: integer('member_limit'),
+		/** Days ahead members on this plan may book; null = the gym-wide window. */
+		bookAheadDays: integer('book_ahead_days'),
 		/** Shown on the public join page. */
 		listed: boolean('listed').notNull().default(true),
 		active: boolean('active').notNull().default(true),

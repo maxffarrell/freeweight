@@ -55,6 +55,7 @@
 	let guestPasses = $state<number | null>(null);
 	let commitmentMonths = $state<number | null>(null);
 	let memberLimit = $state<number | null>(null);
+	let bookAheadDays = $state<number | null>(null);
 	let listed = $state(true);
 	let active = $state(true);
 
@@ -72,6 +73,7 @@
 		guestPasses = p.guestPasses;
 		commitmentMonths = p.commitmentMonths;
 		memberLimit = p.memberLimit;
+		bookAheadDays = p.bookAheadDays;
 		listed = p.listed;
 		active = p.active;
 		open = true;
@@ -89,6 +91,7 @@
 		guestPasses = null;
 		commitmentMonths = null;
 		memberLimit = null;
+		bookAheadDays = null;
 		listed = active = true;
 	}
 
@@ -112,6 +115,7 @@
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
 					memberLimit: isPack ? null : memberLimit || null,
+					bookAheadDays: isPack ? null : bookAheadDays || null,
 					listed,
 					active
 				});
@@ -130,6 +134,7 @@
 					guestPasses: guestPasses || null,
 					commitmentMonths: isPack ? null : commitmentMonths || null,
 					memberLimit: isPack ? null : memberLimit || null,
+					bookAheadDays: isPack ? null : bookAheadDays || null,
 					listed,
 					active
 				});
@@ -238,6 +243,8 @@
 						{#if p.guestPasses}<Badge variant="outline">{p.guestPasses} guest passes/mo</Badge>{/if}
 						{#if p.commitmentMonths}<Badge variant="outline"
 								>{p.commitmentMonths}-mo commitment</Badge
+							>{/if}
+						{#if p.bookAheadDays}<Badge variant="outline">books {p.bookAheadDays}d ahead</Badge
 							>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
 						{#if p.activeMembers > 0 || p.memberLimit}<Badge
@@ -472,18 +479,32 @@
 					/>
 				</Field.Field>
 			</div>
-			<Field.Field>
-				<Field.Label for="p-limit">Member cap</Field.Label>
-				<Input
-					id="p-limit"
-					type="number"
-					min={1}
-					bind:value={memberLimit}
-					placeholder="Unlimited"
-					disabled={isPack}
-				/>
-				<Field.Description>Max active members — full plans can't be joined</Field.Description>
-			</Field.Field>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="p-limit">Member cap</Field.Label>
+					<Input
+						id="p-limit"
+						type="number"
+						min={1}
+						bind:value={memberLimit}
+						placeholder="Unlimited"
+						disabled={isPack}
+					/>
+					<Field.Description>Max active members on the plan</Field.Description>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="p-ahead">Book ahead (days)</Field.Label>
+					<Input
+						id="p-ahead"
+						type="number"
+						min={1}
+						bind:value={bookAheadDays}
+						placeholder="Gym default"
+						disabled={isPack}
+					/>
+					<Field.Description>Overrides the gym-wide window</Field.Description>
+				</Field.Field>
+			</div>
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<span>Class pack — one-time purchase, no recurring billing</span>
 				<Switch bind:checked={isPack} />
