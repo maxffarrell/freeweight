@@ -232,6 +232,52 @@ export async function notifySeriesBooked(
 }
 
 /**
+ * Price-change notice — emailed to active members on a plan whose amount just
+ * changed (and who have no custom price override). Required billing notice,
+ * not marketing.
+ */
+export async function notifyPlanPriceChange(
+	orgId: string,
+	planName: string,
+	memberIds: string[],
+	oldAmount: number,
+	newAmount: number,
+	interval: string
+) {
+	if (!memberIds.length) return;
+	const [name, st] = await Promise.all([
+		orgName(orgId),
+		db
+			.select({ currency: gymSettings.currency })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, orgId))
+			.limit(1)
+	]);
+	const currency = st[0]?.currency ?? 'usd';
+	const rows = await db
+		.select({ id: gymMember.id, email: gymMember.email, memberName: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), inArray(gymMember.id, memberIds)));
+	const each = ` per ${interval}`;
+	for (const m of rows) {
+		if (!m.email) continue;
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject: `Your ${planName} rate is changing at ${name}`,
+			...renderEmail({
+				orgName: name,
+				heading: `Heads up, ${m.memberName}`,
+				lines: [
+					`Your ${planName} membership changes from ${formatMoney(oldAmount, currency)}${each} to ${formatMoney(newAmount, currency)}${each} on your next billing date.`,
+					'Questions? Reply to this email or see us at the front desk.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
+}
+
+/**
  * Receipt for a recorded payment — one email per recordPayment call.
  * `paymentIds` covers the split rows a payment can allocate across; dedup on the first.
  */

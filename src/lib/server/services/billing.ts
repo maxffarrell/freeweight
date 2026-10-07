@@ -1,5 +1,17 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, lte, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	getTableColumns,
+	gte,
+	inArray,
+	isNull,
+	lt,
+	lte,
+	sql
+} from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	charge,
@@ -19,7 +31,8 @@ import {
 	notifyMembershipSuspended,
 	notifyPaymentReceived,
 	notifyPaymentRefunded,
-	notifyPlanChanged
+	notifyPlanChanged,
+	notifyPlanPriceChange
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
@@ -76,12 +89,40 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 
 export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.planUpdate>) {
 	const { id, ...set } = input;
+	const [old] = await db
+		.select()
+		.from(plan)
+		.where(and(eq(plan.organizationId, ctx.orgId), eq(plan.id, id)));
 	const [row] = await db
 		.update(plan)
 		.set(set)
 		.where(and(eq(plan.organizationId, ctx.orgId), eq(plan.id, id)))
 		.returning();
 	if (!row) error(404, 'Plan not found');
+
+	// An amount change silently reprices the next charge for every active member
+	// on the plan without a price override — email them the new rate.
+	if (old && set.amount !== undefined && set.amount !== old.amount && !row.isPack) {
+		const affected = await db
+			.select({ memberId: membership.memberId })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, ctx.orgId),
+					eq(membership.planId, id),
+					eq(membership.status, 'active'),
+					isNull(membership.price)
+				)
+			);
+		notifyPlanPriceChange(
+			ctx.orgId,
+			row.name,
+			affected.map((a) => a.memberId),
+			old.amount,
+			row.amount,
+			row.interval
+		).catch(() => {});
+	}
 	return row;
 }
 
