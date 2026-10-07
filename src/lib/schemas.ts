@@ -154,6 +154,9 @@ export const templateInput = v.object({
 	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });
 
+/** Same fields as templateInput plus the row id — the form always submits all values. */
+export const templateUpdate = v.object({ id: idSchema, ...templateInput.entries });
+
 export const sessionUpdate = v.object({
 	id: idSchema,
 	startsAt: v.optional(localDateTime),

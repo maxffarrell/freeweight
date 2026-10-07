@@ -1038,6 +1038,47 @@ export async function createTemplate(
 	return row;
 }
 
+/**
+ * Edits a template's class/day/time/seats. Sessions already materialized keep
+ * what they were generated with — the new values only shape future cron runs
+ * (and the immediate materialize below), same as before.
+ */
+export async function updateTemplate(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.templateUpdate>
+) {
+	const { id, ...set } = input;
+	const [ct] = await db
+		.select({ id: classType.id, name: classType.name })
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, set.classTypeId)));
+	if (!ct) error(404, 'Class not found');
+	const [row] = await db
+		.update(classTemplate)
+		.set({
+			classTypeId: set.classTypeId,
+			locationId: set.locationId ?? null,
+			instructorId: set.instructorId ?? null,
+			weekday: set.weekday,
+			startTime: set.startTime,
+			capacity: set.capacity ?? null,
+			updatedAt: new Date()
+		})
+		.where(and(eq(classTemplate.organizationId, ctx.orgId), eq(classTemplate.id, id)))
+		.returning();
+	if (!row) error(404, 'Template not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'class_template',
+		entityId: row.id,
+		action: 'updated',
+		summary: `Recurring ${ct.name} — ${WEEKDAYS[set.weekday]}s ${set.startTime}`
+	});
+	await materializeTemplates(ctx.orgId);
+	return row;
+}
+
 export async function deleteTemplate(ctx: OrgContext, id: string) {
 	const [row] = await db
 		.delete(classTemplate)
