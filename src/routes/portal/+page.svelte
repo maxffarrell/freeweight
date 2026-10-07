@@ -45,7 +45,8 @@
 		checkInWithCode,
 		getPortalChallenges,
 		joinChallenge,
-		leaveChallenge
+		leaveChallenge,
+		getPortalAnnouncements
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -153,6 +154,7 @@
 
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
+	const news = $derived(await getPortalAnnouncements(memberId));
 	let chalBusy = $state('');
 	async function joinChal(challengeId: string) {
 		chalBusy = challengeId;
@@ -1000,6 +1002,30 @@
 								{c.leaders.map((l, i) => `${i + 1}. ${l.name} (${l.count})`).join(' · ')}
 							</p>
 						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if news.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">News</Card.Title>
+				<Card.Description>Announcements from your gym</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6">
+				{#each news as n (n.sentAt)}
+					<div class="py-3 first:pt-0 last:pb-0">
+						<div class="flex items-baseline justify-between gap-2">
+							<p class="text-sm font-medium">{n.subject}</p>
+							<span class="shrink-0 text-xs text-muted-foreground"
+								>{formatDate(localDate(n.sentAt, d.settings?.timezone ?? 'UTC'))}</span
+							>
+						</div>
+						<p class="mt-1 line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">
+							{n.message}
+						</p>
 					</div>
 				{/each}
 			</Card.Content>
