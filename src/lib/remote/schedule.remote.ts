@@ -251,6 +251,15 @@ export const updateResource = command(resourceUpdate, async (input) => {
 	void getResources().refresh();
 	return r;
 });
+export const getResourceBookings = query(async () =>
+	res.listResourceBookings((await requireOrg()).orgId)
+);
+/** Staff cancel a member's amenity reservation. */
+export const cancelAmenityBooking = command(idSchema, async (id) => {
+	const r = await res.cancelResourceBooking((await requireOrg()).orgId, id);
+	void getResourceBookings().refresh();
+	return r;
+});
 
 // ---------- Events (workshops, comps, bring-a-friend days) ----------
 
