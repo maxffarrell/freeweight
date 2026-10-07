@@ -19,6 +19,8 @@
 		createMember,
 		emailAllMembers,
 		emailMeTest,
+		scheduleEmail,
+		cancelScheduledEmail,
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
@@ -149,6 +151,7 @@
 	let emailSubject = $state('');
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
+	let emailSendAt = $state('');
 	let emailPending = $state(false);
 	const audTag = $derived(emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined);
 	const audPlan = $derived(emailAudience.startsWith('plan:') ? emailAudience.slice(5) : undefined);
@@ -169,20 +172,39 @@
 		e.preventDefault();
 		emailPending = true;
 		try {
-			const r = await emailAllMembers({
-				subject: emailSubject,
-				message: emailBody,
-				tag: audTag,
-				planId: audPlan
-			});
-			toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
+			if (emailSendAt) {
+				await scheduleEmail({
+					subject: emailSubject,
+					message: emailBody,
+					tag: audTag,
+					planId: audPlan,
+					sendAt: new Date(emailSendAt).toISOString()
+				});
+				toast.success('Scheduled — the daily job sends it');
+			} else {
+				const r = await emailAllMembers({
+					subject: emailSubject,
+					message: emailBody,
+					tag: audTag,
+					planId: audPlan
+				});
+				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
+			}
 			emailOpen = false;
-			emailSubject = emailBody = '';
+			emailSubject = emailBody = emailSendAt = '';
 			emailAudience = '__all';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send — try again'));
 		}
 		emailPending = false;
+	}
+	async function cancelScheduled(id: string) {
+		try {
+			await cancelScheduledEmail(id);
+			toast.success('Scheduled email cancelled');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
+		}
 	}
 	let testPending = $state(false);
 	async function sendTest() {
@@ -418,9 +440,16 @@
 						<li class="flex items-baseline justify-between gap-3">
 							<span class="truncate">{a.subject}</span>
 							<span class="shrink-0 text-xs text-muted-foreground">
-								{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}{a.plan
-									? ` · plan: ${a.plan}`
-									: ''}
+								{#if a.action === 'scheduled'}
+									Sends {new Date(a.sendAt!).toLocaleString()}
+									<button class="ml-1 underline" onclick={() => cancelScheduled(a.id)}
+										>cancel</button
+									>
+								{:else}
+									{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}{a.plan
+										? ` · plan: ${a.plan}`
+										: ''}
+								{/if}
 							</span>
 						</li>
 					{/each}
@@ -452,6 +481,11 @@
 				<Input id="a-subject" required bind:value={emailSubject} autofocus />
 			</Field.Field>
 			<Field.Field>
+				<Field.Label for="a-sendat">Send at (optional)</Field.Label>
+				<Input id="a-sendat" type="datetime-local" bind:value={emailSendAt} />
+				<Field.Description>Leave blank to send right away.</Field.Description>
+			</Field.Field>
+			<Field.Field>
 				<Field.Label for="a-body">Message</Field.Label>
 				<Textarea
 					id="a-body"
@@ -479,9 +513,11 @@
 					<Button type="submit" disabled={emailPending || audienceCount === 0}>
 						{emailPending
 							? 'Sending…'
-							: emailAudience === '__all'
-								? 'Send to all members'
-								: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
+							: emailSendAt
+								? 'Schedule'
+								: emailAudience === '__all'
+									? 'Send to all members'
+									: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
 					</Button>
 				</div></Dialog.Footer
 			>

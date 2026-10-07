@@ -965,16 +965,85 @@ export async function countAnnouncementAudience(orgId: string, tag?: string, pla
 	return n;
 }
 
+/** Queues an announcement for a later send time; the cron delivers it. */
+export async function scheduleAnnouncement(
+	orgId: string,
+	actorId: string | null | undefined,
+	opts: { subject: string; message: string; sendAt: Date; tag?: string; planId?: string }
+) {
+	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
+	if (!opts.tag && !opts.planId && !(await countAnnouncementAudience(orgId)))
+		error(409, 'No members to email');
+	const entityId = `scheduled:${crypto.randomUUID()}`;
+	await emit({
+		orgId,
+		actorId: actorId ?? null,
+		entityType: 'announcement',
+		entityId,
+		action: 'scheduled',
+		summary: `Announcement scheduled for ${opts.sendAt.toISOString()}: ${opts.subject}`,
+		data: {
+			subject: opts.subject,
+			message: opts.message,
+			sendAt: opts.sendAt.toISOString(),
+			tag: opts.tag ?? null,
+			planId: opts.planId ?? null
+		}
+	});
+	return { scheduledFor: opts.sendAt };
+}
+
+/**
+ * Delivers scheduled announcements whose time has come — runs from the daily
+ * cron per org. Each pending row goes through sendAnnouncement (which logs
+ * its own 'sent' history row), then the 'scheduled' placeholder is deleted.
+ */
+export async function sendDueAnnouncements(orgId: string) {
+	const due = await db
+		.select({
+			id: activity.id,
+			subject: sql<string>`${activity.data}->>'subject'`,
+			message: sql<string>`${activity.data}->>'message'`,
+			tag: sql<string | null>`${activity.data}->>'tag'`,
+			planId: sql<string | null>`${activity.data}->>'planId'`
+		})
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'announcement'),
+				eq(activity.action, 'scheduled'),
+				sql`(${activity.data}->>'sendAt')::timestamptz <= now()`
+			)
+		);
+	let sent = 0;
+	for (const a of due) {
+		await sendAnnouncement(
+			orgId,
+			a.subject,
+			a.message,
+			undefined,
+			a.tag ?? undefined,
+			a.planId ?? undefined
+		);
+		await db.delete(activity).where(eq(activity.id, a.id));
+		sent++;
+	}
+	return sent;
+}
+
 /** Recent staff announcements, most recent first — surfaced on the Members page. */
 export async function listRecentAnnouncements(orgId: string, limit = 5) {
 	const rows = await db
 		.select({
 			id: activity.id,
+			action: activity.action,
 			createdAt: activity.createdAt,
 			subject: sql<string>`${activity.data}->>'subject'`,
 			message: sql<string>`${activity.data}->>'message'`,
 			sent: sql<number>`(${activity.data}->>'sent')::int`,
 			total: sql<number>`(${activity.data}->>'total')::int`,
+			sendAt: sql<string | null>`${activity.data}->>'sendAt'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
 			plan: sql<string | null>`${activity.data}->>'plan'`
 		})
@@ -983,6 +1052,22 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 		.orderBy(desc(activity.createdAt))
 		.limit(limit);
 	return rows;
+}
+
+/** Drops a queued announcement before it sends (staff changed their mind). */
+export async function cancelScheduledAnnouncement(orgId: string, id: string) {
+	const r = await db
+		.delete(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.id, id),
+				eq(activity.entityType, 'announcement'),
+				eq(activity.action, 'scheduled')
+			)
+		)
+		.returning({ id: activity.id });
+	if (!r.length) error(404, 'Scheduled announcement not found');
 }
 
 /** "Invoice ready" when a charge posts — membership billing, first period, anything else. */

@@ -10,6 +10,7 @@ import {
 	sendBillingReminders,
 	sendBirthdayGreetings,
 	sendClassReminders,
+	sendDueAnnouncements,
 	sendInstructorRosters,
 	sendPastDueNotices,
 	sendTrialEndingNotices,
@@ -48,6 +49,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let winbacks = 0;
 	let rosters = 0;
 	let billingReminders = 0;
+	let announcements = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -99,6 +101,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`waitlist-expiry cron failed for ${o.id}`, err);
 		}
 		try {
+			announcements += await sendDueAnnouncements(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`scheduled-announcement cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -145,7 +153,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		digests,
 		winbacks,
 		rosters,
-		billingReminders
+		billingReminders,
+		announcements
 	});
 };
 
