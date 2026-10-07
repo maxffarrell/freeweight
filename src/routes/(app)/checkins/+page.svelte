@@ -181,10 +181,21 @@
 				<Table.Body>
 					{#each checkIns as c (c.checkIn.id)}
 						<Table.Row>
-							<Table.Cell class="font-medium"
-								>{c.checkIn.guestName
-									? `${c.checkIn.guestName} (guest of ${c.memberName})`
-									: c.memberName}</Table.Cell
+							<Table.Cell>
+								<span class="flex items-center gap-2 font-medium">
+									{#if c.memberPhotoId}
+										<img
+											src="/api/documents/{c.memberPhotoId}"
+											alt=""
+											class="size-7 shrink-0 rounded-full object-cover"
+										/>
+									{/if}
+									<span class="truncate"
+										>{c.checkIn.guestName
+											? `${c.checkIn.guestName} (guest of ${c.memberName})`
+											: c.memberName}</span
+									>
+								</span></Table.Cell
 							>
 							<Table.Cell class="text-muted-foreground"
 								>{localTime(c.checkIn.checkedAt, settings.timezone)}</Table.Cell
