@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, eq, gte, isNull, sql , lt} from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
