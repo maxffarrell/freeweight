@@ -289,6 +289,20 @@ async function topReferrers(orgId: string) {
 		.limit(10);
 }
 
+/** Signups grouped by the join page's "How did you hear about us?" — marketing signal. */
+async function leadSources(orgId: string) {
+	return db
+		.select({
+			source: sql<string>`coalesce(${gymMember.referralSource}, 'Not answered')`,
+			joins: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, orgId))
+		.groupBy(gymMember.referralSource)
+		.orderBy(desc(sql`count(*)`))
+		.limit(12);
+}
+
 /** Check-ins by hour of day (gym timezone) over the last 90 days — staffing signal. */
 async function checkInsByHour(orgId: string) {
 	const [s] = await db
@@ -471,7 +485,8 @@ export async function getReports(orgId: string) {
 		visit,
 		retention,
 		waivers,
-		kinds
+		kinds,
+		sources
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -490,7 +505,8 @@ export async function getReports(orgId: string) {
 		avgVisitMinutes(orgId),
 		retentionByCohort(orgId),
 		waiverStatus(orgId),
-		revenueByKind(orgId)
+		revenueByKind(orgId),
+		leadSources(orgId)
 	]);
 	return {
 		checkIns,
@@ -510,6 +526,7 @@ export async function getReports(orgId: string) {
 		visit,
 		retention,
 		waivers,
-		kinds
+		kinds,
+		sources
 	};
 }
