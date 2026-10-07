@@ -776,6 +776,18 @@ export async function updatePortalProfile(
 	return row;
 }
 
+/** Member sets (or clears with null) their own monthly visit goal. */
+export async function setVisitGoal(orgId: string, memberId: string, goal: number | null) {
+	if (goal !== null && (goal < 1 || goal > 60)) error(400, 'Goal must be 1–60 visits');
+	const [row] = await db
+		.update(gymMember)
+		.set({ goalVisitsPerMonth: goal })
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
+		.returning({ id: gymMember.id });
+	if (!row) error(404, 'Member not found');
+	return row;
+}
+
 /**
  * Member self-joins a plan from the portal — the same plans the public join
  * page offers (active + listed). Refuses when an active (non-pack) membership

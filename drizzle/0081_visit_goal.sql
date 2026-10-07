@@ -1,0 +1,1 @@
+ALTER TABLE "gym_member" ADD COLUMN "goal_visits_per_month" integer;

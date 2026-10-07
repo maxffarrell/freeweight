@@ -54,7 +54,8 @@
 		getPortalAi,
 		aiWorkoutPlan,
 		redeemGiftCard,
-		rateSession
+		rateSession,
+		setVisitGoal
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -120,6 +121,24 @@
 			toast.error(errMsg(err, 'Could not redeem that code'));
 		}
 		gcBusy = false;
+	}
+	async function editGoal() {
+		const v = prompt(
+			'How many visits this month are you aiming for? (1–60, blank clears)',
+			d.member.goalVisitsPerMonth ? String(d.member.goalVisitsPerMonth) : '12'
+		);
+		if (v === null) return;
+		const goal = v.trim() === '' ? null : Number(v);
+		if (goal !== null && (!Number.isInteger(goal) || goal < 1 || goal > 60)) {
+			toast.error('Pick a number of visits between 1 and 60');
+			return;
+		}
+		try {
+			await setVisitGoal({ memberId, goal });
+			toast.success(goal ? `Goal set: ${goal} visits` : 'Goal cleared');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save your goal'));
+		}
 	}
 	async function uploadPhoto(file: File | null | undefined) {
 		if (!file || photoBusy) return;
@@ -1370,6 +1389,29 @@
 					<p class="text-xs text-muted-foreground">week streak</p>
 				</div>
 			</div>
+			{#if d.member.goalVisitsPerMonth}
+				{@const goalPct = Math.min(
+					100,
+					Math.round((d.attendance.visitsThisMonth / d.member.goalVisitsPerMonth) * 100)
+				)}
+				<div class="space-y-1">
+					<div class="flex items-center justify-between text-xs">
+						<span class="text-muted-foreground"
+							>Goal: {d.member.goalVisitsPerMonth} visits this month</span
+						>
+						<button
+							class="text-muted-foreground underline-offset-2 hover:underline"
+							onclick={editGoal}>{goalPct >= 100 ? 'Done 🎉' : `${goalPct}%`}</button
+						>
+					</div>
+					<Progress max={d.member.goalVisitsPerMonth} value={d.attendance.visitsThisMonth} />
+				</div>
+			{:else}
+				<button
+					class="text-xs text-muted-foreground underline-offset-2 hover:underline"
+					onclick={editGoal}>Set a monthly visit goal</button
+				>
+			{/if}
 			<p class="text-xs text-muted-foreground">
 				{d.attendance.totalVisits} visits in the last 6 months
 			</p>

@@ -502,3 +502,17 @@ export const getPortalAi = query(async () => {
 	requireUser();
 	return { configured: aiAvailable() };
 });
+
+/** Member sets their monthly visit goal (null clears it). */
+export const setVisitGoal = command(
+	v.object({
+		memberId: idSchema,
+		goal: v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(60)))
+	}),
+	async ({ memberId, goal }) => {
+		const m = await myMember(memberId);
+		const r = await svc.setVisitGoal(m.organizationId, m.id, goal);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);

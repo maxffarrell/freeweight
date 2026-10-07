@@ -147,6 +147,8 @@ export const gymMember = pgTable(
 		}),
 		/** Set via the signed /unsubscribe link in member-facing emails. */
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
+		/** Member's own monthly visit target, set in the portal; drives the progress bar. */
+		goalVisitsPerMonth: integer('goal_visits_per_month'),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		birthday: date('birthday', { mode: 'string' }),
 		...timestamps
