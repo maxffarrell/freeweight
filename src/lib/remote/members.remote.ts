@@ -3,6 +3,7 @@ import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/members.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
+import * as sched from '#lib/server/services/schedule.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
@@ -83,6 +84,19 @@ export const getTodayCheckIns = query(async () => {
 	const tz = (await settingsSvc.getSettings(orgId)).timezone;
 	const since = zonedToUtc(`${localDate(new Date(), tz)}T00:00`, tz);
 	return checkins.listCheckIns(orgId, { since });
+});
+
+/** Sessions starting today from now-30min onward — the kiosk "up next" strip. */
+export const getUpNext = query(async () => {
+	const { orgId } = await requireOrg();
+	const tz = (await settingsSvc.getSettings(orgId)).timezone;
+	const start = zonedToUtc(`${localDate(new Date(), tz)}T00:00`, tz);
+	const end = new Date(start.getTime() + 86400_000);
+	const rows = await sched.listSessions(orgId, start, end);
+	const now = Date.now();
+	return rows
+		.filter((s) => !s.session.cancelledAt && s.session.startsAt.getTime() >= now - 30 * 60_000)
+		.slice(0, 4);
 });
 
 /** Check-ins for one local day, optionally filtered by member/guest name. */
