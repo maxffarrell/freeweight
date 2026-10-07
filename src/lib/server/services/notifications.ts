@@ -897,6 +897,41 @@ export async function notifyMembershipSuspended(orgId: string, memberIds: string
 	}
 }
 
+/** "Welcome back" when a frozen membership auto-resumes on its resume date. Deduped per membership. */
+export async function notifyMembershipResumed(
+	orgId: string,
+	membershipId: string,
+	nextChargeOn: string
+) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			memberEmail: gymMember.email,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
+	if (!row?.memberEmail) return;
+	if (!(await logOnce(orgId, 'membership_resumed', membershipId, row.memberEmail))) return;
+	const name = await orgName(orgId);
+	await sendMemberEmail(row.memberId, {
+		to: row.memberEmail,
+		subject: `Welcome back — your ${row.planName} membership is active`,
+		...renderEmail({
+			orgName: name,
+			heading: 'Welcome back!',
+			lines: [
+				`Hi ${row.memberName} — your pause is over and your ${row.planName} membership at ${name} is active again.`,
+				`Your next bill is scheduled for ${formatDate(nextChargeOn)}. Book a class and pick up where you left off.`
+			],
+			action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /**
  * A member asked to cancel in the portal: staff (org owner/admins) get the request,
  * the member gets a "we received it" confirmation. Deduped per request day.

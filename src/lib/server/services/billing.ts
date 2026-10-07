@@ -14,6 +14,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import {
 	notifyChargePosted,
+	notifyMembershipResumed,
 	notifyMembershipSuspended,
 	notifyPaymentReceived,
 	notifyPaymentRefunded
@@ -393,14 +394,16 @@ async function resumeFrozenMemberships(orgId: string) {
 			)
 		);
 	for (const r of rows) {
+		const nextCharge = nextPeriod(todayISO(), r.interval);
 		await db
 			.update(membership)
 			.set({
 				status: 'active',
 				frozenUntil: null,
-				nextChargeAt: new Date(`${nextPeriod(todayISO(), r.interval)}T00:00:00Z`)
+				nextChargeAt: new Date(`${nextCharge}T00:00:00Z`)
 			})
 			.where(eq(membership.id, r.id));
+		notifyMembershipResumed(orgId, r.id, nextCharge).catch(() => {});
 	}
 	return rows.length;
 }
