@@ -8,6 +8,7 @@ import {
 	gt,
 	gte,
 	inArray,
+	isNotNull,
 	isNull,
 	lt,
 	lte,
@@ -40,6 +41,7 @@ import {
 	notifyChargePosted,
 	notifyInstructorChanged,
 	notifyNoShow,
+	notifyPackLowCredit,
 	notifySessionChanged,
 	notifySessionCancelled,
 	notifySeriesBooked,
@@ -444,6 +446,40 @@ export async function creditUsage(orgId: string, memberId: string) {
 		bonus: ms.membership.bonusCredits,
 		membershipId: ms.membership.id
 	};
+}
+
+/**
+ * Daily sweep: active pack memberships down to ≤2 remaining credits get one
+ * nudge email each (once per membership via notification_log — a new pack
+ * purchase is a new membership, so the nudge re-arms naturally).
+ */
+export async function sendPackLowCreditNudges(orgId: string) {
+	const packs = await db
+		.select({ ms: membership, memberId: membership.memberId, classCredits: plan.classCredits })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	let n = 0;
+	for (const p of packs) {
+		const window = {
+			start: p.ms.startsAt.toISOString().slice(0, 10),
+			end: (p.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+		};
+		const used = await creditsUsedIn(orgId, p.memberId, window);
+		const limit = (p.classCredits ?? 0) + p.ms.bonusCredits;
+		const remaining = limit - used;
+		if (remaining <= 2 && remaining >= 0) {
+			if (await notifyPackLowCredit(orgId, p.memberId, remaining, limit, p.ms.id)) n++;
+		}
+	}
+	return n;
 }
 
 /** 402s when the member's plan caps classes per period and they've used them. */

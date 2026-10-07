@@ -854,6 +854,44 @@ export async function sendClassReminders(orgId: string) {
 	return sent;
 }
 
+/**
+ * "Almost out of classes" nudge — once per pack membership (notification_log),
+ * when the remaining credits hit ≤2. Returns whether the mail went out.
+ */
+export async function notifyPackLowCredit(
+	orgId: string,
+	memberId: string,
+	remaining: number,
+	limit: number,
+	membershipId: string
+) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email || !(await logOnce(orgId, 'pack-low-credit', membershipId, m.email))) return false;
+	const name = await orgName(orgId);
+	const first = m.name.split(' ')[0] ?? m.name;
+	const heading =
+		remaining > 0
+			? `${remaining} class${remaining === 1 ? '' : 'es'} left on your pack`
+			: 'Your class pack is used up';
+	const { text, html } = renderEmail({
+		orgName: name,
+		heading,
+		lines: [
+			`Hi ${first},`,
+			remaining > 0
+				? `You've used ${limit - remaining} of ${limit} classes on your pack at ${name}.`
+				: `You've used all ${limit} classes on your pack at ${name}.`,
+			'Grab a new pack anytime from the member portal.'
+		],
+		action: { label: 'Buy a pack', url: `${appOrigin()}/portal` }
+	});
+	await sendMemberEmail(memberId, { to: m.email, subject: `${name}: ${heading}`, text, html });
+	return true;
+}
+
 /** Replaces {name} and {first_name} merge tags in an announcement draft. */
 export function mergeTags(t: string, memberName: string) {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;

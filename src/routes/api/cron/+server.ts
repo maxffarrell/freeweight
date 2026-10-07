@@ -20,7 +20,8 @@ import {
 import {
 	expireWaitlists,
 	markPastNoShows,
-	materializeTemplates
+	materializeTemplates,
+	sendPackLowCreditNudges
 } from '#lib/server/services/schedule.ts';
 import type { RequestHandler } from './$types';
 
@@ -50,6 +51,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let rosters = 0;
 	let billingReminders = 0;
 	let announcements = 0;
+	let packNudges = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -107,6 +109,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`scheduled-announcement cron failed for ${o.id}`, err);
 		}
 		try {
+			packNudges += await sendPackLowCreditNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`pack-nudge cron failed for ${o.id}`, err);
+		}
+		try {
 			generated += await materializeTemplates(o.id);
 		} catch (err) {
 			failed++;
@@ -154,7 +162,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		winbacks,
 		rosters,
 		billingReminders,
-		announcements
+		announcements,
+		packNudges
 	});
 };
 
