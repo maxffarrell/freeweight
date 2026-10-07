@@ -239,6 +239,13 @@
       "when": 1791366588086,
       "tag": "0033_closures",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791369508510,
+      "tag": "0034_check-out",
+      "breakpoints": true
     }
   ]
 }

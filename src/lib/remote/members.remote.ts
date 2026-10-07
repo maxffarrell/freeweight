@@ -103,6 +103,15 @@ export const recordCheckIn = command(checkInInput, async (input) => {
 	return r;
 });
 
+/** Staff marks a check-in row as over — the member left. */
+export const checkOut = command(idSchema, async (checkInId) => {
+	const ctx = await requireOrg();
+	const row = await checkins.checkOut(ctx, checkInId);
+	void getTodayCheckIns().refresh();
+	void getMember(row.memberId).refresh();
+	return row;
+});
+
 export const logGuestVisit = command(guestVisitInput, async (input) => {
 	const r = await checkins.recordGuestVisit(await requireOrg(), input);
 	void getTodayCheckIns().refresh();

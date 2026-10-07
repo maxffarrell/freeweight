@@ -369,6 +369,27 @@ async function trialConversion(orgId: string) {
 	return row;
 }
 
+/** Average visit length in minutes over the last 30 days, where a check-out was recorded. */
+async function avgVisitMinutes(orgId: string) {
+	const [row] = await db
+		.select({
+			minutes:
+				sql<number>`round(avg(extract(epoch from (${checkIn.checkedOutAt} - ${checkIn.checkedAt})) / 60))`.mapWith(
+					(v) => (v == null ? null : Number(v))
+				),
+			count: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNotNull(checkIn.checkedOutAt),
+				gte(checkIn.checkedAt, new Date(Date.now() - 30 * 86400_000))
+			)
+		);
+	return { minutes: row?.minutes ?? null, visits: row?.count ?? 0 };
+}
+
 export async function getReports(orgId: string) {
 	const [
 		checkIns,
@@ -384,7 +405,8 @@ export async function getReports(orgId: string) {
 		hours,
 		weekdays,
 		payroll,
-		trials
+		trials,
+		visit
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -399,7 +421,8 @@ export async function getReports(orgId: string) {
 		checkInsByHour(orgId),
 		fillByWeekday(orgId),
 		instructorPayroll(orgId),
-		trialConversion(orgId)
+		trialConversion(orgId),
+		avgVisitMinutes(orgId)
 	]);
 	return {
 		checkIns,
@@ -415,6 +438,7 @@ export async function getReports(orgId: string) {
 		hours,
 		weekdays,
 		payroll,
-		trials
+		trials,
+		visit
 	};
 }

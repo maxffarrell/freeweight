@@ -59,7 +59,10 @@ export async function dashboard(orgId: string) {
 		.where(eq(charge.organizationId, orgId));
 
 	const [checkInStats] = await db
-		.select({ today: sql<number>`count(*)`.mapWith(Number) })
+		.select({
+			today: sql<number>`count(*)`.mapWith(Number),
+			inNow: sql<number>`count(*) filter (where ${checkIn.checkedOutAt} is null)`.mapWith(Number)
+		})
 		.from(checkIn)
 		.where(
 			and(
@@ -149,6 +152,7 @@ export async function dashboard(orgId: string) {
 		openTotal: openStats?.openTotal ?? 0,
 		overdueTotal: openStats?.overdueTotal ?? 0,
 		checkInsToday: checkInStats?.today ?? 0,
+		inGymNow: checkInStats?.inNow ?? 0,
 		mrr,
 		todaySessions,
 		recentActivity,

@@ -62,7 +62,8 @@
 		<Card.Header>
 			<Card.Title class="text-base">Check-ins — last 30 days</Card.Title>
 			<Card.Description>
-				{r.checkIns.reduce((s, d) => s + d.count, 0)} total
+				{r.checkIns.reduce((s, d) => s + d.count, 0)} total{#if r.visit.minutes != null}
+					· avg visit {r.visit.minutes} min ({r.visit.visits} with check-outs){/if}
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
