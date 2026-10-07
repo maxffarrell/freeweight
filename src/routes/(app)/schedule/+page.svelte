@@ -48,6 +48,7 @@
 		getCourseRoster,
 		removeCourse,
 		enrollMemberInCourse,
+		generateOpenSlots,
 		registerMemberForEvent,
 		cancelEventRegistration,
 		setEventAttended,
@@ -509,6 +510,37 @@
 		}
 	}
 
+	let slotsOpen = $state(false);
+	let sType = $state('');
+	let sInstr = $state('');
+	let sFrom = $state('');
+	let sTo = $state('');
+	let sSeats = $state(1);
+
+	async function publishSlots(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await generateOpenSlots({
+				classTypeId: sType,
+				instructorId: sInstr,
+				from: sFrom,
+				to: sTo,
+				capacity: sSeats
+			});
+			toast.success(
+				r.created
+					? `Published ${r.created} slot${r.created === 1 ? '' : 's'}${r.skipped ? ` — ${r.skipped} skipped (past/conflict)` : ''}`
+					: 'No new slots — everything was already scheduled or outside availability'
+			);
+			await reload();
+			slotsOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not publish slots'));
+		}
+		pending = false;
+	}
+
 	let eName = $state('');
 	let eDesc = $state('');
 	let eDate = $state('');
@@ -822,6 +854,7 @@
 		>
 		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
 		<Button variant="outline" size="sm" onclick={() => (coursesOpen = true)}>Courses</Button>
+		<Button variant="outline" size="sm" onclick={() => (slotsOpen = true)}>Slots</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 	{/snippet}
 </PageHeader>
@@ -2064,6 +2097,67 @@
 			</div>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>Create event</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={slotsOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Publish open slots</Dialog.Title>
+			<Dialog.Description>
+				Fill an instructor's weekly availability windows with bookable sessions — PT, assessments,
+				office hours. Already-scheduled times are skipped, so re-running is safe.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={publishSlots}>
+			<div class="grid grid-cols-2 gap-3">
+				<Field.Field>
+					<Field.Label for="s-type">Class type</Field.Label>
+					<select
+						id="s-type"
+						required
+						bind:value={sType}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="" disabled>Pick…</option>
+						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
+					</select>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="s-instr">Instructor</Field.Label>
+					<select
+						id="s-instr"
+						required
+						bind:value={sInstr}
+						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+					>
+						<option value="" disabled>Pick…</option>
+						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
+					</select>
+				</Field.Field>
+			</div>
+			<div class="grid grid-cols-3 gap-3">
+				<Field.Field>
+					<Field.Label for="s-from">From</Field.Label>
+					<Input id="s-from" type="date" required bind:value={sFrom} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="s-to">To</Field.Label>
+					<Input id="s-to" type="date" required bind:value={sTo} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="s-seats">Seats / slot</Field.Label>
+					<Input id="s-seats" type="number" min={1} max={50} bind:value={sSeats} />
+				</Field.Field>
+			</div>
+			<Field.Description>
+				Slot length comes from the class type. The instructor needs weekly availability set under My
+				classes → Availability.
+			</Field.Description>
+			<Dialog.Footer>
+				<Button type="submit" disabled={pending}>Publish slots</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>

@@ -2028,3 +2028,146 @@ export async function instructorAvailabilityConflicts(
 		);
 	});
 }
+
+// ---------- Open slots (availability-driven 1:1/bookable sessions) ----------
+
+/**
+ * Generates capacity-N sessions inside an instructor's weekly availability
+ * windows — PT/assessment "open slots" members or the desk can book.
+ * Steps `classType.durationMin` through each window, skipping gym closures,
+ * instructor time-off, past slots, and slots that overlap an existing
+ * (non-cancelled) session of that instructor — so re-runs are idempotent.
+ */
+export async function generateSlots(ctx: OrgContext, input: v.InferOutput<typeof s.slotGenInput>) {
+	const [ct] = await db
+		.select()
+		.from(classType)
+		.where(and(eq(classType.id, input.classTypeId), eq(classType.organizationId, ctx.orgId)));
+	if (!ct) error(404, 'Class type not found');
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	const tz = st?.timezone ?? 'UTC';
+
+	const windows = await db
+		.select({
+			weekday: instructorAvailability.weekday,
+			startTime: instructorAvailability.startTime,
+			endTime: instructorAvailability.endTime
+		})
+		.from(instructorAvailability)
+		.where(
+			and(
+				eq(instructorAvailability.organizationId, ctx.orgId),
+				eq(instructorAvailability.instructorId, input.instructorId)
+			)
+		)
+		.orderBy(asc(instructorAvailability.startTime));
+	if (!windows.length)
+		error(
+			404,
+			'No availability windows for this instructor — set them on My classes → Availability'
+		);
+
+	// Whole-day time-off in the range — skip those days entirely.
+	const offs = new Set(
+		(
+			await db
+				.select({ startDate: instructorTimeOff.startDate, endDate: instructorTimeOff.endDate })
+				.from(instructorTimeOff)
+				.where(
+					and(
+						eq(instructorTimeOff.organizationId, ctx.orgId),
+						eq(instructorTimeOff.instructorId, input.instructorId),
+						lte(instructorTimeOff.startDate, input.to),
+						gte(instructorTimeOff.endDate, input.from)
+					)
+				)
+		).flatMap((o) => {
+			const days = [];
+			for (let d = o.startDate; d <= o.endDate; d = addDays(d, 1)) days.push(d);
+			return days;
+		})
+	);
+	const closed = new Set(
+		(
+			await db
+				.select({ date: closure.date })
+				.from(closure)
+				.where(
+					and(
+						eq(closure.organizationId, ctx.orgId),
+						gte(closure.date, input.from),
+						lte(closure.date, input.to)
+					)
+				)
+		).map((c) => c.date)
+	);
+
+	// The instructor's existing sessions in the range — skip overlapping slots.
+	const busy = await db
+		.select({ startsAt: classSession.startsAt, endsAt: classSession.endsAt })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, input.instructorId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, zonedToUtc(`${input.from}T00:00`, tz)),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(input.to, 1)}T00:00`, tz))
+			)
+		);
+
+	const now = Date.now();
+	const stepMs = ct.durationMin * 60_000;
+	const rows = [];
+	let skipped = 0;
+	for (let day = input.from; day <= input.to; day = addDays(day, 1)) {
+		if (closed.has(day) || offs.has(day)) continue;
+		const weekday = localWeekday(zonedToUtc(`${day}T12:00`, tz), tz);
+		for (const w of windows.filter((x) => x.weekday === weekday)) {
+			for (let t = w.startTime; ;) {
+				const startsAt = zonedToUtc(`${day}T${t}`, tz);
+				const endsAt = new Date(startsAt.getTime() + stepMs);
+				// Advance the cursor to the next slot start.
+				const [h, m] = w.endTime.split(':').map(Number);
+				const windowEnd = zonedToUtc(
+					`${day}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+					tz
+				);
+				if (endsAt > windowEnd) break;
+				const next = localMinutes(startsAt, tz) + ct.durationMin;
+				t = `${String(Math.floor(next / 60)).padStart(2, '0')}:${String(next % 60).padStart(2, '0')}`;
+				if (startsAt.getTime() < now) {
+					skipped++;
+					continue;
+				}
+				if (busy.some((b) => b.startsAt < endsAt && b.endsAt > startsAt)) {
+					skipped++;
+					continue;
+				}
+				rows.push({
+					organizationId: ctx.orgId,
+					classTypeId: ct.id,
+					locationId: ct.locationId,
+					instructorId: input.instructorId,
+					startsAt,
+					endsAt,
+					capacity: input.capacity ?? 1,
+					checkinCode: sessionCode()
+				});
+			}
+		}
+	}
+	if (rows.length) await db.insert(classSession).values(rows);
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'class_type',
+		entityId: ct.id,
+		action: 'slots_generated',
+		summary: `${rows.length} open ${ct.name} slot${rows.length === 1 ? '' : 's'} generated${skipped ? ` (${skipped} skipped)` : ''}`
+	});
+	return { created: rows.length, skipped };
+}

@@ -378,7 +378,7 @@ export const setEventAttended = command(
 
 // ---------- Courses (multi-week priced programs) ----------
 import * as crs from '#lib/server/services/courses.ts';
-import { courseInput } from '#lib/schemas.ts';
+import { courseInput, slotGenInput } from '#lib/schemas.ts';
 
 export const getCourses = query(async () => crs.listCourses((await requireOrg()).orgId));
 export const getCourseRoster = query(idSchema, async (id) =>
@@ -404,3 +404,9 @@ export const enrollMemberInCourse = command(
 		return r;
 	}
 );
+
+/** Publishes bookable sessions inside an instructor's availability windows. */
+export const generateOpenSlots = command(slotGenInput, async (input) => {
+	const r = await svc.generateSlots(await requireOrg('admin'), input);
+	return r;
+});
