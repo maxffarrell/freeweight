@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/billing.ts';
+import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
@@ -55,7 +56,12 @@ export const createMembership = command(membershipInput, async (input) => {
 	return m;
 });
 export const updateMembership = command(membershipUpdate, async (input) => {
-	const m = await svc.updateMembership(await requireOrg(), input);
+	const ctx = await requireOrg();
+	const m = await svc.updateMembership(ctx, input);
+	// A cancelled membership frees the member's upcoming spots — waitlists
+	// promote off the back of each cancellation.
+	if (m && input.status === 'cancelled')
+		await sched.cancelUpcomingBookings(ctx, m.memberId).catch(() => {});
 	void getMemberships().refresh();
 	void getMember(m.memberId).refresh();
 	return m;
