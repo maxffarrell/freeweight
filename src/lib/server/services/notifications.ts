@@ -2339,6 +2339,71 @@ export async function sendWinBackNudges(orgId: string) {
 }
 
 /**
+ * Daily cron: follow up with public-page leads 3+ days after they left their
+ * info — one nudge per lead ever, skipped once they hold any membership.
+ * Returns emails sent.
+ */
+export async function sendLeadNudges(orgId: string) {
+	const rows = await db
+		.select({ memberId: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.innerJoin(memberTag, and(eq(memberTag.memberId, gymMember.id), eq(memberTag.tag, 'lead')))
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				isNotNull(gymMember.email),
+				lte(gymMember.createdAt, new Date(Date.now() - 3 * 86400_000))
+			)
+		)
+		.limit(200);
+	if (!rows.length) return 0;
+	const joined = new Set(
+		(
+			await db
+				.select({ memberId: membership.memberId })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, orgId),
+						inArray(
+							membership.memberId,
+							rows.map((r) => r.memberId)
+						)
+					)
+				)
+		).map((r) => r.memberId)
+	);
+	const [[org], name] = await Promise.all([
+		db
+			.select({ slug: organization.slug })
+			.from(organization)
+			.where(eq(organization.id, orgId))
+			.limit(1),
+		orgBrand(orgId)
+	]);
+	let sent = 0;
+	for (const r of rows) {
+		if (!r.email || joined.has(r.memberId)) continue;
+		if (!(await logOnce(orgId, 'lead_nudge', r.memberId, r.email))) continue;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Still thinking it over? — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: 'Still thinking it over?',
+				lines: [
+					`Hi ${r.name} — thanks for your interest in ${name.orgName} a few days ago.`,
+					'Ready when you are — have a look at the timetable and grab a plan, or just reply to this email with any questions.'
+				],
+				action: { label: 'See plans', url: `${appOrigin()}/j/${org?.slug}` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
  * Member email when a booking is marked no-show by the daily cron —
  * a gentle rebook nudge. Deduped per booking.
  */
