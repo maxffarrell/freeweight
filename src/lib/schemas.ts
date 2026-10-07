@@ -351,3 +351,8 @@ export const memberTagInput = v.object({
 	memberId: idSchema,
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
 });
+
+export const bulkTagInput = v.object({
+	memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)),
+	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
+});
