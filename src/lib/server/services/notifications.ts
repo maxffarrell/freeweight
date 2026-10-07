@@ -10,9 +10,11 @@ import {
 	gymSettings,
 	location,
 	member,
+	membership,
 	notificationLog,
 	organization,
 	payment,
+	plan,
 	user
 } from '#lib/server/db/schema.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
@@ -584,4 +586,62 @@ export async function notifyMembershipSuspended(orgId: string, memberIds: string
 			})
 		});
 	}
+}
+
+/**
+ * A member asked to cancel in the portal: staff (org owner/admins) get the request,
+ * the member gets a "we received it" confirmation. Deduped per request day.
+ */
+export async function notifyCancellationRequested(orgId: string, membershipId: string) {
+	const [row] = await db
+		.select({
+			memberName: gymMember.name,
+			memberEmail: gymMember.email,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.id, membershipId)));
+	if (!row) return;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'cancel_request_staff', `${membershipId}:${today}`, s.email)))
+			continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Cancellation request — ${row.memberName}`,
+			...renderEmail({
+				orgName: name,
+				heading: `${row.memberName} wants to cancel`,
+				lines: [
+					`${row.memberName} requested cancellation of their ${row.planName} membership from the member portal.`,
+					'Open their member page to confirm the cancellation or dismiss the request.'
+				]
+			})
+		});
+	}
+
+	if (!row.memberEmail) return;
+	if (!(await logOnce(orgId, 'cancel_request', `${membershipId}:${today}`, row.memberEmail)))
+		return;
+	await sendEmail({
+		to: row.memberEmail,
+		subject: `Cancellation requested — ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: 'We received your request',
+			lines: [
+				`Hi ${row.memberName} — we got your request to cancel your ${row.planName} membership at ${name}.`,
+				'A staff member will confirm your cancellation shortly. Changed your mind? You can withdraw the request from the member portal until then.'
+			]
+		})
+	});
 }

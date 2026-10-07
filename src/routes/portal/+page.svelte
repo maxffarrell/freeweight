@@ -13,6 +13,8 @@
 		getBookable,
 		memberBook,
 		memberCancel,
+		requestMembershipCancel,
+		withdrawMembershipCancel,
 		getProviders,
 		startCheckout,
 		signWaiver
@@ -91,6 +93,23 @@
 		}
 		busy = null;
 	}
+
+	async function requestCancel(membershipId: string) {
+		try {
+			await requestMembershipCancel({ memberId, membershipId });
+			toast.success('Cancellation requested — staff will confirm');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not request'));
+		}
+	}
+	async function withdrawCancel(membershipId: string) {
+		try {
+			await withdrawMembershipCancel({ memberId, membershipId });
+			toast.success('Request withdrawn');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not withdraw'));
+		}
+	}
 	const myBookingId = (b: (typeof bookable)[number]) =>
 		d.upcoming.find((u) => u.booking.sessionId === b.session.id && u.booking.status !== 'cancelled')
 			?.booking.id;
@@ -137,6 +156,22 @@
 						<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
 					{/if}
 				</div>
+				{#each d.memberships as mm (mm.membership.id)}
+					{#if mm.membership.status === 'active'}
+						<p class="mt-1 text-xs text-muted-foreground">
+							{#if mm.membership.cancelRequestedAt}
+								{mm.plan.name}: cancellation requested — staff will confirm shortly.{' '}
+								<button class="underline" onclick={() => withdrawCancel(mm.membership.id)}
+									>Withdraw request</button
+								>
+							{:else}
+								<button class="underline" onclick={() => requestCancel(mm.membership.id)}
+									>Request cancellation of {mm.plan.name}</button
+								>
+							{/if}
+						</p>
+					{/if}
+				{/each}
 			</div>
 		</Card.Content>
 	</Card.Root>

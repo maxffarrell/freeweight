@@ -25,6 +25,7 @@ import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
 import { creditUsage } from './schedule.ts';
 import { emit } from './events.ts';
+import { notifyCancellationRequested } from './notifications.ts';
 import { localDate } from '#lib/tz.ts';
 
 const TTL_MS = 14 * 86400_000;
@@ -353,4 +354,49 @@ export async function availableProviders(orgId: string, currency: string) {
 		if (p.ready(row)) out.push({ id: p.id, name: p.name, payLabel: p.payLabel, newTab: p.newTab });
 	}
 	return out;
+}
+
+/** Member asks to cancel a membership — staff confirm from the member page. */
+export async function requestCancellation(orgId: string, memberId: string, membershipId: string) {
+	const [row] = await db
+		.update(membership)
+		.set({ cancelRequestedAt: new Date() })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active')
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Membership not found');
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'membership',
+		entityId: membershipId,
+		action: 'cancel_requested',
+		summary: 'Member requested cancellation',
+		data: { memberId }
+	});
+	notifyCancellationRequested(orgId, membershipId).catch(() => {});
+	return row;
+}
+
+/** Member changes their mind before staff act on the request. */
+export async function withdrawCancellation(orgId: string, memberId: string, membershipId: string) {
+	const [row] = await db
+		.update(membership)
+		.set({ cancelRequestedAt: null })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Membership not found');
+	return row;
 }

@@ -60,6 +60,26 @@ export const memberCancel = command(
 	}
 );
 
+export const requestMembershipCancel = command(
+	v.object({ memberId: idSchema, membershipId: idSchema }),
+	async ({ memberId, membershipId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.requestCancellation(m.organizationId, m.id, membershipId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+export const withdrawMembershipCancel = command(
+	v.object({ memberId: idSchema, membershipId: idSchema }),
+	async ({ memberId, membershipId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.withdrawCancellation(m.organizationId, m.id, membershipId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
 export const getProviders = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	const overview = await svc.portalOverview(m.id);

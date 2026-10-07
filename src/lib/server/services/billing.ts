@@ -239,14 +239,17 @@ export async function updateMembership(
 	} else if (input.status && input.status !== 'active') {
 		nextChargeAt = null;
 	}
+	const set: Partial<typeof membership.$inferInsert> = {};
+	if (input.status) {
+		set.status = input.status;
+		set.cancelledAt = input.status === 'cancelled' ? new Date() : null;
+		set.nextChargeAt = nextChargeAt ?? null;
+		set.frozenUntil = input.status === 'paused' ? (input.resumeAt ?? null) : null;
+	}
+	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
 	const [row] = await db
 		.update(membership)
-		.set({
-			status: input.status,
-			cancelledAt: input.status === 'cancelled' ? new Date() : null,
-			nextChargeAt,
-			frozenUntil: input.status === 'paused' ? (input.resumeAt ?? null) : null
-		})
+		.set(set)
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
 	if (!row) error(404, 'Membership not found');

@@ -189,6 +189,8 @@ export const membership = pgTable(
 		endsAt: timestamp('ends_at', { withTimezone: true }),
 		/** Paused memberships auto-resume on this date (billing restarts); null = manual resume. */
 		frozenUntil: date('frozen_until', { mode: 'string' }),
+		/** Member asked to cancel in the portal; staff confirm from the member page. */
+		cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [
