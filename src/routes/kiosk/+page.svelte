@@ -8,7 +8,8 @@
 		getTodayCheckIns,
 		recordCheckIn,
 		checkOut,
-		getMembers
+		getMembers,
+		getUpNext
 	} from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
@@ -26,6 +27,7 @@
 	const liveLocations = $derived(locations);
 
 	let checkIns = $state(await getTodayCheckIns());
+	let upNext = $state(await getUpNext());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
 	let suggestions = $state<
@@ -39,7 +41,11 @@
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
-		const t = setInterval(() => (now = new Date()), 30_000);
+		const t = setInterval(async () => {
+			now = new Date();
+			upNext = await getUpNext();
+			checkIns = await getTodayCheckIns();
+		}, 30_000);
 		inputEl?.focus();
 		return () => clearInterval(t);
 	});
@@ -183,6 +189,28 @@
 						onclick={() => (locationId = l.id)}>{l.name}</Button
 					>
 				{/each}
+			</div>
+		{/if}
+
+		{#if upNext.length}
+			<div>
+				<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					Up next
+				</p>
+				<div class="flex flex-wrap gap-2">
+					{#each upNext as s (s.session.id)}
+						<div
+							class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+							style="border-left: 4px solid {s.color}"
+						>
+							<span class="font-medium tabular-nums">{localTime(s.session.startsAt, tz)}</span>
+							<span>{s.className}</span>
+							<span class="text-muted-foreground">
+								{s.booked}/{s.session.capacity}{s.locationName ? ` · ${s.locationName}` : ''}
+							</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 		{/if}
 
