@@ -92,7 +92,7 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 }
 
 export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.planUpdate>) {
-	const { id, ...set } = input;
+	const { id, grandfatherPrice, ...set } = input;
 	const [old] = await db
 		.select()
 		.from(plan)
@@ -107,25 +107,41 @@ export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 	// An amount change silently reprices the next charge for every active member
 	// on the plan without a price override — email them the new rate.
 	if (old && set.amount !== undefined && set.amount !== old.amount && !row.isPack) {
-		const affected = await db
-			.select({ memberId: membership.memberId })
-			.from(membership)
-			.where(
-				and(
-					eq(membership.organizationId, ctx.orgId),
-					eq(membership.planId, id),
-					eq(membership.status, 'active'),
-					isNull(membership.price)
-				)
-			);
-		notifyPlanPriceChange(
-			ctx.orgId,
-			row.name,
-			affected.map((a) => a.memberId),
-			old.amount,
-			row.amount,
-			row.interval
-		).catch(() => {});
+		if (grandfatherPrice) {
+			// Lock the old rate on every active membership without its own override —
+			// only future joins pay the new price.
+			await db
+				.update(membership)
+				.set({ price: old.amount, updatedAt: new Date() })
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.planId, id),
+						eq(membership.status, 'active'),
+						isNull(membership.price)
+					)
+				);
+		} else {
+			const affected = await db
+				.select({ memberId: membership.memberId })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.planId, id),
+						eq(membership.status, 'active'),
+						isNull(membership.price)
+					)
+				);
+			notifyPlanPriceChange(
+				ctx.orgId,
+				row.name,
+				affected.map((a) => a.memberId),
+				old.amount,
+				row.amount,
+				row.interval
+			).catch(() => {});
+		}
 	}
 	return row;
 }
