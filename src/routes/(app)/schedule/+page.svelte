@@ -401,6 +401,19 @@
 			{#if focus}
 				<Button variant="outline" class="w-full" onclick={openEdit}>Edit session</Button>
 				<Button
+					variant="ghost"
+					class="w-full"
+					onclick={() => {
+						if (!focus) return;
+						sessTypeId = focus.session.classTypeId;
+						sessLocationId = focus.session.locationId ?? '';
+						sessInstructorId = focus.session.instructorId ?? '';
+						sessStart = addDays(localDate(focus.session.startsAt, tz), 7);
+						sessStartTime = localTime(focus.session.startsAt, tz);
+						sessOpen = true;
+					}}>Duplicate next week</Button
+				>
+				<Button
 					variant="outline"
 					class="w-full"
 					onclick={async () => {
