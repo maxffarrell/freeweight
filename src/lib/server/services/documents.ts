@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
 import { db } from '#lib/server/db/index.ts';
@@ -90,7 +90,11 @@ export async function readMemberDocument(id: string, memberId: string) {
 		.select()
 		.from(document)
 		.where(
-			and(eq(document.id, id), eq(document.entityType, 'member'), eq(document.entityId, memberId))
+			and(
+				eq(document.id, id),
+				inArray(document.entityType, ['member', 'member_avatar']),
+				eq(document.entityId, memberId)
+			)
 		);
 	if (!doc) error(404, 'Document not found');
 	const data = await store.get(doc.storageKey);
