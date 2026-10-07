@@ -20,7 +20,7 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import { checkInToken } from './checkins.ts';
-import { bookSession, cancelBooking } from './schedule.ts';
+import { activeMembership, bookSession, cancelBooking } from './schedule.ts';
 import { notifySeriesBooked } from './notifications.ts';
 import {
 	assertPlanCapacity,
@@ -309,6 +309,7 @@ export async function bookableSessions(memberId: string, days = 14) {
 			color: classType.color,
 			locationName: location.name,
 			memberBookable: classType.memberBookable,
+			dropInPrice: classType.dropInPrice,
 			booked:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
 					Number
@@ -351,7 +352,8 @@ export async function memberBook(
 		.select({
 			startsAt: classSession.startsAt,
 			classCutoff: classType.bookCutoffMin,
-			memberBookable: classType.memberBookable
+			memberBookable: classType.memberBookable,
+			dropInPrice: classType.dropInPrice
 		})
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
@@ -367,7 +369,13 @@ export async function memberBook(
 	const cutoff = s.classCutoff ?? bookCutoffMin;
 	if (cutoff != null && s.startsAt.getTime() - Date.now() < cutoff * 60_000)
 		error(409, `Booking closes ${cutoff} minutes before class`);
-	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, opts);
+	// Members without an active plan buy the visit as a drop-in — the class's
+	// drop-in charge lands on their balance to pay online or at the desk.
+	const ms = await activeMembership(orgId, memberId);
+	const dropIn = !ms;
+	if (dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
+		error(402, 'An active membership is required to book');
+	return bookSession(memberCtx(orgId, userId), { sessionId, memberId, dropIn }, userId, opts);
 }
 
 /**

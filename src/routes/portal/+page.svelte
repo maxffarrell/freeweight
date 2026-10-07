@@ -101,6 +101,7 @@
 		}
 	}
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
+	const hasPlan = $derived(d.memberships.some((mm) => mm.membership.status === 'active'));
 	const buyablePacks = $derived(
 		joinablePlans.filter(
 			(p) =>
@@ -936,22 +937,33 @@
 							{:else if !b.memberBookable}
 								<span class="text-xs whitespace-nowrap text-muted-foreground">Book at the desk</span
 								>
+							{:else if !hasPlan && (!b.dropInPrice || b.dropInPrice <= 0)}
+								<span class="text-xs whitespace-nowrap text-muted-foreground">Needs a plan</span>
+							{:else if !hasPlan && b.booked >= b.session.capacity}
+								<span class="text-xs whitespace-nowrap text-muted-foreground">Full</span>
 							{:else}
 								<div class="flex justify-end gap-1">
-									<Button
-										size="sm"
-										variant="ghost"
-										title={`Book every upcoming ${b.className}`}
-										disabled={busy === b.session.id || busy === `series:${b.session.classTypeId}`}
-										onclick={() => bookSeriesAll(b.session.classTypeId, b.className)}>Series</Button
-									>
+									{#if hasPlan}
+										<Button
+											size="sm"
+											variant="ghost"
+											title={`Book every upcoming ${b.className}`}
+											disabled={busy === b.session.id || busy === `series:${b.session.classTypeId}`}
+											onclick={() => bookSeriesAll(b.session.classTypeId, b.className)}
+											>Series</Button
+										>
+									{/if}
 									<Button
 										size="sm"
 										variant="outline"
 										disabled={busy === b.session.id}
 										onclick={() => book(b.session.id)}
 									>
-										{b.booked >= b.session.capacity ? 'Join waitlist' : 'Book'}
+										{!hasPlan && b.dropInPrice
+											? `Book — ${formatMoney(b.dropInPrice, currency)}`
+											: b.booked >= b.session.capacity
+												? 'Join waitlist'
+												: 'Book'}
 									</Button>
 								</div>
 							{/if}
