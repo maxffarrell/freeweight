@@ -139,9 +139,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		})
 		.returning();
 	// Promo code — validated before the membership is created so a bad code fails the join.
-	const promo = input.promoCode?.trim()
-		? await redeemablePromo(org.id, input.promoCode)
-		: null;
+	const promo = input.promoCode?.trim() ? await redeemablePromo(org.id, input.promoCode) : null;
 
 	let checkoutUrl: string | null = null;
 	if (input.planId) {
@@ -222,8 +220,7 @@ async function signupCheckout(
 	// discounts the same total the membership charges were reduced by.
 	const state = promo ? promoState(promo) : null;
 	const amount = promo
-		? promoApply(promo, state!, p.signupFee) +
-			(p.isPack ? promoApply(promo, state!, p.amount) : 0)
+		? promoApply(promo, state!, p.signupFee) + (p.isPack ? promoApply(promo, state!, p.amount) : 0)
 		: p.signupFee + (p.isPack ? p.amount : 0);
 	return onlineCheckout(
 		orgId,

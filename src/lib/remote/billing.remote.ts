@@ -30,9 +30,7 @@ export const updatePlan = command(planUpdate, async (input) => {
 	return p;
 });
 
-export const getPromoCodes = query(async () =>
-	svc.listPromoCodes((await requireOrg()).orgId)
-);
+export const getPromoCodes = query(async () => svc.listPromoCodes((await requireOrg()).orgId));
 export const createPromoCode = command(promoCodeInput, async (input) => {
 	const p = await svc.createPromoCode(await requireOrg('admin'), input);
 	void getPromoCodes().refresh();

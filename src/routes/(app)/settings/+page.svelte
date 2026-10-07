@@ -37,6 +37,7 @@
 		refreshProvider
 	} from '#lib/remote/payments.remote.ts';
 	import { getApiKeys, createApiKey, deleteApiKey } from '#lib/remote/api-keys.remote.ts';
+	import { getClosures, addClosure, removeClosure } from '#lib/remote/schedule.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -50,8 +51,36 @@
 	let webhooks = $state(await getWebhooks());
 	let apiKeys = $state(await getApiKeys());
 	let providerList = $state(await getPaymentProviders());
+	let closures = $state(await getClosures());
 	const staff = await getStaff();
 	let pending = $state(false);
+	let cDate = $state('');
+	let cReason = $state('');
+	let cPending = $state(false);
+
+	async function submitClosure(e: SubmitEvent) {
+		e.preventDefault();
+		cPending = true;
+		try {
+			const c = await addClosure({ date: cDate, reason: cReason });
+			closures = await getClosures();
+			cDate = '';
+			cReason = '';
+			toast.success(
+				c.sessionsCancelled
+					? `Closed — ${c.sessionsCancelled} session${c.sessionsCancelled === 1 ? '' : 's'} cancelled`
+					: 'Closure added'
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		} finally {
+			cPending = false;
+		}
+	}
+	async function delClosure(id: string) {
+		await removeClosure(id).catch((err) => toast.error(errMsg(err, 'Could not remove')));
+		closures = await getClosures();
+	}
 
 	// ------- general -------
 	let timezone = $state(settings.timezone);
@@ -374,6 +403,44 @@
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Closures</Card.Title>
+					<Card.Description>
+						Days the gym is closed. Adding one cancels that day's sessions and emails the attendees;
+						recurring rules skip closed days.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-4">
+					<form class="flex flex-wrap items-end gap-2" onsubmit={submitClosure}>
+						<Field.Field>
+							<Field.Label>Date</Field.Label>
+							<Input type="date" bind:value={cDate} required />
+						</Field.Field>
+						<Field.Field class="min-w-40 flex-1">
+							<Field.Label>Reason (optional)</Field.Label>
+							<Input bind:value={cReason} placeholder="Holiday, maintenance…" />
+						</Field.Field>
+						<Button type="submit" disabled={cPending}>Add</Button>
+					</form>
+					<ul class="divide-y">
+						{#each closures as c (c.id)}
+							<li class="flex items-center justify-between py-2.5 text-sm">
+								<div>
+									<p class="font-medium">{formatDate(c.date)}</p>
+									{#if c.reason}<p class="text-xs text-muted-foreground">{c.reason}</p>{/if}
+								</div>
+								<Button variant="ghost" size="icon" onclick={() => delClosure(c.id)}
+									><Trash class="size-4" /></Button
+								>
+							</li>
+						{:else}
+							<p class="py-2 text-sm text-muted-foreground">No closures scheduled.</p>
+						{/each}
+					</ul>
 				</Card.Content>
 			</Card.Root>
 		</Tabs.Content>

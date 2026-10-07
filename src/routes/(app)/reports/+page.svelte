@@ -317,8 +317,7 @@
 						<Table.Row>
 							<Table.Cell class="font-medium">{t.instructor}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{t.sessions}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{formatMoney(t.pay, currency)}</Table.Cell
+							<Table.Cell class="text-right tabular-nums">{formatMoney(t.pay, currency)}</Table.Cell
 							>
 						</Table.Row>
 					{:else}

@@ -277,6 +277,20 @@ export const classType = pgTable(
 	(t) => [index('class_type_org_idx').on(t.organizationId)]
 );
 
+/** A day the gym is closed — live sessions on it are cancelled and templates skip it. */
+export const closure = pgTable(
+	'closure',
+	{
+		id: id(),
+		organizationId: orgId(),
+		/** Org-local day, YYYY-MM-DD. */
+		date: date('date', { mode: 'string' }).notNull(),
+		reason: text('reason').notNull().default(''),
+		...timestamps
+	},
+	(t) => [uniqueIndex('closure_org_date_idx').on(t.organizationId, t.date)]
+);
+
 /** Recurring rule — "Tuesdays at 6pm". The cron materializes sessions ~2 weeks ahead. */
 export const classTemplate = pgTable(
 	'class_template',

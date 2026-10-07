@@ -232,6 +232,13 @@
       "when": 1791366027095,
       "tag": "0032_class_pay_rate",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791366588086,
+      "tag": "0033_closures",
+      "breakpoints": true
     }
   ]
 }

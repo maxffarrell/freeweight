@@ -10,6 +10,7 @@ import {
 	inArray,
 	isNull,
 	lt,
+	lte,
 	ne,
 	or,
 	sql
@@ -22,6 +23,7 @@ import {
 	classSession,
 	classTemplate,
 	classType,
+	closure,
 	gymMember,
 	gymSettings,
 	location,
@@ -752,6 +754,77 @@ export async function deleteTemplate(ctx: OrgContext, id: string) {
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 /** Sessions templates keep ahead of today (org-local). */
+// ------- Closures -------
+
+/** Lists every closure day, soonest first. */
+export async function listClosures(orgId: string) {
+	return db
+		.select()
+		.from(closure)
+		.where(eq(closure.organizationId, orgId))
+		.orderBy(asc(closure.date));
+}
+
+/**
+ * Marks a day closed and cancels every live session on it — members get the usual
+ * cancellation email and credits are returned. Recurring templates skip closed days.
+ */
+export async function addClosure(ctx: OrgContext, input: { date: string; reason: string }) {
+	const [row] = await db
+		.insert(closure)
+		.values({ organizationId: ctx.orgId, date: input.date, reason: input.reason })
+		.onConflictDoNothing()
+		.returning();
+	if (!row) error(409, 'That day is already marked closed');
+
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const sessions = await db
+		.select({ id: classSession.id })
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				isNull(classSession.cancelledAt),
+				sql`to_char(${classSession.startsAt} AT TIME ZONE ${tz}, 'YYYY-MM-DD') = ${row.date}`
+			)
+		);
+	if (sessions.length)
+		await db
+			.update(classSession)
+			.set({ cancelledAt: new Date() })
+			.where(
+				inArray(
+					classSession.id,
+					sessions.map((s) => s.id)
+				)
+			);
+	for (const s of sessions) notifySessionCancelled(ctx.orgId, s.id).catch(() => {});
+
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'closure',
+		entityId: row.id,
+		action: 'created',
+		summary: `Closed ${row.date}${row.reason ? ` (${row.reason})` : ''}${sessions.length ? ` — ${sessions.length} session${sessions.length === 1 ? '' : 's'} cancelled` : ''}`
+	});
+	return { ...row, sessionsCancelled: sessions.length };
+}
+
+/** Removes a closure day. Sessions already cancelled stay cancelled. */
+export async function removeClosure(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(closure)
+		.where(and(eq(closure.organizationId, ctx.orgId), eq(closure.id, id)))
+		.returning();
+	if (!row) error(404, 'Closure not found');
+	return row;
+}
+
 const TEMPLATE_HORIZON_DAYS = 14;
 
 /**
@@ -791,11 +864,26 @@ export async function materializeTemplates(orgId: string) {
 			)
 		);
 	const have = new Set(existing.map((e) => `${e.templateId}|${e.startsAt.getTime()}`));
+	const closed = new Set(
+		(
+			await db
+				.select({ date: closure.date })
+				.from(closure)
+				.where(
+					and(
+						eq(closure.organizationId, orgId),
+						gte(closure.date, today),
+						lte(closure.date, addDays(today, TEMPLATE_HORIZON_DAYS))
+					)
+				)
+		).map((c) => c.date)
+	);
 
 	const now = Date.now();
 	const rows = [];
 	for (let i = 0; i <= TEMPLATE_HORIZON_DAYS; i++) {
 		const day = addDays(today, i);
+		if (closed.has(day)) continue;
 		// Noon local avoids the DST edge where the day has no midnight.
 		const weekday = localWeekday(zonedToUtc(`${day}T12:00`, tz), tz);
 		for (const { template: tpl, classType: ct } of templates) {

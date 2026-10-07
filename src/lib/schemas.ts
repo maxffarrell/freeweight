@@ -119,6 +119,12 @@ export const classTypeInput = v.object({
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
 
+/** A gym closure day. */
+export const closureInput = v.object({
+	date: isoDate,
+	reason: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(200)), '')
+});
+
 /** Local wall-clock time (`YYYY-MM-DDTHH:mm`) in the workspace timezone. */
 const localDateTime = v.pipe(v.string(), v.isoDateTime('Use YYYY-MM-DDTHH:mm'));
 
@@ -240,7 +246,9 @@ export const promoCodeInput = v.object({
 		v.maxLength(50),
 		v.regex(/^[A-Za-z0-9_-]+$/, 'Letters, numbers, - and _ only')
 	),
-	percentOff: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)))),
+	percentOff: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)))
+	),
 	amountOff: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	maxUses: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	expiresAt: v.optional(v.nullable(isoDate))
