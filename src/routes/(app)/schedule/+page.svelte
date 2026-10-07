@@ -11,6 +11,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getSessions,
@@ -25,7 +26,8 @@
 		getInstructors,
 		getTemplates,
 		createTemplate,
-		deleteTemplate
+		deleteTemplate,
+		emailSessionRoster
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -35,6 +37,7 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Repeat from '@lucide/svelte/icons/repeat';
 	import Printer from '@lucide/svelte/icons/printer';
+	import Mail from '@lucide/svelte/icons/mail';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { errMsg, formatDate } from '#lib/format.ts';
 
@@ -137,6 +140,31 @@
 			await reload();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update'));
+		}
+		pending = false;
+	}
+
+	// ------- message attendees -------
+	let msgOpen = $state(false);
+	let msgSubject = $state('');
+	let msgBody = $state('');
+	async function submitMsg(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await emailSessionRoster({
+				sessionId: focusId,
+				subject: msgSubject,
+				message: msgBody
+			});
+			toast.success(
+				r.sent ? `Sent to ${r.sent} member${r.sent === 1 ? '' : 's'}` : 'Nobody to email'
+			);
+			msgOpen = false;
+			msgSubject = '';
+			msgBody = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
 		}
 		pending = false;
 	}
@@ -380,7 +408,10 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
-			<div class="flex justify-end">
+			<div class="flex justify-end gap-1">
+				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => (msgOpen = true)}
+					><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
+				>
 				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
 					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
 				>
@@ -792,5 +823,33 @@
 		{:else}
 			<p class="text-sm text-muted-foreground">No templates yet.</p>
 		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={msgOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Message attendees</Dialog.Title>
+			<Dialog.Description
+				>Emails everyone booked or waitlisted on {focus?.className ??
+					'this session'}.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={submitMsg}>
+			<Field.Field>
+				<Field.Label for="msg-subject">Subject</Field.Label>
+				<Input
+					id="msg-subject"
+					required
+					bind:value={msgSubject}
+					placeholder="Heads up about class"
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="msg-body">Message</Field.Label>
+				<Textarea id="msg-body" required rows={4} bind:value={msgBody} />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={pending}>Send to attendees</Button>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

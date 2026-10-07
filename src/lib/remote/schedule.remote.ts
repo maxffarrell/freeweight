@@ -9,11 +9,13 @@ import {
 	bookingUpdate,
 	classTypeInput,
 	classTypeUpdate,
+	emailRosterInput,
 	idSchema,
 	sessionInput,
 	sessionUpdate,
 	templateInput
 } from '#lib/schemas.ts';
+import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 
 const tz = async () => {
 	const { orgId } = await requireOrg();
@@ -49,6 +51,19 @@ export const getSession = query(idSchema, async (id) =>
 );
 export const getRoster = query(idSchema, async (id) =>
 	svc.getRoster((await requireOrg()).orgId, id)
+);
+/** Email everyone booked or waitlisted on a session — "AC is out tonight" notes. */
+export const emailSessionRoster = command(
+	emailRosterInput,
+	async ({ sessionId, subject, message }) => {
+		const { orgId } = await requireOrg();
+		const roster = await svc.getRoster(orgId, sessionId);
+		const ids = roster
+			.filter((r) => r.booking.status === 'booked' || r.booking.status === 'waitlisted')
+			.map((r) => r.booking.memberId);
+		if (!ids.length) return { sent: 0, total: 0 };
+		return sendAnnouncement(orgId, subject, message, ids);
+	}
 );
 export const createSession = command(sessionInput, async (input) => {
 	const s = await svc.createSession(await requireOrg(), await tz(), input);

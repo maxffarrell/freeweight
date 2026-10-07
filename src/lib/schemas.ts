@@ -239,6 +239,12 @@ export const dropInInput = v.object({
 	agreedWaiver: v.optional(v.boolean(), false)
 });
 
+export const emailRosterInput = v.object({
+	sessionId: idSchema,
+	subject: requiredText('Subject'),
+	message: requiredText('Message')
+});
+
 export const announcementInput = v.object({
 	subject: requiredText('Subject'),
 	message: requiredText('Message'),
