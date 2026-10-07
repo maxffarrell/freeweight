@@ -17,6 +17,7 @@ import {
 	sendResourceReminders,
 	sendInstructorRosters,
 	sendPastDueNotices,
+	ratingNudges,
 	sendStaffBriefing,
 	sendTrialEndingNotices,
 	sendWaiverReminders,
@@ -66,6 +67,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let announcements = 0;
 	let packNudges = 0;
 	let waiverNudges = 0;
+	let ratingNudgeCount = 0;
 	let challengeInvites = 0;
 	let challengeResults = 0;
 	let underEnrolled = 0;
@@ -156,6 +158,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`waiver-reminder cron failed for ${o.id}`, err);
 		}
 		try {
+			ratingNudgeCount += await ratingNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`rating-nudge cron failed for ${o.id}`, err);
+		}
+		try {
 			underEnrolled += await autoCancelUnderEnrolled(o.id);
 		} catch (err) {
 			failed++;
@@ -235,6 +243,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		announcements,
 		packNudges,
 		waiverNudges,
+		ratingNudges: ratingNudgeCount,
 		underEnrolled,
 		autoCheckouts,
 		shiftCloses,
