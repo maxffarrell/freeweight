@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "day_pass_price" integer;

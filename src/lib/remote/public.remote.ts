@@ -1,6 +1,12 @@
 import { command, getRequestEvent, query } from '$app/server';
-import { dropInInput, joinInput, leadInput } from '#lib/schemas.ts';
-import { bookDropIn, captureLead, joinGym, referrerName } from '#lib/server/services/public.ts';
+import { dayPassInput, dropInInput, joinInput, leadInput } from '#lib/schemas.ts';
+import {
+	bookDropIn,
+	buyDayPass,
+	captureLead,
+	joinGym,
+	referrerName
+} from '#lib/server/services/public.ts';
 import * as v from 'valibot';
 
 /** Public join form on /j/[slug] — unauthenticated by design (rate-limited + honeypot inside). */
@@ -51,5 +57,20 @@ export const bookDropInForm = command(
 			// adapter without client IPs
 		}
 		return bookDropIn(slug, ip, input);
+	}
+);
+
+/** Public day-pass purchase on /j/[slug] — same unauthenticated + rate-limited treatment. */
+export const buyDayPassForm = command(
+	v.object({ slug: v.string(), input: dayPassInput }),
+	async ({ slug, input }) => {
+		const event = getRequestEvent();
+		let ip = 'unknown';
+		try {
+			ip = event.getClientAddress();
+		} catch {
+			// adapter without client IPs
+		}
+		return buyDayPass(slug, ip, input);
 	}
 );
