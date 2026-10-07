@@ -932,6 +932,28 @@
 
 		<Card.Root>
 			<Card.Header>
+				<Card.Title class="text-base">Progress</Card.Title>
+				<Card.Description>Measurements the member logged in the portal</Card.Description>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each m.measurements as e (e.id)}
+					<div class="flex items-baseline gap-2 py-1 text-sm">
+						<span class="w-16 shrink-0 text-xs text-muted-foreground capitalize"
+							>{e.kind.replaceAll('_', ' ')}</span
+						>
+						<span class="font-medium tabular-nums">{e.value} {e.unit}</span>
+						<span class="ml-auto shrink-0 text-xs text-muted-foreground">{e.recordedAt}</span>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						Nothing logged yet — members add these in the portal.
+					</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title class="text-base">Emails sent</Card.Title>
 			</Card.Header>
 			<Card.Content class="px-4">

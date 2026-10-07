@@ -353,6 +353,16 @@ export const memberNoteInput = v.object({
 	body: v.pipe(requiredText('Note'), v.maxLength(2000))
 });
 
+export const measurementKinds = ['weight', 'body_fat', 'waist', 'chest'] as const;
+export const measurementUnits = ['lb', 'kg', '%', 'in', 'cm'] as const;
+
+export const measurementInput = v.object({
+	kind: v.picklist(measurementKinds),
+	value: v.pipe(v.number(), v.gtValue(0), v.maxValue(2000)),
+	unit: v.picklist(measurementUnits),
+	recordedAt: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
+});
+
 export const memberTagInput = v.object({
 	memberId: idSchema,
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))

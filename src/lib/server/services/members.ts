@@ -11,6 +11,7 @@ import {
 	document,
 	gymMember,
 	location,
+	memberMeasurement,
 	memberNote,
 	memberTag,
 	membership,
@@ -23,6 +24,7 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
+import { todayISO } from '#lib/format.ts';
 import { emit } from './events.ts';
 import { creditUsage } from './schedule.ts';
 import type * as s from '#lib/schemas.ts';
@@ -276,72 +278,85 @@ export async function getMember(orgId: string, id: string) {
 				sql`${checkIn.checkedAt} >= date_trunc('month', now())`
 			)
 		);
-	const [[att], [bs], referredBy, [referralCount], guardian, dependents, memberOptions, emails] =
-		await Promise.all([
-			db
-				.select({
-					visits: sql<number>`count(*) filter (where ${checkIn.guestName} is null)`.mapWith(Number),
-					thisMonth:
-						sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
-							Number
-						)
-				})
-				.from(checkIn)
-				.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
-			db
-				.select({
-					attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(
-						Number
-					),
-					noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(
+	const [
+		[att],
+		[bs],
+		referredBy,
+		[referralCount],
+		guardian,
+		dependents,
+		memberOptions,
+		emails,
+		measurements
+	] = await Promise.all([
+		db
+			.select({
+				visits: sql<number>`count(*) filter (where ${checkIn.guestName} is null)`.mapWith(Number),
+				thisMonth:
+					sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
 						Number
 					)
-				})
-				.from(booking)
-				.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id))),
-			row.member.referredByMemberId
-				? db
-						.select({ id: gymMember.id, name: gymMember.name })
-						.from(gymMember)
-						.where(eq(gymMember.id, row.member.referredByMemberId))
-						.limit(1)
-				: Promise.resolve([]),
-			db
-				.select({ n: sql<number>`count(*)`.mapWith(Number) })
-				.from(gymMember)
-				.where(eq(gymMember.referredByMemberId, id)),
-			row.member.guardianId
-				? db
-						.select({ id: gymMember.id, name: gymMember.name })
-						.from(gymMember)
-						.where(eq(gymMember.id, row.member.guardianId))
-						.limit(1)
-				: Promise.resolve([]),
-			db
-				.select({ id: gymMember.id, name: gymMember.name })
-				.from(gymMember)
-				.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.guardianId, id)))
-				.orderBy(asc(gymMember.name)),
-			db
-				.select({ id: gymMember.id, name: gymMember.name })
-				.from(gymMember)
-				.where(and(eq(gymMember.organizationId, orgId), ne(gymMember.id, id)))
-				.orderBy(asc(gymMember.name))
-				.limit(500),
-			row.member.email
-				? db
-						.select({ kind: notificationLog.kind, createdAt: notificationLog.createdAt })
-						.from(notificationLog)
-						.where(
-							and(
-								eq(notificationLog.organizationId, orgId),
-								eq(notificationLog.recipient, row.member.email)
-							)
+			})
+			.from(checkIn)
+			.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
+		db
+			.select({
+				attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(
+					Number
+				),
+				noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number)
+			})
+			.from(booking)
+			.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id))),
+		row.member.referredByMemberId
+			? db
+					.select({ id: gymMember.id, name: gymMember.name })
+					.from(gymMember)
+					.where(eq(gymMember.id, row.member.referredByMemberId))
+					.limit(1)
+			: Promise.resolve([]),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(gymMember)
+			.where(eq(gymMember.referredByMemberId, id)),
+		row.member.guardianId
+			? db
+					.select({ id: gymMember.id, name: gymMember.name })
+					.from(gymMember)
+					.where(eq(gymMember.id, row.member.guardianId))
+					.limit(1)
+			: Promise.resolve([]),
+		db
+			.select({ id: gymMember.id, name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.guardianId, id)))
+			.orderBy(asc(gymMember.name)),
+		db
+			.select({ id: gymMember.id, name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), ne(gymMember.id, id)))
+			.orderBy(asc(gymMember.name))
+			.limit(500),
+		row.member.email
+			? db
+					.select({ kind: notificationLog.kind, createdAt: notificationLog.createdAt })
+					.from(notificationLog)
+					.where(
+						and(
+							eq(notificationLog.organizationId, orgId),
+							eq(notificationLog.recipient, row.member.email)
 						)
-						.orderBy(desc(notificationLog.createdAt))
-						.limit(20)
-				: Promise.resolve([])
-		]);
+					)
+					.orderBy(desc(notificationLog.createdAt))
+					.limit(20)
+			: Promise.resolve([]),
+		db
+			.select()
+			.from(memberMeasurement)
+			.where(and(eq(memberMeasurement.organizationId, orgId), eq(memberMeasurement.memberId, id)))
+			.orderBy(desc(memberMeasurement.recordedAt), desc(memberMeasurement.createdAt))
+			.limit(12)
+	]);
 	return {
 		...row,
 		memberships,
@@ -358,6 +373,7 @@ export async function getMember(orgId: string, id: string) {
 		dependents,
 		memberOptions,
 		emails,
+		measurements,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {
@@ -475,7 +491,16 @@ export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: stri
 					select 1 from ${memberTag} k
 					where k.organization_id = ${ctx.orgId}
 						and k.member_id = ${keepId} and k.tag = t.tag)`);
-		for (const t of [waiver, membership, checkIn, charge, payment, memberNote, memberTag]) {
+		for (const t of [
+			waiver,
+			membership,
+			checkIn,
+			charge,
+			payment,
+			memberNote,
+			memberTag,
+			memberMeasurement
+		]) {
 			await tx
 				.update(t)
 				.set({ memberId: keepId })
@@ -627,6 +652,66 @@ export async function deleteMemberNote(ctx: OrgContext, noteId: string) {
 		.where(and(eq(memberNote.organizationId, ctx.orgId), eq(memberNote.id, noteId)))
 		.returning();
 	if (!row) error(404, 'Note not found');
+}
+
+// ------- member-logged body metrics (portal Progress card + member page) -------
+
+export async function listMeasurements(orgId: string, memberId: string, limit = 12) {
+	return db
+		.select()
+		.from(memberMeasurement)
+		.where(
+			and(eq(memberMeasurement.organizationId, orgId), eq(memberMeasurement.memberId, memberId))
+		)
+		.orderBy(desc(memberMeasurement.recordedAt), desc(memberMeasurement.createdAt))
+		.limit(limit);
+}
+
+export async function addMeasurement(
+	orgId: string,
+	memberId: string,
+	input: v.InferOutput<typeof s.measurementInput>
+) {
+	const [m] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const [row] = await db
+		.insert(memberMeasurement)
+		.values({
+			organizationId: orgId,
+			memberId,
+			kind: input.kind,
+			value: input.value,
+			unit: input.unit,
+			recordedAt: input.recordedAt ?? todayISO()
+		})
+		.returning();
+	await emit({
+		orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'measurement_logged',
+		summary: `Logged ${input.kind.replace('_', ' ')}: ${input.value} ${input.unit}`,
+		data: { measurementId: row!.id }
+	});
+	return row;
+}
+
+/** Delete is member-scoped — the portal lets members remove their own entries only. */
+export async function deleteMeasurement(orgId: string, memberId: string, id: string) {
+	const [row] = await db
+		.delete(memberMeasurement)
+		.where(
+			and(
+				eq(memberMeasurement.organizationId, orgId),
+				eq(memberMeasurement.memberId, memberId),
+				eq(memberMeasurement.id, id)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Entry not found');
 }
 
 /** Members whose portal login is this user — one user can belong to several gyms. */
