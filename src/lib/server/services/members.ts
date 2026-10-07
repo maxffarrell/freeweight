@@ -17,6 +17,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { creditUsage } from './schedule.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -111,7 +112,9 @@ export async function getMember(orgId: string, id: string) {
 		.orderBy(desc(checkIn.checkedAt))
 		.limit(50);
 
-	return { ...row, memberships, charges, payments, bookings, checkIns };
+	const credits = await creditUsage(orgId, id);
+
+	return { ...row, memberships, charges, payments, bookings, checkIns, credits };
 }
 
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {

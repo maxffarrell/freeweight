@@ -36,7 +36,7 @@
 	} from '#lib/remote/payments.remote.ts';
 	import { getApiKeys, createApiKey, deleteApiKey } from '#lib/remote/api-keys.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
-	import { formatDate } from '#lib/format.ts';
+	import { errMsg, formatDate } from '#lib/format.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Trash from '@lucide/svelte/icons/trash-2';
@@ -76,7 +76,7 @@
 			});
 			toast.success('Settings saved');
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not save');
+			toast.error(errMsg(err, 'Could not save'));
 		}
 		pending = false;
 	}
@@ -93,7 +93,7 @@
 			locOpen = false;
 			locName = '';
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not add');
+			toast.error(errMsg(err, 'Could not add'));
 		}
 		pending = false;
 	}
@@ -102,7 +102,7 @@
 			await updateLocation({ id, archived });
 			locations = await getLocations();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not update');
+			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
 
@@ -146,7 +146,7 @@
 			keyPerms = {};
 			apiKeys = await getApiKeys();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not create key');
+			toast.error(errMsg(err, 'Could not create key'));
 		}
 		pending = false;
 	}
@@ -155,7 +155,7 @@
 			await deleteApiKey(id);
 			apiKeys = await getApiKeys();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not delete');
+			toast.error(errMsg(err, 'Could not delete'));
 		}
 	}
 
@@ -176,7 +176,7 @@
 			webhooks = await getWebhooks();
 			hookUrl = '';
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not add webhook');
+			toast.error(errMsg(err, 'Could not add webhook'));
 		}
 		pending = false;
 	}
@@ -591,7 +591,7 @@
 								toast.success('Demo gym loaded — look around');
 								await goto('/dashboard', { invalidateAll: true });
 							} catch (err) {
-								toast.error(err instanceof Error ? err.message : 'Could not seed');
+								toast.error(errMsg(err, 'Could not seed'));
 							}
 							pending = false;
 						}}><Sparkles /> Load demo data</Button

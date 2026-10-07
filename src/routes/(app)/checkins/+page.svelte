@@ -12,6 +12,7 @@
 	import { localTime } from '#lib/tz.ts';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
+	import { errMsg } from '#lib/format.ts';
 
 	const settings = await getSettings();
 	const locations = await getLocations();
@@ -32,7 +33,7 @@
 			code = '';
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Check-in failed');
+			toast.error(errMsg(err, 'Check-in failed'));
 		}
 		pending = false;
 		inputEl?.focus();

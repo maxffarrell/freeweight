@@ -23,7 +23,7 @@
 		getCurrency
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
-	import { formatMoney, formatDate, todayISO } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
 	import { chargeKinds, paymentMethods } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Wallet from '@lucide/svelte/icons/wallet';
@@ -68,7 +68,7 @@
 			charges = await getCharges({ status: chargeFilter || undefined });
 			payments = await getPayments();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not record payment');
+			toast.error(errMsg(err, 'Could not record payment'));
 		}
 		pending = false;
 	}
@@ -99,7 +99,7 @@
 			cAmount = null;
 			charges = await getCharges({ status: chargeFilter || undefined });
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not add charge');
+			toast.error(errMsg(err, 'Could not add charge'));
 		}
 		pending = false;
 	}
@@ -109,7 +109,7 @@
 			await updateCharge({ id, status: 'void' });
 			charges = await getCharges({ status: chargeFilter || undefined });
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not void');
+			toast.error(errMsg(err, 'Could not void'));
 		}
 	}
 	async function setMembership(id: string, status: 'paused' | 'cancelled' | 'active') {
@@ -117,7 +117,7 @@
 			await updateMembership({ id, status });
 			memberships = await getMemberships();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not update');
+			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
 </script>

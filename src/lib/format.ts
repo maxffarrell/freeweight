@@ -1,5 +1,18 @@
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
 
+/** Message from a remote-function rejection (plain object, not always an Error). */
+export function errMsg(err: unknown, fallback: string) {
+	if (err instanceof Error) return err.message;
+	if (
+		typeof err === 'object' &&
+		err !== null &&
+		'message' in err &&
+		typeof (err as { message: unknown }).message === 'string'
+	)
+		return (err as { message: string }).message;
+	return fallback;
+}
+
 export function formatMoney(cents: number | null | undefined, currency = 'USD', compact = false) {
 	if (cents == null) return '—';
 	const key = `${currency}:${compact}`;

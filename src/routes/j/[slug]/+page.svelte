@@ -8,7 +8,7 @@
 	import { toast } from 'svelte-sonner';
 	import { joinGymForm } from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
-	import { formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import Phone from '@lucide/svelte/icons/phone';
@@ -38,7 +38,7 @@
 			});
 			joined = true;
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not join — try again');
+			toast.error(errMsg(err, 'Could not join — try again'));
 		}
 		pending = false;
 	}

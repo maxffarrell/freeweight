@@ -25,7 +25,7 @@
 		recordPayment,
 		getCurrency
 	} from '#lib/remote/billing.remote.ts';
-	import { formatMoney, formatDate } from '#lib/format.ts';
+	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -67,7 +67,7 @@
 			toast.success('Member updated');
 			editOpen = false;
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Update failed');
+			toast.error(errMsg(err, 'Update failed'));
 		}
 		pending = false;
 	}
@@ -84,7 +84,7 @@
 			toast.success('Membership started — signup and first-period charges posted');
 			memOpen = false;
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not start membership');
+			toast.error(errMsg(err, 'Could not start membership'));
 		}
 		pending = false;
 	}
@@ -94,7 +94,7 @@
 			await updateMembership({ id: membershipId, status });
 			toast.success(`Membership ${status}`);
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not update');
+			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
 
@@ -114,7 +114,7 @@
 			payAmount = null;
 			notes = '';
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not record payment');
+			toast.error(errMsg(err, 'Could not record payment'));
 		}
 		pending = false;
 	}
@@ -126,7 +126,7 @@
 			await navigator.clipboard.writeText(url);
 			toast.success('Portal link copied — valid 14 days');
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not create link');
+			toast.error(errMsg(err, 'Could not create link'));
 		}
 	}
 	async function manualCheckIn() {
@@ -134,7 +134,7 @@
 			await recordCheckIn({ code: id });
 			toast.success(`${m.member.name} checked in`);
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Check-in failed');
+			toast.error(errMsg(err, 'Check-in failed'));
 		}
 	}
 </script>
@@ -229,6 +229,11 @@
 				{:else}
 					<p class="text-sm text-muted-foreground">No memberships.</p>
 				{/each}
+				{#if m.credits}
+					<p class="text-xs text-muted-foreground">
+						{m.credits.used} of {m.credits.limit} classes used this period
+					</p>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	</div>

@@ -13,7 +13,7 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { toast } from 'svelte-sonner';
 	import { getMembers, createMember } from '#lib/remote/members.remote.ts';
-	import { formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Users from '@lucide/svelte/icons/users';
@@ -50,7 +50,7 @@
 			name = email = phone = '';
 			members = await getMembers({ q });
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not add member');
+			toast.error(errMsg(err, 'Could not add member'));
 		}
 		pending = false;
 	}

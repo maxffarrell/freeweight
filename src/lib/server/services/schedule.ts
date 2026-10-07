@@ -11,8 +11,7 @@ import {
 	member,
 	membership,
 	plan,
-	user,
-	outer
+	user
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
@@ -246,25 +245,25 @@ async function activeMembership(orgId: string, memberId: string) {
 /** Bookings that consume a class credit (cancelled doesn't). */
 const CREDIT_STATUSES = ['booked', 'attended', 'no_show'] as const;
 
-/**
- * 402s when the member's plan caps classes per period and they've used them.
- * The period rolls from `membership.startsAt` on the plan's interval.
- */
-async function assertCreditAvailable(
+type ActiveMembership = {
+	classCredits: number | null;
+	interval: 'week' | 'month' | 'year';
+	membership: { startsAt: Date };
+};
+
+/** Current rolling membership period: startsAt stepped forward on the plan's interval. */
+function periodWindow(startsAt: Date, interval: 'week' | 'month' | 'year') {
+	let start = startsAt.toISOString().slice(0, 10);
+	const today = new Date().toISOString().slice(0, 10);
+	while (nextPeriod(start, interval) <= today) start = nextPeriod(start, interval);
+	return { start, end: nextPeriod(start, interval) };
+}
+
+async function creditsUsedIn(
 	orgId: string,
 	memberId: string,
-	ms: {
-		membership: { startsAt: Date };
-		classCredits: number | null;
-		interval: 'week' | 'month' | 'year';
-	}
+	window: { start: string; end: string }
 ) {
-	if (ms.classCredits == null) return;
-	let periodStart = ms.membership.startsAt.toISOString().slice(0, 10);
-	while (nextPeriod(periodStart, ms.interval) <= new Date().toISOString().slice(0, 10))
-		periodStart = nextPeriod(periodStart, ms.interval);
-	const periodEnd = nextPeriod(periodStart, ms.interval);
-
 	const [{ count }] = await db
 		.select({ count: sql<number>`count(*)`.mapWith(Number) })
 		.from(booking)
@@ -274,11 +273,37 @@ async function assertCreditAvailable(
 				eq(booking.organizationId, orgId),
 				eq(booking.memberId, memberId),
 				inArray(booking.status, [...CREDIT_STATUSES]),
-				gte(classSession.startsAt, new Date(`${periodStart}T00:00:00Z`)),
-				lt(classSession.startsAt, new Date(`${periodEnd}T00:00:00Z`))
+				gte(classSession.startsAt, new Date(`${window.start}T00:00:00Z`)),
+				lt(classSession.startsAt, new Date(`${window.end}T00:00:00Z`))
 			)
 		);
-	if (count >= ms.classCredits) error(402, `All ${ms.classCredits} classes used for this period`);
+	return count;
+}
+
+/**
+ * Classes used this membership period, or null when the active plan has no cap.
+ * Shared by the staff member page, portal overview and booking enforcement.
+ */
+export async function creditUsage(orgId: string, memberId: string) {
+	const ms = await activeMembership(orgId, memberId);
+	if (!ms || ms.classCredits == null) return null;
+	const used = await creditsUsedIn(
+		orgId,
+		memberId,
+		periodWindow(ms.membership.startsAt, ms.interval)
+	);
+	return { used, limit: ms.classCredits };
+}
+
+/** 402s when the member's plan caps classes per period and they've used them. */
+async function assertCreditAvailable(orgId: string, memberId: string, ms: ActiveMembership) {
+	if (ms.classCredits == null) return;
+	const used = await creditsUsedIn(
+		orgId,
+		memberId,
+		periodWindow(ms.membership.startsAt, ms.interval)
+	);
+	if (used >= ms.classCredits) error(402, `All ${ms.classCredits} classes used for this period`);
 }
 
 /**
@@ -354,19 +379,19 @@ export async function bookSession(
 /** Cancels a booking and promotes the longest-waiting member, if any. */
 export async function cancelBooking(ctx: OrgContext, id: string, actorId?: string | null) {
 	const promoted = await db.transaction(async (tx) => {
+		// Read status before updating — the returning row is always 'cancelled'.
+		const [prev] = await tx
+			.select({ status: booking.status })
+			.from(booking)
+			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, id)))
+			.for('update');
+		if (!prev || prev.status === 'cancelled') error(404, 'Booking not found');
 		const [b] = await tx
 			.update(booking)
 			.set({ status: 'cancelled', cancelledAt: new Date() })
-			.where(
-				and(
-					eq(booking.organizationId, ctx.orgId),
-					eq(booking.id, id),
-					sql`${outer(booking.status)} in ('booked','waitlisted')`
-				)
-			)
+			.where(eq(booking.id, id))
 			.returning();
-		if (!b) error(404, 'Booking not found');
-		if (b.status !== 'booked') return null;
+		if (prev.status !== 'booked') return null;
 
 		const [next] = await tx
 			.select()

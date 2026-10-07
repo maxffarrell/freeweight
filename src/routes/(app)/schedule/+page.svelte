@@ -28,6 +28,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import { errMsg } from '#lib/format.ts';
 
 	const tz = (await getSettings()).timezone;
 	const locations = await getLocations();
@@ -78,7 +79,7 @@
 			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not book');
+			toast.error(errMsg(err, 'Could not book'));
 		}
 	}
 	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show') {
@@ -87,7 +88,7 @@
 			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not update');
+			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
 
@@ -115,7 +116,7 @@
 			sessOpen = false;
 			await reload();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not schedule');
+			toast.error(errMsg(err, 'Could not schedule'));
 		}
 		pending = false;
 	}
@@ -143,7 +144,7 @@
 			typeOpen = false;
 			tName = tDescription = '';
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not create');
+			toast.error(errMsg(err, 'Could not create'));
 		}
 		pending = false;
 	}
@@ -292,7 +293,7 @@
 							await reload();
 							rosterOpen = false;
 						} catch (err) {
-							toast.error(err instanceof Error ? err.message : 'Failed');
+							toast.error(errMsg(err, 'Failed'));
 						}
 					}}
 				>

@@ -13,7 +13,7 @@
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import { getPlans, createPlan, updatePlan, getCurrency } from '#lib/remote/billing.remote.ts';
-	import { formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { planIntervals } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -91,7 +91,7 @@
 			open = false;
 			resetNew();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not save plan');
+			toast.error(errMsg(err, 'Could not save plan'));
 		}
 		pending = false;
 	}

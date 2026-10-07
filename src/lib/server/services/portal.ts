@@ -21,6 +21,7 @@ import { bookSession, cancelBooking } from './schedule.ts';
 import { memberBalance } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
+import { creditUsage } from './schedule.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -123,6 +124,7 @@ export async function portalOverview(memberId: string) {
 		upcoming,
 		balance,
 		openCharges,
+		credits: await creditUsage(orgId, memberId),
 		checkInCode: checkInToken(memberId)
 	};
 }

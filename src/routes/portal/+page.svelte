@@ -16,7 +16,7 @@
 		getProviders,
 		startCheckout
 	} from '#lib/remote/portal.remote.ts';
-	import { formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
@@ -52,7 +52,7 @@
 			location.assign(url);
 		} catch (err) {
 			paying = false;
-			toast.error(err instanceof Error ? err.message : 'Could not start payment');
+			toast.error(errMsg(err, 'Could not start payment'));
 		}
 	}
 
@@ -63,7 +63,7 @@
 			const b = await memberBook({ memberId, sessionId });
 			toast.success(b.status === 'waitlisted' ? 'Class full — you are on the waitlist' : 'Booked!');
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not book');
+			toast.error(errMsg(err, 'Could not book'));
 		}
 		busy = null;
 	}
@@ -73,7 +73,7 @@
 			await memberCancel({ memberId, bookingId });
 			toast.success('Booking cancelled');
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not cancel');
+			toast.error(errMsg(err, 'Could not cancel'));
 		}
 		busy = null;
 	}
@@ -118,6 +118,9 @@
 					{/each}
 					{#if !d.memberships.some((mm) => mm.membership.status === 'active')}
 						<Badge variant="secondary">No active membership</Badge>
+					{/if}
+					{#if d.credits}
+						<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
 					{/if}
 				</div>
 			</div>
