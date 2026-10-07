@@ -7,6 +7,7 @@ import { requireOrg } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
 import { gymMember, member, user, webhook } from '#lib/server/db/schema.ts';
 import { dashboard } from '#lib/server/services/dashboard.ts';
+import * as dashboardSvc from '#lib/server/services/dashboard.ts';
 import { search } from '#lib/server/services/search.ts';
 import { loadDemoData } from '#lib/server/services/demo.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
@@ -21,6 +22,22 @@ import { assertNotDemo } from '#lib/server/demo-mode.ts';
 import { appOrigin } from '#lib/server/email.ts';
 
 export const getDashboard = query(async () => dashboard((await requireOrg()).orgId));
+
+/** Audit-log page feed; `before` is the createdAt cursor of the previous page's last row. */
+export const getActivity = query(
+	v.object({
+		entityType: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40))),
+		before: v.optional(v.pipe(v.string(), v.isoTimestamp()))
+	}),
+	async (input) => {
+		const { orgId } = await requireOrg();
+		return dashboardSvc.listActivity(orgId, input.entityType, input.before);
+	}
+);
+
+export const getActivityTypes = query(async () =>
+	dashboardSvc.listActivityTypes((await requireOrg()).orgId)
+);
 export const searchAll = query(v.pipe(v.string(), v.maxLength(100)), async (q) =>
 	search((await requireOrg()).orgId, q)
 );

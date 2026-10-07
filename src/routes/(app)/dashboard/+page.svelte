@@ -131,7 +131,10 @@
 				</Card.Root>
 			{/if}
 			<Card.Root>
-				<Card.Header><Card.Title class="text-base">Recent activity</Card.Title></Card.Header>
+				<Card.Header class="flex flex-row items-center justify-between">
+					<Card.Title class="text-base">Recent activity</Card.Title>
+					<a href="/activity" class="text-xs text-muted-foreground hover:underline">View all</a>
+				</Card.Header>
 				<Card.Content class="px-4">
 					{#if d.recentActivity.length === 0}
 						<p class="py-4 text-sm text-muted-foreground">Nothing yet.</p>
