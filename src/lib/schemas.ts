@@ -288,6 +288,20 @@ export const timeOffInput = v.object({
 	note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
 });
 
+/** Instructor's recurring weekly availability — replaces their whole set. */
+export const availabilityInput = v.object({
+	windows: v.pipe(
+		v.array(
+			v.object({
+				weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
+				startTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')),
+				endTime: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)'))
+			})
+		),
+		v.maxLength(30)
+	)
+});
+
 export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema,

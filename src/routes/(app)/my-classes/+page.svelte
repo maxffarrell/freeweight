@@ -11,9 +11,13 @@
 		claimCover,
 		getTimeOff,
 		addTimeOff,
-		removeTimeOff
+		removeTimeOff,
+		getAvailability,
+		setAvailability
 	} from '#lib/remote/schedule.remote.ts';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { localTime } from '#lib/tz.ts';
@@ -23,6 +27,31 @@
 	const classes = await getMyClasses();
 	const cover = $derived(await getCoverNeeded());
 	const timeOff = $derived(await getTimeOff());
+	const availability = await getAvailability();
+	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	let windows = $state<{ weekday: string; startTime: string; endTime: string }[]>(
+		availability.map((w) => ({
+			weekday: String(w.weekday),
+			startTime: w.startTime,
+			endTime: w.endTime
+		}))
+	);
+	let availBusy = $state(false);
+
+	async function saveAvailability() {
+		availBusy = true;
+		try {
+			await setAvailability({
+				windows: windows.map((w) => ({ ...w, weekday: Number(w.weekday) }))
+			});
+			toast.success(
+				windows.length ? 'Availability saved' : 'Availability cleared — you show as always free'
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save availability'));
+		}
+		availBusy = false;
+	}
 	let offStart = $state('');
 	let offEnd = $state('');
 	let offNote = $state('');
@@ -179,6 +208,51 @@
 				/>
 				<Button type="submit" disabled={offBusy}>Add</Button>
 			</form>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Availability</Card.Title>
+			<Card.Description>
+				Your usual weekly hours — schedulers get a warning if a session is placed outside them.
+				Leave empty to show as always available.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3 px-6 pb-4">
+			{#if windows.length === 0}
+				<p class="text-sm text-muted-foreground">No hours set — you show as always available.</p>
+			{/if}
+			{#each windows as w, i (i)}
+				<div class="flex flex-wrap items-center gap-3">
+					<Select.Root type="single" bind:value={windows[i].weekday}>
+						<Select.Trigger class="w-32">{WEEKDAYS[Number(w.weekday)]}</Select.Trigger>
+						<Select.Content>
+							{#each WEEKDAYS as d, di (d)}
+								<Select.Item value={String(di)}>{d}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+					<Input type="time" class="w-28" bind:value={windows[i].startTime} />
+					<span class="text-sm text-muted-foreground">–</span>
+					<Input type="time" class="w-28" bind:value={windows[i].endTime} />
+					<Button
+						variant="ghost"
+						size="icon"
+						class="ml-auto"
+						onclick={() => windows.splice(i, 1)}
+						aria-label="Remove window"><Trash2 class="size-4" /></Button
+					>
+				</div>
+			{/each}
+			<div class="flex items-center gap-2 pt-1">
+				<Button
+					variant="outline"
+					onclick={() => windows.push({ weekday: '1', startTime: '06:00', endTime: '12:00' })}
+					>Add window</Button
+				>
+				<Button onclick={saveAvailability} disabled={availBusy}>Save</Button>
+			</div>
 		</Card.Content>
 	</Card.Root>
 

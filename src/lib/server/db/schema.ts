@@ -346,6 +346,24 @@ export const instructorTimeOff = pgTable(
 	(t) => [index('instructor_time_off_member_idx').on(t.instructorId)]
 );
 
+/** Instructor's recurring weekly availability windows — scheduling outside them warns (does not block). Empty = always available. */
+export const instructorAvailability = pgTable(
+	'instructor_availability',
+	{
+		id: id(),
+		organizationId: orgId(),
+		instructorId: text('instructor_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+		weekday: integer('weekday').notNull(),
+		startTime: text('start_time').notNull(),
+		endTime: text('end_time').notNull(),
+		...timestamps
+	},
+	(t) => [index('instructor_availability_member_idx').on(t.instructorId)]
+);
+
 /** Recurring rule — "Tuesdays at 6pm". The cron materializes sessions ~2 weeks ahead. */
 export const classTemplate = pgTable(
 	'class_template',
