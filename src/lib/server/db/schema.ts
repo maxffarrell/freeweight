@@ -568,6 +568,42 @@ export const rota = pgTable(
 	(t) => [index('rota_org_idx').on(t.organizationId), index('rota_member_idx').on(t.memberId)]
 );
 
+/** A repeatable front-desk task ("Unlock doors", "Check sauna") ticked off daily. */
+export const deskTask = pgTable(
+	'desk_task',
+	{
+		id: id(),
+		organizationId: orgId(),
+		label: text('label').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('desk_task_org_idx').on(t.organizationId)]
+);
+
+/** A desk task completed on a given gym-local date by a staff member. */
+export const deskTaskDone = pgTable(
+	'desk_task_done',
+	{
+		id: id(),
+		organizationId: orgId(),
+		taskId: text('task_id')
+			.notNull()
+			.references(() => deskTask.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		/** Gym-local date the task was done ('YYYY-MM-DD'). */
+		doneOn: date('done_on', { mode: 'string' }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('desk_task_done_org_idx').on(t.organizationId),
+		uniqueIndex('desk_task_done_task_date_idx').on(t.taskId, t.doneOn)
+	]
+);
+
 export const resourceBooking = pgTable(
 	'resource_booking',
 	{
