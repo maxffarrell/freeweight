@@ -421,6 +421,13 @@
       "when": 1791392997603,
       "tag": "0059_event_cancel",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791394197812,
+      "tag": "0060_event_waitlist",
+      "breakpoints": true
     }
   ]
 }

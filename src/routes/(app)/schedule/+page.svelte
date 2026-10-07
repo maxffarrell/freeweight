@@ -445,7 +445,13 @@
 		if (!evRosterId || !evMemberId) return;
 		try {
 			const r = await registerMemberForEvent({ eventId: evRosterId, memberId: evMemberId });
-			toast.success(r.registration.chargeId ? 'Registered — signup charge posted' : 'Registered');
+			toast.success(
+				r.registration.waitlisted
+					? 'Event is full — added to the waitlist'
+					: r.registration.chargeId
+						? 'Registered — signup charge posted'
+						: 'Registered'
+			);
 			evMemberId = '';
 			await getEventRoster(evRosterId).refresh();
 		} catch (err) {
@@ -1641,22 +1647,26 @@
 									<div class="flex items-center justify-between py-1 text-sm">
 										<span class="flex items-center gap-2"
 											>{r.memberName}
-											{#if r.registration.status === 'attended'}
+											{#if r.registration.waitlisted}
+												<Badge variant="outline">Waitlist</Badge>
+											{:else if r.registration.status === 'attended'}
 												<Badge variant="secondary">Attended</Badge>
 											{/if}</span
 										>
 										<div>
-											<Button
-												variant="ghost"
-												size="sm"
-												class="h-6 px-2 text-xs"
-												onclick={() =>
-													markAttended(
-														ev.event.id,
-														r.registration.id,
-														r.registration.status !== 'attended'
-													)}>{r.registration.status === 'attended' ? 'Undo' : 'Attended'}</Button
-											>
+											{#if !r.registration.waitlisted}
+												<Button
+													variant="ghost"
+													size="sm"
+													class="h-6 px-2 text-xs"
+													onclick={() =>
+														markAttended(
+															ev.event.id,
+															r.registration.id,
+															r.registration.status !== 'attended'
+														)}>{r.registration.status === 'attended' ? 'Undo' : 'Attended'}</Button
+												>
+											{/if}
 											<Button
 												variant="ghost"
 												size="sm"

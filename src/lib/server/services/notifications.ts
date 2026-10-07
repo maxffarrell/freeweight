@@ -264,6 +264,39 @@ export async function notifyEventRegistered(orgId: string, registrationId: strin
 	});
 }
 
+/** "You're on the waitlist" when a member registers for a full event. */
+export async function notifyEventWaitlisted(orgId: string, registrationId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			eventName: gymEvent.name,
+			startsAt: gymEvent.startsAt
+		})
+		.from(eventRegistration)
+		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
+		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
+		.where(eq(eventRegistration.id, registrationId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'event_waitlisted', registrationId, row.email))) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Waitlist: ${row.eventName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `You're on the waitlist, ${row.memberName}`,
+			lines: [
+				`${row.eventName} on ${when} is full — you're on the waitlist.`,
+				"We'll email you the moment a spot opens up."
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "Event cancelled" to every registrant when staff cancels an event. */
 export async function notifyEventCancelled(orgId: string, registrationId: string) {
 	const [row] = await db

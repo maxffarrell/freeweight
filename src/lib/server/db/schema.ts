@@ -523,6 +523,8 @@ export const eventRegistration = pgTable(
 			.notNull()
 			.references(() => gymMember.id, { onDelete: 'cascade' }),
 		status: eventRegistrationStatus('status').notNull().default('registered'),
+		/** status stays 'registered'; this flag means "waiting for a seat" — promoted FIFO when one frees. */
+		waitlisted: boolean('waitlisted').notNull().default(false),
 		/** Signup charge this registration posted — voided on cancel before payment. */
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
