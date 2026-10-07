@@ -99,3 +99,32 @@ export const setStaffRate = command(
 		return row;
 	}
 );
+
+// ---------- Desk checklist ----------
+
+export const getDeskChecklist = query(async () => svc.deskChecklist((await requireOrg()).orgId));
+
+export const toggleDeskTask = command(
+	v.object({ taskId: idSchema, done: v.boolean() }),
+	async (input) => {
+		await svc.toggleDeskTask(await requireOrg(), input.taskId, input.done);
+		void getDeskChecklist().refresh();
+	}
+);
+
+/** Admin: add a desk task. */
+export const addDeskTask = command(
+	v.object({ label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120)) }),
+	async (input) => {
+		const row = await svc.createDeskTask(await requireOrg('admin'), input.label);
+		void getDeskChecklist().refresh();
+		return row;
+	}
+);
+
+/** Admin: remove a desk task (its completion history goes with it). */
+export const removeDeskTask = command(idSchema, async (id) => {
+	const row = await svc.removeDeskTask(await requireOrg('admin'), id);
+	void getDeskChecklist().refresh();
+	return row;
+});

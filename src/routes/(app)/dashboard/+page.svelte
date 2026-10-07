@@ -34,7 +34,11 @@
 		clockOut,
 		closeShift,
 		updateShift,
-		deleteShift
+		deleteShift,
+		getDeskChecklist,
+		toggleDeskTask,
+		addDeskTask,
+		removeDeskTask
 	} from '#lib/remote/shifts.remote.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -45,6 +49,8 @@
 	import { toast } from 'svelte-sonner';
 	import Timer from '@lucide/svelte/icons/timer';
 	import Check from '@lucide/svelte/icons/check';
+	import ListChecks from '@lucide/svelte/icons/list-checks';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import Circle from '@lucide/svelte/icons/circle';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 
@@ -59,6 +65,18 @@
 	const staff = $derived(await getStaff());
 	const atRisk = $derived(await getAtRisk());
 	const checklist = $derived(await getChecklist());
+	const deskTasks = $derived(await getDeskChecklist());
+	let newTask = $state('');
+	async function addTask(e: SubmitEvent) {
+		e.preventDefault();
+		if (!newTask.trim()) return;
+		try {
+			await addDeskTask({ label: newTask.trim() });
+			newTask = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add task'));
+		}
+	}
 	const isAdmin = $derived(myShift.role === 'owner' || myShift.role === 'admin');
 	let logOpen = $state(false);
 	const tzName = $derived(d.timezone);
@@ -349,6 +367,65 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
+
+			{#if deskTasks.length || isAdmin}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="flex items-center gap-2 text-base"
+							><ListChecks class="size-4" /> Desk checklist</Card.Title
+						>
+					</Card.Header>
+					<Card.Content class="px-4">
+						{#if deskTasks.length}
+							<ul class="space-y-2">
+								{#each deskTasks as t (t.id)}
+									<li class="flex items-center gap-2 text-sm">
+										<Checkbox
+											checked={!!t.done}
+											onCheckedChange={(v) =>
+												toggleDeskTask({ taskId: t.id, done: v === true }).catch((e) =>
+													toast.error(errMsg(e, 'Could not update task'))
+												)}
+										/>
+										<span class={t.done ? 'text-muted-foreground line-through' : ''}>
+											{t.label}
+										</span>
+										{#if t.done}
+											<span class="ml-auto shrink-0 text-xs text-muted-foreground"
+												>{t.done.staffName} · {localTime(t.done.at, d.timezone)}</span
+											>
+										{/if}
+										{#if isAdmin}
+											<Button
+												size="icon"
+												variant="ghost"
+												class="size-6 shrink-0 text-muted-foreground {t.done ? '' : 'ml-auto'}"
+												onclick={() =>
+													removeDeskTask(t.id).catch((e) =>
+														toast.error(errMsg(e, 'Could not remove task'))
+													)}
+												aria-label="Remove {t.label}"
+											>
+												<Trash2 class="size-3.5" />
+											</Button>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="text-sm text-muted-foreground">
+								No tasks yet — add the daily desk routine (unlock, tidy, check amenities).
+							</p>
+						{/if}
+						{#if isAdmin}
+							<form class="mt-3 flex gap-2 border-t pt-3" onsubmit={addTask}>
+								<Input bind:value={newTask} placeholder="Add a task…" class="h-8" />
+								<Button size="sm" type="submit" disabled={!newTask.trim()}>Add</Button>
+							</form>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.pendingRequests.length}
 				<Card.Root class="border-amber-500/50">
 					<Card.Header><Card.Title class="text-base">Needs attention</Card.Title></Card.Header>
