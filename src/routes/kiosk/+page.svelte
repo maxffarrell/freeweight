@@ -31,9 +31,24 @@
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
 	let suggestions = $state<
-		{ id: string; name: string; status: string; openBalance: number; planName: string | null }[]
+		{
+			id: string;
+			name: string;
+			status: string;
+			openBalance: number;
+			planName: string | null;
+			photoDocumentId: string | null;
+		}[]
 	>([]);
-	let flash = $state<{ ok: boolean; text: string } | null>(null);
+	let flash = $state<{ ok: boolean; text: string; photo?: string | null } | null>(null);
+	const initials = (name: string) =>
+		name
+			.split(/\s+/)
+			.map((w) => w[0])
+			.filter(Boolean)
+			.slice(0, 2)
+			.join('')
+			.toUpperCase();
 	let pending = $state(false);
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let now = $state(new Date());
@@ -50,9 +65,9 @@
 		return () => clearInterval(t);
 	});
 
-	function showFlash(ok: boolean, text: string) {
+	function showFlash(ok: boolean, text: string, photo?: string | null) {
 		clearTimeout(flashTimer);
-		flash = { ok, text };
+		flash = { ok, text, photo };
 		flashTimer = setTimeout(() => (flash = null), 3000);
 	}
 
@@ -81,7 +96,8 @@
 				r.checkedOut
 					? `${r.member.name} checked out`
 					: `${r.member.name} checked in` +
-							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '')
+							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : ''),
+				r.member.photoDocumentId
 			);
 			checkIns = await getTodayCheckIns();
 		} catch (err) {
@@ -135,7 +151,13 @@
 					? 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-400'
 					: 'border-destructive bg-destructive/10 text-destructive'}"
 			>
-				{#if flash.ok}<CircleCheck class="size-8 shrink-0" />{:else}<TriangleAlert
+				{#if flash.photo}
+					<img
+						src="/api/documents/{flash.photo}"
+						alt=""
+						class="size-12 shrink-0 rounded-full object-cover"
+					/>
+				{:else if flash.ok}<CircleCheck class="size-8 shrink-0" />{:else}<TriangleAlert
 						class="size-8 shrink-0"
 					/>{/if}
 				{flash.text}
@@ -160,11 +182,25 @@
 					{#each suggestions as m (m.id)}
 						<button
 							type="button"
-							class="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
+							class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
 							disabled={pending || m.status !== 'active'}
 							onclick={() => checkIn(m.id)}
 						>
-							<span class="font-medium">{m.name}</span>
+							<span class="flex min-w-0 items-center gap-3">
+								{#if m.photoDocumentId}
+									<img
+										src="/api/documents/{m.photoDocumentId}"
+										alt=""
+										class="size-9 shrink-0 rounded-full object-cover"
+									/>
+								{:else}
+									<span
+										class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+										>{initials(m.name)}</span
+									>
+								{/if}
+								<span class="truncate font-medium">{m.name}</span>
+							</span>
 							<span class="flex items-center gap-2">
 								{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
 								{#if m.openBalance > 0}
@@ -221,8 +257,19 @@
 				</p>
 				<div class="divide-y rounded-lg border">
 					{#each checkIns.slice(0, 8) as c (c.checkIn.id)}
-						<div class="flex items-center justify-between px-4 py-2 text-sm">
-							<span>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span>
+						<div class="flex items-center justify-between gap-2 px-4 py-2 text-sm">
+							<span class="flex min-w-0 items-center gap-2">
+								{#if c.memberPhotoId}
+									<img
+										src="/api/documents/{c.memberPhotoId}"
+										alt=""
+										class="size-7 shrink-0 rounded-full object-cover"
+									/>
+								{/if}
+								<span class="truncate"
+									>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span
+								>
+							</span>
 							<span class="flex items-center gap-2 text-muted-foreground">
 								{c.locationName ?? ''}
 								<Badge variant="outline" class="text-xs">{c.checkIn.method}</Badge>
