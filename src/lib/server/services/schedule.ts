@@ -28,7 +28,11 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifySessionCancelled, notifyWaitlistPromoted } from './notifications.ts';
+import {
+	notifyBookingConfirmed,
+	notifySessionCancelled,
+	notifyWaitlistPromoted
+} from './notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
 import { nextPeriod } from './billing.ts';
 import type * as s from '#lib/schemas.ts';
@@ -407,6 +411,7 @@ export async function bookSession(
 		summary: `${m.name} ${row.status === 'waitlisted' ? 'joined the waitlist' : 'booked a class'}`,
 		data: { sessionId: input.sessionId, memberId: input.memberId }
 	});
+	notifyBookingConfirmed(ctx.orgId, row.id).catch(() => {});
 	return row;
 }
 

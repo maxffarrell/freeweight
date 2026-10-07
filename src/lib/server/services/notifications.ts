@@ -76,6 +76,47 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 	});
 }
 
+/** "You're booked" (or waitlisted) right after bookSession lands. One email per booking. */
+export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
+	const [row] = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			status: booking.status
+		})
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(eq(booking.id, bookingId));
+	if (!row?.email) return;
+	const waitlisted = row.status === 'waitlisted';
+	if (!(await logOnce(orgId, 'booking_confirmed', bookingId, row.email))) return;
+	const [name, settings] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	const when = `${localDate(row.startsAt, settings)} at ${localTime(row.startsAt, settings)}`;
+	await sendEmail({
+		to: row.email,
+		subject: waitlisted
+			? `Waitlisted: ${row.className} at ${name}`
+			: `Booked: ${row.className} at ${name}`,
+		...renderEmail({
+			orgName: name,
+			heading: waitlisted
+				? `You're on the waitlist, ${row.memberName}`
+				: `You're booked, ${row.memberName}`,
+			lines: waitlisted
+				? [
+						`${row.className} on ${when} is full — you're on the waitlist.`,
+						"We'll email you the moment a spot opens."
+					]
+				: [`${row.className} on ${when}.`, 'You can cancel any time from your member portal.'],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "Class cancelled" to every booked/waitlisted member of the session. One email per member. */
 export async function notifySessionCancelled(orgId: string, sessionId: string) {
 	const rows = await db
