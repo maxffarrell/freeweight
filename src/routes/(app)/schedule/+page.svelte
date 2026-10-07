@@ -37,6 +37,8 @@
 		getResources,
 		createResource,
 		updateResource,
+		getResourceBookings,
+		cancelAmenityBooking,
 		getEvents,
 		createEvent,
 		getEventRoster,
@@ -69,6 +71,7 @@
 	const classTypes = $derived(await getClassTypes());
 	const templates = $derived(await getTemplates());
 	const resources = $derived(await getResources());
+	const amenityBookings = $derived(await getResourceBookings());
 
 	let weekStart = $state(localDate(new Date(), tz));
 	const from = $derived(weekStart);
@@ -1539,6 +1542,35 @@
 							checked={r.resource.active}
 							onCheckedChange={(v) => toggleResource(r.resource.id, v)}
 						/>
+					</div>
+				{/each}
+			</div>
+		{/if}
+		{#if amenityBookings.length}
+			<p class="mb-1 text-xs font-medium text-muted-foreground">Upcoming reservations</p>
+			<div class="mb-4 max-h-56 divide-y overflow-y-auto rounded-lg border">
+				{#each amenityBookings.slice(0, 60) as b (b.booking.id)}
+					<div class="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+						<div class="min-w-0">
+							<span class="font-medium">{b.memberName}</span>
+							<span class="text-muted-foreground">
+								· {b.resourceName} · {localDate(b.booking.startsAt, tz)}
+								{localTime(b.booking.startsAt, tz)}–{localTime(b.booking.endsAt, tz)}</span
+							>
+						</div>
+						<Button
+							size="xs"
+							variant="ghost"
+							class="shrink-0 text-muted-foreground"
+							onclick={async () => {
+								try {
+									await cancelAmenityBooking(b.booking.id);
+									toast.success('Reservation cancelled');
+								} catch (err) {
+									toast.error(errMsg(err, 'Could not cancel'));
+								}
+							}}>Cancel</Button
+						>
 					</div>
 				{/each}
 			</div>
