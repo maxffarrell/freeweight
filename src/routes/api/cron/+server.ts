@@ -5,6 +5,7 @@ import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
 import { runBilling } from '#lib/server/services/billing.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
+import { sendClassReminders } from '#lib/server/services/notifications.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -19,6 +20,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	if (!authorized(request.headers.get('authorization'))) error(401, 'Unauthorized');
 	const orgs = await db.select({ id: organization.id }).from(organization);
 	let failed = 0;
+	let reminders = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -26,9 +28,15 @@ export const GET: RequestHandler = async ({ request }) => {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);
 		}
+		try {
+			reminders += await sendClassReminders(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`reminder cron failed for ${o.id}`, err);
+		}
 	}
 	await purgeExpiredDemos();
-	return json({ workspaces: orgs.length, failed });
+	return json({ workspaces: orgs.length, failed, reminders });
 };
 
 export const POST = GET;

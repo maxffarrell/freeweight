@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
@@ -6,6 +6,7 @@ import {
 	classType,
 	gymMember,
 	gymSettings,
+	location,
 	notificationLog,
 	organization
 } from '#lib/server/db/schema.ts';
@@ -108,4 +109,59 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 			})
 		});
 	}
+}
+
+/**
+ * "Your class is tomorrow" — one email per booked member for sessions starting in the
+ * next ~24h (the cron runs daily, so each session is caught exactly once).
+ * Returns the number of emails sent.
+ */
+export async function sendClassReminders(orgId: string) {
+	const soon = new Date(Date.now() + 26 * 3600_000);
+	const rows = await db
+		.select({
+			email: gymMember.email,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			bookingId: booking.id,
+			locationName: location.name
+		})
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'booked'),
+				gte(classSession.startsAt, new Date()),
+				lte(classSession.startsAt, soon),
+				isNull(classSession.cancelledAt)
+			)
+		);
+	if (!rows.length) return 0;
+	const [name, tz] = await Promise.all([orgName(orgId), orgTimezone(orgId)]);
+	let sent = 0;
+	for (const row of rows) {
+		if (!row.email) continue;
+		if (!(await logOnce(orgId, 'class_reminder', row.bookingId, row.email))) continue;
+		const when = `${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}`;
+		await sendEmail({
+			to: row.email,
+			subject: `Tomorrow: ${row.className} at ${name}`,
+			...renderEmail({
+				orgName: name,
+				heading: `See you tomorrow, ${row.memberName}`,
+				lines: [
+					`You're booked into ${row.className} on ${when}${row.locationName ? ` at ${row.locationName}` : ''}.`,
+					'Need to change it? Cancel or rebook in the member portal.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
