@@ -13,6 +13,7 @@
 		getPortalOverview,
 		getBookable,
 		memberBook,
+		memberBookSeries,
 		memberCancel,
 		requestMembershipCancel,
 		requestMembershipPause,
@@ -154,6 +155,21 @@
 		}
 		busy = null;
 	}
+	async function bookSeriesAll(classTypeId: string, className: string) {
+		if (!confirm(`Book into every upcoming ${className} session?`)) return;
+		busy = `series:${classTypeId}`;
+		try {
+			const r = await memberBookSeries({ memberId, classTypeId });
+			const parts = [`Booked ${r.booked}`];
+			if (r.waitlisted) parts.push(`waitlisted ${r.waitlisted}`);
+			if (r.skipped) parts.push(`skipped ${r.skipped}`);
+			toast.success(parts.join(' · '));
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book the series'));
+		}
+		busy = null;
+	}
+
 	async function cancel(bookingId: string, sessionId: string) {
 		busy = sessionId;
 		try {
@@ -703,14 +719,23 @@
 									onclick={() => cancel(myBookingId(b)!, b.session.id)}>Cancel</Button
 								>
 							{:else}
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={busy === b.session.id}
-									onclick={() => book(b.session.id)}
-								>
-									{b.booked >= b.session.capacity ? 'Join waitlist' : 'Book'}
-								</Button>
+								<div class="flex justify-end gap-1">
+									<Button
+										size="sm"
+										variant="ghost"
+										title={`Book every upcoming ${b.className}`}
+										disabled={busy === b.session.id || busy === `series:${b.session.classTypeId}`}
+										onclick={() => bookSeriesAll(b.session.classTypeId, b.className)}>Series</Button
+									>
+									<Button
+										size="sm"
+										variant="outline"
+										disabled={busy === b.session.id}
+										onclick={() => book(b.session.id)}
+									>
+										{b.booked >= b.session.capacity ? 'Join waitlist' : 'Book'}
+									</Button>
+								</div>
 							{/if}
 						</Table.Cell>
 					</Table.Row>
