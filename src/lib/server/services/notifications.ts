@@ -2580,6 +2580,75 @@ export async function sendInstructorRosters(orgId: string) {
 }
 
 /**
+ * Weekly (Monday) digest: every instructor who received new class feedback in
+ * the last 7 days gets their average, count and newest comments by email —
+ * pushes the My classes "Your ratings" data to them. One email per instructor
+ * per week via the notification log.
+ */
+export async function sendInstructorFeedbackDigests(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	if (localWeekday(new Date(), tz) !== 1) return 0; // Mondays only
+
+	const rows = await db
+		.select({
+			instructorId: classSession.instructorId,
+			rating: sessionFeedback.rating,
+			comment: sessionFeedback.comment,
+			className: classType.name,
+			memberName: gymMember.name
+		})
+		.from(sessionFeedback)
+		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
+		.where(
+			and(
+				eq(sessionFeedback.organizationId, orgId),
+				gte(sessionFeedback.createdAt, new Date(Date.now() - 7 * 86400_000)),
+				isNotNull(classSession.instructorId)
+			)
+		)
+		.orderBy(desc(sessionFeedback.createdAt));
+	if (!rows.length) return 0;
+
+	const instructorIds = [...new Set(rows.map((r) => r.instructorId as string))];
+	const instructors = await db
+		.select({ id: member.id, name: user.name, email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(inArray(member.id, instructorIds));
+
+	const name = await orgBrand(orgId);
+	let sent = 0;
+	for (const ins of instructors) {
+		if (!ins.email) continue;
+		const mine = rows.filter((r) => r.instructorId === ins.id);
+		if (!mine.length) continue;
+		if (!(await logOnce(orgId, 'instructor_feedback', `${ins.id}:${today}`, ins.email))) continue;
+		const avg = (mine.reduce((a, r) => a + r.rating, 0) / mine.length).toFixed(1);
+		const lines = [
+			`Your average rating this week: ${avg}★ across ${mine.length} rating${mine.length === 1 ? '' : 's'}.`
+		];
+		for (const c of mine.filter((r) => r.comment?.trim()).slice(0, 3)) {
+			lines.push(`“${c.comment}” — ${c.memberName} (${c.className}, ${'★'.repeat(c.rating)})`);
+		}
+		lines.push('The full history lives on My classes → Your ratings.');
+		await sendEmail({
+			to: ins.email,
+			subject: `Your class feedback this week — ${avg}★ (${mine.length} new)`,
+			...renderEmail({
+				...name,
+				heading: `Your feedback this week, ${ins.name.split(' ')[0]}`,
+				lines
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
  * Heads-up billing emails, seven days out:
  * - recurring members: "your plan renews on {date} — {amount}" (once per period)
  * - pack members: "your class pack expires {date} — {n} credits left" (once per pack)

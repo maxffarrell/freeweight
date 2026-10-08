@@ -15,6 +15,7 @@ import {
 	sendDueAnnouncements,
 	sendEventReminders,
 	sendResourceReminders,
+	sendInstructorFeedbackDigests,
 	sendInstructorRosters,
 	sendPastDueNotices,
 	ratingNudges,
@@ -64,6 +65,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let winbacks = 0;
 	let leadNudges = 0;
 	let rosters = 0;
+	let feedbackDigests = 0;
 	let briefings = 0;
 	let billingReminders = 0;
 	let announcements = 0;
@@ -214,6 +216,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`instructor-roster cron failed for ${o.id}`, err);
 		}
 		try {
+			feedbackDigests += await sendInstructorFeedbackDigests(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`feedback-digest cron failed for ${o.id}`, err);
+		}
+		try {
 			briefings += await sendStaffBriefing(o.id);
 		} catch (err) {
 			failed++;
@@ -247,6 +255,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		winbacks,
 		leadNudges,
 		rosters,
+		feedbackDigests,
 		briefings,
 		billingReminders,
 		announcements,
