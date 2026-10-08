@@ -34,6 +34,7 @@ import {
 	membership,
 	payment,
 	plan,
+	giftCard,
 	recurringCharge,
 	resourceBooking,
 	sessionFeedback,
@@ -649,6 +650,30 @@ async function waiverStatus(orgId: string) {
 	return { required: !!s?.waiver, signed: row?.signed ?? 0, total: row?.total ?? 0 };
 }
 
+/** Gift cards: issued count/face value, how many redeemed, and the unredeemed
+ * balance still on the books — a liability the gym owes in services. */
+async function giftCardStats(orgId: string) {
+	const [row] = await db
+		.select({
+			issued: sql<number>`count(*)`.mapWith(Number),
+			issuedValue: sql<number>`coalesce(sum(${giftCard.amount}), 0)`.mapWith(Number),
+			redeemed: sql<number>`count(*) filter (where ${giftCard.redeemedAt} is not null)`.mapWith(
+				Number
+			),
+			active: sql<number>`count(*) filter (where ${giftCard.balance} > 0)`.mapWith(Number),
+			outstanding: sql<number>`coalesce(sum(${giftCard.balance}), 0)`.mapWith(Number)
+		})
+		.from(giftCard)
+		.where(eq(giftCard.organizationId, orgId));
+	return {
+		issued: row?.issued ?? 0,
+		issuedValue: row?.issuedValue ?? 0,
+		redeemed: row?.redeemed ?? 0,
+		active: row?.active ?? 0,
+		outstanding: row?.outstanding ?? 0
+	};
+}
+
 /** Why members leave: stated reasons bucketed by end state (cancelled vs paused). */
 async function churnReasons(orgId: string) {
 	const rows = await db
@@ -967,7 +992,8 @@ export async function getReports(orgId: string) {
 		ratings,
 		expenseMonths,
 		expenseCategories,
-		mrr
+		mrr,
+		giftCards
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1002,7 +1028,8 @@ export async function getReports(orgId: string) {
 		classRatings(orgId),
 		expensesByMonth(orgId),
 		expensesByCategory(orgId),
-		monthlyRecurring(orgId)
+		monthlyRecurring(orgId),
+		giftCardStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1044,6 +1071,7 @@ export async function getReports(orgId: string) {
 		locations,
 		ratings,
 		pnl,
-		mrr
+		mrr,
+		giftCards
 	};
 }
