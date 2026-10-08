@@ -66,7 +66,8 @@ export async function listMembers(
 	status?: 'active' | 'inactive',
 	planId?: string,
 	sort: MemberSort = 'name',
-	owes?: boolean
+	owes?: boolean,
+	suspended?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -115,6 +116,9 @@ export async function listMembers(
 						: undefined,
 				owes
 					? sql`exists (select 1 from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open' and c.amount > coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0))`
+					: undefined,
+				suspended
+					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
 					: undefined
 			)
 		)

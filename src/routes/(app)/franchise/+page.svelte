@@ -2,11 +2,29 @@
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { goto } from '$app/navigation';
+	import { toast } from 'svelte-sonner';
+	import { authClient } from '#lib/auth-client.ts';
 	import { getFranchise } from '#lib/remote/franchise.remote.ts';
 	import { formatMoney } from '#lib/format.ts';
 
 	const f = await getFranchise();
 	const multiCurrency = new Set(f.gyms.map((g) => g.currency)).size > 1;
+	let switching = $state<string | null>(null);
+
+	async function switchTo(orgId: string, name: string) {
+		switching = orgId;
+		const { error } = await authClient.organization.setActive({ organizationId: orgId });
+		if (error) {
+			switching = null;
+			toast.error(error.message ?? 'Could not switch gyms');
+			return;
+		}
+		await goto('/dashboard');
+		toast.success(`Switched to ${name}`);
+	}
 </script>
 
 <svelte:head><title>Franchise · Freeweight</title></svelte:head>
@@ -62,6 +80,7 @@
 							<Table.Head class="text-right">Revenue (mo)</Table.Head>
 							<Table.Head class="text-right">Check-ins (mo)</Table.Head>
 							<Table.Head class="text-right">Sessions (7d)</Table.Head>
+							<Table.Head class="w-0"></Table.Head>
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
@@ -80,6 +99,18 @@
 								>
 								<Table.Cell class="text-right tabular-nums">{g.monthCheckIns}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.sessionsNext7}</Table.Cell>
+								<Table.Cell class="text-right">
+									{#if g.id === f.activeId}
+										<Badge>Current</Badge>
+									{:else}
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={switching !== null}
+											onclick={() => switchTo(g.id, g.name)}>Switch</Button
+										>
+									{/if}
+								</Table.Cell>
 							</Table.Row>
 						{/each}
 					</Table.Body>
