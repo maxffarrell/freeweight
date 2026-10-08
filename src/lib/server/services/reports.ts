@@ -435,7 +435,7 @@ export async function atRiskMembers(orgId: string) {
 			memberId: gymMember.id,
 			name: gymMember.name,
 			email: gymMember.email,
-			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`.mapWith(Date)
 		})
 		.from(gymMember)
 		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))

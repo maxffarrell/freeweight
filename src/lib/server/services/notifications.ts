@@ -2301,7 +2301,7 @@ export async function sendWinBackNudges(orgId: string) {
 			name: gymMember.name,
 			email: gymMember.email,
 			joined: gymMember.createdAt,
-			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`.mapWith(Date)
 		})
 		.from(gymMember)
 		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
