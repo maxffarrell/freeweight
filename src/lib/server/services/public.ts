@@ -70,7 +70,7 @@ export async function getPublicGym(slug: string) {
 			instructorName: user.name,
 			dropInPrice: classType.dropInPrice,
 			booked:
-				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+				sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
 					Number
 				)
 		})
@@ -387,7 +387,9 @@ export async function bookDropIn(
 		if (existing && existing.status !== 'cancelled') error(409, 'Already booked into this class');
 
 		const [{ count }] = await tx
-			.select({ count: sql<number>`count(*)`.mapWith(Number) })
+			.select({
+				count: sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+			})
 			.from(booking)
 			.where(and(eq(booking.sessionId, sess.id), eq(booking.status, 'booked')));
 		if (count >= sess.capacity) error(409, 'This class is full');

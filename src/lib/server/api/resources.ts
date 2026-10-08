@@ -330,6 +330,18 @@ export const resources: Record<string, Resource> = {
 			return members.removeMemberTag(ctx, memberId, rest.join(':'));
 		}
 	},
+	personal_records: {
+		description:
+			'Member-logged personal records (lift/benchmark, free-form result, recordedOn). Filter by memberId.',
+		list: (ctx, url) => members.prBoard(ctx.orgId, Number(url.searchParams.get('limit') ?? 200)),
+		create: {
+			schema: v.object({ memberId: s.idSchema, ...s.prInput.entries }),
+			run: (ctx, input) => {
+				const { memberId, ...rest } = input as { memberId: string } & Record<string, unknown>;
+				return members.addPersonalRecord(ctx.orgId, memberId, rest as never);
+			}
+		}
+	},
 	desk_tasks: {
 		description:
 			"Daily front-desk checklist tasks (with today's tick state). POST {label}; DELETE removes the task",

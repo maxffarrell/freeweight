@@ -30,7 +30,8 @@ export const API_RESOURCES = [
 	'recurring_charges',
 	'expenses',
 	'member_tags',
-	'desk_tasks'
+	'desk_tasks',
+	'personal_records'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -69,7 +70,8 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	recurring_charges: 'Recurring add-ons',
 	expenses: 'Expenses',
 	member_tags: 'Member tags',
-	desk_tasks: 'Desk checklist'
+	desk_tasks: 'Desk checklist',
+	personal_records: 'Personal records'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

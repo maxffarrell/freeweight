@@ -499,6 +499,7 @@
 	let bookOpen = $state(false);
 	let bookSessions = $state<Awaited<ReturnType<typeof getSessions>>>([]);
 	let bookPending = $state<string | null>(null);
+	let bookGuests = $state(0);
 	/** Upcoming, non-cancelled sessions the member isn't already booked/waitlisted on. */
 	const bookable = $derived(
 		bookSessions.filter(
@@ -519,7 +520,7 @@
 		bookPending = sessionId;
 		try {
 			const dropIn = !hasActiveMembership;
-			const b = await bookSession({ sessionId, memberId: id, dropIn });
+			const b = await bookSession({ sessionId, memberId: id, dropIn, guests: bookGuests });
 			toast.success(
 				dropIn
 					? `Drop-in booked — ${formatMoney(dropInPrice ?? 0, currency)} charge posted`
@@ -528,6 +529,7 @@
 						: 'Booked'
 			);
 			bookOpen = false;
+			bookGuests = 0;
 			await getMember(id).refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
@@ -1042,6 +1044,24 @@
 							<span class="ml-auto shrink-0 font-medium"
 								>{s.result.score}{s.result.asRx ? ' Rx' : ''}</span
 							>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		{#if m.prs.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Personal records</Card.Title>
+					<Card.Description>PRs the member logged in the portal</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.prs as pr (pr.id)}
+						<div class="flex items-baseline gap-2 py-1 text-sm">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">{pr.recordedOn}</span>
+							<span class="min-w-0 truncate">{pr.label}</span>
+							<span class="ml-auto shrink-0 font-medium">{pr.value}</span>
 						</div>
 					{/each}
 				</Card.Content>
@@ -1637,6 +1657,17 @@
 				>Upcoming sessions in the next two weeks — full sessions go to the waitlist.</Dialog.Description
 			>
 		</Dialog.Header>
+		<label class="flex items-center gap-2 pb-2 text-sm">
+			<span class="text-muted-foreground">Bringing guests</span>
+			<select bind:value={bookGuests} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+				{#each [0, 1, 2, 3] as n (n)}
+					<option value={n}>{n === 0 ? 'None' : `+${n} guest${n > 1 ? 's' : ''}`}</option>
+				{/each}
+			</select>
+			{#if bookGuests > 0}
+				<span class="text-xs text-muted-foreground">guest passes first, then drop-in price</span>
+			{/if}
+		</label>
 		<div class="max-h-80 space-y-1 overflow-y-auto">
 			{#each bookable as s (s.session.id)}
 				<button

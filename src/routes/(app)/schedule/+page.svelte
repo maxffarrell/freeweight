@@ -159,12 +159,18 @@
 	}
 
 	let bookMemberId = $state('');
+	let bookGuests = $state(0);
 	async function book() {
 		if (!bookMemberId) return;
 		try {
 			const m = memberList.find((mm) => mm.id === bookMemberId);
 			const dropIn = m ? !m.planName : false;
-			const b = await bookSession({ sessionId: focusId, memberId: bookMemberId, dropIn });
+			const b = await bookSession({
+				sessionId: focusId,
+				memberId: bookMemberId,
+				dropIn,
+				guests: bookGuests
+			});
 			toast.success(
 				b.status === 'waitlisted'
 					? 'Class full — waitlisted'
@@ -173,6 +179,7 @@
 						: 'Booked'
 			);
 			bookMemberId = '';
+			bookGuests = 0;
 			await getRoster(focusId).refresh();
 			await reload();
 		} catch (err) {
@@ -1004,6 +1011,9 @@
 						<Table.Row>
 							<Table.Cell class="font-medium">
 								{r.memberName}
+								{#if r.booking.guestCount}
+									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
+								{/if}
 								{#if r.resultScore}
 									<span class="ml-1 text-xs font-normal text-muted-foreground"
 										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span
@@ -1074,6 +1084,22 @@
 							<Select.Item value={mm.id}
 								>{mm.name}{#if !mm.planName}
 									(drop-in){/if}</Select.Item
+							>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				<Select.Root
+					type="single"
+					value={String(bookGuests)}
+					onValueChange={(v) => (bookGuests = Number(v) || 0)}
+				>
+					<Select.Trigger class="w-28" title="Spots for guests the member brings">
+						{bookGuests ? `+${bookGuests} guest${bookGuests > 1 ? 's' : ''}` : 'No guests'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each [0, 1, 2, 3] as n (n)}
+							<Select.Item value={String(n)}
+								>{n === 0 ? 'No guests' : `+${n} guest${n > 1 ? 's' : ''}`}</Select.Item
 							>
 						{/each}
 					</Select.Content>

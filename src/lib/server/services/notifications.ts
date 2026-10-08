@@ -2869,7 +2869,7 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 			className: classType.name,
 			locationName: location.name,
 			instructorName: user.name,
-			booked: sql<number>`(select count(*)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
+			booked: sql<number>`(select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
 		})
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
