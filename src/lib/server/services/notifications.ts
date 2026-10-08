@@ -24,7 +24,10 @@ import {
 	charge,
 	checkIn,
 	classSession,
+	classTemplate,
 	classType,
+	course,
+	courseEnrollment,
 	eventRegistration,
 	facilityResource,
 	gymEvent,
@@ -2396,6 +2399,79 @@ export async function sendLeadNudges(orgId: string) {
 					'Ready when you are — have a look at the timetable and grab a plan, or just reply to this email with any questions.'
 				],
 				action: { label: 'See plans', url: `${appOrigin()}/j/${org?.slug}` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
+ * Daily cron: the day after a course ends, email every enrollee who attended
+ * at least one session a completion congrats. One email per enrollment.
+ */
+export async function sendCourseCompletions(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const yesterday = addDays(localDate(new Date(), tz), -1);
+	const ended = await db
+		.select()
+		.from(course)
+		.where(and(eq(course.organizationId, orgId), eq(course.endsOn, yesterday)))
+		.limit(20);
+	if (!ended.length) return 0;
+	const courseIds = ended.map((c) => c.id);
+	const enrs = await db
+		.select({
+			id: courseEnrollment.id,
+			courseId: courseEnrollment.courseId,
+			memberId: courseEnrollment.memberId,
+			memberName: gymMember.name,
+			email: gymMember.email
+		})
+		.from(courseEnrollment)
+		.innerJoin(gymMember, eq(courseEnrollment.memberId, gymMember.id))
+		.where(inArray(courseEnrollment.courseId, courseIds));
+	if (!enrs.length) return 0;
+
+	// Attended count per enrollee: 'attended' bookings on sessions materialized
+	// from this course's bounded templates.
+	const attended = await db
+		.select({
+			memberId: booking.memberId,
+			courseId: classTemplate.courseId,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classTemplate, eq(classSession.templateId, classTemplate.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'attended'),
+				inArray(classTemplate.courseId, courseIds)
+			)
+		)
+		.groupBy(booking.memberId, classTemplate.courseId);
+	const attendedBy = new Map(attended.map((a) => [`${a.memberId}:${a.courseId}`, a.n]));
+
+	const name = await orgBrand(orgId);
+	let sent = 0;
+	for (const e of enrs) {
+		const n = attendedBy.get(`${e.memberId}:${e.courseId}`) ?? 0;
+		if (n < 1 || !e.email) continue;
+		if (!(await logOnce(orgId, 'course_completed', e.id, e.email))) continue;
+		const c = ended.find((x) => x.id === e.courseId)!;
+		await sendMemberEmail(e.memberId, {
+			to: e.email,
+			subject: `You finished ${c.name} — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `You did it, ${e.memberName.split(' ')[0]}!`,
+				lines: [
+					`${c.name} wrapped up yesterday — you made it to ${n} session${n === 1 ? '' : 's'}.`,
+					'Keep the momentum going: your next class is already on the schedule.'
+				],
+				action: { label: 'Book your next class', url: `${appOrigin()}/portal` }
 			})
 		});
 		sent++;
