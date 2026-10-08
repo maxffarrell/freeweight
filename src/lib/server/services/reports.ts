@@ -394,11 +394,12 @@ async function fillByWeekday(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
+	// Reuse one sql fragment for select + groupBy — separate interpolations get
+	// separate param slots, which Postgres treats as different expressions.
+	const dowExpr = sql`extract(dow from ${classSession.startsAt} at time zone ${tz})`;
 	const rows = await db
 		.select({
-			dow: sql<number>`extract(dow from ${classSession.startsAt} at time zone ${tz})`.mapWith(
-				Number
-			),
+			dow: sql<number>`${dowExpr}`.mapWith(Number),
 			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
 			booked:
 				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','no_show'))), 0)`.mapWith(
@@ -414,7 +415,7 @@ async function fillByWeekday(orgId: string) {
 				lt(classSession.startsAt, new Date())
 			)
 		)
-		.groupBy(sql`extract(dow from ${classSession.startsAt} at time zone ${tz})`);
+		.groupBy(dowExpr);
 	const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const byDow = new Map(rows.map((r) => [r.dow, r]));
 	return [1, 2, 3, 4, 5, 6, 0].map((d) => ({
@@ -518,9 +519,10 @@ async function checkInsByHour(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
+	const hourExpr = sql`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`;
 	const rows = await db
 		.select({
-			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`.mapWith(Number),
+			hour: sql<number>`${hourExpr}`.mapWith(Number),
 			count: sql<number>`count(*)`.mapWith(Number)
 		})
 		.from(checkIn)
@@ -531,7 +533,7 @@ async function checkInsByHour(orgId: string) {
 				isNull(checkIn.guestName)
 			)
 		)
-		.groupBy(sql`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`);
+		.groupBy(hourExpr);
 	const byHour = new Map(rows.map((r) => [r.hour, r.count]));
 	return Array.from({ length: 24 }, (_, hour) => ({ hour, count: byHour.get(hour) ?? 0 }));
 }
