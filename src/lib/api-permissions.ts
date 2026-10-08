@@ -1,5 +1,7 @@
 import * as v from 'valibot';
 
+// Keep in sync with the keys of `resources` in #lib/server/api/resources.ts — a resource
+// missing here can never be granted to an API key (normalizePermissions strips it).
 export const API_RESOURCES = [
 	'locations',
 	'class_types',
@@ -7,12 +9,28 @@ export const API_RESOURCES = [
 	'plans',
 	'memberships',
 	'sessions',
+	'class_templates',
 	'bookings',
 	'check_ins',
 	'charges',
 	'payments',
 	'events',
-	'event_registrations'
+	'event_registrations',
+	'challenges',
+	'amenities',
+	'amenity_bookings',
+	'courses',
+	'course_enrollments',
+	'equipment',
+	'shifts',
+	'session_feedback',
+	'shop_items',
+	'promo_codes',
+	'gift_cards',
+	'recurring_charges',
+	'expenses',
+	'member_tags',
+	'desk_tasks'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -30,12 +48,28 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	plans: 'Membership plans',
 	memberships: 'Memberships',
 	sessions: 'Class sessions',
+	class_templates: 'Recurring class templates',
 	bookings: 'Bookings',
 	check_ins: 'Check-ins',
 	charges: 'Charges',
 	payments: 'Payments',
 	events: 'Events',
-	event_registrations: 'Event registrations'
+	event_registrations: 'Event registrations',
+	challenges: 'Member challenges',
+	amenities: 'Bookable amenities',
+	amenity_bookings: 'Amenity reservations',
+	courses: 'Courses',
+	course_enrollments: 'Course enrollments',
+	equipment: 'Equipment',
+	shifts: 'Staff shifts',
+	session_feedback: 'Class ratings',
+	shop_items: 'Shop items',
+	promo_codes: 'Promo codes',
+	gift_cards: 'Gift cards',
+	recurring_charges: 'Recurring add-ons',
+	expenses: 'Expenses',
+	member_tags: 'Member tags',
+	desk_tasks: 'Desk checklist'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

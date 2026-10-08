@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
+import { resources } from '#lib/server/api/resources.ts';
 import {
 	allows,
+	API_RESOURCE_LABELS,
+	API_RESOURCES,
 	apiPermissionsSchema,
 	describePermissions,
 	everything,
@@ -36,5 +39,15 @@ describe('api permissions', () => {
 		expect(v.parse(apiPermissionsSchema, { sessions: ['read'] })).toEqual({
 			sessions: ['read']
 		});
+	});
+
+	it('covers every REST resource — an unlisted one can never be granted to a key', () => {
+		for (const name of Object.keys(resources)) {
+			expect(API_RESOURCES, `resource "${name}" missing from API_RESOURCES`).toContain(name);
+			expect(
+				API_RESOURCE_LABELS[name as keyof typeof API_RESOURCE_LABELS],
+				`resource "${name}" has no label`
+			).toBeTruthy();
+		}
 	});
 });
