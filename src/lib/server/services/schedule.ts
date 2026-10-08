@@ -629,8 +629,9 @@ export async function updateSession(
 
 // ---------- Bookings ----------
 
-export async function activeMembership(orgId: string, memberId: string) {
-	const [row] = await db
+/** Every live membership a member holds — a plan plus one or more packs. */
+export async function activeMemberships(orgId: string, memberId: string) {
+	return db
 		.select({
 			membership,
 			classCredits: plan.classCredits,
@@ -650,9 +651,12 @@ export async function activeMembership(orgId: string, memberId: string) {
 				or(isNull(membership.endsAt), gt(membership.endsAt, new Date()))
 			)
 		)
-		.orderBy(desc(membership.createdAt))
-		.limit(1);
-	return row;
+		.orderBy(desc(membership.createdAt));
+}
+
+/** The membership a member is billed against for display (newest wins). */
+export async function activeMembership(orgId: string, memberId: string) {
+	return (await activeMemberships(orgId, memberId))[0];
 }
 
 /**
@@ -820,10 +824,12 @@ function creditWindow(ms: ActiveMembership) {
 async function creditsUsedIn(
 	orgId: string,
 	memberId: string,
+	membershipId: string,
 	window: { start: string; end: string },
-	classTypeId?: string | null
+	classTypeId?: string | null,
+	q: Pick<typeof db, 'select'> = db
 ) {
-	const [{ count }] = await db
+	const [{ count }] = await q
 		.select({ count: sql<number>`count(*)`.mapWith(Number) })
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
@@ -832,12 +838,20 @@ async function creditsUsedIn(
 				eq(booking.organizationId, orgId),
 				eq(booking.memberId, memberId),
 				inArray(booking.status, [...CREDIT_STATUSES]),
-				// A class-type pack only drains on its own class.
-				classTypeId ? eq(classSession.classTypeId, classTypeId) : undefined,
 				// A cancelled class gives the credit back.
 				isNull(classSession.cancelledAt),
-				gte(classSession.startsAt, new Date(`${window.start}T00:00:00Z`)),
-				lt(classSession.startsAt, new Date(`${window.end}T00:00:00Z`))
+				or(
+					// New bookings are attributed to the membership that granted them, so a
+					// plan + pack member only drains the entitlement that paid.
+					eq(booking.membershipId, membershipId),
+					// Pre-attribution rows still count by window (and class for a restricted pack).
+					and(
+						isNull(booking.membershipId),
+						classTypeId ? eq(classSession.classTypeId, classTypeId) : undefined,
+						gte(classSession.startsAt, new Date(`${window.start}T00:00:00Z`)),
+						lt(classSession.startsAt, new Date(`${window.end}T00:00:00Z`))
+					)
+				)
 			)
 		);
 	return count;
@@ -853,6 +867,7 @@ export async function creditUsage(orgId: string, memberId: string) {
 	const used = await creditsUsedIn(
 		orgId,
 		memberId,
+		ms.membership.id,
 		creditWindow(ms),
 		ms.isPack ? ms.classTypeId : null
 	);
@@ -902,7 +917,7 @@ export async function sendPackLowCreditNudges(orgId: string) {
 			start: p.ms.startsAt.toISOString().slice(0, 10),
 			end: (p.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
 		};
-		const used = await creditsUsedIn(orgId, p.memberId, window, p.classTypeId);
+		const used = await creditsUsedIn(orgId, p.memberId, p.ms.id, window, p.classTypeId);
 		const limit = (p.classCredits ?? 0) + p.ms.bonusCredits;
 		const remaining = limit - used;
 		if (remaining <= 2 && remaining >= 0) {
@@ -912,23 +927,53 @@ export async function sendPackLowCreditNudges(orgId: string) {
 	return n;
 }
 
-/** 402s when the member's plan caps classes per period and they've used them. */
-async function assertCreditAvailable(orgId: string, memberId: string, ms: ActiveMembership) {
-	if (ms.classCredits == null) return;
-	const used = await creditsUsedIn(
-		orgId,
-		memberId,
-		creditWindow(ms),
-		ms.isPack ? ms.classTypeId : null
+/**
+ * Which membership pays for a booking on this class type. Order: a restricted
+ * pack matching the class (the pack exists for exactly this), then a recurring
+ * plan, then an unrestricted pack — generic punch credits are the fallback so
+ * they aren't drained by visits the plan already covers. Exhausted
+ * memberships are skipped for the next eligible one; when none qualify, 402s
+ * (class mismatch when only restricted packs exist, else credits used up).
+ */
+async function pickEntitlement(
+	q: Pick<typeof db, 'select'>,
+	orgId: string,
+	memberId: string,
+	mss: ActiveMembership[],
+	classTypeId: string,
+	className: string
+) {
+	const eligible = mss.filter(
+		(ms) => !ms.isPack || !ms.classTypeId || ms.classTypeId === classTypeId
 	);
-	const limit = ms.classCredits + ms.membership.bonusCredits;
-	if (used >= limit)
-		error(
-			402,
-			ms.isPack
-				? `All ${limit} classes used in this pack`
-				: `All ${limit} classes used for this period`
+	if (!eligible.length) error(402, `Your pack doesn't cover ${className} classes`);
+	const ordered = [
+		...eligible.filter((ms) => ms.isPack && ms.classTypeId),
+		...eligible.filter((ms) => !ms.isPack),
+		...eligible.filter((ms) => ms.isPack && !ms.classTypeId)
+	];
+	let exhausted: ActiveMembership | null = null;
+	for (const ms of ordered) {
+		if (ms.classCredits == null) return ms;
+		const used = await creditsUsedIn(
+			orgId,
+			memberId,
+			ms.membership.id,
+			creditWindow(ms),
+			ms.isPack ? ms.classTypeId : null,
+			q
 		);
+		const limit = ms.classCredits + ms.membership.bonusCredits;
+		if (used < limit) return ms;
+		exhausted ??= ms;
+	}
+	const ms = exhausted!;
+	error(
+		402,
+		ms.isPack
+			? `All ${ms.classCredits! + ms.membership.bonusCredits} classes used in this pack`
+			: `All ${ms.classCredits! + ms.membership.bonusCredits} classes used for this period`
+	);
 }
 
 /**
@@ -946,11 +991,10 @@ export async function bookSession(
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
-	const ms = await activeMembership(ctx.orgId, input.memberId);
+	const mss = await activeMemberships(ctx.orgId, input.memberId);
 	// Staff-side drop-in: no membership required, the class's drop-in
 	// charge posts to the member's balance instead.
-	if (!ms && !input.dropIn) error(402, 'An active membership is required to book');
-	if (ms) await assertCreditAvailable(ctx.orgId, input.memberId, ms);
+	if (!mss.length && !input.dropIn) error(402, 'An active membership is required to book');
 
 	const [st] = await db
 		.select({
@@ -978,10 +1022,11 @@ export async function bookSession(
 			.for('update');
 		if (!s) error(404, 'Session not found');
 		if (s.cancelledAt) error(409, 'This session is cancelled');
-		// A class-type pack ("Yoga 10-pack") doesn't cover other classes — the
-		// member needs a plan, an unrestricted pack, or a paid drop-in.
-		if (!input.dropIn && ms?.isPack && ms.classTypeId && s.classTypeId !== ms.classTypeId)
-			error(402, `Your pack doesn't cover ${s.className} classes`);
+		// Which membership pays for this booking — restricted pack for its own
+		// class first, then a plan, then an open pack. Drop-ins never drain credits.
+		const ms = input.dropIn
+			? null
+			: await pickEntitlement(tx, ctx.orgId, input.memberId, mss, s.classTypeId, s.className);
 		if (input.dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 			error(409, `No drop-in price set on ${s.className}`);
 		// "First class free": a member's first-ever booking skips the drop-in charge.
@@ -1048,7 +1093,12 @@ export async function bookSession(
 			if (existing.status !== 'cancelled') error(409, 'Already booked');
 			const [row] = await tx
 				.update(booking)
-				.set({ status, cancelledAt: null, createdAt: new Date() })
+				.set({
+					status,
+					cancelledAt: null,
+					createdAt: new Date(),
+					membershipId: ms?.membership.id ?? null
+				})
 				.where(eq(booking.id, existing.id))
 				.returning();
 			return { row: row!, dropInInfo };
@@ -1059,6 +1109,7 @@ export async function bookSession(
 				organizationId: ctx.orgId,
 				sessionId: input.sessionId,
 				memberId: input.memberId,
+				membershipId: ms?.membership.id ?? null,
 				status
 			})
 			.returning();

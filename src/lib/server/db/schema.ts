@@ -457,6 +457,10 @@ export const booking = pgTable(
 			.notNull()
 			.references(() => gymMember.id, { onDelete: 'cascade' }),
 		status: bookingStatus('status').notNull().default('booked'),
+		/** Membership this booking drains credits from (null for drop-ins and pre-entitlement rows). */
+		membershipId: text('membership_id').references((): AnyPgColumn => membership.id, {
+			onDelete: 'set null'
+		}),
 		/** Drop-in charge this booking created — voided when the booking/session is cancelled. */
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),

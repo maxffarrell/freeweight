@@ -624,6 +624,13 @@
       "when": 1791419140482,
       "tag": "0088_pack-class-type",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1791419688248,
+      "tag": "0089_booking-membership",
+      "breakpoints": true
     }
   ]
 }
