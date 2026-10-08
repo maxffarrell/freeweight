@@ -257,6 +257,35 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Member value</Card.Title>
+			<Card.Description>Lifetime collected per member — all time</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<p class="text-3xl font-semibold tabular-nums">
+				{formatMoney(r.memberValue.avgPerActive, currency, true)}
+			</p>
+			<div class="space-y-1 text-sm">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Total collected</span>
+					<span class="tabular-nums">{formatMoney(r.memberValue.total, currency, true)}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Avg per active member</span>
+					<span class="tabular-nums">{formatMoney(r.memberValue.avgPerActive, currency, true)}</span
+					>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground"
+						>Avg per paying member ({r.memberValue.payingMembers})</span
+					>
+					<span class="tabular-nums">{formatMoney(r.memberValue.avgPerPayer, currency, true)}</span>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
 			<Card.Description
 				>Unredeemed balance — services the gym still owes cardholders</Card.Description
