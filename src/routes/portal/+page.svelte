@@ -65,7 +65,13 @@
 		setVisitGoal,
 		logWorkoutResult,
 		acceptSaveOffer,
-		requestAddonRemoval
+		requestAddonRemoval,
+		getShopItems,
+		buyShopItem,
+		getPersonalRecords,
+		addPersonalRecord,
+		deletePersonalRecord,
+		getPrBoard
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -78,6 +84,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import type { PageProps } from './$types';
@@ -381,6 +388,53 @@
 		chalBusy = '';
 	}
 
+	// ------- shop -------
+	const shopItems = $derived(await getShopItems(memberId));
+	let shopBusy = $state('');
+	async function buyItem(itemId: string) {
+		shopBusy = itemId;
+		try {
+			await buyShopItem({ memberId, itemId });
+			toast.success('Added to your tab — pick it up at the desk');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not buy'));
+		}
+		shopBusy = '';
+	}
+
+	// ------- personal records -------
+	const prs = $derived(await getPersonalRecords(memberId));
+	const prBoard = $derived(await getPrBoard(memberId));
+	let prLabel = $state('');
+	let prValue = $state('');
+	let prDate = $state('');
+	let prBusy = $state(false);
+	async function addPr(e: SubmitEvent) {
+		e.preventDefault();
+		if (!prLabel.trim() || !prValue.trim()) return;
+		prBusy = true;
+		try {
+			await addPersonalRecord({
+				memberId,
+				label: prLabel.trim(),
+				value: prValue.trim(),
+				...(prDate ? { recordedOn: prDate } : {})
+			});
+			prLabel = prValue = prDate = '';
+			toast.success('PR logged');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save'));
+		}
+		prBusy = false;
+	}
+	async function delPr(prId: string) {
+		try {
+			await deletePersonalRecord({ memberId, prId });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
+
 	// ------- class check-in code -------
 	let code = $state('');
 	let codeBusy = $state(false);
@@ -608,10 +662,13 @@
 	const obDoneCount = $derived(obItems.filter((i) => i.done).length);
 
 	let busy = $state<string | null>(null);
+	// Guests the member wants to bring to each session (guest passes / drop-in priced).
+	let guestPick = $state<Record<string, string>>({});
 	async function book(sessionId: string) {
 		busy = sessionId;
 		try {
-			const b = await memberBook({ memberId, sessionId });
+			const guests = Number(guestPick[sessionId] ?? 0) || 0;
+			const b = await memberBook({ memberId, sessionId, guests });
 			toast.success(b.status === 'waitlisted' ? 'Class full — you are on the waitlist' : 'Booked!');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
@@ -1503,6 +1560,97 @@
 		</Card.Root>
 	{/if}
 
+	{#if shopItems.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="flex items-center gap-2 text-base"
+					><ShoppingBag class="size-4" /> Shop</Card.Title
+				>
+				<Card.Description>Buy now, pay at the desk — pick up on your next visit</Card.Description>
+			</Card.Header>
+			<Card.Content class="px-6">
+				<div class="grid gap-2 sm:grid-cols-2">
+					{#each shopItems as item (item.id)}
+						<div class="flex items-center gap-3 rounded-lg border p-3">
+							<div class="min-w-0 flex-1">
+								<p class="truncate text-sm font-medium">{item.name}</p>
+								<p class="text-sm text-muted-foreground">{formatMoney(item.price, currency)}</p>
+							</div>
+							{#if item.stock !== null && item.stock <= 0}
+								<Badge variant="secondary">Sold out</Badge>
+							{:else}
+								<Button
+									size="sm"
+									variant="outline"
+									disabled={shopBusy === item.id}
+									onclick={() => buyItem(item.id)}>Buy</Button
+								>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	<Card.Root class="sm:col-span-2">
+		<Card.Header class="pb-2">
+			<Card.Title class="flex items-center gap-2 text-base"
+				><Trophy class="size-4" /> Personal records</Card.Title
+			>
+		</Card.Header>
+		<Card.Content class="grid gap-4 px-6 sm:grid-cols-2">
+			<div>
+				<form class="flex flex-wrap gap-2" onsubmit={addPr}>
+					<Input placeholder="Back squat" bind:value={prLabel} class="w-32" />
+					<Input placeholder="315 lb" bind:value={prValue} class="w-24" />
+					<Input type="date" bind:value={prDate} class="w-36" />
+					<Button type="submit" size="sm" disabled={prBusy}>Log</Button>
+				</form>
+				{#if prs.length}
+					<ul class="mt-3 space-y-1 text-sm">
+						{#each prs as pr (pr.id)}
+							<li class="flex items-center gap-2">
+								<span class="min-w-0 flex-1 truncate"
+									><span class="font-medium">{pr.label}</span> — {pr.value}</span
+								>
+								<span class="shrink-0 text-xs text-muted-foreground">{pr.recordedOn}</span>
+								<button
+									class="shrink-0 text-muted-foreground hover:text-destructive"
+									onclick={() => delPr(pr.id)}><Trash2 class="size-3.5" /></button
+								>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="mt-3 text-sm text-muted-foreground">
+						Log your first PR — lifts, benchmarks, anything.
+					</p>
+				{/if}
+			</div>
+			<div>
+				<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					Gym leaderboard
+				</p>
+				{#if prBoard.length}
+					<ul class="space-y-1 text-sm">
+						{#each prBoard.slice(0, 10) as e (e.pr.id)}
+							<li class="flex items-center gap-2">
+								<span class="min-w-0 flex-1 truncate"
+									><span class="font-medium">{e.memberName}</span> · {e.pr.label} — {e.pr
+										.value}</span
+								>
+								<span class="shrink-0 text-xs text-muted-foreground">{e.pr.recordedOn}</span>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="text-sm text-muted-foreground">No PRs logged yet — be first.</p>
+				{/if}
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	{#if portalAi.configured}
 		<Card.Root class="sm:col-span-2">
 			<Card.Header class="pb-2">
@@ -1839,6 +1987,11 @@
 						{/if}
 					</div>
 					<span class="flex items-center gap-1.5">
+						{#if u.booking.guestCount}
+							<Badge variant="outline"
+								>+{u.booking.guestCount} guest{u.booking.guestCount > 1 ? 's' : ''}</Badge
+							>
+						{/if}
 						{#if u.waitlistPos}<span class="text-xs text-muted-foreground">#{u.waitlistPos}</span
 							>{/if}
 						<StatusBadge status={u.booking.status} />
@@ -1988,7 +2141,7 @@
 							{:else if !hasPlan && b.booked >= b.session.capacity}
 								<span class="text-xs whitespace-nowrap text-muted-foreground">Full</span>
 							{:else}
-								<div class="flex justify-end gap-1">
+								<div class="flex items-center justify-end gap-1">
 									{#if hasPlan}
 										<Button
 											size="sm"
@@ -1999,6 +2152,16 @@
 											>Series</Button
 										>
 									{/if}
+									<select
+										class="h-8 rounded-md border bg-transparent px-1 text-xs"
+										title="Bring guests — uses guest passes first, then drop-in price"
+										bind:value={guestPick[b.session.id]}
+									>
+										<option value="0">Just me</option>
+										{#each [1, 2, 3] as n (n)}
+											<option value={String(n)}>+{n} guest{n > 1 ? 's' : ''}</option>
+										{/each}
+									</select>
 									<Button
 										size="sm"
 										variant="outline"

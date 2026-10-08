@@ -21,6 +21,7 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	booking,
 	charge,
+	checkIn,
 	classSession,
 	classTemplate,
 	classType,
@@ -128,8 +129,9 @@ export async function updateClassType(
 
 // ---------- Sessions ----------
 
+/** Spots taken — a booking occupies 1 + its guest seats. */
 const bookedCount = (sessionId: AnyPgColumn) =>
-	sql<number>`(select count(*) from ${booking} b where b.session_id = ${sessionId} and b.status = 'booked')`.mapWith(
+	sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${sessionId} and b.status = 'booked')`.mapWith(
 		Number
 	);
 const waitlistedCount = (sessionId: AnyPgColumn) =>
@@ -308,7 +310,7 @@ export async function sessionsNeedingCover(ctx: OrgContext) {
 			color: classType.color,
 			locationName: location.name,
 			instructorName: user.name,
-			booked: sql<number>`(select count(*)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
+			booked: sql<number>`(select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
 		})
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
@@ -572,29 +574,39 @@ export async function updateSession(
 		if (!cutoffHit) {
 			const promotedIds = await db.transaction(async (tx) => {
 				const [{ n: booked }] = await tx
-					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.select({
+						n: sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+					})
 					.from(booking)
 					.where(and(eq(booking.sessionId, id), eq(booking.status, 'booked')));
-				const free = row.capacity - booked;
+				let free = row.capacity - booked;
 				if (free <= 0) return [] as string[];
 				const waiters = await tx
-					.select({ id: booking.id })
+					.select({ id: booking.id, guestCount: booking.guestCount })
 					.from(booking)
 					.where(and(eq(booking.sessionId, id), eq(booking.status, 'waitlisted')))
 					.orderBy(asc(booking.createdAt))
 					.limit(free)
 					.for('update');
 				if (!waiters.length) return [] as string[];
+				// A booking needs 1 + guestCount seats — skip parties that don't fit
+				// so a smaller party behind them can still take the spot.
+				const fit = waiters.filter((w) => {
+					const ok = 1 + w.guestCount <= free;
+					if (ok) free -= 1 + w.guestCount;
+					return ok;
+				});
+				if (!fit.length) return [] as string[];
 				await tx
 					.update(booking)
 					.set({ status: 'booked' })
 					.where(
 						inArray(
 							booking.id,
-							waiters.map((w) => w.id)
+							fit.map((w) => w.id)
 						)
 					);
-				return waiters.map((w) => w.id);
+				return fit.map((w) => w.id);
 			});
 			for (const bid of promotedIds) await notifyWaitlistPromoted(ctx.orgId, bid).catch(() => {});
 			if (promotedIds.length)
@@ -638,7 +650,8 @@ export async function activeMemberships(orgId: string, memberId: string) {
 			interval: plan.interval,
 			isPack: plan.isPack,
 			classTypeId: plan.classTypeId,
-			bookAheadDays: plan.bookAheadDays
+			bookAheadDays: plan.bookAheadDays,
+			guestPasses: plan.guestPasses
 		})
 		.from(membership)
 		.innerJoin(plan, eq(membership.planId, plan.id))
@@ -799,6 +812,7 @@ type ActiveMembership = {
 	interval: 'week' | 'month' | 'year';
 	isPack: boolean;
 	classTypeId: string | null;
+	guestPasses: number | null;
 	membership: { id: string; startsAt: Date; endsAt: Date | null; bonusCredits: number };
 };
 
@@ -1005,7 +1019,7 @@ export async function bookSession(
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 
-	const { row, dropInInfo } = await db.transaction(async (tx) => {
+	const { row, dropInInfo, guestCharge } = await db.transaction(async (tx) => {
 		const [s] = await tx
 			.select({
 				capacity: classSession.capacity,
@@ -1036,20 +1050,73 @@ export async function bookSession(
 					.from(booking)
 					.where(and(eq(booking.memberId, input.memberId), ne(booking.status, 'cancelled')))
 			: [{ prior: 1 }];
-		const freeFirst = !!input.dropIn && !!st?.firstClassFree && prior === 0;
-		const dropInInfo =
-			input.dropIn && !freeFirst ? { className: s.className, price: s.dropInPrice! } : null;
-
-		const [{ count }] = await tx
-			.select({ count: sql<number>`count(*)`.mapWith(Number) })
-			.from(booking)
-			.where(and(eq(booking.sessionId, input.sessionId), eq(booking.status, 'booked')));
-
 		// Rebook if they cancelled before, else insert fresh.
 		const [existing] = await tx
 			.select()
 			.from(booking)
 			.where(and(eq(booking.sessionId, input.sessionId), eq(booking.memberId, input.memberId)));
+		const existingId = existing?.id ?? 'none';
+		const guests = Math.max(0, Math.min(5, input.guests ?? 0));
+		const freeFirst = !!input.dropIn && !!st?.firstClassFree && prior === 0;
+		const seats = 1 + guests;
+		const dropInInfo =
+			input.dropIn && !freeFirst
+				? {
+						className: s.className,
+						price: s.dropInPrice! * seats,
+						// "(×3)" suffix on the charge line when guests ride along.
+						seats
+					}
+				: null;
+		// Guests ride the member's monthly guest-pass allowance first (shared with
+		// kiosk guest check-ins); seats beyond it bill at the class's drop-in price.
+		let guestCharge: { seats: number; price: number } | null = null;
+		if (!input.dropIn && guests > 0) {
+			const cap = Math.max(0, ...mss.map((x) => x.guestPasses ?? 0));
+			const month = s.startsAt.toISOString().slice(0, 7);
+			const [{ usedCk }] = await tx
+				.select({ usedCk: sql<number>`count(*)`.mapWith(Number) })
+				.from(checkIn)
+				.where(
+					and(
+						eq(checkIn.organizationId, ctx.orgId),
+						eq(checkIn.memberId, input.memberId),
+						isNotNull(checkIn.guestName),
+						sql`date_trunc('month', ${checkIn.checkedAt}) = ${month + '-01'}::date`
+					)
+				);
+			const [{ usedBk }] = await tx
+				.select({
+					usedBk: sql<number>`coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+				})
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(booking.organizationId, ctx.orgId),
+						eq(booking.memberId, input.memberId),
+						ne(booking.status, 'cancelled'),
+						ne(booking.id, existingId),
+						sql`date_trunc('month', ${classSession.startsAt}) = ${month + '-01'}::date`
+					)
+				);
+			const paidGuests = Math.max(0, guests - Math.max(0, cap - usedCk - usedBk));
+			if (paidGuests > 0 && (s.dropInPrice == null || s.dropInPrice <= 0))
+				error(
+					402,
+					cap > 0
+						? `${m.name} has used all ${cap} guest passes this month`
+						: `${m.name}'s plan doesn't include guest passes`
+				);
+			if (paidGuests > 0) guestCharge = { seats: paidGuests, price: s.dropInPrice! * paidGuests };
+		}
+
+		const [{ count }] = await tx
+			.select({
+				count: sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+			})
+			.from(booking)
+			.where(and(eq(booking.sessionId, input.sessionId), eq(booking.status, 'booked')));
 
 		// Daily booking limit: the member can't hold more than N non-cancelled
 		// bookings on sessions in the same local day. (An existing live booking
@@ -1079,16 +1146,16 @@ export async function bookSession(
 				error(409, `Daily booking limit reached (${st.maxPerDay} per day)`);
 		}
 
-		if (input.dropIn && count >= s.capacity)
+		if (input.dropIn && count + seats > s.capacity)
 			error(409, "This class is full — paid drop-ins can't join the waitlist");
-		if (count >= s.capacity && s.waitlistLimit != null) {
+		if (count + seats > s.capacity && s.waitlistLimit != null) {
 			const [{ waiting }] = await tx
 				.select({ waiting: sql<number>`count(*)`.mapWith(Number) })
 				.from(booking)
 				.where(and(eq(booking.sessionId, input.sessionId), eq(booking.status, 'waitlisted')));
 			if (waiting >= s.waitlistLimit) error(409, 'This class and its waitlist are full');
 		}
-		const status = count >= s.capacity ? 'waitlisted' : 'booked';
+		const status = count + seats > s.capacity ? 'waitlisted' : 'booked';
 		if (existing) {
 			if (existing.status !== 'cancelled') error(409, 'Already booked');
 			const [row] = await tx
@@ -1097,11 +1164,12 @@ export async function bookSession(
 					status,
 					cancelledAt: null,
 					createdAt: new Date(),
-					membershipId: ms?.membership.id ?? null
+					membershipId: ms?.membership.id ?? null,
+					guestCount: guests
 				})
 				.where(eq(booking.id, existing.id))
 				.returning();
-			return { row: row!, dropInInfo };
+			return { row: row!, dropInInfo, guestCharge };
 		}
 		const [row] = await tx
 			.insert(booking)
@@ -1110,10 +1178,11 @@ export async function bookSession(
 				sessionId: input.sessionId,
 				memberId: input.memberId,
 				membershipId: ms?.membership.id ?? null,
+				guestCount: guests,
 				status
 			})
 			.returning();
-		return { row: row!, dropInInfo };
+		return { row: row!, dropInInfo, guestCharge };
 	});
 	if (dropInInfo) {
 		const [c] = await db
@@ -1122,7 +1191,7 @@ export async function bookSession(
 				organizationId: ctx.orgId,
 				memberId: input.memberId,
 				kind: 'dropin',
-				description: `${dropInInfo.className} drop-in`,
+				description: `${dropInInfo.className} drop-in${dropInInfo.seats > 1 ? ` (×${dropInInfo.seats})` : ''}`,
 				amount: dropInInfo.price,
 				dueDate: todayISO()
 			})
@@ -1139,13 +1208,29 @@ export async function bookSession(
 		});
 		notifyChargePosted(ctx.orgId, c!.id).catch(() => {});
 	}
+	// Guests beyond the member's pass allowance bill at the drop-in price.
+	if (guestCharge) {
+		const [c] = await db
+			.insert(charge)
+			.values({
+				organizationId: ctx.orgId,
+				memberId: input.memberId,
+				kind: 'dropin',
+				description: `Guest drop-in ×${guestCharge.seats}`,
+				amount: guestCharge.price,
+				dueDate: todayISO()
+			})
+			.returning({ id: charge.id });
+		await db.update(booking).set({ chargeId: c!.id }).where(eq(booking.id, row.id));
+		notifyChargePosted(ctx.orgId, c!.id).catch(() => {});
+	}
 	await emit({
 		orgId: ctx.orgId,
 		actorId: actorId ?? ctx.userId,
 		entityType: 'booking',
 		entityId: row.id,
 		action: row.status === 'waitlisted' ? 'waitlisted' : 'booked',
-		summary: `${m.name} ${row.status === 'waitlisted' ? 'joined the waitlist' : 'booked a class'}`,
+		summary: `${m.name} ${row.status === 'waitlisted' ? 'joined the waitlist' : 'booked a class'}${row.guestCount ? ` (+${row.guestCount} guest${row.guestCount > 1 ? 's' : ''})` : ''}`,
 		data: { sessionId: input.sessionId, memberId: input.memberId }
 	});
 	if (opts?.notify !== false) notifyBookingConfirmed(ctx.orgId, row.id).catch(() => {});
@@ -1226,7 +1311,11 @@ export async function cancelBooking(
 	const { promoted, lateCancel } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
-			.select({ status: booking.status, chargeId: booking.chargeId })
+			.select({
+				status: booking.status,
+				chargeId: booking.chargeId,
+				guestCount: booking.guestCount
+			})
 			.from(booking)
 			.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, id)))
 			.for('update');
@@ -1250,6 +1339,7 @@ export async function cancelBooking(
 				.select({
 					startsAt: classSession.startsAt,
 					cancelledAt: classSession.cancelledAt,
+					capacity: classSession.capacity,
 					className: classType.name
 				})
 				.from(classSession)
@@ -1285,12 +1375,24 @@ export async function cancelBooking(
 		if (st?.cutoff && sess && sess.startsAt.getTime() - Date.now() < st.cutoff * 60_000)
 			return { promoted: null, lateCancel };
 
-		const [next] = await tx
+		// First waitlisted party that fits the freed seats — a bigger party is
+		// skipped rather than blocking the queue behind it.
+		const freed = 1 + prev.guestCount;
+		const [{ spots }] = await tx
+			.select({
+				spots: sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+			})
+			.from(booking)
+			.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')));
+		const free = (sess?.capacity ?? 0) - spots;
+		if (free <= 0) return { promoted: null, lateCancel };
+		const waiters = await tx
 			.select()
 			.from(booking)
 			.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'waitlisted')))
 			.orderBy(asc(booking.createdAt))
-			.limit(1);
+			.limit(freed + 2);
+		const next = waiters.find((w) => 1 + w.guestCount <= free);
 		if (!next) return { promoted: null, lateCancel };
 		await tx.update(booking).set({ status: 'booked' }).where(eq(booking.id, next.id));
 		return { promoted: next, lateCancel };

@@ -19,6 +19,7 @@ import { emit } from '#lib/server/services/events.ts';
 import {
 	idSchema,
 	measurementInput,
+	prInput,
 	resourceBookInput,
 	sessionFeedbackInput
 } from '#lib/schemas.ts';
@@ -54,11 +55,15 @@ export const getBookable = query(idSchema, async (memberId) => {
 });
 
 export const memberBook = command(
-	v.object({ memberId: idSchema, sessionId: idSchema }),
-	async ({ memberId, sessionId }) => {
+	v.object({
+		memberId: idSchema,
+		sessionId: idSchema,
+		guests: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(5)))
+	}),
+	async ({ memberId, sessionId, guests }) => {
 		const m = await myMember(memberId);
 		const { user } = requireUser();
-		const b = await svc.memberBook(m.organizationId, user.id, sessionId, m.id);
+		const b = await svc.memberBook(m.organizationId, user.id, sessionId, m.id, { guests });
 		void getBookable(memberId).refresh();
 		void getPortalOverview(memberId).refresh();
 		return b;
@@ -619,3 +624,51 @@ export const leaveCourse = command(
 		return r;
 	}
 );
+
+// ---------- Portal shop + personal records ----------
+
+export const getShopItems = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.memberShopItems(m.organizationId);
+});
+
+export const buyShopItem = command(
+	v.object({ memberId: idSchema, itemId: idSchema }),
+	async ({ memberId, itemId }) => {
+		const { user } = requireUser();
+		const m = await myMember(memberId);
+		const r = await svc.memberBuyItem(m.organizationId, user.id, memberId, itemId);
+		void getShopItems(memberId).refresh();
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
+export const getPersonalRecords = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return memberSvc.listPersonalRecords(m.organizationId, memberId);
+});
+
+export const addPersonalRecord = command(
+	v.object({ memberId: idSchema, ...prInput.entries }),
+	async ({ memberId, ...input }) => {
+		const m = await myMember(memberId);
+		const r = await memberSvc.addPersonalRecord(m.organizationId, memberId, input);
+		void getPersonalRecords(memberId).refresh();
+		return r;
+	}
+);
+
+export const deletePersonalRecord = command(
+	v.object({ memberId: idSchema, prId: idSchema }),
+	async ({ memberId, prId }) => {
+		const m = await myMember(memberId);
+		return memberSvc.deletePersonalRecord(m.organizationId, memberId, prId);
+	}
+);
+
+/** Gym-wide recent PRs — the leaderboard shown beside the member's own log. */
+export const getPrBoard = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return memberSvc.prBoard(m.organizationId);
+});

@@ -299,6 +299,11 @@
 								<span>
 									{localDate(s.session.startsAt, tz)} · {localTime(s.session.startsAt, tz)}
 								</span>
+								{#if s.booked < s.session.capacity && s.session.capacity - s.booked <= 5}
+									<Badge variant="secondary" class="text-amber-700 dark:text-amber-400"
+										>{s.session.capacity - s.booked} left</Badge
+									>
+								{/if}
 								{#if s.dropInPrice}
 									{#if s.booked >= s.session.capacity}
 										<Badge variant="outline">Full</Badge>

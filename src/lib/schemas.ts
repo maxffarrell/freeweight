@@ -334,7 +334,9 @@ export const bookingInput = v.object({
 	sessionId: idSchema,
 	memberId: idSchema,
 	/** Staff: sell a drop-in — posts the class's drop-in charge; no membership required. */
-	dropIn: v.optional(v.boolean())
+	dropIn: v.optional(v.boolean()),
+	/** Extra spots held for the member's guests — passes first, then drop-in priced. */
+	guests: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(5)))
 });
 /** Book a member into every upcoming session of a class type for N weeks. */
 export const seriesBookingInput = v.object({
@@ -601,6 +603,14 @@ export const measurementInput = v.object({
 export const memberTagInput = v.object({
 	memberId: idSchema,
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
+});
+
+export const prInput = v.object({
+	/** Lift or benchmark — "Back squat", "Fran". */
+	label: v.pipe(requiredText('Lift or benchmark'), v.maxLength(60)),
+	/** Free-form result — "315 lb", "3:12". */
+	value: v.pipe(requiredText('Result'), v.maxLength(30)),
+	recordedOn: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
 });
 
 export const memberMergeInput = v.object({

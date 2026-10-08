@@ -18,6 +18,7 @@ import {
 	notificationLog,
 	organization,
 	payment,
+	personalRecord,
 	user,
 	waiver,
 	plan,
@@ -311,7 +312,8 @@ export async function getMember(orgId: string, id: string) {
 		memberOptions,
 		emails,
 		measurements,
-		scores
+		scores,
+		prs
 	] = await Promise.all([
 		db
 			.select({
@@ -391,7 +393,13 @@ export async function getMember(orgId: string, id: string) {
 			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 			.where(and(eq(workoutResult.organizationId, orgId), eq(workoutResult.memberId, id)))
 			.orderBy(desc(classSession.startsAt))
-			.limit(12)
+			.limit(12),
+		db
+			.select()
+			.from(personalRecord)
+			.where(and(eq(personalRecord.organizationId, orgId), eq(personalRecord.memberId, id)))
+			.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+			.limit(25)
 	]);
 	return {
 		...row,
@@ -411,6 +419,7 @@ export async function getMember(orgId: string, id: string) {
 		emails,
 		measurements,
 		scores,
+		prs,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {
@@ -753,6 +762,63 @@ export async function deleteMeasurement(orgId: string, memberId: string, id: str
 	if (!row) error(404, 'Entry not found');
 }
 
+// ---------- Personal records (member PR board) ----------
+
+export async function listPersonalRecords(orgId: string, memberId: string, limit = 50) {
+	return db
+		.select()
+		.from(personalRecord)
+		.where(and(eq(personalRecord.organizationId, orgId), eq(personalRecord.memberId, memberId)))
+		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+		.limit(limit);
+}
+
+export async function addPersonalRecord(
+	orgId: string,
+	memberId: string,
+	input: v.InferOutput<typeof s.prInput>
+) {
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const [row] = await db
+		.insert(personalRecord)
+		.values({
+			organizationId: orgId,
+			memberId,
+			label: input.label,
+			value: input.value,
+			recordedOn: input.recordedOn ?? todayISO()
+		})
+		.returning();
+	await emit({
+		orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'pr_logged',
+		summary: `New PR: ${input.label} — ${input.value}`,
+		data: { prId: row!.id }
+	});
+	return row;
+}
+
+/** Delete is member-scoped — the portal lets members remove their own entries only. */
+export async function deletePersonalRecord(orgId: string, memberId: string, id: string) {
+	const [row] = await db
+		.delete(personalRecord)
+		.where(
+			and(
+				eq(personalRecord.organizationId, orgId),
+				eq(personalRecord.memberId, memberId),
+				eq(personalRecord.id, id)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Record not found');
+}
+
 /** Members whose portal login is this user — one user can belong to several gyms. */
 export async function portalMembers(userId: string) {
 	const own = await db
@@ -775,4 +841,18 @@ export async function portalMembers(userId: string) {
 			)
 		);
 	return [...mine, ...deps.map((d) => ({ ...d, dependent: true }))];
+}
+
+/** Latest PRs across the gym — the portal's PR leaderboard. */
+export async function prBoard(orgId: string, limit = 20) {
+	return db
+		.select({ pr: personalRecord, memberName: gymMember.name })
+		.from(personalRecord)
+		.innerJoin(
+			gymMember,
+			and(eq(personalRecord.memberId, gymMember.id), eq(personalRecord.organizationId, orgId))
+		)
+		.where(eq(personalRecord.organizationId, orgId))
+		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+		.limit(limit);
 }

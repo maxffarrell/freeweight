@@ -461,6 +461,8 @@ export const booking = pgTable(
 		membershipId: text('membership_id').references((): AnyPgColumn => membership.id, {
 			onDelete: 'set null'
 		}),
+		/** Extra spots held for the member's guests (they don't book individually). */
+		guestCount: integer('guest_count').notNull().default(0),
 		/** Drop-in charge this booking created — voided when the booking/session is cancelled. */
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -494,6 +496,32 @@ export const sessionFeedback = pgTable(
 	(t) => [
 		uniqueIndex('session_feedback_session_member_idx').on(t.sessionId, t.memberId),
 		index('session_feedback_org_idx').on(t.organizationId)
+	]
+);
+
+/**
+ * Personal records a member logs in the portal ("Back squat 315 lb") —
+ * the classic whiteboard PR board, kept per member.
+ */
+export const personalRecord = pgTable(
+	'personal_record',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Lift or benchmark name — "Back squat", "Fran", "5K row". */
+		label: text('label').notNull(),
+		/** The result as the member wrote it — "315 lb", "3:12". */
+		value: text('value').notNull(),
+		/** Day it was set, `YYYY-MM-DD`. */
+		recordedOn: date('recorded_on', { mode: 'string' }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('personal_record_member_idx').on(t.memberId),
+		index('personal_record_org_idx').on(t.organizationId)
 	]
 );
 

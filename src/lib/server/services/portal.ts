@@ -11,6 +11,7 @@ import {
 	classType,
 	document,
 	sessionFeedback,
+	shopItem,
 	workoutResult,
 	gymMember,
 	gymSettings,
@@ -34,7 +35,8 @@ import {
 	memberBalance,
 	nextPeriod,
 	proratePlanChange,
-	recordPayment
+	recordPayment,
+	sellItem
 } from './billing.ts';
 import { providers } from '#lib/server/payments/index.ts';
 import { providerRow } from '#lib/server/payments/settings.ts';
@@ -479,7 +481,7 @@ export async function bookableSessions(memberId: string, days = 14) {
 			memberBookable: classType.memberBookable,
 			dropInPrice: classType.dropInPrice,
 			booked:
-				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+				sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
 					Number
 				),
 			myStatus: sql<
@@ -513,7 +515,7 @@ export async function memberBook(
 	userId: string,
 	sessionId: string,
 	memberId: string,
-	opts?: { notify?: boolean; skipDailyLimit?: boolean }
+	opts?: { notify?: boolean; skipDailyLimit?: boolean; guests?: number }
 ) {
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
@@ -542,7 +544,12 @@ export async function memberBook(
 	const dropIn = !ms;
 	if (dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 		error(402, 'An active membership is required to book');
-	return bookSession(memberCtx(orgId, userId), { sessionId, memberId, dropIn }, userId, opts);
+	return bookSession(
+		memberCtx(orgId, userId),
+		{ sessionId, memberId, dropIn, guests: opts?.guests },
+		userId,
+		opts
+	);
 }
 
 /**
@@ -1130,4 +1137,34 @@ export async function acceptSaveOffer(orgId: string, memberId: string) {
 		summary: `Stay offer accepted — ${pct}% off (${formatMoney(credit)})`
 	});
 	return { credit };
+}
+
+// ---------- Portal shop — members buy retail, pay the gym tab ----------
+
+/** Active items the member can buy in the portal (active only, stock-aware). */
+export async function memberShopItems(orgId: string) {
+	return db
+		.select()
+		.from(shopItem)
+		.where(and(eq(shopItem.organizationId, orgId), eq(shopItem.active, true)))
+		.orderBy(asc(shopItem.name));
+}
+
+/**
+ * Buys one of an item — posts an 'other' charge on the member's tab and
+ * decrements stock. Pick-up is at the desk; no member-facing inventory.
+ */
+export async function memberBuyItem(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	itemId: string
+) {
+	return sellItem(memberCtx(orgId, userId), {
+		itemId,
+		memberId,
+		qty: 1,
+		payNow: false,
+		method: 'card'
+	});
 }
