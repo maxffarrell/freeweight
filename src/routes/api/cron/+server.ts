@@ -12,6 +12,7 @@ import {
 	sendChallengeInvites,
 	sendChallengeResults,
 	sendClassReminders,
+	sendCourseCompletions,
 	sendDueAnnouncements,
 	sendEventReminders,
 	sendResourceReminders,
@@ -66,6 +67,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let leadNudges = 0;
 	let rosters = 0;
 	let feedbackDigests = 0;
+	let courseCompletions = 0;
 	let briefings = 0;
 	let billingReminders = 0;
 	let announcements = 0;
@@ -222,6 +224,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`feedback-digest cron failed for ${o.id}`, err);
 		}
 		try {
+			courseCompletions += await sendCourseCompletions(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`course-completion cron failed for ${o.id}`, err);
+		}
+		try {
 			briefings += await sendStaffBriefing(o.id);
 		} catch (err) {
 			failed++;
@@ -256,6 +264,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		leadNudges,
 		rosters,
 		feedbackDigests,
+		courseCompletions,
 		briefings,
 		billingReminders,
 		announcements,
