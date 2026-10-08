@@ -32,7 +32,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyCheckInMilestone, notifyFirstVisit } from './notifications.ts';
+import { notifyCheckInMilestone, notifyFirstVisit, notifyReviewRequest } from './notifications.ts';
 import { getRoster, getSession } from './schedule.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
@@ -512,4 +512,28 @@ export async function checkInWithCode(orgId: string, memberId: string, rawCode: 
 		summary: `${m?.name ?? 'Member'} checked in to ${row.className} with the class code`
 	});
 	return { className: row.className, already: false };
+}
+
+/**
+ * Daily sweep: when a member's lifetime check-ins cross `reviewAfterVisits`,
+ * send them the gym's `reviewUrl` once (notification_log dedupes per member).
+ * Off unless both settings are set.
+ */
+export async function sendReviewNudges(orgId: string) {
+	const [st] = await db
+		.select({ url: gymSettings.reviewUrl, after: gymSettings.reviewAfterVisits })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	if (!st?.url || !st.after) return 0;
+	const rows = await db
+		.select({ memberId: checkIn.memberId })
+		.from(checkIn)
+		.where(and(eq(checkIn.organizationId, orgId), isNull(checkIn.guestName)))
+		.groupBy(checkIn.memberId)
+		.having(sql`count(*) >= ${st.after}`);
+	let n = 0;
+	for (const r of rows) {
+		if (await notifyReviewRequest(orgId, r.memberId, st.url)) n++;
+	}
+	return n;
 }

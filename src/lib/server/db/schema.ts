@@ -97,6 +97,10 @@ export const gymSettings = pgTable('gym_settings', {
 	saveOfferPct: integer('save_offer_pct'),
 	/** One-time charge posted when a membership is paused (minor units); null = free to freeze. */
 	freezeFee: integer('freeze_fee'),
+	/** Google/whatever review link nudged to members after `reviewAfterVisits` visits; null = off. */
+	reviewUrl: text('review_url'),
+	/** Lifetime visits that triggers the once-per-member review-request email; null = off. */
+	reviewAfterVisits: integer('review_after_visits'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -288,6 +292,8 @@ export const membership = pgTable(
 		price: integer('price'),
 		/** When the member last took a retention save offer; each membership may take one. */
 		saveOfferAt: timestamp('save_offer_at', { withTimezone: true }),
+		/** Pack memberships: buy the same pack again when it runs out or expires. */
+		autoRenew: boolean('auto_renew').notNull().default(false),
 		...timestamps
 	},
 	(t) => [
@@ -846,6 +852,8 @@ export const course = pgTable(
 		capacity: integer('capacity'),
 		/** false = staff enroll members; members can't self-register. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Split the course price across this many monthly charges (1 = pay up front). */
+		installments: integer('installments').notNull().default(1),
 		...timestamps
 	},
 	(t) => [index('course_org_idx').on(t.organizationId)]

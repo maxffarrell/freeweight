@@ -703,3 +703,13 @@ export const getMovementVideos = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return svc.memberClassVideos(m.organizationId, memberId);
 });
+
+/** Member toggles pack auto-renew on their own membership. */
+export const setPackAutoRenew = command(
+	v.object({ memberId: idSchema, membershipId: idSchema, on: v.boolean() }),
+	async ({ memberId, membershipId, on }) => {
+		const m = await myMember(memberId);
+		await svc.memberSetPackAutoRenew(m.organizationId, m.id, membershipId, on);
+		await getPortalOverview(memberId).refresh();
+	}
+);

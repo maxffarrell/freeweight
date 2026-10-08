@@ -1211,3 +1211,34 @@ export async function memberClassVideos(orgId: string, memberId: string) {
 		.orderBy(asc(classType.name), asc(classVideo.title))
 		.limit(50);
 }
+
+/** Member flips pack auto-renew on one of their own pack memberships. */
+export async function memberSetPackAutoRenew(
+	orgId: string,
+	memberId: string,
+	membershipId: string,
+	on: boolean
+) {
+	const [row] = await db
+		.update(membership)
+		.set({ autoRenew: on })
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active'),
+				sql`exists (select 1 from ${plan} p where p.id = ${membership.planId} and p.is_pack)`
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Pack membership not found');
+	await emit({
+		orgId,
+		entityType: 'membership',
+		entityId: membershipId,
+		action: 'updated',
+		summary: `Auto-renew ${on ? 'on' : 'off'}`
+	});
+	return row;
+}

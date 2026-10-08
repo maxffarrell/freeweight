@@ -384,7 +384,7 @@ export async function assertPlanCapacity(orgId: string, p: typeof plan.$inferSel
 }
 
 /** Posts the recurring charge for one period. Idempotent via the period unique index. */
-async function postMembershipCharge(
+export async function postMembershipCharge(
 	orgId: string,
 	membershipId: string,
 	periodStart: string,
@@ -490,6 +490,7 @@ export async function updateMembership(
 	}
 	if (newPlan) set.planId = newPlan.id;
 	if (input.price !== undefined) set.price = input.price;
+	if (input.autoRenew !== undefined) set.autoRenew = input.autoRenew;
 	const [row] = await db
 		.update(membership)
 		.set(set)

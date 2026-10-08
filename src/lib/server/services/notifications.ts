@@ -3152,3 +3152,34 @@ export async function notifySignRequest(orgId: string, signRequestId: string) {
 		})
 	});
 }
+
+/**
+ * "How are we doing?" — after a member crosses the gym's reviewAfterVisits
+ * threshold, send them the review link once ever (notification_log).
+ */
+export async function notifyReviewRequest(orgId: string, memberId: string, reviewUrl: string) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email || !(await logOnce(orgId, 'review-request', memberId, m.email))) return false;
+	const name = await orgBrand(orgId);
+	const first = m.name.split(' ')[0] ?? m.name;
+	const { text, html } = renderEmail({
+		...name,
+		heading: 'Enjoying your training?',
+		lines: [
+			`Hi ${first},`,
+			`You've been putting in the work at ${name.orgName} — we'd love to hear about it.`,
+			'A quick review helps others find the gym and means a lot to the team.'
+		],
+		action: { label: 'Leave a review', url: reviewUrl }
+	});
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${name.orgName}: how are we doing?`,
+		text,
+		html
+	});
+	return true;
+}

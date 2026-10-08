@@ -156,6 +156,8 @@
 	// svelte-ignore state_referenced_locally
 	let saveOfferPct = $state<number | null>(settings.saveOfferPct);
 	let freezeFee = $state<number | null>(settings.freezeFee);
+	let reviewUrl = $state(settings.reviewUrl ?? '');
+	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
 	// svelte-ignore state_referenced_locally
@@ -188,6 +190,8 @@
 				referralCredits,
 				saveOfferPct,
 				freezeFee,
+				reviewUrl: reviewUrl.trim() || null,
+				reviewAfterVisits,
 				publicPage,
 				staffBriefing,
 				firstClassFree
@@ -550,6 +554,32 @@
 								>Shown inside the member's cancellation form — "Stay instead, N% off your next
 								bill". Applies a one-time account credit; each membership can take it once. Leave
 								empty for no offer.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-review-url">Review link</Field.Label>
+							<Input
+								id="s-review-url"
+								type="url"
+								bind:value={reviewUrl}
+								placeholder="https://g.page/r/your-gym/review"
+							/>
+							<Field.Description
+								>Google/Yelp review URL sent to loyal members — leave empty to never ask.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-review-after">Ask for a review after N visits</Field.Label>
+							<Input
+								id="s-review-after"
+								type="number"
+								min={1}
+								bind:value={reviewAfterVisits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Once a member's lifetime check-ins reach this, they get one review-request email
+								(never twice).</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

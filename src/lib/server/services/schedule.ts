@@ -65,7 +65,7 @@ import {
 } from './notifications.ts';
 import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
-import { nextPeriod } from './billing.ts';
+import { nextPeriod, postMembershipCharge } from './billing.ts';
 import { getSettings } from './settings.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -876,7 +876,7 @@ function creditWindow(ms: ActiveMembership) {
 	return periodWindow(ms.membership.startsAt, ms.interval);
 }
 
-async function creditsUsedIn(
+export async function creditsUsedIn(
 	orgId: string,
 	memberId: string,
 	membershipId: string,
@@ -980,6 +980,74 @@ export async function sendPackLowCreditNudges(orgId: string) {
 		}
 	}
 	return n;
+}
+
+/**
+ * Pack auto-renew: a pack membership with `autoRenew` that expired or burned its
+ * last credit spawns a fresh identical membership (fresh credit window + expiry)
+ * and posts the pack charge — the member never loses booking access. The old
+ * membership stays 'active' but spent; entitlement selection already skips it.
+ * Runs in the daily cron.
+ */
+export async function renewExpiredPacks(orgId: string) {
+	const packs = await db
+		.select({ ms: membership, plan })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(membership.autoRenew, true),
+				eq(plan.isPack, true)
+			)
+		);
+	let renewed = 0;
+	for (const { ms, plan: p } of packs) {
+		const expired = ms.endsAt != null && ms.endsAt < new Date();
+		let exhausted = false;
+		if (!expired && p.classCredits != null) {
+			const used = await creditsUsedIn(
+				orgId,
+				ms.memberId,
+				ms.id,
+				{
+					start: ms.startsAt.toISOString().slice(0, 10),
+					end: (ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+				},
+				p.classTypeId
+			);
+			exhausted = used >= p.classCredits + ms.bonusCredits;
+		}
+		if (!expired && !exhausted) continue;
+		const start = todayISO();
+		const [row] = await db
+			.insert(membership)
+			.values({
+				organizationId: orgId,
+				memberId: ms.memberId,
+				planId: p.id,
+				autoRenew: true,
+				price: ms.price,
+				endsAt: p.packDays
+					? new Date(new Date(`${start}T00:00:00Z`).getTime() + p.packDays * 86400_000)
+					: null
+			})
+			.returning();
+		// Stop the spent pack renewing alongside its replacement.
+		await db.update(membership).set({ autoRenew: false }).where(eq(membership.id, ms.id));
+		await postMembershipCharge(orgId, row!.id, start, p);
+		await emit({
+			orgId,
+			entityType: 'membership',
+			entityId: row!.id,
+			action: 'created',
+			summary: `Auto-renewed pack "${p.name}"`,
+			data: { memberId: ms.memberId }
+		});
+		renewed++;
+	}
+	return renewed;
 }
 
 /**

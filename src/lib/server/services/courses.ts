@@ -19,6 +19,7 @@ import { addCharge } from './billing.ts';
 import { materializeTemplates } from './schedule.ts';
 import { emit } from './events.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
+import { addDays } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -115,7 +116,8 @@ export async function createCourse(ctx: OrgContext, input: v.InferOutput<typeof 
 			endsOn: input.endsOn,
 			priceCents: input.priceCents ?? 0,
 			capacity: input.capacity ?? null,
-			memberBookable: input.memberBookable ?? true
+			memberBookable: input.memberBookable ?? true,
+			installments: input.installments ?? 1
 		})
 		.returning();
 	await db.insert(classTemplate).values(
@@ -308,19 +310,27 @@ export async function enrollCourse(orgId: string, memberId: string, courseId: st
 	const sessions = await courseSessions(orgId, c);
 	if (!sessions.length) error(404, 'No upcoming sessions in this course');
 
-	// Charge first so a failure doesn't leave bookings behind.
+	// Charge first so a failure doesn't leave bookings behind. Installments
+	// split the price into equal monthly charges; the first is linked on the
+	// enrollment, the rest are found by description prefix when voiding.
 	let chargeRow = null;
 	if (c.priceCents > 0) {
-		chargeRow = await addCharge(
-			{ orgId },
-			{
-				memberId,
-				kind: 'other',
-				description: `Course: ${c.name}`,
-				amount: c.priceCents,
-				dueDate: todayISO()
-			}
-		);
+		const n = Math.min(12, Math.max(1, c.installments ?? 1));
+		const per = Math.ceil(c.priceCents / n);
+		for (let i = 0; i < n; i++) {
+			const row = await addCharge(
+				{ orgId },
+				{
+					memberId,
+					kind: 'other',
+					description:
+						n > 1 ? `Course: ${c.name} — installment ${i + 1}/${n}` : `Course: ${c.name}`,
+					amount: i === n - 1 ? c.priceCents - per * (n - 1) : per,
+					dueDate: addDays(todayISO(), i * 30)
+				}
+			);
+			chargeRow ??= row;
+		}
 	}
 	const [enrollment] = await db
 		.insert(courseEnrollment)
@@ -416,10 +426,18 @@ export async function unenrollCourse(orgId: string, memberId: string, courseId: 
 			);
 	}
 	if (enrollment.chargeId) {
+		// Void the whole installment series still open for this course.
 		await db
 			.update(charge)
 			.set({ status: 'void', updatedAt: new Date() })
-			.where(and(eq(charge.id, enrollment.chargeId), eq(charge.status, 'open')));
+			.where(
+				and(
+					eq(charge.memberId, memberId),
+					eq(charge.organizationId, orgId),
+					eq(charge.status, 'open'),
+					sql`${charge.description} like ${`Course: ${c?.name ?? ''}%`}`
+				)
+			);
 	}
 	await db.delete(courseEnrollment).where(eq(courseEnrollment.id, enrollment.id));
 	await emit({

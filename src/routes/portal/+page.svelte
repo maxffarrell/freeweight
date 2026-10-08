@@ -74,7 +74,8 @@
 		getPrBoard,
 		getSignRequests,
 		signDocument,
-		getMovementVideos
+		getMovementVideos,
+		setPackAutoRenew
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -427,6 +428,15 @@
 
 	// ------- movement library -------
 	const movementVideos = $derived(await getMovementVideos(memberId));
+
+	async function toggleAutoRenew(msId: string, on: boolean) {
+		try {
+			await setPackAutoRenew({ memberId, membershipId: msId, on });
+			toast.success(on ? 'Pack will auto-renew' : 'Auto-renew off');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 
 	// ------- personal records -------
 	const prs = $derived(await getPersonalRecords(memberId));
@@ -1104,6 +1114,14 @@
 										>
 										·
 									{/if}
+									{#if mm.plan.isPack}
+										<button
+											class="underline"
+											onclick={() => toggleAutoRenew(mm.membership.id, !mm.membership.autoRenew)}
+											>Auto-renew: {mm.membership.autoRenew ? 'on' : 'off'}</button
+										>
+										·
+									{/if}
 									<button
 										class="underline"
 										onclick={() =>
@@ -1461,7 +1479,7 @@
 								onclick={() => joinCourse(c.course.id)}
 							>
 								{c.course.priceCents
-									? `Enroll — ${formatMoney(c.course.priceCents, currency)}`
+									? `Enroll — ${formatMoney(c.course.priceCents, currency)}${c.course.installments > 1 ? ` (${c.course.installments}×${formatMoney(Math.ceil(c.course.priceCents / c.course.installments), currency)}/mo)` : ''}`
 									: 'Enroll'}
 							</Button>
 						{/if}

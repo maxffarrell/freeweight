@@ -32,9 +32,10 @@ import {
 	expireWaitlists,
 	markPastNoShows,
 	materializeTemplates,
-	sendPackLowCreditNudges
+	sendPackLowCreditNudges,
+	renewExpiredPacks
 } from '#lib/server/services/schedule.ts';
-import { closeStaleCheckIns } from '#lib/server/services/checkins.ts';
+import { closeStaleCheckIns, sendReviewNudges } from '#lib/server/services/checkins.ts';
 import { closeStaleShifts } from '#lib/server/services/shifts.ts';
 import { postDueRecurring } from '#lib/server/services/recurring.ts';
 import type { RequestHandler } from './$types';
@@ -156,6 +157,18 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`pack-nudge cron failed for ${o.id}`, err);
+		}
+		try {
+			await renewExpiredPacks(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`pack-renew cron failed for ${o.id}`, err);
+		}
+		try {
+			await sendReviewNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`review-nudge cron failed for ${o.id}`, err);
 		}
 		try {
 			waiverNudges += await sendWaiverReminders(o.id);
