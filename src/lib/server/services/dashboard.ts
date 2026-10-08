@@ -245,6 +245,31 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(membership.endsAt))
 		.limit(10);
 
+	// Class packs expiring within 7 days — same window as the pack-expiry
+	// email. Staff can nudge a last visit or sell a top-up pack.
+	const packsExpiring = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			planName: plan.name,
+			endsAt: membership.endsAt
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(membership.endsAt),
+				gt(membership.endsAt, new Date()),
+				lte(membership.endsAt, new Date(Date.now() + 7 * 86400_000))
+			)
+		)
+		.orderBy(asc(membership.endsAt))
+		.limit(10);
+
 	// Trial memberships whose first billing lands within 3 days — the same
 	// window the trial-ending email uses (still-trialing = trial plan + no
 	// charge posted yet).
@@ -324,6 +349,7 @@ export async function dashboard(orgId: string) {
 		birthdaysThisWeek,
 		renewalsThisWeek,
 		trialsEnding,
+		packsExpiring,
 		liveChallenges
 	};
 }

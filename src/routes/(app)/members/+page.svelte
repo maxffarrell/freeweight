@@ -117,7 +117,8 @@
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
 			planId: planFilter === '__all' ? undefined : planFilter === '__none' ? 'none' : planFilter,
 			sort,
-			owes: owesFilter === 'owes' || undefined
+			owes: owesFilter === 'owes' || undefined,
+			suspended: owesFilter === 'suspended' || undefined
 		});
 	}
 	function search() {
@@ -443,11 +444,16 @@
 		{/if}
 		<Select.Root type="single" bind:value={owesFilter} onValueChange={() => void refilter()}>
 			<Select.Trigger class="w-36"
-				>{owesFilter === 'owes' ? 'Owes money' : 'Any balance'}</Select.Trigger
+				>{owesFilter === 'owes'
+					? 'Owes money'
+					: owesFilter === 'suspended'
+						? 'Suspended'
+						: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
 				<Select.Item value="owes">Owes money</Select.Item>
+				<Select.Item value="suspended">Suspended</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
