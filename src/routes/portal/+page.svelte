@@ -64,7 +64,8 @@
 		rateSession,
 		setVisitGoal,
 		logWorkoutResult,
-		acceptSaveOffer
+		acceptSaveOffer,
+		requestAddonRemoval
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -149,6 +150,17 @@
 	// ------- gift cards -------
 	let gcCode = $state('');
 	let gcBusy = $state(false);
+	async function askRemoveAddon(addOnId: string) {
+		if (!confirm('Ask the front desk to stop this add-on? They will confirm before it ends.'))
+			return;
+		try {
+			await requestAddonRemoval({ memberId, addOnId });
+			toast.success('Removal requested');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not request'));
+		}
+	}
+
 	async function redeemCard() {
 		if (gcBusy || !gcCode.trim()) return;
 		gcBusy = true;
@@ -1588,6 +1600,33 @@
 						</li>
 					{/each}
 				</ul>
+			{/if}
+			{#if d.addOns.some((a) => a.active)}
+				<div>
+					<p class="mb-1 text-xs font-medium text-muted-foreground uppercase">Add-ons</p>
+					<ul class="space-y-1 text-sm">
+						{#each d.addOns as a (a.id)}
+							{#if a.active}
+								<li class="flex items-center justify-between gap-2">
+									<span class="truncate text-muted-foreground"
+										>{a.description} · next {a.nextDue}</span
+									>
+									<span class="flex shrink-0 items-center gap-2">
+										<span class="tabular-nums">{formatMoney(a.amount, currency)}/{a.interval}</span>
+										{#if a.removalRequestedAt}
+											<span class="text-xs text-muted-foreground">removal requested</span>
+										{:else}
+											<button
+												class="text-xs text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+												onclick={() => askRemoveAddon(a.id)}>stop</button
+											>
+										{/if}
+									</span>
+								</li>
+							{/if}
+						{/each}
+					</ul>
+				</div>
 			{/if}
 			<form
 				class="flex items-center gap-2"

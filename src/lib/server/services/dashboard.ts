@@ -17,6 +17,7 @@ import {
 	payment,
 	paymentProvider,
 	plan,
+	recurringCharge,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -147,6 +148,27 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
 
+	// Members who asked staff to stop a recurring add-on — folded into the same
+	// Needs-attention list with kind 'addon'.
+	const addonRequests = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			description: recurringCharge.description,
+			requestedAt: recurringCharge.removalRequestedAt
+		})
+		.from(recurringCharge)
+		.innerJoin(gymMember, eq(recurringCharge.memberId, gymMember.id))
+		.where(
+			and(
+				eq(recurringCharge.organizationId, orgId),
+				eq(recurringCharge.active, true),
+				isNotNull(recurringCharge.removalRequestedAt)
+			)
+		)
+		.orderBy(asc(recurringCharge.removalRequestedAt))
+		.limit(50);
+
 	// Upcoming sessions flagged as needing a substitute instructor.
 	const coverNeeded = await db
 		.select({
@@ -260,7 +282,18 @@ export async function dashboard(orgId: string) {
 		todaySessions,
 		recentActivity,
 		recentMembers,
-		pendingRequests,
+		pendingRequests: [
+			...pendingRequests,
+			...addonRequests.map((a) => ({
+				memberId: a.memberId,
+				memberName: a.memberName,
+				planName: a.description,
+				kind: 'addon' as const,
+				requestedAt: a.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			}))
+		],
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,

@@ -124,6 +124,17 @@ export const dropCourseSession = command(
 	}
 );
 
+/** Member asks staff to stop a recurring add-on — staff deactivate on their side. */
+export const requestAddonRemoval = command(
+	v.object({ memberId: idSchema, addOnId: idSchema }),
+	async ({ memberId, addOnId }) => {
+		const m = await myMember(memberId);
+		const r = await svc.requestAddOnRemoval(m.organizationId, m.id, addOnId);
+		void getPortalOverview(memberId).refresh();
+		return r;
+	}
+);
+
 /** Re-books a previously dropped course occurrence — waitlisted when full. */
 export const rebookCourseSession = command(
 	v.object({ memberId: idSchema, bookingId: idSchema }),
