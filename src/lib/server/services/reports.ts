@@ -1185,13 +1185,13 @@ async function memberLifetimeValue(orgId: string) {
  * currently-active count — which plans churn hardest.
  */
 async function churnByPlan(orgId: string) {
-	const since = new Date(Date.now() - 90 * 86400_000);
+	const since = new Date(Date.now() - 90 * 86400_000).toISOString();
 	const rows = await db
 		.select({
 			planName: plan.name,
 			active: sql<number>`count(*) filter (where ${membership.status} = 'active')`.mapWith(Number),
 			cancelled:
-				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since})`.mapWith(
+				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since}::timestamptz)`.mapWith(
 					Number
 				)
 		})
@@ -1201,7 +1201,7 @@ async function churnByPlan(orgId: string) {
 		.groupBy(plan.id, plan.name)
 		.orderBy(
 			desc(
-				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since})`
+				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since}::timestamptz)`
 			)
 		);
 	return rows.filter((r) => r.active + r.cancelled > 0);
