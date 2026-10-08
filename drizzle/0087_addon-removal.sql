@@ -1,0 +1,1 @@
+ALTER TABLE "recurring_charge" ADD COLUMN "removal_requested_at" timestamp with time zone;

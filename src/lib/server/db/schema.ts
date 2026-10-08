@@ -917,6 +917,8 @@ export const recurringCharge = pgTable(
 		/** Next gym-local posting date (YYYY-MM-DD). */
 		nextDue: date('next_due', { mode: 'string' }).notNull(),
 		active: boolean('active').notNull().default(true),
+		/** Member asked staff to stop this add-on — surfaced to staff until deactivated. */
+		removalRequestedAt: timestamp('removal_requested_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [

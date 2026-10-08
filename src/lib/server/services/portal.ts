@@ -15,10 +15,12 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	memberNote,
 	membership,
 	organization,
 	payment,
 	plan,
+	recurringCharge,
 	waiver,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -177,6 +179,14 @@ export async function portalOverview(memberId: string) {
 		.orderBy(desc(waiver.signedAt))
 		.limit(1);
 
+	// Recurring add-ons billed to this member (PT packages, towel service). Shown
+	// in the Balance card so members can see them and ask staff to stop one.
+	const addOns = await db
+		.select()
+		.from(recurringCharge)
+		.where(and(eq(recurringCharge.memberId, memberId), eq(recurringCharge.organizationId, orgId)))
+		.orderBy(asc(recurringCharge.nextDue));
+
 	const [[org], [referred]] = await Promise.all([
 		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
 		db
@@ -312,6 +322,7 @@ export async function portalOverview(memberId: string) {
 		balance,
 		openCharges,
 		payments,
+		addOns,
 		history,
 		feedback,
 		results,
@@ -830,6 +841,47 @@ export async function withdrawCancellation(orgId: string, memberId: string, memb
 		.returning();
 	if (!row) error(404, 'Membership not found');
 	return row;
+}
+
+/**
+ * Member asks staff to stop a recurring add-on (PT package, towel service).
+ * Sets `removalRequestedAt` — the charge keeps posting until staff deactivate
+ * it, and the request is surfaced on the dashboard and the Billing tab.
+ */
+export async function requestAddOnRemoval(orgId: string, memberId: string, addOnId: string) {
+	const [row] = await db
+		.select()
+		.from(recurringCharge)
+		.where(
+			and(
+				eq(recurringCharge.id, addOnId),
+				eq(recurringCharge.memberId, memberId),
+				eq(recurringCharge.organizationId, orgId),
+				eq(recurringCharge.active, true)
+			)
+		);
+	if (!row) error(404, 'Add-on not found');
+	if (row.removalRequestedAt) return row;
+	const [updated] = await db
+		.update(recurringCharge)
+		.set({ removalRequestedAt: new Date(), updatedAt: new Date() })
+		.where(eq(recurringCharge.id, row.id))
+		.returning();
+	await db.insert(memberNote).values({
+		organizationId: orgId,
+		memberId,
+		body: `Requested removal of recurring add-on: ${row.description} (${formatMoney(row.amount)}/${row.interval})`
+	});
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'recurring_charge',
+		entityId: row.id,
+		action: 'cancel_requested',
+		summary: `Member asked to stop ${row.description}`,
+		data: { memberId }
+	});
+	return updated;
 }
 
 /** Member re-enables gym emails after using the unsubscribe link. */

@@ -916,7 +916,14 @@
 											>
 										</Table.Cell>
 										<Table.Cell class="text-muted-foreground"
-											>{r.rec.description} · {r.rec.interval}ly</Table.Cell
+											>{r.rec.description} · {r.rec
+												.interval}ly{#if r.rec.active && r.rec.removalRequestedAt}
+												<Badge
+													variant="outline"
+													class="ml-2 border-amber-500/50 text-amber-600 dark:text-amber-400"
+													>removal requested</Badge
+												>
+											{/if}</Table.Cell
 										>
 										<Table.Cell class="text-right tabular-nums"
 											>{formatMoney(r.rec.amount, currency)}</Table.Cell

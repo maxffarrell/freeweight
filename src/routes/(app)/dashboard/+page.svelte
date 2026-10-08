@@ -441,7 +441,9 @@
 									<Badge variant="outline" class="shrink-0">
 										{r.kind === 'cancel'
 											? `cancel ${r.planName}`
-											: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+											: r.kind === 'addon'
+												? `stop ${r.planName}`
+												: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
