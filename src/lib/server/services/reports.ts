@@ -1055,7 +1055,8 @@ export async function getReports(orgId: string) {
 		mrr,
 		giftCards,
 		profitability,
-		memberValue
+		memberValue,
+		planChurn
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1093,7 +1094,8 @@ export async function getReports(orgId: string) {
 		monthlyRecurring(orgId),
 		giftCardStats(orgId),
 		classProfitability(orgId),
-		memberLifetimeValue(orgId)
+		memberLifetimeValue(orgId),
+		churnByPlan(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1138,7 +1140,8 @@ export async function getReports(orgId: string) {
 		mrr,
 		giftCards,
 		profitability,
-		memberValue
+		memberValue,
+		planChurn
 	};
 }
 
@@ -1175,4 +1178,31 @@ async function memberLifetimeValue(orgId: string) {
 		avgPerActive: active ? Math.round(total / active) : 0,
 		avgPerPayer: paying ? Math.round(total / paying) : 0
 	};
+}
+
+/**
+ * Memberships cancelled in the last 90 days per plan, with each plan's
+ * currently-active count — which plans churn hardest.
+ */
+async function churnByPlan(orgId: string) {
+	const since = new Date(Date.now() - 90 * 86400_000);
+	const rows = await db
+		.select({
+			planName: plan.name,
+			active: sql<number>`count(*) filter (where ${membership.status} = 'active')`.mapWith(Number),
+			cancelled:
+				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since})`.mapWith(
+					Number
+				)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(plan.isPack, false)))
+		.groupBy(plan.id, plan.name)
+		.orderBy(
+			desc(
+				sql`count(*) filter (where ${membership.status} = 'cancelled' and ${membership.updatedAt} >= ${since})`
+			)
+		);
+	return rows.filter((r) => r.active + r.cancelled > 0);
 }

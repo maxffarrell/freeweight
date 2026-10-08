@@ -327,13 +327,23 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				.where(and(eq(waiver.memberId, memberId), eq(waiver.text, st.waiverText)))
 				.limit(1)
 		).length;
+	// Desk heads-up: a suspended membership (dunning or staff action) — the
+	// member can still walk in, staff decide whether to chase the balance.
+	const suspended = !!(
+		await db
+			.select({ id: membership.id })
+			.from(membership)
+			.where(and(eq(membership.memberId, memberId), eq(membership.status, 'suspended')))
+			.limit(1)
+	).length;
 	return {
 		checkIn: row!,
 		member: m,
 		attended: attended.length,
 		birthday,
 		visits: n,
-		waiverMissing
+		waiverMissing,
+		suspended
 	};
 }
 

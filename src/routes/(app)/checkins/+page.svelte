@@ -63,7 +63,8 @@
 				`${r.member.name} checked in` +
 					(r.attended
 						? ` — marked attended for ${r.attended} class${r.attended > 1 ? 'es' : ''}`
-						: '')
+						: '') +
+					(r.suspended ? ' — membership suspended' : '')
 			);
 			code = '';
 			await refilter();

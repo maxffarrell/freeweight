@@ -232,6 +232,41 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Churn by plan</Card.Title>
+			<Card.Description>Memberships cancelled in the last 90 days vs still active</Card.Description>
+		</Card.Header>
+		<Card.Content class="p-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Plan</Table.Head>
+						<Table.Head class="text-right">Active</Table.Head>
+						<Table.Head class="text-right">Cancelled (90d)</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.planChurn as p (p.planName)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{p.planName}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{p.active}</Table.Cell>
+							<Table.Cell
+								class="text-right tabular-nums {p.cancelled > p.active ? 'text-red-500' : ''}"
+								>{p.cancelled}</Table.Cell
+							>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground">No memberships yet.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Recurring revenue</Card.Title>
 			<Card.Description>Monthly run rate from {r.mrr.activeMembers} active members</Card.Description
 			>
