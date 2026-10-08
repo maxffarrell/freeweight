@@ -10,6 +10,7 @@ import {
 	classType,
 	document,
 	gymMember,
+	incident,
 	location,
 	memberMeasurement,
 	memberNote,
@@ -19,6 +20,7 @@ import {
 	organization,
 	payment,
 	personalRecord,
+	signRequest,
 	user,
 	waiver,
 	plan,
@@ -29,6 +31,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
 import { emit } from './events.ts';
 import { creditUsage } from './schedule.ts';
+import { notifySignRequest } from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -313,7 +316,9 @@ export async function getMember(orgId: string, id: string) {
 		emails,
 		measurements,
 		scores,
-		prs
+		prs,
+		incidents,
+		signRequests
 	] = await Promise.all([
 		db
 			.select({
@@ -399,6 +404,17 @@ export async function getMember(orgId: string, id: string) {
 			.from(personalRecord)
 			.where(and(eq(personalRecord.organizationId, orgId), eq(personalRecord.memberId, id)))
 			.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+			.limit(25),
+		db
+			.select()
+			.from(incident)
+			.where(and(eq(incident.organizationId, orgId), eq(incident.memberId, id)))
+			.orderBy(desc(incident.occurredOn), desc(incident.createdAt)),
+		db
+			.select()
+			.from(signRequest)
+			.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.memberId, id)))
+			.orderBy(desc(signRequest.createdAt))
 			.limit(25)
 	]);
 	return {
@@ -420,6 +436,8 @@ export async function getMember(orgId: string, id: string) {
 		measurements,
 		scores,
 		prs,
+		incidents,
+		signRequests,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		attendance: {
@@ -855,4 +873,164 @@ export async function prBoard(orgId: string, limit = 20) {
 		.where(eq(personalRecord.organizationId, orgId))
 		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
 		.limit(limit);
+}
+
+// ---------- Incident / injury reports ----------
+
+export async function listIncidents(orgId: string, memberId?: string) {
+	return db
+		.select({ incident, memberName: gymMember.name })
+		.from(incident)
+		.leftJoin(gymMember, eq(incident.memberId, gymMember.id))
+		.where(
+			and(
+				eq(incident.organizationId, orgId),
+				memberId ? eq(incident.memberId, memberId) : undefined
+			)
+		)
+		.orderBy(desc(incident.occurredOn), desc(incident.createdAt))
+		.limit(memberId ? 50 : 200);
+}
+
+/** Logs an injury/incident report. `subjectName` is required when memberId is null. */
+export async function logIncident(ctx: OrgContext, input: v.InferOutput<typeof s.incidentInput>) {
+	if (!input.memberId && !input.subjectName?.trim()) error(400, 'Pick a member or enter a name');
+	if (input.memberId) {
+		const [m] = await db
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
+		if (!m) error(404, 'Member not found');
+	}
+	const [row] = await db
+		.insert(incident)
+		.values({
+			organizationId: ctx.orgId,
+			memberId: input.memberId,
+			subjectName: input.subjectName?.trim() ?? '',
+			kind: input.kind,
+			occurredOn: input.occurredOn,
+			description: input.description,
+			reportedById: ctx.userId ?? null
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'member',
+		entityId: input.memberId ?? ctx.orgId,
+		action: 'incident_logged',
+		summary: `${input.kind === 'injury' ? 'Injury' : 'Incident'} report — ${input.subjectName?.trim() || 'member'}`
+	});
+	return row;
+}
+
+export async function updateIncident(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.incidentUpdate>
+) {
+	const { id, ...set } = input;
+	const [row] = await db
+		.update(incident)
+		.set(set)
+		.where(and(eq(incident.organizationId, ctx.orgId), eq(incident.id, id)))
+		.returning();
+	if (!row) error(404, 'Incident not found');
+	return row;
+}
+
+// ---------- Signature requests ----------
+
+export async function listSignRequests(orgId: string, memberId?: string) {
+	return db
+		.select()
+		.from(signRequest)
+		.where(
+			and(
+				eq(signRequest.organizationId, orgId),
+				memberId ? eq(signRequest.memberId, memberId) : undefined
+			)
+		)
+		.orderBy(desc(signRequest.createdAt))
+		.limit(memberId ? 50 : 200);
+}
+
+/** Sends a document for the member to sign in the portal; emails them the link. */
+export async function sendSignRequest(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.signRequestInput>
+) {
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
+	if (!m) error(404, 'Member not found');
+	const [row] = await db
+		.insert(signRequest)
+		.values({
+			organizationId: ctx.orgId,
+			memberId: input.memberId,
+			title: input.title,
+			body: input.body,
+			sentById: ctx.userId ?? null
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'member',
+		entityId: input.memberId,
+		action: 'sign_request_sent',
+		summary: `Sent "${input.title}" for signature`
+	});
+	notifySignRequest(ctx.orgId, row!.id).catch(() => {});
+	return row;
+}
+
+/** Member signs in the portal — typed name + timestamp, one shot. */
+export async function signDocumentRequest(
+	orgId: string,
+	memberId: string,
+	id: string,
+	signedName: string
+) {
+	if (!signedName.trim()) error(400, 'Type your name to sign');
+	const [row] = await db
+		.update(signRequest)
+		.set({ status: 'signed', signedName: signedName.trim(), signedAt: new Date() })
+		.where(
+			and(
+				eq(signRequest.organizationId, orgId),
+				eq(signRequest.memberId, memberId),
+				eq(signRequest.id, id),
+				eq(signRequest.status, 'pending')
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Request not found or already handled');
+	await emit({
+		orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'document_signed',
+		summary: `Signed "${row.title}"`
+	});
+	return row;
+}
+
+/** Staff withdraws a pending request. */
+export async function voidSignRequest(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.update(signRequest)
+		.set({ status: 'voided' })
+		.where(
+			and(
+				eq(signRequest.organizationId, ctx.orgId),
+				eq(signRequest.id, id),
+				eq(signRequest.status, 'pending')
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Request not found or already handled');
+	return row;
 }

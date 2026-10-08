@@ -71,7 +71,10 @@
 		getPersonalRecords,
 		addPersonalRecord,
 		deletePersonalRecord,
-		getPrBoard
+		getPrBoard,
+		getSignRequests,
+		signDocument,
+		getMovementVideos
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -401,6 +404,29 @@
 		}
 		shopBusy = '';
 	}
+
+	// ------- signature requests -------
+	const signRequests = $derived(await getSignRequests(memberId));
+	const pendingSigns = $derived(signRequests.filter((r) => r.status === 'pending'));
+	let signFor = $state<(typeof signRequests)[number] | null>(null);
+	let signName = $state('');
+	let signBusy = $state(false);
+	async function doSign() {
+		if (!signFor || signName.trim().length < 2) return;
+		signBusy = true;
+		try {
+			await signDocument({ memberId, requestId: signFor.id, signedName: signName.trim() });
+			signFor = null;
+			signName = '';
+			toast.success('Signed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not sign'));
+		}
+		signBusy = false;
+	}
+
+	// ------- movement library -------
+	const movementVideos = $derived(await getMovementVideos(memberId));
 
 	// ------- personal records -------
 	const prs = $derived(await getPersonalRecords(memberId));
@@ -1593,6 +1619,62 @@
 		</Card.Root>
 	{/if}
 
+	{#if pendingSigns.length}
+		<Card.Root class="border-amber-500/50 sm:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">Documents to sign</Card.Title>
+				<Card.Description>Your gym sent these for your signature</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-2 px-6">
+				{#each pendingSigns as r (r.id)}
+					<div class="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+						<span class="min-w-0 truncate font-medium">{r.title}</span>
+						<Button
+							size="sm"
+							onclick={() => {
+								signFor = r;
+								signName = d.member.name;
+							}}>Review & sign</Button
+						>
+					</div>
+				{/each}
+				{#each signRequests.filter((r) => r.status === 'signed').slice(0, 3) as r (r.id)}
+					<p class="text-xs text-muted-foreground">
+						Signed: {r.title} — {r.signedName}
+					</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if movementVideos.length}
+		<Card.Root class="sm:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Movement library</Card.Title>
+				<Card.Description>Coaching videos for your classes</Card.Description>
+			</Card.Header>
+			<Card.Content class="px-6">
+				{#each Object.entries(Object.groupBy(movementVideos, (v) => v.className)) as [cname, vids] (cname)}
+					<p class="mt-2 mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						{cname}
+					</p>
+					<ul class="space-y-1 text-sm">
+						{#each vids as v (v.video.id)}
+							<li>
+								<a
+									href={v.video.url}
+									target="_blank"
+									rel="noreferrer"
+									class="text-primary hover:underline">{v.video.title}</a
+								>
+							</li>
+						{/each}
+					</ul>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root class="sm:col-span-2">
 		<Card.Header class="pb-2">
 			<Card.Title class="flex items-center gap-2 text-base"
@@ -2364,6 +2446,30 @@
 			<Button variant="outline" onclick={() => (resultFor = null)}>Cancel</Button>
 			<Button onclick={submitResult} disabled={resultBusy || !resultScore.trim()}>
 				Save score
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root open={!!signFor} onOpenChange={(o) => !o && (signFor = null)}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>{signFor?.title}</Dialog.Title>
+			<Dialog.Description>Read the document, then type your name to sign.</Dialog.Description>
+		</Dialog.Header>
+		<p
+			class="max-h-64 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap text-muted-foreground"
+		>
+			{signFor?.body}
+		</p>
+		<Field.Field>
+			<Field.Label for="sign-name">Sign as</Field.Label>
+			<Input id="sign-name" placeholder="Your full name" bind:value={signName} />
+		</Field.Field>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (signFor = null)}>Cancel</Button>
+			<Button onclick={doSign} disabled={signBusy || signName.trim().length < 2}>
+				{signBusy ? 'Signing…' : 'Sign document'}
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

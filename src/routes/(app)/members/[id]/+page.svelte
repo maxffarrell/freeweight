@@ -31,7 +31,11 @@
 		emailAllMembers,
 		requestPayment,
 		getMembers,
-		mergeMembers
+		mergeMembers,
+		logIncident,
+		updateIncidentEntry,
+		sendSignRequest,
+		voidSignRequest
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -65,11 +69,14 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import FilePen from '@lucide/svelte/icons/file-pen';
 	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
+	const mSignReqs = $derived(m.signRequests);
+	const mIncidents = $derived(m.incidents);
 	const memberNotes = $derived(await getMemberNotes(id));
 	const challenges = $derived(await getChallenges());
 	const memberChallenges = $derived(
@@ -121,6 +128,67 @@
 			await deleteMemberNote({ noteId, memberId: id });
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete note'));
+		}
+	}
+
+	// ------- incidents -------
+	let incOpen = $state(false);
+	let incKind = $state<'injury' | 'incident'>('injury');
+	let incDate = $state('');
+	let incDesc = $state('');
+	let incPending = $state(false);
+	async function addIncident(e: SubmitEvent) {
+		e.preventDefault();
+		if (!incDesc.trim() || !incDate) return;
+		incPending = true;
+		try {
+			await logIncident({
+				memberId: id,
+				kind: incKind,
+				occurredOn: incDate,
+				description: incDesc.trim()
+			});
+			incOpen = false;
+			incDesc = incDate = '';
+			toast.success('Incident logged');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log'));
+		}
+		incPending = false;
+	}
+	async function closeIncident(incidentId: string) {
+		const followUp = prompt('Follow-up notes (what was done):') ?? '';
+		try {
+			await updateIncidentEntry({ id: incidentId, memberId: id, status: 'closed', followUp });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
+
+	// ------- signature requests -------
+	let srOpen = $state(false);
+	let srTitle = $state('');
+	let srBody = $state('');
+	let srPending = $state(false);
+	async function sendRequest(e: SubmitEvent) {
+		e.preventDefault();
+		if (!srTitle.trim() || !srBody.trim()) return;
+		srPending = true;
+		try {
+			await sendSignRequest({ memberId: id, title: srTitle.trim(), body: srBody.trim() });
+			srOpen = false;
+			srTitle = srBody = '';
+			toast.success('Sent — the member signs in their portal');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		srPending = false;
+	}
+	async function voidRequest(reqId: string) {
+		try {
+			await voidSignRequest({ id: reqId, memberId: id });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not void'));
 		}
 	}
 
@@ -966,6 +1034,95 @@
 		</Card.Root>
 
 		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Signature requests</Card.Title>
+					<Card.Description>Documents the member signs in their portal</Card.Description>
+				</div>
+				<Button size="sm" variant="outline" onclick={() => (srOpen = true)}>
+					<FilePen /> Request signature
+				</Button>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each mSignReqs as r (r.id)}
+					<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+						<div class="min-w-0">
+							<span class="truncate font-medium">{r.title}</span>
+							{#if r.status === 'signed'}
+								<span class="block text-xs text-muted-foreground"
+									>Signed by {r.signedName} · {formatRelative(r.signedAt!)}</span
+								>
+							{/if}
+						</div>
+						<div class="flex shrink-0 items-center gap-2">
+							<Badge
+								variant={r.status === 'signed'
+									? 'secondary'
+									: r.status === 'pending'
+										? 'outline'
+										: 'destructive'}>{r.status}</Badge
+							>
+							{#if r.status === 'pending'}
+								<Button
+									size="sm"
+									variant="ghost"
+									class="h-7 px-1.5 text-destructive"
+									onclick={() => voidRequest(r.id)}>Void</Button
+								>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						No requests yet — send a release form or agreement for the member to sign online.
+					</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Incident reports</Card.Title>
+					<Card.Description>Injuries and incidents involving this member</Card.Description>
+				</div>
+				<Button size="sm" variant="outline" onclick={() => (incOpen = true)}>
+					<Plus /> Log incident
+				</Button>
+			</Card.Header>
+			<Card.Content class="px-4">
+				{#each mIncidents as i (i.id)}
+					<div class="py-1.5 text-sm">
+						<div class="flex items-center justify-between gap-2">
+							<span class="min-w-0 truncate">
+								<Badge variant={i.kind === 'injury' ? 'destructive' : 'outline'} class="mr-1.5"
+									>{i.kind}</Badge
+								>
+								{i.description}
+							</span>
+							<span class="flex shrink-0 items-center gap-2">
+								<span class="text-xs text-muted-foreground">{i.occurredOn}</span>
+								{#if i.status === 'open'}
+									<Button
+										size="sm"
+										variant="ghost"
+										class="h-7 px-1.5"
+										onclick={() => closeIncident(i.id)}>Close</Button
+									>
+								{:else}
+									<Badge variant="secondary">closed</Badge>
+								{/if}
+							</span>
+						</div>
+						{#if i.followUp}<p class="mt-0.5 text-xs text-muted-foreground">{i.followUp}</p>{/if}
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No incident reports.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Notes</Card.Title>
 			</Card.Header>
@@ -1736,6 +1893,80 @@
 				{mergePending ? 'Merging…' : 'Merge and delete duplicate'}
 			</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={incOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Log incident</Dialog.Title>
+			<Dialog.Description>
+				Record an injury or incident involving {m.member.name} — kept on their record for follow-up.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={addIncident}>
+			<Field.Field>
+				<Field.Label>Type</Field.Label>
+				<Select.Root
+					type="single"
+					value={incKind}
+					onValueChange={(v) => (incKind = v as 'injury' | 'incident')}
+				>
+					<Select.Trigger class="w-full"
+						>{incKind === 'injury' ? 'Injury' : 'Incident'}</Select.Trigger
+					>
+					<Select.Content>
+						<Select.Item value="injury">Injury</Select.Item>
+						<Select.Item value="incident">Incident</Select.Item>
+					</Select.Content>
+				</Select.Root>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="inc-date">Date</Field.Label>
+				<Input id="inc-date" type="date" bind:value={incDate} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="inc-desc">What happened</Field.Label>
+				<Textarea
+					id="inc-desc"
+					rows={4}
+					placeholder="Rolled ankle during box jumps; ice applied, sat out remainder…"
+					bind:value={incDesc}
+				/>
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={incPending || !incDesc.trim() || !incDate}>
+					{incPending ? 'Saving…' : 'Log incident'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={srOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Request signature</Dialog.Title>
+			<Dialog.Description>
+				The member gets an email and signs this in their portal — release forms, consents,
+				agreements.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendRequest}>
+			<Field.Field>
+				<Field.Label for="sr-title">Title</Field.Label>
+				<Input id="sr-title" placeholder="Competition release" bind:value={srTitle} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="sr-body">Document text</Field.Label>
+				<Textarea id="sr-body" rows={8} placeholder="I agree to…" bind:value={srBody} />
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={srPending || !srTitle.trim() || !srBody.trim()}>
+					{srPending ? 'Sending…' : 'Send for signature'}
+				</Button>
+			</Dialog.Footer>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>
 

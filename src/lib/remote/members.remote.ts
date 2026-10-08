@@ -12,13 +12,16 @@ import {
 	checkInInput,
 	guestVisitInput,
 	idSchema,
+	incidentInput,
+	incidentUpdate,
 	memberImportInput,
 	memberInput,
 	memberMergeInput,
 	memberNoteInput,
 	memberTagInput,
 	memberUpdate,
-	scheduledAnnouncementInput
+	scheduledAnnouncementInput,
+	signRequestInput
 } from '#lib/schemas.ts';
 import {
 	cancelScheduledAnnouncement,
@@ -258,5 +261,37 @@ export const deleteMemberNote = command(
 	async ({ noteId, memberId }) => {
 		await svc.deleteMemberNote(await requireOrg(), noteId);
 		void getMemberNotes(memberId).refresh();
+	}
+);
+
+// ---------- Incidents + signature requests ----------
+
+export const logIncident = command(incidentInput, async (input) => {
+	const r = await svc.logIncident(await requireOrg(), input);
+	if (input.memberId) void getMember(input.memberId).refresh();
+	return r;
+});
+
+export const updateIncidentEntry = command(
+	v.object({ ...incidentUpdate.entries, memberId: idSchema }),
+	async ({ memberId, ...input }) => {
+		const r = await svc.updateIncident(await requireOrg(), input);
+		void getMember(memberId).refresh();
+		return r;
+	}
+);
+
+export const sendSignRequest = command(signRequestInput, async (input) => {
+	const r = await svc.sendSignRequest(await requireOrg(), input);
+	void getMember(input.memberId).refresh();
+	return r;
+});
+
+export const voidSignRequest = command(
+	v.object({ id: idSchema, memberId: idSchema }),
+	async ({ id, memberId }) => {
+		const r = await svc.voidSignRequest(await requireOrg(), id);
+		void getMember(memberId).refresh();
+		return r;
 	}
 );

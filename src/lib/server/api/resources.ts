@@ -330,6 +330,28 @@ export const resources: Record<string, Resource> = {
 			return members.removeMemberTag(ctx, memberId, rest.join(':'));
 		}
 	},
+	incidents: {
+		description:
+			'Injury/incident reports (kind, occurredOn, status open|closed). Filter by memberId; PATCH closes with followUp notes.',
+		list: (ctx, url) =>
+			members.listIncidents(ctx.orgId, url.searchParams.get('memberId') ?? undefined),
+		create: { schema: s.incidentInput, run: members.logIncident as never },
+		update: { schema: s.incidentUpdate, run: members.updateIncident as never }
+	},
+	sign_requests: {
+		description:
+			'Document signature requests (pending/signed/voided). Filter by memberId; POST emails the member a portal signing link.',
+		list: (ctx, url) =>
+			members.listSignRequests(ctx.orgId, url.searchParams.get('memberId') ?? undefined),
+		create: { schema: s.signRequestInput, run: members.sendSignRequest as never }
+	},
+	class_videos: {
+		description:
+			'Movement/coaching video links per class type (title + URL), shown in the member portal.',
+		list: (ctx) => schedule.listClassVideos(ctx.orgId),
+		create: { schema: s.classVideoInput, run: schedule.addClassVideo as never },
+		delete: (ctx, id) => schedule.deleteClassVideo(ctx, id)
+	},
 	personal_records: {
 		description:
 			'Member-logged personal records (lift/benchmark, free-form result, recordedOn). Filter by memberId.',

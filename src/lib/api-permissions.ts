@@ -31,7 +31,10 @@ export const API_RESOURCES = [
 	'expenses',
 	'member_tags',
 	'desk_tasks',
-	'personal_records'
+	'personal_records',
+	'incidents',
+	'sign_requests',
+	'class_videos'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -71,7 +74,10 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	expenses: 'Expenses',
 	member_tags: 'Member tags',
 	desk_tasks: 'Desk checklist',
-	personal_records: 'Personal records'
+	personal_records: 'Personal records',
+	incidents: 'Incident reports',
+	sign_requests: 'Signature requests',
+	class_videos: 'Movement videos'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

@@ -155,6 +155,7 @@
 	let referralCredits = $state<number | null>(settings.referralCredits);
 	// svelte-ignore state_referenced_locally
 	let saveOfferPct = $state<number | null>(settings.saveOfferPct);
+	let freezeFee = $state<number | null>(settings.freezeFee);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
 	// svelte-ignore state_referenced_locally
@@ -186,6 +187,7 @@
 				suspendAfterDays,
 				referralCredits,
 				saveOfferPct,
+				freezeFee,
 				publicPage,
 				staffBriefing,
 				firstClassFree
@@ -525,6 +527,13 @@
 							<Field.Description
 								>Class credits granted to a member the first time someone who joined through their
 								referral link makes a payment. Leave empty for no reward.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Freeze fee</Field.Label>
+							<MoneyInput bind:value={freezeFee} />
+							<Field.Description
+								>One-time charge posted when a membership is paused. Leave empty to freeze free.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>

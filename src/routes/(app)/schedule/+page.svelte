@@ -57,7 +57,10 @@
 		getEquipment,
 		createEquipment,
 		updateEquipment,
-		removeEquipment
+		removeEquipment,
+		getClassVideos,
+		addClassVideo,
+		deleteClassVideo
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -795,6 +798,37 @@
 		tActive = c.active;
 		tMemberBookable = c.memberBookable;
 	}
+	// ------- movement video library -------
+	const classVideos = $derived(await getClassVideos());
+	const editTypeVideos = $derived(
+		editTypeId ? classVideos.filter((v) => v.video.classTypeId === editTypeId) : []
+	);
+	let vidTitle = $state('');
+	let vidUrl = $state('');
+	let vidPending = $state(false);
+	async function addVideo() {
+		if (!editTypeId || !vidTitle.trim() || !vidUrl.trim()) return;
+		vidPending = true;
+		try {
+			await addClassVideo({
+				classTypeId: editTypeId,
+				title: vidTitle.trim(),
+				url: vidUrl.trim()
+			});
+			vidTitle = vidUrl = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add video'));
+		}
+		vidPending = false;
+	}
+	async function removeVideo(id: string) {
+		try {
+			await deleteClassVideo(id);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
+	}
+
 	function resetTypeForm() {
 		editTypeId = null;
 		tName = tDescription = '';
@@ -1580,6 +1614,43 @@
 				<Button type="submit" disabled={pending}>{editTypeId ? 'Save' : 'Create'}</Button>
 			</Dialog.Footer>
 		</form>
+		{#if editTypeId}
+			<div class="mt-4 border-t pt-4">
+				<p class="mb-1 text-sm font-medium">Movement videos</p>
+				<p class="mb-2 text-xs text-muted-foreground">
+					Coaching links members see in the portal for this class.
+				</p>
+				{#each editTypeVideos as v (v.video.id)}
+					<div class="flex items-center gap-2 py-1 text-sm">
+						<a
+							href={v.video.url}
+							target="_blank"
+							rel="noreferrer"
+							class="min-w-0 flex-1 truncate hover:underline">{v.video.title}</a
+						>
+						<Button
+							size="sm"
+							variant="ghost"
+							class="h-7 px-1.5 text-destructive"
+							onclick={() => removeVideo(v.video.id)}><Trash2 class="size-3.5" /></Button
+						>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No videos yet.</p>
+				{/each}
+				<div class="mt-2 flex gap-2">
+					<Input placeholder="Thruster demo" bind:value={vidTitle} class="w-40" />
+					<Input placeholder="https://youtube.com/…" bind:value={vidUrl} class="flex-1" />
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						disabled={vidPending || !vidTitle.trim() || !vidUrl.trim()}
+						onclick={addVideo}>Add</Button
+					>
+				</div>
+			</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
 

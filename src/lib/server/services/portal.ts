@@ -12,6 +12,8 @@ import {
 	document,
 	sessionFeedback,
 	shopItem,
+	signRequest,
+	classVideo,
 	workoutResult,
 	gymMember,
 	gymSettings,
@@ -1167,4 +1169,45 @@ export async function memberBuyItem(
 		payNow: false,
 		method: 'card'
 	});
+}
+
+// ---------- Signature requests + movement library (portal) ----------
+
+/** Documents the member can see — pending first so 'to sign' is always on top. */
+export async function memberSignRequests(orgId: string, memberId: string) {
+	return db
+		.select()
+		.from(signRequest)
+		.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.memberId, memberId)))
+		.orderBy(
+			sql`case when ${signRequest.status} = 'pending' then 0 else 1 end`,
+			desc(signRequest.createdAt)
+		)
+		.limit(25);
+}
+
+/**
+ * Coaching videos for the class types the member has booked or attended in the
+ * last 60 days — the 'how do I do this movement' library.
+ */
+export async function memberClassVideos(orgId: string, memberId: string) {
+	return db
+		.select({ video: classVideo, className: classType.name })
+		.from(classVideo)
+		.innerJoin(classType, eq(classVideo.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classVideo.organizationId, orgId),
+				sql`exists (
+					select 1 from ${booking} b
+					join ${classSession} s on s.id = b.session_id
+					where b.member_id = ${memberId}
+					and b.status != 'cancelled'
+					and s.class_type_id = ${classVideo.classTypeId}
+					and s.starts_at > now() - interval '60 days'
+				)`
+			)
+		)
+		.orderBy(asc(classType.name), asc(classVideo.title))
+		.limit(50);
 }

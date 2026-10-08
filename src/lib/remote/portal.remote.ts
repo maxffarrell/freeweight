@@ -672,3 +672,34 @@ export const getPrBoard = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return memberSvc.prBoard(m.organizationId);
 });
+
+// ---------- Signature requests + movement library ----------
+
+export const getSignRequests = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.memberSignRequests(m.organizationId, memberId);
+});
+
+export const signDocument = command(
+	v.object({
+		memberId: idSchema,
+		requestId: idSchema,
+		signedName: v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(120))
+	}),
+	async ({ memberId, requestId, signedName }) => {
+		const m = await myMember(memberId);
+		const r = await memberSvc.signDocumentRequest(
+			m.organizationId,
+			memberId,
+			requestId,
+			signedName
+		);
+		void getSignRequests(memberId).refresh();
+		return r;
+	}
+);
+
+export const getMovementVideos = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.memberClassVideos(m.organizationId, memberId);
+});
