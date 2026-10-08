@@ -6,6 +6,7 @@ import * as billing from '#lib/server/services/billing.ts';
 import * as schedule from '#lib/server/services/schedule.ts';
 import * as events from '#lib/server/services/gym-events.ts';
 import * as challenges from '#lib/server/services/challenges.ts';
+import * as courses from '#lib/server/services/courses.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as amenities from '#lib/server/services/resources.ts';
 import * as shifts from '#lib/server/services/shifts.ts';
@@ -193,6 +194,30 @@ export const resources: Record<string, Resource> = {
 			}
 		},
 		delete: (ctx, id) => events.cancelRegistration(ctx.orgId, id)
+	},
+	courses: {
+		description:
+			'Multi-week priced programs — enrollments auto-book every session. POST creates the course plus its bounded weekly templates (weekdays = 0 Sunday … 6 Saturday); DELETE cancels a course with no enrollees',
+		list: (ctx) => courses.listCourses(ctx.orgId),
+		create: { schema: s.courseInput, run: courses.createCourse as never },
+		delete: (ctx, id) => courses.removeCourse(ctx, id)
+	},
+	course_enrollments: {
+		description:
+			'Course rosters (`?course=` required). POST enrolls a member (posts the signup charge for paid courses, books every upcoming session); DELETE cancels the enrollment — upcoming bookings cancelled, unpaid charge voided',
+		list: (ctx, url) => {
+			const courseId = url.searchParams.get('course');
+			if (!courseId) error(400, 'course_enrollments requires ?course=<id>');
+			return courses.courseRoster(ctx.orgId, courseId);
+		},
+		create: {
+			schema: v.object({ courseId: s.idSchema, memberId: s.idSchema }),
+			run: (ctx, input: never) => {
+				const { courseId, memberId } = input as { courseId: string; memberId: string };
+				return courses.enrollCourse(ctx.orgId, memberId, courseId);
+			}
+		},
+		delete: (ctx, id) => courses.cancelCourseEnrollment(ctx.orgId, id)
 	},
 	challenges: {
 		description:
