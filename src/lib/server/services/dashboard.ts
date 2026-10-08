@@ -245,6 +245,32 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(membership.endsAt))
 		.limit(10);
 
+	// Trial memberships whose first billing lands within 3 days — the same
+	// window the trial-ending email uses (still-trialing = trial plan + no
+	// charge posted yet).
+	const trialsEnding = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			planName: plan.name,
+			firstBillAt: membership.nextChargeAt,
+			amount: plan.amount
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				gt(plan.trialDays, 0),
+				lte(membership.nextChargeAt, new Date(Date.now() + 3 * 86400_000)),
+				sql`not exists (select 1 from ${charge} c where c.membership_id = ${membership.id})`
+			)
+		)
+		.orderBy(asc(membership.nextChargeAt))
+		.limit(10);
+
 	// Challenges whose window includes today — joined count so staff can see
 	// engagement without opening the members page.
 	const liveChallenges = await db
@@ -297,6 +323,7 @@ export async function dashboard(orgId: string) {
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,
+		trialsEnding,
 		liveChallenges
 	};
 }

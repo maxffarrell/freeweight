@@ -1054,7 +1054,8 @@ export async function getReports(orgId: string) {
 		expenseCategories,
 		mrr,
 		giftCards,
-		profitability
+		profitability,
+		memberValue
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1091,7 +1092,8 @@ export async function getReports(orgId: string) {
 		expensesByCategory(orgId),
 		monthlyRecurring(orgId),
 		giftCardStats(orgId),
-		classProfitability(orgId)
+		classProfitability(orgId),
+		memberLifetimeValue(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1135,6 +1137,42 @@ export async function getReports(orgId: string) {
 		pnl,
 		mrr,
 		giftCards,
-		profitability
+		profitability,
+		memberValue
+	};
+}
+
+/**
+ * Member lifetime value: total collected all time, split per active member and
+ * per member-month of paying history. Excludes refunded payments and
+ * gift-card/credit redemptions (same exclusion as revenueByMonth).
+ */
+async function memberLifetimeValue(orgId: string) {
+	const [rev] = await db
+		.select({
+			total: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number),
+			payingMembers: sql<number>`count(distinct ${payment.memberId})`.mapWith(Number)
+		})
+		.from(payment)
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
+				notInArray(payment.method, ['gift_card', 'credit'])
+			)
+		);
+	const [mem] = await db
+		.select({ active: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.status, 'active')));
+	const total = rev?.total ?? 0;
+	const active = mem?.active ?? 0;
+	const paying = rev?.payingMembers ?? 0;
+	return {
+		total,
+		activeMembers: active,
+		payingMembers: paying,
+		avgPerActive: active ? Math.round(total / active) : 0,
+		avgPerPayer: paying ? Math.round(total / paying) : 0
 	};
 }

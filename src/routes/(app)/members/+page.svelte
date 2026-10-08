@@ -214,7 +214,18 @@
 
 	function exportCsv() {
 		const csv = toCsv([
-			['Name', 'Email', 'Phone', 'Status', 'Location', 'Plan', 'Open balance', 'Joined'],
+			[
+				'Name',
+				'Email',
+				'Phone',
+				'Status',
+				'Location',
+				'Plan',
+				'Tags',
+				'Open balance',
+				'Joined',
+				'Last visit'
+			],
 			...members.map((m) => [
 				m.name,
 				m.email,
@@ -222,8 +233,10 @@
 				m.status,
 				m.locationName,
 				m.planName,
+				m.tags.join(' '),
 				(m.openBalance / 100).toFixed(2),
-				m.joinedAt ? formatDate(m.joinedAt) : ''
+				m.joinedAt ? formatDate(m.joinedAt) : '',
+				m.lastVisit ? formatDate(m.lastVisit) : ''
 			])
 		]);
 		const a = document.createElement('a');
