@@ -253,6 +253,42 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Gift cards</Card.Title>
+			<Card.Description
+				>Unredeemed balance — services the gym still owes cardholders</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			{#if r.giftCards.issued === 0}
+				<p class="text-sm text-muted-foreground">
+					No gift cards issued yet — sell them from the front-desk shop.
+				</p>
+			{:else}
+				<p class="text-3xl font-semibold tabular-nums">
+					{formatMoney(r.giftCards.outstanding, currency, true)}
+				</p>
+				<div class="space-y-1 text-sm">
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Issued</span>
+						<span class="tabular-nums"
+							>{r.giftCards.issued} · {formatMoney(r.giftCards.issuedValue, currency, true)}</span
+						>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Redeemed</span>
+						<span class="tabular-nums">{r.giftCards.redeemed}</span>
+					</div>
+					<div class="flex justify-between border-t pt-1">
+						<span class="text-muted-foreground">With balance left</span>
+						<span class="tabular-nums">{r.giftCards.active}</span>
+					</div>
+				</div>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Revenue collected</Card.Title>
 			<Card.Description>Payments per month, last 12 months</Card.Description>
 		</Card.Header>
