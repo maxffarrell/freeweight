@@ -22,6 +22,7 @@
 		updatePromoCode
 	} from '#lib/remote/billing.remote.ts';
 	import { getJoinInfo } from '#lib/remote/workspace.remote.ts';
+	import { getClassTypes } from '#lib/remote/schedule.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { planIntervals } from '#lib/schemas.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -31,6 +32,7 @@
 
 	const currency = await getCurrency();
 	const joinInfo = await getJoinInfo();
+	let classTypes = $state(await getClassTypes());
 	let plans = $state(await getPlans());
 	let promoCodes = $state(await getPromoCodes());
 
@@ -50,6 +52,8 @@
 	let signupFee = $state<number | null>(0);
 	let classCredits = $state<number | null>(null);
 	let isPack = $state(false);
+	/** 'any' = valid for every class; a class-type id scopes the pack to it. */
+	let packClassType = $state('any');
 	let packDays = $state<number | null>(null);
 	let trialDays = $state(0);
 	let guestPasses = $state<number | null>(null);
@@ -70,6 +74,7 @@
 		signupFee = p.signupFee;
 		classCredits = p.classCredits;
 		isPack = p.isPack;
+		packClassType = p.classTypeId ?? 'any';
 		packDays = p.packDays;
 		trialDays = p.trialDays;
 		guestPasses = p.guestPasses;
@@ -90,6 +95,7 @@
 		signupFee = 0;
 		classCredits = null;
 		isPack = false;
+		packClassType = 'any';
 		packDays = null;
 		trialDays = 0;
 		guestPasses = null;
@@ -116,6 +122,7 @@
 					signupFee: signupFee ?? 0,
 					classCredits: classCredits || null,
 					isPack,
+					classTypeId: isPack && packClassType !== 'any' ? packClassType : null,
 					packDays: isPack ? packDays || null : null,
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
@@ -137,6 +144,7 @@
 					signupFee: signupFee ?? 0,
 					classCredits: classCredits || null,
 					isPack,
+					classTypeId: isPack && packClassType !== 'any' ? packClassType : null,
 					packDays: isPack ? packDays || null : null,
 					trialDays: trialDays || 0,
 					guestPasses: guestPasses || null,
@@ -246,6 +254,8 @@
 							>{/if}
 						{#if p.isPack}<Badge variant="secondary"
 								>pack{p.packDays ? ` · ${p.packDays} days` : ''}</Badge
+							>{/if}
+						{#if p.isPack && p.packClassName}<Badge variant="outline">{p.packClassName} only</Badge
 							>{/if}
 						{#if p.classCredits}<Badge variant="outline">{p.classCredits} credits</Badge>{/if}
 						{#if p.trialDays > 0}<Badge variant="outline">{p.trialDays}d free trial</Badge>{/if}
@@ -523,6 +533,27 @@
 				<span>Class pack — one-time purchase, no recurring billing</span>
 				<Switch bind:checked={isPack} />
 			</div>
+			{#if isPack}
+				<Field.Field>
+					<Field.Label>Valid for</Field.Label>
+					<Select.Root type="single" bind:value={packClassType}>
+						<Select.Trigger class="w-full">
+							{packClassType === 'any'
+								? 'Any class'
+								: classTypes.find((c) => c.id === packClassType)?.name}</Select.Trigger
+						>
+						<Select.Content>
+							<Select.Item value="any">Any class</Select.Item>
+							{#each classTypes as c (c.id)}
+								<Select.Item value={c.id}>{c.name} only</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+					<Field.Description
+						>A restricted pack can't book other class types — a "Yoga 10-pack" only covers yoga.</Field.Description
+					>
+				</Field.Field>
+			{/if}
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<span>Listed on public page</span>
 				<Switch bind:checked={listed} />

@@ -617,6 +617,13 @@
       "when": 1791417738803,
       "tag": "0087_addon-removal",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1791419140482,
+      "tag": "0088_pack-class-type",
+      "breakpoints": true
     }
   ]
 }

@@ -180,6 +180,8 @@ export const plan = pgTable(
 		classCredits: integer('class_credits'),
 		/** One-time punch pass: sells `classCredits` classes for `amount`, no recurring billing. */
 		isPack: boolean('is_pack').notNull().default(false),
+		/** Pack restricted to one class type ("Yoga 10-pack"); null = valid for any class. */
+		classTypeId: text('class_type_id').references((): AnyPgColumn => classType.id),
 		/** Days a pack stays valid after purchase; null = never expires. */
 		packDays: integer('pack_days'),
 		/** Free days before the first recurring charge posts; 0 = bill from day one. */

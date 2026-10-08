@@ -902,9 +902,9 @@
 				{#if m.credits}
 					<div class="flex items-center justify-between">
 						<p class="text-xs text-muted-foreground">
-							{m.credits.used} of {m.credits.limit} classes used this period{m.credits.bonus
-								? ` (+${m.credits.bonus} comp)`
-								: ''}
+							{m.credits.used} of {m.credits.limit}{m.credits.className
+								? ` ${m.credits.className}`
+								: ''} classes used this period{m.credits.bonus ? ` (+${m.credits.bonus} comp)` : ''}
 						</p>
 						<Button
 							variant="ghost"

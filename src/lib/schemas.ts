@@ -61,6 +61,8 @@ export const planInput = v.object({
 	signupFee: v.optional(cents, 0),
 	classCredits: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	isPack: v.optional(v.boolean(), false),
+	/** Pack-only: restricts the pack's credits to one class type; null = any class. */
+	classTypeId: v.optional(v.nullable(idSchema)),
 	packDays: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	trialDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 0),
 	guestPasses: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),

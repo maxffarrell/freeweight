@@ -1,0 +1,2 @@
+ALTER TABLE "plan" ADD COLUMN "class_type_id" text;--> statement-breakpoint
+ALTER TABLE "plan" ADD CONSTRAINT "plan_class_type_id_class_type_id_fk" FOREIGN KEY ("class_type_id") REFERENCES "public"."class_type"("id") ON DELETE no action ON UPDATE no action;

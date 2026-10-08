@@ -3,7 +3,7 @@ import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
+import { classType, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as crs from '#lib/server/services/courses.ts';
@@ -250,12 +250,14 @@ export const getJoinablePlans = query(idSchema, async (memberId) => {
 	return db
 		.select({
 			...getTableColumns(plan),
+			packClassName: classType.name,
 			activeMembers:
 				sql<number>`(select count(*) from ${membership} mm where mm.plan_id = ${outer(plan.id)} and mm.status = 'active')`.mapWith(
 					Number
 				)
 		})
 		.from(plan)
+		.leftJoin(classType, eq(plan.classTypeId, classType.id))
 		.where(
 			and(eq(plan.organizationId, m.organizationId), eq(plan.active, true), eq(plan.listed, true))
 		)

@@ -898,7 +898,11 @@
 							<Badge variant="secondary">No active membership</Badge>
 						{/if}
 						{#if d.credits}
-							<Badge variant="outline">{d.credits.used} of {d.credits.limit} classes used</Badge>
+							<Badge variant="outline"
+								>{d.credits.used} of {d.credits.limit}{d.credits.className
+									? ` ${d.credits.className}`
+									: ''} classes used</Badge
+							>
 						{/if}
 					</div>
 					<p class="mt-1 text-xs">
@@ -946,7 +950,7 @@
 										<span class="font-medium">{p.name}</span>
 										<span class="text-muted-foreground">
 											— {formatMoney(p.amount, currency)}{p.isPack
-												? ` · ${p.classCredits} classes`
+												? ` · ${p.classCredits} classes${p.packClassName ? ` (${p.packClassName} only)` : ''}`
 												: `/${p.interval}`}{p.trialDays
 												? ` · ${p.trialDays}-day free trial`
 												: ''}{p.commitmentMonths ? ` · ${p.commitmentMonths}-mo minimum` : ''}
@@ -971,9 +975,9 @@
 									<div class="min-w-0">
 										<span class="font-medium">{p.name}</span>
 										<span class="text-muted-foreground">
-											— {formatMoney(p.amount, currency)} · {p.classCredits} classes{p.packDays
-												? ` · expires in ${p.packDays} days`
-												: ''}
+											— {formatMoney(p.amount, currency)} · {p.classCredits} classes{p.packClassName
+												? ` · ${p.packClassName} only`
+												: ''}{p.packDays ? ` · expires in ${p.packDays} days` : ''}
 										</span>
 									</div>
 									<Button

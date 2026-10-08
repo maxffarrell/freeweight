@@ -259,6 +259,9 @@
 									{#if p.classCredits}<Badge variant="outline"
 											>{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}</Badge
 										>{/if}
+									{#if p.isPack && p.packClassName}<Badge variant="outline"
+											>{p.packClassName} only</Badge
+										>{/if}
 									{#if p.commitmentMonths}<Badge variant="outline"
 											>{p.commitmentMonths}-mo minimum{p.earlyCancelFeeCents
 												? ` · ${formatMoney(p.earlyCancelFeeCents, currency)} early cancel`

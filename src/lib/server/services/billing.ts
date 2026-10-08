@@ -16,6 +16,7 @@ import {
 import { db } from '#lib/server/db/index.ts';
 import {
 	charge,
+	classType,
 	expense,
 	gymMember,
 	gymSettings,
@@ -52,12 +53,14 @@ export async function listPlans(orgId: string) {
 	return db
 		.select({
 			...getTableColumns(plan),
+			packClassName: classType.name,
 			activeMembers:
 				sql<number>`(select count(*) from ${membership} m where m.plan_id = ${outer(plan.id)} and m.status = 'active')`.mapWith(
 					Number
 				)
 		})
 		.from(plan)
+		.leftJoin(classType, eq(plan.classTypeId, classType.id))
 		.where(eq(plan.organizationId, orgId))
 		.orderBy(asc(plan.amount));
 }
@@ -83,6 +86,7 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 			signupFee: input.signupFee,
 			classCredits: input.classCredits ?? null,
 			isPack: input.isPack,
+			classTypeId: input.isPack ? (input.classTypeId ?? null) : null,
 			packDays: input.isPack ? (input.packDays ?? null) : null,
 			trialDays: input.trialDays,
 			guestPasses: input.guestPasses ?? null,
@@ -99,6 +103,8 @@ export async function createPlan(ctx: OrgContext, input: v.InferOutput<typeof s.
 
 export async function updatePlan(ctx: OrgContext, input: v.InferOutput<typeof s.planUpdate>) {
 	const { id, grandfatherPrice, ...set } = input;
+	// Class-type scoping is pack-only — clear it when a plan stops being a pack.
+	if (set.isPack === false) set.classTypeId = null;
 	const [old] = await db
 		.select()
 		.from(plan)

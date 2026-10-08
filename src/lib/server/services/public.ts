@@ -48,12 +48,14 @@ export async function getPublicGym(slug: string) {
 	const plans = await db
 		.select({
 			...getTableColumns(plan),
+			packClassName: classType.name,
 			activeMembers:
 				sql<number>`(select count(*) from ${membership} m where m.plan_id = ${outer(plan.id)} and m.status = 'active')`.mapWith(
 					Number
 				)
 		})
 		.from(plan)
+		.leftJoin(classType, eq(plan.classTypeId, classType.id))
 		.where(and(eq(plan.organizationId, org.id), eq(plan.active, true), eq(plan.listed, true)))
 		.orderBy(asc(plan.amount));
 
