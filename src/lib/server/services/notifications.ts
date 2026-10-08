@@ -2301,7 +2301,7 @@ export async function sendWinBackNudges(orgId: string) {
 			name: gymMember.name,
 			email: gymMember.email,
 			joined: gymMember.createdAt,
-			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+			lastVisit: sql<string | null>`max(${checkIn.checkedAt})`
 		})
 		.from(gymMember)
 		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
@@ -2320,7 +2320,7 @@ export async function sendWinBackNudges(orgId: string) {
 	let sent = 0;
 	for (const r of rows) {
 		if (!r.email) continue;
-		const since = r.lastVisit ?? r.joined;
+		const since = r.lastVisit ? new Date(r.lastVisit) : r.joined;
 		if (since.getTime() > cutoff) continue;
 		if (!(await logOnce(orgId, 'winback', `${r.memberId}:${month}`, r.email))) continue;
 		const days = Math.floor((Date.now() - since.getTime()) / 86400_000);

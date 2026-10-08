@@ -5,15 +5,22 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getActivity, getActivityTypes, getSettings } from '#lib/remote/workspace.remote.ts';
+	import {
+		getActivity,
+		getActivityActors,
+		getActivityTypes,
+		getSettings
+	} from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 
 	const settings = await getSettings();
 	const types = await getActivityTypes();
+	const actors = await getActivityActors();
 
 	const PAGE = 50;
 	let entityType = $state('all');
+	let actorId = $state('all');
 	// 51 rows come back per fetch — the +1 tells us another page exists.
 	const first = await getActivity({});
 	let items = $state(first.slice(0, PAGE));
@@ -22,7 +29,8 @@
 
 	async function refilter() {
 		const r = await getActivity({
-			entityType: entityType === 'all' ? undefined : entityType
+			entityType: entityType === 'all' ? undefined : entityType,
+			actorId: actorId === 'all' ? undefined : actorId
 		});
 		items = r.slice(0, PAGE);
 		hasMore = r.length > PAGE;
@@ -35,6 +43,7 @@
 		try {
 			const next = await getActivity({
 				entityType: entityType === 'all' ? undefined : entityType,
+				actorId: actorId === 'all' ? undefined : actorId,
 				before: new Date(last.createdAt).toISOString()
 			});
 			items = [...items, ...next.slice(0, PAGE)];
@@ -72,17 +81,32 @@
 				<Card.Title class="text-base">Audit log</Card.Title>
 				<Card.Description>Every staff and system event — who did what, when.</Card.Description>
 			</div>
-			<Select.Root type="single" bind:value={entityType} onValueChange={() => void refilter()}>
-				<Select.Trigger class="w-44">
-					{entityType === 'all' ? 'All activity' : typeLabel(entityType)}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="all">All activity</Select.Item>
-					{#each types as t (t)}
-						<Select.Item value={t}>{typeLabel(t)}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
+			<div class="flex items-center gap-2">
+				{#if actors.length > 1}
+					<Select.Root type="single" bind:value={actorId} onValueChange={() => void refilter()}>
+						<Select.Trigger class="w-36">
+							{actorId === 'all' ? 'Everyone' : actors.find((a) => a.id === actorId)?.name}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="all">Everyone</Select.Item>
+							{#each actors as a (a.id)}
+								<Select.Item value={a.id}>{a.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+				<Select.Root type="single" bind:value={entityType} onValueChange={() => void refilter()}>
+					<Select.Trigger class="w-44">
+						{entityType === 'all' ? 'All activity' : typeLabel(entityType)}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="all">All activity</Select.Item>
+						{#each types as t (t)}
+							<Select.Item value={t}>{typeLabel(t)}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
 		</Card.Header>
 		<Card.Content class="divide-y p-0">
 			{#each items as a (a.id)}

@@ -8,6 +8,7 @@ import Settings from '@lucide/svelte/icons/settings';
 import ChartColumn from '@lucide/svelte/icons/chart-column';
 import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 import History from '@lucide/svelte/icons/history';
+import Building2 from '@lucide/svelte/icons/building-2';
 
 /** `key` is the second key of the `g <key>` keyboard shortcut. */
 export const mainNav = [
@@ -22,6 +23,7 @@ export const mainNav = [
 
 export const secondaryNav = [
 	{ href: '/my-classes', label: 'My classes', icon: GraduationCap, key: 'y' },
+	{ href: '/franchise', label: 'Franchise', icon: Building2, key: 'f' },
 	{ href: '/activity', label: 'Activity', icon: History, key: 'a' },
 	{ href: '/settings', label: 'Settings', icon: Settings, key: 't' }
 ] as const;

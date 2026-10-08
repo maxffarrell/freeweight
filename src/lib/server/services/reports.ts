@@ -201,7 +201,7 @@ async function paymentsByMethod(orgId: string) {
 async function revenueByKind(orgId: string) {
 	return db
 		.select({
-			kind: sql<string>`coalesce(${charge.kind}, 'unapplied')`,
+			kind: sql<string>`coalesce(${charge.kind}::text, 'unapplied')`,
 			count: sql<number>`count(*)`.mapWith(Number),
 			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
 		})
@@ -215,7 +215,7 @@ async function revenueByKind(orgId: string) {
 				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
 			)
 		)
-		.groupBy(sql`coalesce(${charge.kind}, 'unapplied')`)
+		.groupBy(sql`coalesce(${charge.kind}::text, 'unapplied')`)
 		.orderBy(desc(sql`sum(${payment.amount})`));
 }
 
@@ -287,6 +287,56 @@ async function noShowByClass(orgId: string) {
 	}));
 }
 
+/** Per-class-type economics over the last 30 days: sessions run, avg attendance,
+ * drop-in revenue collected, and instructor cost (sessions × pay rate).
+ * Membership revenue isn't attributable to one class, so margin counts
+ * drop-in revenue only — a floor on true profitability. */
+async function classProfitability(orgId: string) {
+	const since = new Date(Date.now() - 30 * 86400_000);
+	const rows = await db
+		.select({
+			className: classType.name,
+			color: classType.color,
+			payRate: classType.payRate,
+			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
+			attended:
+				sql<number>`count(distinct ${booking.id}) filter (where ${booking.status} = 'attended')`.mapWith(
+					Number
+				),
+			dropIn: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(booking, and(eq(booking.sessionId, classSession.id), ne(booking.status, 'cancelled')))
+		.leftJoin(
+			payment,
+			and(
+				eq(payment.chargeId, booking.chargeId),
+				isNull(payment.refundedAt),
+				notInArray(payment.method, ['gift_card', 'credit'])
+			)
+		)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, since),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(classType.name, classType.color, classType.payRate)
+		.orderBy(desc(sql`count(distinct ${classSession.id})`));
+	return rows.map((r) => {
+		const cost = r.payRate ? r.sessions * r.payRate : null;
+		return {
+			...r,
+			avgAttendance: r.sessions ? Math.round((r.attended / r.sessions) * 10) / 10 : 0,
+			cost,
+			margin: cost === null ? null : r.dropIn - cost
+		};
+	});
+}
+
 /**
  * Per-event signups and show rate over the last 90 days + upcoming —
  * waitlisted/cancelled registrations excluded; revenue = non-void signup charges.
@@ -344,9 +394,13 @@ async function fillByWeekday(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
+	// The tz must be embedded as a literal: a ${tz} param gives SELECT and
+	// GROUP BY different param slots ($1 vs $5), which Postgres treats as
+	// different expressions and rejects the GROUP BY.
+	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
 	const rows = await db
 		.select({
-			dow: sql<number>`extract(dow from ${classSession.startsAt} at time zone ${tz})`.mapWith(
+			dow: sql<number>`extract(dow from ${classSession.startsAt} at time zone ${tzLit})`.mapWith(
 				Number
 			),
 			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
@@ -364,7 +418,7 @@ async function fillByWeekday(orgId: string) {
 				lt(classSession.startsAt, new Date())
 			)
 		)
-		.groupBy(sql`extract(dow from ${classSession.startsAt} at time zone ${tz})`);
+		.groupBy(sql`extract(dow from ${classSession.startsAt} at time zone ${tzLit})`);
 	const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const byDow = new Map(rows.map((r) => [r.dow, r]));
 	return [1, 2, 3, 4, 5, 6, 0].map((d) => ({
@@ -385,7 +439,7 @@ export async function atRiskMembers(orgId: string) {
 			memberId: gymMember.id,
 			name: gymMember.name,
 			email: gymMember.email,
-			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`
+			lastVisit: sql<string | null>`max(${checkIn.checkedAt})`
 		})
 		.from(gymMember)
 		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
@@ -393,13 +447,16 @@ export async function atRiskMembers(orgId: string) {
 		.groupBy(gymMember.id, gymMember.name, gymMember.email);
 	const cutoff = Date.now() - 30 * 86400_000;
 	return rows
-		.map((r) => ({
-			memberId: r.memberId,
-			name: r.name,
-			email: r.email,
-			lastVisit: r.lastVisit,
-			daysSince: r.lastVisit ? Math.floor((Date.now() - r.lastVisit.getTime()) / 86400_000) : null
-		}))
+		.map((r) => {
+			const lastVisit = r.lastVisit ? new Date(r.lastVisit) : null;
+			return {
+				memberId: r.memberId,
+				name: r.name,
+				email: r.email,
+				lastVisit,
+				daysSince: lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400_000) : null
+			};
+		})
 		.filter((r) => r.lastVisit === null || r.lastVisit.getTime() < cutoff)
 		.sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
 		.slice(0, 50);
@@ -465,9 +522,12 @@ async function checkInsByHour(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
+	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
 	const rows = await db
 		.select({
-			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`.mapWith(Number),
+			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})`.mapWith(
+				Number
+			),
 			count: sql<number>`count(*)`.mapWith(Number)
 		})
 		.from(checkIn)
@@ -478,7 +538,7 @@ async function checkInsByHour(orgId: string) {
 				isNull(checkIn.guestName)
 			)
 		)
-		.groupBy(sql`extract(hour from ${checkIn.checkedAt} at time zone ${tz})`);
+		.groupBy(sql`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})`);
 	const byHour = new Map(rows.map((r) => [r.hour, r.count]));
 	return Array.from({ length: 24 }, (_, hour) => ({ hour, count: byHour.get(hour) ?? 0 }));
 }
@@ -993,7 +1053,8 @@ export async function getReports(orgId: string) {
 		expenseMonths,
 		expenseCategories,
 		mrr,
-		giftCards
+		giftCards,
+		profitability
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1029,7 +1090,8 @@ export async function getReports(orgId: string) {
 		expensesByMonth(orgId),
 		expensesByCategory(orgId),
 		monthlyRecurring(orgId),
-		giftCardStats(orgId)
+		giftCardStats(orgId),
+		classProfitability(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1072,6 +1134,7 @@ export async function getReports(orgId: string) {
 		ratings,
 		pnl,
 		mrr,
-		giftCards
+		giftCards,
+		profitability
 	};
 }

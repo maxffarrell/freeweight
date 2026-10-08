@@ -37,12 +37,18 @@ export const dismissChecklist = command(async () => {
 export const getActivity = query(
 	v.object({
 		entityType: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40))),
-		before: v.optional(v.pipe(v.string(), v.isoTimestamp()))
+		before: v.optional(v.pipe(v.string(), v.isoTimestamp())),
+		actorId: v.optional(idSchema)
 	}),
 	async (input) => {
 		const { orgId } = await requireOrg();
-		return dashboardSvc.listActivity(orgId, input.entityType, input.before);
+		return dashboardSvc.listActivity(orgId, input.entityType, input.before, input.actorId);
 	}
+);
+
+/** Staff members appearing in the audit log — feeds the person filter. */
+export const getActivityActors = query(async () =>
+	dashboardSvc.listActivityActors((await requireOrg()).orgId)
 );
 
 export const getActivityTypes = query(async () =>

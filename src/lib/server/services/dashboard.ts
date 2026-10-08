@@ -306,7 +306,12 @@ export async function dashboard(orgId: string) {
  * `before` (createdAt of the last row on the previous page), optionally
  * filtered to one entityType. Actor names come from a left join on auth users.
  */
-export async function listActivity(orgId: string, entityType?: string, before?: string) {
+export async function listActivity(
+	orgId: string,
+	entityType?: string,
+	before?: string,
+	actorId?: string
+) {
 	return db
 		.select({
 			id: activity.id,
@@ -323,11 +328,22 @@ export async function listActivity(orgId: string, entityType?: string, before?: 
 			and(
 				eq(activity.organizationId, orgId),
 				entityType ? eq(activity.entityType, entityType) : undefined,
+				actorId ? eq(activity.actorId, actorId) : undefined,
 				before ? lt(activity.createdAt, new Date(before)) : undefined
 			)
 		)
 		.orderBy(desc(activity.createdAt))
 		.limit(51);
+}
+
+/** Staff who appear as actors in the org's activity — feeds the page's person filter. */
+export async function listActivityActors(orgId: string) {
+	return db
+		.selectDistinct({ id: user.id, name: user.name })
+		.from(activity)
+		.innerJoin(user, eq(activity.actorId, user.id))
+		.where(eq(activity.organizationId, orgId))
+		.orderBy(asc(user.name));
 }
 
 /** Distinct entity types present in the org's activity — feeds the page filter. */
