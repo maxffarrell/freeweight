@@ -12,6 +12,7 @@ import {
 	bookingUpdate,
 	classTypeInput,
 	classTypeUpdate,
+	classVideoInput,
 	closureInput,
 	emailRosterInput,
 	equipmentInput,
@@ -411,5 +412,21 @@ export const enrollMemberInCourse = command(
 /** Publishes bookable sessions inside an instructor's availability windows. */
 export const generateOpenSlots = command(slotGenInput, async (input) => {
 	const r = await svc.generateSlots(await requireOrg('admin'), input);
+	return r;
+});
+
+// ---------- Movement video library ----------
+
+export const getClassVideos = query(async () => svc.listClassVideos((await requireOrg()).orgId));
+
+export const addClassVideo = command(classVideoInput, async (input) => {
+	const r = await svc.addClassVideo(await requireOrg(), input);
+	void getClassVideos().refresh();
+	return r;
+});
+
+export const deleteClassVideo = command(idSchema, async (id) => {
+	const r = await svc.deleteClassVideo(await requireOrg(), id);
+	void getClassVideos().refresh();
 	return r;
 });

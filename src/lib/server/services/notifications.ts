@@ -45,6 +45,7 @@ import {
 	rota,
 	sessionFeedback,
 	shopItem,
+	signRequest,
 	user,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -3121,4 +3122,33 @@ export async function notifyLowStock(orgId: string, itemId: string, newStock: nu
 			})
 		});
 	}
+}
+
+/** "A document needs your signature" — sent when staff issues a sign request. */
+export async function notifySignRequest(orgId: string, signRequestId: string) {
+	const [row] = await db
+		.select({
+			memberId: signRequest.memberId,
+			title: signRequest.title,
+			email: gymMember.email,
+			memberName: gymMember.name
+		})
+		.from(signRequest)
+		.innerJoin(gymMember, eq(signRequest.memberId, gymMember.id))
+		.where(eq(signRequest.id, signRequestId));
+	if (!row?.email) return;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Please sign: ${row.title} — ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `Hi ${row.memberName}, a document needs your signature`,
+			lines: [
+				`${name.orgName} sent you "${row.title}" to review and sign.`,
+				'It only takes a minute in your member portal.'
+			],
+			action: { label: 'Review and sign', url: `${appOrigin()}/portal` }
+		})
+	});
 }

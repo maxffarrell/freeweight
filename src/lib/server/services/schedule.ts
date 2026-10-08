@@ -25,6 +25,7 @@ import {
 	classSession,
 	classTemplate,
 	classType,
+	classVideo,
 	closure,
 	courseEnrollment,
 	gymMember,
@@ -70,6 +71,46 @@ import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
 // ---------- Class types ----------
+
+// ---------- Movement video library (per class type) ----------
+
+export async function listClassVideos(orgId: string) {
+	return db
+		.select({ video: classVideo, className: classType.name })
+		.from(classVideo)
+		.innerJoin(classType, eq(classVideo.classTypeId, classType.id))
+		.where(eq(classVideo.organizationId, orgId))
+		.orderBy(asc(classType.name), asc(classVideo.title));
+}
+
+export async function addClassVideo(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.classVideoInput>
+) {
+	const [t] = await db
+		.select({ id: classType.id })
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, input.classTypeId)));
+	if (!t) error(404, 'Class type not found');
+	const [row] = await db
+		.insert(classVideo)
+		.values({
+			organizationId: ctx.orgId,
+			classTypeId: input.classTypeId,
+			title: input.title,
+			url: input.url
+		})
+		.returning();
+	return row;
+}
+
+export async function deleteClassVideo(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(classVideo)
+		.where(and(eq(classVideo.organizationId, ctx.orgId), eq(classVideo.id, id)))
+		.returning();
+	if (!row) error(404, 'Video not found');
+}
 
 export async function listClassTypes(orgId: string) {
 	return db

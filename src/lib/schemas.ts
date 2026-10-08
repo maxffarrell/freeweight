@@ -480,7 +480,9 @@ export const settingsInput = v.object({
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)))
 	),
 	/** Max people inside at once; null = no cap. */
-	occupancyCap: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	occupancyCap: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** One-time charge when a membership is paused; null/0 = free to freeze. */
+	freezeFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });
 
 export const webhookInput = v.object({
@@ -603,6 +605,34 @@ export const measurementInput = v.object({
 export const memberTagInput = v.object({
 	memberId: idSchema,
 	tag: v.pipe(requiredText('Tag'), v.maxLength(50))
+});
+
+export const incidentInput = v.object({
+	/** Member it happened to; null for a guest/walk-in (then subjectName is required). */
+	memberId: v.nullable(idSchema),
+	subjectName: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+	kind: v.picklist(['injury', 'incident']),
+	occurredOn: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)),
+	description: requiredText('Description')
+});
+
+export const incidentUpdate = v.object({
+	id: idSchema,
+	status: v.optional(v.picklist(['open', 'closed'])),
+	followUp: v.optional(v.pipe(v.string(), v.maxLength(4000)))
+});
+
+export const signRequestInput = v.object({
+	memberId: idSchema,
+	title: requiredText('Title'),
+	/** Full document text the member agrees to. */
+	body: v.pipe(requiredText('Document text'), v.maxLength(20000))
+});
+
+export const classVideoInput = v.object({
+	classTypeId: idSchema,
+	title: requiredText('Title'),
+	url: v.pipe(requiredText('URL'), v.url('Must be a URL'))
 });
 
 export const prInput = v.object({

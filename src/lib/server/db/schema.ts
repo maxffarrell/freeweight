@@ -95,6 +95,8 @@ export const gymSettings = pgTable('gym_settings', {
 	occupancyCap: integer('occupancy_cap'),
 	/** One-time "stay" offer: % off the next bill shown when a member requests cancel. null = off. */
 	saveOfferPct: integer('save_offer_pct'),
+	/** One-time charge posted when a membership is paused (minor units); null = free to freeze. */
+	freezeFee: integer('freeze_fee'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -497,6 +499,79 @@ export const sessionFeedback = pgTable(
 		uniqueIndex('session_feedback_session_member_idx').on(t.sessionId, t.memberId),
 		index('session_feedback_org_idx').on(t.organizationId)
 	]
+);
+
+/**
+ * Staff-logged incident/injury report tied to a member (or a named guest —
+ * memberId null for drop-ins and walk-ins).
+ */
+export const incident = pgTable(
+	'incident',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id').references(() => gymMember.id, { onDelete: 'set null' }),
+		/** Who it happened to when not a member — e.g. a drop-in visitor. */
+		subjectName: text('subject_name').notNull().default(''),
+		/** 'injury' | 'incident' */
+		kind: text('kind').notNull(),
+		occurredOn: date('occurred_on', { mode: 'string' }).notNull(),
+		description: text('description').notNull(),
+		/** 'open' | 'closed' */
+		status: text('status').notNull().default('open'),
+		/** Follow-up notes appended as the incident is handled. */
+		followUp: text('follow_up').notNull().default(''),
+		reportedById: text('reported_by_id').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [
+		index('incident_org_idx').on(t.organizationId),
+		index('incident_member_idx').on(t.memberId)
+	]
+);
+
+/**
+ * Staff-sent document a member signs in the portal — release forms, photo
+ * consent, comp-team agreements. One typed-name signature per request.
+ */
+export const signRequest = pgTable(
+	'sign_request',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		/** Full document text the member agrees to. */
+		body: text('body').notNull(),
+		/** 'pending' | 'signed' | 'voided' */
+		status: text('status').notNull().default('pending'),
+		signedName: text('signed_name').notNull().default(''),
+		signedAt: timestamp('signed_at', { withTimezone: true }),
+		sentById: text('sent_by_id').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [
+		index('sign_request_member_idx').on(t.memberId),
+		index('sign_request_org_idx').on(t.organizationId)
+	]
+);
+
+/** Movement/video links attached to a class type — the coaching library shown in the portal. */
+export const classVideo = pgTable(
+	'class_video',
+	{
+		id: id(),
+		organizationId: orgId(),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		url: text('url').notNull(),
+		...timestamps
+	},
+	(t) => [index('class_video_org_idx').on(t.organizationId)]
 );
 
 /**

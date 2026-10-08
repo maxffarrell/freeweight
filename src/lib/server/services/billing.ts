@@ -523,6 +523,21 @@ export async function updateMembership(
 			});
 		notifyMembershipCancelled(ctx.orgId, row.id, earlyFee).catch(() => {});
 	}
+	// Pausing posts the gym's optional one-time freeze fee (Settings).
+	if (input.status === 'paused' && current.status !== 'paused') {
+		const [gs] = await db
+			.select({ freezeFee: gymSettings.freezeFee })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, ctx.orgId));
+		if (gs?.freezeFee)
+			await addCharge(ctx, {
+				memberId: row.memberId,
+				kind: 'other',
+				description: 'Membership freeze fee',
+				amount: gs.freezeFee,
+				dueDate: todayISO()
+			});
+	}
 	if (newPlan) {
 		const [oldPlan] = await db
 			.select({ name: plan.name, amount: plan.amount, interval: plan.interval })
