@@ -201,7 +201,7 @@ async function paymentsByMethod(orgId: string) {
 async function revenueByKind(orgId: string) {
 	return db
 		.select({
-			kind: sql<string>`coalesce(${charge.kind}, 'unapplied')`,
+			kind: sql<string>`coalesce(${charge.kind}::text, 'unapplied')`,
 			count: sql<number>`count(*)`.mapWith(Number),
 			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
 		})
@@ -215,7 +215,7 @@ async function revenueByKind(orgId: string) {
 				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
 			)
 		)
-		.groupBy(sql`coalesce(${charge.kind}, 'unapplied')`)
+		.groupBy(sql`coalesce(${charge.kind}::text, 'unapplied')`)
 		.orderBy(desc(sql`sum(${payment.amount})`));
 }
 
@@ -435,7 +435,7 @@ export async function atRiskMembers(orgId: string) {
 			memberId: gymMember.id,
 			name: gymMember.name,
 			email: gymMember.email,
-			lastVisit: sql<Date | null>`max(${checkIn.checkedAt})`.mapWith(Date)
+			lastVisit: sql<string | null>`max(${checkIn.checkedAt})`
 		})
 		.from(gymMember)
 		.leftJoin(checkIn, eq(checkIn.memberId, gymMember.id))
@@ -443,13 +443,16 @@ export async function atRiskMembers(orgId: string) {
 		.groupBy(gymMember.id, gymMember.name, gymMember.email);
 	const cutoff = Date.now() - 30 * 86400_000;
 	return rows
-		.map((r) => ({
-			memberId: r.memberId,
-			name: r.name,
-			email: r.email,
-			lastVisit: r.lastVisit,
-			daysSince: r.lastVisit ? Math.floor((Date.now() - r.lastVisit.getTime()) / 86400_000) : null
-		}))
+		.map((r) => {
+			const lastVisit = r.lastVisit ? new Date(r.lastVisit) : null;
+			return {
+				memberId: r.memberId,
+				name: r.name,
+				email: r.email,
+				lastVisit,
+				daysSince: lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400_000) : null
+			};
+		})
 		.filter((r) => r.lastVisit === null || r.lastVisit.getTime() < cutoff)
 		.sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
 		.slice(0, 50);
