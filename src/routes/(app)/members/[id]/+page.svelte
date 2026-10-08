@@ -896,7 +896,26 @@
 						<div class="flex items-center gap-2">
 							<StatusBadge status={mm.membership.status} />
 							{#if mm.membership.status === 'active'}
-								{#if !mm.isPack}
+								{#if mm.isPack}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Buy the same pack again when it runs out or expires"
+										onclick={() =>
+											updateMembership({
+												id: mm.membership.id,
+												autoRenew: !mm.membership.autoRenew
+											})
+												.then(() =>
+													toast.success(
+														mm.membership.autoRenew ? 'Auto-renew off' : 'Pack will auto-renew'
+													)
+												)
+												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
+										>{mm.membership.autoRenew ? 'Auto-renew ✓' : 'Auto-renew'}</Button
+									>
+								{:else}
 									<Button
 										variant="ghost"
 										size="sm"

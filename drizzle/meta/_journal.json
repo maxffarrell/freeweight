@@ -645,6 +645,13 @@
       "when": 1791421518837,
       "tag": "0091_incidents-signing-videos-freeze",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1791422004486,
+      "tag": "0092_pack-autorenew-installments-review",
+      "breakpoints": true
     }
   ]
 }

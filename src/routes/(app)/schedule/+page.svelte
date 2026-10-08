@@ -453,6 +453,7 @@
 	let cStart = $state('');
 	let cEnd = $state('');
 	let cPrice = $state('');
+	let cInstallments = $state('');
 	let cCap = $state('');
 	let cBookable = $state(true);
 	let cDays = $state<number[]>([]);
@@ -476,6 +477,7 @@
 				startsOn: cStart,
 				endsOn: cEnd,
 				priceCents: cPrice === '' ? 0 : Math.round(Number(cPrice) * 100),
+				installments: cInstallments === '' ? 1 : Math.round(Number(cInstallments)),
 				capacity: cCap === '' ? null : Math.round(Number(cCap)),
 				memberBookable: cBookable,
 				weekdays: cDays,
@@ -485,6 +487,7 @@
 			});
 			toast.success('Course created — sessions scheduled, members can enroll in the portal');
 			cName = cDesc = cStart = cEnd = cPrice = cCap = cTime = cInstr = cLoc = '';
+			cInstallments = '';
 			cDays = [];
 			await getCourses().refresh();
 		} catch (err) {
@@ -2390,6 +2393,20 @@
 				<Field.Field>
 					<Field.Label for="c-cap">Cap (optional)</Field.Label>
 					<Input id="c-cap" type="number" min={1} bind:value={cCap} />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="c-inst">Installments</Field.Label>
+					<Input
+						id="c-inst"
+						type="number"
+						min={1}
+						max={12}
+						bind:value={cInstallments}
+						placeholder="1"
+					/>
+					<Field.Description
+						>Split the price into monthly charges (1 = pay up front).</Field.Description
+					>
 				</Field.Field>
 			</div>
 			<Field.Field>

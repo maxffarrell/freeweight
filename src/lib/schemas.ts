@@ -99,7 +99,9 @@ export const membershipUpdate = v.object({
 	/** With planId: also post the prorated price difference for the rest of this period. */
 	prorate: v.optional(v.boolean()),
 	/** Staff: custom recurring price in minor units; null clears the override. */
-	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0))))
+	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
+	/** Pack memberships: renew automatically when the pack runs out or expires. */
+	autoRenew: v.optional(v.boolean())
 });
 
 export const grantCreditsInput = v.object({
@@ -482,7 +484,13 @@ export const settingsInput = v.object({
 	/** Max people inside at once; null = no cap. */
 	occupancyCap: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	/** One-time charge when a membership is paused; null/0 = free to freeze. */
-	freezeFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	freezeFee: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Review link (Google/Yelp) sent to members after `reviewAfterVisits` visits; null = off. */
+	reviewUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.url(), v.maxLength(300)))),
+	/** Lifetime attended visits that triggers a once-per-member review request; null = off. */
+	reviewAfterVisits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
+	)
 });
 
 export const webhookInput = v.object({
@@ -681,6 +689,10 @@ export const courseInput = v.object({
 	/** Program-wide enrollment cap; null = per-session capacities only. */
 	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	memberBookable: v.optional(v.boolean(), true),
+	/** Split the price into this many monthly installments (1 = pay up front). */
+	installments: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(12)))
+	),
 	/** Weekly sessions generated for the course (0 = Sunday … 6 = Saturday). */
 	weekdays: v.pipe(
 		v.array(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6))),
