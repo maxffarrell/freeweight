@@ -12,6 +12,7 @@
 	import { errMsg } from '#lib/format.ts';
 	import Mail from '@lucide/svelte/icons/mail';
 	import { getReportsQuery } from '#lib/remote/reports.remote.ts';
+	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
@@ -19,6 +20,9 @@
 
 	const r = await getReportsQuery();
 	const currency = await getCurrency();
+	const repSettings = await getSettings();
+	const thisMonthRevenue =
+		r.revenue.find((m) => m.month === new Date().toISOString().slice(0, 7))?.total ?? 0;
 
 	const maxCheckIns = Math.max(1, ...r.checkIns.map((d) => d.count));
 	const maxMembers = Math.max(1, ...r.members.map((m) => m.joined));
@@ -293,6 +297,31 @@
 			<Card.Description>Payments per month, last 12 months</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-1.5">
+			{#if repSettings.revenueTarget}
+				<div class="mb-3 space-y-1">
+					<div class="flex justify-between text-xs text-muted-foreground">
+						<span>This month vs target</span>
+						<span class="tabular-nums"
+							>{formatMoney(thisMonthRevenue, currency, true)} / {formatMoney(
+								repSettings.revenueTarget,
+								currency,
+								true
+							)}</span
+						>
+					</div>
+					<div class="h-2 rounded bg-muted">
+						<div
+							class="h-2 rounded {thisMonthRevenue >= repSettings.revenueTarget
+								? 'bg-green-500'
+								: 'bg-amber-500'}"
+							style="width: {Math.min(
+								100,
+								Math.round((thisMonthRevenue / repSettings.revenueTarget) * 100)
+							)}%"
+						></div>
+					</div>
+				</div>
+			{/if}
 			{#each r.revenue as m (m.month)}
 				<div class="flex items-center gap-2 text-sm">
 					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
@@ -537,6 +566,63 @@
 						<Table.Row
 							><Table.Cell colspan={4} class="text-muted-foreground"
 								>No concluded bookings in the last 90 days.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">Class economics — last 30 days</Card.Title>
+			<Card.Description
+				>Sessions run, average attendance, drop-in revenue and instructor cost per class. Margin
+				counts drop-in sales only — membership revenue isn't attributable to one class.</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="px-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Class</Table.Head>
+						<Table.Head class="text-right">Sessions</Table.Head>
+						<Table.Head class="text-right">Avg attendance</Table.Head>
+						<Table.Head class="text-right">Drop-in revenue</Table.Head>
+						<Table.Head class="text-right">Instructor cost</Table.Head>
+						<Table.Head class="text-right">Margin</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.profitability as c (c.className)}
+						<Table.Row>
+							<Table.Cell class="font-medium">
+								{#if c.color}<span
+										class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+										style="background:{c.color}"
+									></span>{/if}
+								{c.className}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.sessions}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.avgAttendance}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums"
+								>{formatMoney(c.dropIn, currency, true)}</Table.Cell
+							>
+							<Table.Cell class="text-right tabular-nums"
+								>{c.cost === null ? '—' : formatMoney(c.cost, currency, true)}</Table.Cell
+							>
+							<Table.Cell
+								class="text-right tabular-nums {c.margin !== null && c.margin < 0
+									? 'text-destructive'
+									: ''}"
+								>{c.margin === null ? '—' : formatMoney(c.margin, currency, true)}</Table.Cell
+							>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={6} class="text-muted-foreground"
+								>No sessions ran in the last 30 days.</Table.Cell
 							></Table.Row
 						>
 					{/each}

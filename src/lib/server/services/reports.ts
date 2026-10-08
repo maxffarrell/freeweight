@@ -287,6 +287,56 @@ async function noShowByClass(orgId: string) {
 	}));
 }
 
+/** Per-class-type economics over the last 30 days: sessions run, avg attendance,
+ * drop-in revenue collected, and instructor cost (sessions × pay rate).
+ * Membership revenue isn't attributable to one class, so margin counts
+ * drop-in revenue only — a floor on true profitability. */
+async function classProfitability(orgId: string) {
+	const since = new Date(Date.now() - 30 * 86400_000);
+	const rows = await db
+		.select({
+			className: classType.name,
+			color: classType.color,
+			payRate: classType.payRate,
+			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
+			attended:
+				sql<number>`count(distinct ${booking.id}) filter (where ${booking.status} = 'attended')`.mapWith(
+					Number
+				),
+			dropIn: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(booking, and(eq(booking.sessionId, classSession.id), ne(booking.status, 'cancelled')))
+		.leftJoin(
+			payment,
+			and(
+				eq(payment.chargeId, booking.chargeId),
+				isNull(payment.refundedAt),
+				notInArray(payment.method, ['gift_card', 'credit'])
+			)
+		)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, since),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(classType.name, classType.color, classType.payRate)
+		.orderBy(desc(sql`count(distinct ${classSession.id})`));
+	return rows.map((r) => {
+		const cost = r.payRate ? r.sessions * r.payRate : null;
+		return {
+			...r,
+			avgAttendance: r.sessions ? Math.round((r.attended / r.sessions) * 10) / 10 : 0,
+			cost,
+			margin: cost === null ? null : r.dropIn - cost
+		};
+	});
+}
+
 /**
  * Per-event signups and show rate over the last 90 days + upcoming —
  * waitlisted/cancelled registrations excluded; revenue = non-void signup charges.
@@ -993,7 +1043,8 @@ export async function getReports(orgId: string) {
 		expenseMonths,
 		expenseCategories,
 		mrr,
-		giftCards
+		giftCards,
+		profitability
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1029,7 +1080,8 @@ export async function getReports(orgId: string) {
 		expensesByMonth(orgId),
 		expensesByCategory(orgId),
 		monthlyRecurring(orgId),
-		giftCardStats(orgId)
+		giftCardStats(orgId),
+		classProfitability(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
@@ -1072,6 +1124,7 @@ export async function getReports(orgId: string) {
 		ratings,
 		pnl,
 		mrr,
-		giftCards
+		giftCards,
+		profitability
 	};
 }

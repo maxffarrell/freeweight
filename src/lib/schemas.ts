@@ -490,7 +490,9 @@ export const settingsInput = v.object({
 	/** Lifetime attended visits that triggers a once-per-member review request; null = off. */
 	reviewAfterVisits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
-	)
+	),
+	/** Monthly revenue goal in minor units for the Reports progress bar; null = off. */
+	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
 });
 
 export const webhookInput = v.object({

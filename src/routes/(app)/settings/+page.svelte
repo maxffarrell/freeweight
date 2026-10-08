@@ -158,6 +158,7 @@
 	let freezeFee = $state<number | null>(settings.freezeFee);
 	let reviewUrl = $state(settings.reviewUrl ?? '');
 	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
+	let revenueTarget = $state<number | null>(settings.revenueTarget);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
 	// svelte-ignore state_referenced_locally
@@ -192,6 +193,7 @@
 				freezeFee,
 				reviewUrl: reviewUrl.trim() || null,
 				reviewAfterVisits,
+				revenueTarget,
 				publicPage,
 				staffBriefing,
 				firstClassFree
@@ -554,6 +556,14 @@
 								>Shown inside the member's cancellation form — "Stay instead, N% off your next
 								bill". Applies a one-time account credit; each membership can take it once. Leave
 								empty for no offer.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Monthly revenue target</Field.Label>
+							<MoneyInput bind:value={revenueTarget} />
+							<Field.Description
+								>Reports shows this month's collected revenue as a progress bar against the target.
+								Leave empty for no target.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>

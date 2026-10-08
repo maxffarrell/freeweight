@@ -101,6 +101,8 @@ export const gymSettings = pgTable('gym_settings', {
 	reviewUrl: text('review_url'),
 	/** Lifetime visits that triggers the once-per-member review-request email; null = off. */
 	reviewAfterVisits: integer('review_after_visits'),
+	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
+	revenueTarget: integer('revenue_target'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

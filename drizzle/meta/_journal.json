@@ -652,6 +652,13 @@
       "when": 1791422004486,
       "tag": "0092_pack-autorenew-installments-review",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1791432169452,
+      "tag": "0093_revenue-target",
+      "breakpoints": true
     }
   ]
 }
