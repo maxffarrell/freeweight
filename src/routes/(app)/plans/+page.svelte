@@ -311,6 +311,12 @@
 									? ' · full'
 									: ''}</Badge
 							>{/if}
+						{#if p.activeMembers > 0}
+							<a
+								class="self-center text-xs text-muted-foreground underline-offset-2 hover:underline"
+								href="/members?plan={p.id}">view members →</a
+							>
+						{/if}
 						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
 								>{p.endingSoon} ending soon</Badge
 							>{/if}

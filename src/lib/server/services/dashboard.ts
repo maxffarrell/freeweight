@@ -270,6 +270,10 @@ export async function dashboard(orgId: string) {
 			booked:
 				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','waitlisted'))), 0)`.mapWith(
 					Number
+				),
+			waitlisted:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status = 'waitlisted')), 0)`.mapWith(
+					Number
 				)
 		})
 		.from(classSession)
@@ -735,7 +739,11 @@ export async function dashboard(orgId: string) {
 		insideNames: insideNow.map((r) => r.name),
 		mrr,
 		todaySessions,
-		tomorrow: { sessions: tm?.sessions ?? 0, booked: tm?.booked ?? 0 },
+		tomorrow: {
+			sessions: tm?.sessions ?? 0,
+			booked: tm?.booked ?? 0,
+			waitlisted: tm?.waitlisted ?? 0
+		},
 		recentActivity,
 		recentMembers,
 		pendingRequests: [
