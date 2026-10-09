@@ -431,7 +431,12 @@ export async function getRoster(orgId: string, sessionId: string) {
 			memberName: gymMember.name,
 			memberEmail: gymMember.email,
 			resultScore: workoutResult.score,
-			resultRx: workoutResult.asRx
+			resultRx: workoutResult.asRx,
+			// First-timer: no prior check-in or attended booking at this org.
+			firstTimer:
+				sql<boolean>`not exists (select 1 from ${checkIn} ci where ci.member_id = ${gymMember.id} and ci.organization_id = ${orgId}) and not exists (select 1 from ${booking} b2 where b2.member_id = ${gymMember.id} and b2.organization_id = ${orgId} and b2.status = 'attended')`.mapWith(
+					Boolean
+				)
 		})
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))

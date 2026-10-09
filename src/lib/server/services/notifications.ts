@@ -146,15 +146,41 @@ async function sendMemberEmail(memberId: string | null | undefined, args: Email)
 	await sendEmail(args);
 }
 
-/** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops. */
+/** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops.
+ * Returns the new row's id, or null when the row already existed. */
 async function logOnce(orgId: string, kind: string, entityId: string, recipient: string) {
 	const [row] = await db
 		.insert(notificationLog)
 		.values({ organizationId: orgId, kind, entityId, recipient })
 		.onConflictDoNothing()
-		.returning();
-	return !!row;
+		.returning({ id: notificationLog.id });
+	return row?.id ?? null;
 }
+
+/** Signed token behind the 1x1 email-open pixel stamped onto a notification_log row. */
+export function openToken(logId: string) {
+	return createHmac('sha256', BETTER_AUTH_SECRET)
+		.update(`open:${logId}`)
+		.digest('hex')
+		.slice(0, 32);
+}
+
+export function validOpenToken(logId: string, token: string) {
+	const a = Buffer.from(openToken(logId));
+	const b = Buffer.from(token);
+	return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Stamps openedAt on a notification_log row — the email-open pixel endpoint. */
+export async function markEmailOpened(logId: string) {
+	await db
+		.update(notificationLog)
+		.set({ openedAt: new Date() })
+		.where(and(eq(notificationLog.id, logId), isNull(notificationLog.openedAt)));
+}
+
+const openPixel = (logId: string) =>
+	`<img src="${appOrigin()}/api/email-open?i=${logId}&t=${openToken(logId)}" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px" />`;
 
 /** "You're in" when a waitlisted member gets promoted into a booked spot. */
 export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
@@ -1614,13 +1640,15 @@ export async function sendAnnouncement(
 	const shared = personalized ? null : render('');
 	let sent = 0;
 	for (const m of members) {
-		if (!m.email || !(await logOnce(orgId, 'announcement', entityId, m.email))) continue;
+		if (!m.email) continue;
+		const logId = await logOnce(orgId, 'announcement', entityId, m.email);
+		if (!logId) continue;
 		const { text, html } = personalized ? render(m.name) : shared!;
 		await sendMemberEmail(m.id, {
 			to: m.email,
 			subject: `${name.orgName}: ${mergeTags(subject, m.name)}`,
 			text,
-			html
+			html: html + openPixel(logId)
 		});
 		sent++;
 	}

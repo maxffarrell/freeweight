@@ -1133,6 +1133,9 @@
 						<Table.Row>
 							<Table.Cell class="font-medium">
 								{r.memberName}
+								{#if r.firstTimer}
+									<Badge variant="secondary" class="ml-1">1st visit</Badge>
+								{/if}
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
 								{/if}
