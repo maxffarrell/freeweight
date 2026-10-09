@@ -803,6 +803,9 @@
 										<a class="font-medium hover:underline" href="/members/{mm.membership.memberId}"
 											>{mm.memberName}</a
 										>
+										{#if mm.membership.noBill}<Badge variant="outline" class="ml-1 text-xs"
+												>comp'd</Badge
+											>{/if}
 									</Table.Cell>
 									<Table.Cell
 										>{mm.planName}
