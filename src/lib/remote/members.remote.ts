@@ -88,7 +88,9 @@ export const getMembers = query(
 			onWaitlist: v.optional(v.boolean()),
 			paused: v.optional(v.boolean()),
 			noUpcoming: v.optional(v.boolean()),
-			comped: v.optional(v.boolean())
+			comped: v.optional(v.boolean()),
+			packExpiring: v.optional(v.boolean()),
+			insideNow: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -114,7 +116,9 @@ export const getMembers = query(
 			opts?.onWaitlist,
 			opts?.paused,
 			opts?.noUpcoming,
-			opts?.comped
+			opts?.comped,
+			opts?.packExpiring,
+			opts?.insideNow
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
