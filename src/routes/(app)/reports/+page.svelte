@@ -1202,6 +1202,25 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Member funnel</Card.Title>
+			<Card.Description>Leads → members → trialed → paying → retained 90+ days</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each [{ label: 'Leads captured', n: r.funnel.leads }, { label: 'Members on file', n: r.funnel.members }, { label: 'Trialed a plan', n: r.funnel.trialed }, { label: 'Paying now', n: r.funnel.paying }, { label: 'Active 90+ days', n: r.funnel.retained }] as step (step.label)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-28 shrink-0">{step.label}</span>
+					<div
+						class="h-4 rounded bg-sky-500/70"
+						style="width: {r.funnel.members ? (step.n / r.funnel.members) * 70 : 0}%"
+					></div>
+					<span class="tabular-nums">{step.n}</span>
+				</div>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Top referrers</Card.Title>
 			<Card.Description>Members whose referral links drove the most signups</Card.Description>
 		</Card.Header>

@@ -27,6 +27,7 @@
 		createWebhook,
 		toggleWebhook,
 		deleteWebhook,
+		testWebhook,
 		getStaff,
 		getJoinInfo,
 		seedDemo,
@@ -970,9 +971,11 @@
 								{#each webhooks as w (w.id)}
 									<Table.Row>
 										<Table.Cell class="min-w-0 truncate font-mono text-xs">{w.url}</Table.Cell>
-										<Table.Cell class="text-xs text-muted-foreground"
-											>{w.events.length} events</Table.Cell
-										>
+										<Table.Cell class="text-xs text-muted-foreground">
+											{w.events.length} events{w.lastDeliveryStatus != null
+												? ` · last ${w.lastDeliveryStatus || '✕'}`
+												: ''}
+										</Table.Cell>
 										<Table.Cell
 											><Switch
 												checked={w.enabled}
@@ -983,15 +986,35 @@
 											/></Table.Cell
 										>
 										<Table.Cell class="text-right">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-7"
-												onclick={async () => {
-													await deleteWebhook(w.id);
-													webhooks = await getWebhooks();
-												}}><Trash class="size-4" /></Button
-											>
+											<div class="flex items-center justify-end gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													class="h-7 px-2 text-xs"
+													onclick={async () => {
+														try {
+															const r = await testWebhook(w.id);
+															toast.success(
+																r.status
+																	? `Delivered — HTTP ${r.status}`
+																	: 'Could not reach the endpoint'
+															);
+															webhooks = await getWebhooks();
+														} catch (err) {
+															toast.error(errMsg(err, 'Test failed'));
+														}
+													}}>Test</Button
+												>
+												<Button
+													variant="ghost"
+													size="icon"
+													class="size-7"
+													onclick={async () => {
+														await deleteWebhook(w.id);
+														webhooks = await getWebhooks();
+													}}><Trash class="size-4" /></Button
+												>
+											</div>
 										</Table.Cell>
 									</Table.Row>
 								{:else}
