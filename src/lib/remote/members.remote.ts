@@ -85,7 +85,9 @@ export const getMembers = query(
 			neverBooked: v.optional(v.boolean()),
 			endingSoon: v.optional(v.boolean()),
 			noWaiver: v.optional(v.boolean()),
-			onWaitlist: v.optional(v.boolean())
+			onWaitlist: v.optional(v.boolean()),
+			paused: v.optional(v.boolean()),
+			noUpcoming: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -108,7 +110,9 @@ export const getMembers = query(
 			opts?.neverBooked,
 			opts?.endingSoon,
 			opts?.noWaiver,
-			opts?.onWaitlist
+			opts?.onWaitlist,
+			opts?.paused,
+			opts?.noUpcoming
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

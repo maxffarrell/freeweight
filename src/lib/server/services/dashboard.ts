@@ -264,6 +264,24 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(classSession.startsAt))
 		.then((rows) => rows.filter((r) => r.booked === 0).slice(0, 4));
 
+	const [tm] = await db
+		.select({
+			sessions: sql<number>`count(*)`.mapWith(Number),
+			booked:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','waitlisted'))), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, dayEnd),
+				lt(classSession.startsAt, tomorrowEnd)
+			)
+		);
+
 	const recentActivity = await db
 		.select()
 		.from(activity)
@@ -717,6 +735,7 @@ export async function dashboard(orgId: string) {
 		insideNames: insideNow.map((r) => r.name),
 		mrr,
 		todaySessions,
+		tomorrow: { sessions: tm?.sessions ?? 0, booked: tm?.booked ?? 0 },
 		recentActivity,
 		recentMembers,
 		pendingRequests: [

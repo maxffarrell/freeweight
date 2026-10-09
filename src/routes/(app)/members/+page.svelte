@@ -174,7 +174,11 @@
 			unsubscribed: owesFilter === '__unsub' || undefined,
 			referred: owesFilter === '__referred' || undefined,
 			neverBooked: owesFilter === '__neverbooked' || undefined,
-			endingSoon: owesFilter === '__ending' || undefined
+			endingSoon: owesFilter === '__ending' || undefined,
+			noWaiver: owesFilter === '__nowaiver' || undefined,
+			onWaitlist: owesFilter === '__waitlist' || undefined,
+			paused: owesFilter === '__paused' || undefined,
+			noUpcoming: owesFilter === '__noupcoming' || undefined
 		});
 	}
 	function search() {
@@ -702,7 +706,11 @@
 															? 'Ending soon'
 															: owesFilter === '__waitlist'
 																? 'On a waitlist'
-																: 'Any balance'}</Select.Trigger
+																: owesFilter === '__paused'
+																	? 'Paused'
+																	: owesFilter === '__noupcoming'
+																		? 'No upcoming'
+																		: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -717,6 +725,8 @@
 				<Select.Item value="__ending">Ending soon</Select.Item>
 				<Select.Item value="__nowaiver">No waiver</Select.Item>
 				<Select.Item value="__waitlist">On a waitlist</Select.Item>
+				<Select.Item value="__paused">Paused</Select.Item>
+				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>

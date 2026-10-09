@@ -339,6 +339,13 @@
 						</Table.Body>
 					</Table.Root>
 				{/if}
+				{#if d.tomorrow.sessions > 0}
+					<p class="border-t px-4 py-2 text-xs text-muted-foreground">
+						Tomorrow: {d.tomorrow.sessions} class{d.tomorrow.sessions === 1 ? '' : 'es'} · {d
+							.tomorrow.booked}
+						booked
+					</p>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 
