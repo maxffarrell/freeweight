@@ -1096,6 +1096,15 @@
 						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
 					>
 				</div>
+				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
+				{#if nextMile}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Next milestone</span>
+						<span class="text-muted-foreground tabular-nums"
+							>{nextMile} ({nextMile - m.attendance.visits} to go)</span
+						>
+					</div>
+				{/if}
 				{#if m.loyalty}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Loyalty</span>

@@ -27,12 +27,14 @@
 	let checkIns = $state(await getCheckIns({ date: viewDate }));
 	let insideOnly = $state(false);
 	let guestsOnly = $state(false);
+	let method = $state<'' | 'qr' | 'manual'>('');
 	async function refilter() {
 		checkIns = await getCheckIns({
 			date: viewDate,
 			q: q.trim() || undefined,
 			inside: insideOnly || undefined,
-			guests: guestsOnly || undefined
+			guests: guestsOnly || undefined,
+			method: method || undefined
 		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -193,6 +195,22 @@
 						if (guestsOnly) insideOnly = false;
 						void refilter();
 					}}>Guests</Button
+				>
+				<Button
+					size="sm"
+					variant={method === 'qr' ? 'default' : 'outline'}
+					onclick={() => {
+						method = method === 'qr' ? '' : 'qr';
+						void refilter();
+					}}>QR</Button
+				>
+				<Button
+					size="sm"
+					variant={method === 'manual' ? 'default' : 'outline'}
+					onclick={() => {
+						method = method === 'manual' ? '' : 'manual';
+						void refilter();
+					}}>Manual</Button
 				>
 			</div>
 			<Table.Root>
