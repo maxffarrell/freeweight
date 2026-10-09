@@ -10,12 +10,14 @@ import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
 import * as woSvc from '#lib/server/services/workouts.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
+import * as ptSvc from '#lib/server/services/pt.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
 import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
+import { zonedToUtc } from '#lib/tz.ts';
 import { emit } from '#lib/server/services/events.ts';
 import {
 	idSchema,
@@ -429,6 +431,36 @@ export const cancelAmenityRule = command(
 		const m = await myMember(memberId);
 		const r = await resSvc.cancelResourceRecurring(m.organizationId, m.id, ruleId);
 		void getAmenityRules(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- PT (1:1) session requests ----------
+
+/** Coaches the member can request a session with. */
+export const getPtCoaches = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return ptSvc.ptCoaches(m.organizationId);
+});
+
+export const getMyPtRequests = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return ptSvc.memberPtRequests(m.organizationId, m.id);
+});
+
+export const requestPt = command(
+	v.object({
+		memberId: idSchema,
+		instructorId: v.optional(v.nullable(idSchema)),
+		preferredAt: v.pipe(v.string(), v.nonEmpty('Pick a date and time')),
+		note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)))
+	}),
+	async ({ memberId, instructorId, preferredAt, note }) => {
+		const m = await myMember(memberId);
+		const st = await getSettings(m.organizationId);
+		const when = zonedToUtc(preferredAt, st.timezone ?? 'UTC');
+		const r = await ptSvc.requestPt(m.organizationId, m.id, instructorId, when, note);
+		void getMyPtRequests(memberId).refresh();
 		return r;
 	}
 );

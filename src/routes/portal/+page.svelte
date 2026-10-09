@@ -44,6 +44,9 @@
 		bookResource,
 		cancelReservation,
 		getReservations,
+		getPtCoaches,
+		getMyPtRequests,
+		requestPt,
 		getAmenityRules,
 		repeatAmenityWeekly,
 		cancelAmenityRule,
@@ -303,6 +306,30 @@
 	const amenities = $derived(await getPortalResources(memberId));
 	const reservations = $derived(await getReservations(memberId));
 	const amenityRules = $derived(await getAmenityRules(memberId));
+	const ptCoaches = $derived(await getPtCoaches(memberId));
+	const myPt = $derived(await getMyPtRequests(memberId));
+	let ptCoach = $state('');
+	let ptAt = $state('');
+	let ptNote = $state('');
+	let ptBusy = $state(false);
+	async function sendPtRequest() {
+		if (!ptAt) return toast.error('Pick a date and time');
+		ptBusy = true;
+		try {
+			await requestPt({
+				memberId,
+				instructorId: ptCoach || undefined,
+				preferredAt: ptAt,
+				note: ptNote || undefined
+			});
+			toast.success('Request sent — the gym will confirm your slot');
+			ptAt = '';
+			ptNote = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send the request'));
+		}
+		ptBusy = false;
+	}
 	let amenityId = $state('');
 	const amenity = $derived(
 		amenities.find((a) => a.resource.id === amenityId) ?? amenities[0] ?? null
@@ -2058,14 +2085,32 @@
 				</div>
 				<div>
 					<p class="text-3xl font-semibold tabular-nums">{d.attendance.weekStreak}</p>
-					<p class="text-xs text-muted-foreground">week streak</p>
+					<p class="text-xs text-muted-foreground">
+						week streak{d.attendance.longestStreak > d.attendance.weekStreak
+							? ` · best ${d.attendance.longestStreak}`
+							: ''}
+					</p>
 				</div>
 			</div>
+			{#if d.attendance.nextMilestone}
+				<p class="text-xs text-muted-foreground">
+					{d.attendance.nextMilestone - d.attendance.totalVisits} visits to your
+					{d.attendance.nextMilestone}-visit milestone
+				</p>
+			{/if}
 			{#if d.member.goalVisitsPerMonth}
 				{@const goalPct = Math.min(
 					100,
 					Math.round((d.attendance.visitsThisMonth / d.member.goalVisitsPerMonth) * 100)
 				)}
+				{@const dayOfMonth = new Date().getDate()}
+				{@const daysInMonth = new Date(
+					new Date().getFullYear(),
+					new Date().getMonth() + 1,
+					0
+				).getDate()}
+				{@const expected = (d.member.goalVisitsPerMonth * dayOfMonth) / daysInMonth}
+				{@const pace = d.attendance.visitsThisMonth - expected}
 				<div class="space-y-1">
 					<div class="flex items-center justify-between text-xs">
 						<span class="text-muted-foreground"
@@ -2077,6 +2122,17 @@
 						>
 					</div>
 					<Progress max={d.member.goalVisitsPerMonth} value={d.attendance.visitsThisMonth} />
+					{#if goalPct < 100 && dayOfMonth > 3}
+						<p
+							class="text-xs {pace >= -0.5
+								? 'text-emerald-600 dark:text-emerald-400'
+								: 'text-amber-600 dark:text-amber-400'}"
+						>
+							{pace >= -0.5
+								? 'On track'
+								: `${Math.ceil(-pace)} visit${Math.ceil(-pace) === 1 ? '' : 's'} behind pace`}
+						</p>
+					{/if}
 				</div>
 			{:else}
 				<button
@@ -2119,6 +2175,46 @@
 			</Card.Content>
 		</Card.Root>
 	{/if}
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Personal training</Card.Title>
+			<Card.Description>Request a 1:1 session — the gym confirms your slot</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			{#each myPt as r (r.request.id)}
+				<div class="flex items-center justify-between gap-2 text-sm">
+					<span>
+						{localDate(r.request.preferredAt, tz)} at {localTime(r.request.preferredAt, tz)}
+						{#if r.instructorName}
+							· {r.instructorName}{/if}
+					</span>
+					<span
+						class="text-xs {r.request.status === 'approved'
+							? 'text-emerald-600 dark:text-emerald-400'
+							: r.request.status === 'declined'
+								? 'text-muted-foreground line-through'
+								: 'text-amber-600 dark:text-amber-400'}">{r.request.status}</span
+					>
+				</div>
+			{/each}
+			<div class="flex flex-wrap items-center gap-2 border-t pt-3">
+				<NativeSelect bind:value={ptCoach} size="sm" class="min-w-36">
+					<option value="">Any coach</option>
+					{#each ptCoaches as c (c.id)}
+						<option value={c.id}>{c.name}</option>
+					{/each}
+				</NativeSelect>
+				<Input type="datetime-local" class="h-8 w-auto" bind:value={ptAt} />
+				<Input
+					placeholder="What do you want to work on?"
+					class="h-8 min-w-44 flex-1"
+					bind:value={ptNote}
+				/>
+				<Button size="sm" disabled={ptBusy} onclick={sendPtRequest}>Request</Button>
+			</div>
+		</Card.Content>
+	</Card.Root>
 
 	<Card.Root>
 		<Card.Header>

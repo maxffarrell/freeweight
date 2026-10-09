@@ -766,3 +766,17 @@ export const giftCreditsInput = v.object({
 	email: v.pipe(requiredText('Email'), v.email('Must be an email')),
 	credits: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))
 });
+
+/** Member requesting a 1:1 session in the portal. */
+export const ptRequestInput = v.object({
+	instructorId: v.optional(v.nullable(idSchema)),
+	preferredAt: v.pipe(v.string(), v.nonEmpty('Pick a date and time')),
+	note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)))
+});
+
+/** Staff approving a PT request — session to create. */
+export const ptApproveInput = v.object({
+	id: idSchema,
+	classTypeId: idSchema,
+	startsAt: v.optional(v.pipe(v.string(), v.nonEmpty()))
+});

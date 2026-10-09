@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
+import * as pt from '#lib/server/services/pt.ts';
 import * as res from '#lib/server/services/resources.ts';
 import * as evt from '#lib/server/services/gym-events.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
@@ -30,7 +31,8 @@ import {
 	templateInput,
 	templateUpdate,
 	timeOffInput,
-	availabilityInput
+	availabilityInput,
+	ptApproveInput
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
@@ -292,6 +294,32 @@ export const claimCover = command(idSchema, async (sessionId) => {
 	void getSession(sessionId).refresh();
 	void getCoverNeeded().refresh();
 	void getMyClasses().refresh();
+	return r;
+});
+
+// ---------- PT (1:1) requests ----------
+
+/** Pending PT requests across the org — for the My classes card. */
+export const getPtRequests = query(async () => pt.myPtRequests(await requireOrg()));
+export const approvePtRequest = command(ptApproveInput, async (input) => {
+	const r = await pt.approvePtRequest(await requireOrg(), input.id, input.classTypeId, await tz(), {
+		startsAt: input.startsAt
+	});
+	void getPtRequests().refresh();
+	void getSessions().refresh();
+	return r;
+});
+export const declinePtRequest = command(idSchema, async (id) => {
+	const r = await pt.declinePtRequest(await requireOrg(), id);
+	void getPtRequests().refresh();
+	return r;
+});
+
+/** Desk undo for a no-show — frees the credit and voids the fee charge. */
+export const forgiveNoShow = command(idSchema, async (id) => {
+	const ctx = await requireOrg();
+	const r = await svc.forgiveNoShow(ctx, id, ctx.userId);
+	void getRoster('').refresh();
 	return r;
 });
 

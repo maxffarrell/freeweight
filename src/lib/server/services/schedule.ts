@@ -2569,3 +2569,55 @@ export async function generateSlots(ctx: OrgContext, input: v.InferOutput<typeof
 	});
 	return { created: rows.length, skipped };
 }
+
+/**
+ * Desk undo for a no-show: flips the booking to 'cancelled' (which frees the
+ * credit it consumed — no_show counts toward creditsUsedIn, cancelled doesn't)
+ * and voids the matching open "No-show fee — <class> <date>" charge.
+ */
+export async function forgiveNoShow(ctx: OrgContext, bookingId: string, actorId?: string | null) {
+	const [b] = await db
+		.select({
+			id: booking.id,
+			status: booking.status,
+			memberId: booking.memberId,
+			startsAt: classSession.startsAt,
+			className: classType.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(classSession.id, booking.sessionId))
+		.innerJoin(classType, eq(classType.id, classSession.classTypeId))
+		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, bookingId)));
+	if (!b || b.status !== 'no_show') error(404, 'No-show booking not found');
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	const tz = st?.timezone ?? 'UTC';
+	await db.transaction(async (tx) => {
+		await tx
+			.update(booking)
+			.set({ status: 'cancelled', cancelledAt: new Date() })
+			.where(eq(booking.id, b.id));
+		await tx
+			.update(charge)
+			.set({ status: 'void', updatedAt: new Date() })
+			.where(
+				and(
+					eq(charge.organizationId, ctx.orgId),
+					eq(charge.memberId, b.memberId),
+					eq(charge.status, 'open'),
+					eq(charge.description, `No-show fee — ${b.className} ${localDate(b.startsAt, tz)}`)
+				)
+			);
+	});
+	await emit({
+		orgId: ctx.orgId,
+		actorId: actorId ?? null,
+		entityType: 'booking',
+		entityId: b.id,
+		action: 'forgiven',
+		summary: `Forgave a no-show — ${b.className}`
+	});
+	return { ok: true };
+}

@@ -14,7 +14,11 @@
 		removeTimeOff,
 		getAvailability,
 		setAvailability,
-		getMyRatings
+		getMyRatings,
+		getPtRequests,
+		approvePtRequest,
+		declinePtRequest,
+		getClassTypes
 	} from '#lib/remote/schedule.remote.ts';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -30,6 +34,36 @@
 	const timeOff = $derived(await getTimeOff());
 	const availability = await getAvailability();
 	const ratings = await getMyRatings();
+	const ptRequests = $derived(await getPtRequests());
+	const classTypes = $derived((await getClassTypes()).filter((c) => c.active));
+	let ptApproveId = $state<string | null>(null);
+	let ptApproveType = $state('');
+	let ptApproveAt = $state('');
+	let ptBusy = $state(false);
+	async function approvePt(id: string) {
+		if (!ptApproveType) return toast.error('Pick a class type');
+		ptBusy = true;
+		try {
+			await approvePtRequest({
+				id,
+				classTypeId: ptApproveType,
+				startsAt: ptApproveAt || undefined
+			});
+			toast.success('Session created and member booked');
+			ptApproveId = null;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not approve'));
+		}
+		ptBusy = false;
+	}
+	async function declinePt(id: string) {
+		try {
+			await declinePtRequest(id);
+			toast.success('Declined');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not decline'));
+		}
+	}
 	const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	let windows = $state<{ weekday: string; startTime: string; endTime: string }[]>(
 		availability.map((w) => ({
@@ -290,6 +324,76 @@
 			{/if}
 		</Card.Content>
 	</Card.Root>
+
+	{#if ptRequests.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">PT requests</Card.Title>
+				<Card.Description>Members asking for a 1:1 session</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6 pb-4">
+				{#each ptRequests as r (r.request.id)}
+					<div class="py-3">
+						<div class="flex items-center gap-3">
+							<div class="min-w-0 flex-1">
+								<div class="truncate font-medium">{r.memberName}</div>
+								<div class="text-sm text-muted-foreground">
+									{formatDate(r.request.preferredAt)} · {localTime(r.request.preferredAt, tz)}
+									{#if r.instructorName}
+										· with {r.instructorName}{:else}
+										· any coach{/if}{#if r.request.note}
+										· “{r.request.note}”{/if}
+								</div>
+							</div>
+							{#if ptApproveId === r.request.id}
+								<Button variant="ghost" size="sm" onclick={() => (ptApproveId = null)}>Back</Button>
+							{:else}
+								<Button
+									size="sm"
+									onclick={() => {
+										ptApproveId = r.request.id;
+										ptApproveAt = '';
+									}}>Approve</Button
+								>
+								<Button variant="ghost" size="sm" onclick={() => declinePt(r.request.id)}
+									>Decline</Button
+								>
+							{/if}
+						</div>
+						{#if ptApproveId === r.request.id}
+							<div class="mt-2 flex flex-wrap items-end gap-2 rounded-md border bg-muted/40 p-2">
+								<div class="min-w-40">
+									<span class="text-xs text-muted-foreground">Class type</span>
+									<Select.Root type="single" bind:value={ptApproveType}>
+										<Select.Trigger class="h-8 w-full">
+											{classTypes.find((c) => c.id === ptApproveType)?.name ?? 'Pick type'}
+										</Select.Trigger>
+										<Select.Content>
+											{#each classTypes as ct (ct.id)}
+												<Select.Item value={ct.id}>{ct.name}</Select.Item>
+											{/each}
+										</Select.Content>
+									</Select.Root>
+								</div>
+								<div>
+									<span class="text-xs text-muted-foreground">Time</span>
+									<Input
+										type="datetime-local"
+										class="h-8"
+										bind:value={ptApproveAt}
+										placeholder="requested time"
+									/>
+								</div>
+								<Button size="sm" disabled={ptBusy} onclick={() => approvePt(r.request.id)}
+									>Book it</Button
+								>
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	{#if cover.length}
 		<Card.Root>
