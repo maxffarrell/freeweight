@@ -688,7 +688,8 @@ export async function memberMakeups(orgId: string, memberId: string) {
 					eq(classSession.classTypeId, l.classTypeId),
 					isNull(classSession.cancelledAt),
 					gte(classSession.startsAt, now),
-					lt(classSession.startsAt, horizon)
+					lt(classSession.startsAt, horizon),
+					sql`not exists (select 1 from ${booking} b3 where b3.session_id = ${outer(classSession.id)} and b3.member_id = ${memberId} and b3.status in ('booked','waitlisted'))`
 				)
 			)
 			.orderBy(asc(classSession.startsAt))
