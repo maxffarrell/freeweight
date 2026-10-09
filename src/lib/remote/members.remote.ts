@@ -7,6 +7,8 @@ import * as workoutSvc from '#lib/server/services/workouts.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import * as trialSvc from '#lib/server/services/trials.ts';
+import * as billingSvc from '#lib/server/services/billing.ts';
+import * as giftcardSvc from '#lib/server/services/giftcards.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
@@ -70,13 +72,23 @@ export const getMembers = query(
 			tag: v.optional(v.string()),
 			status: v.optional(v.picklist(['active', 'inactive'])),
 			planId: v.optional(v.string()),
-			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance'])),
+			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance', 'visits30'])),
 			owes: v.optional(v.boolean()),
 			suspended: v.optional(v.boolean()),
 			recent: v.optional(v.boolean()),
 			risk: v.optional(v.boolean()),
 			family: v.optional(v.boolean()),
-			birthday: v.optional(v.boolean())
+			birthday: v.optional(v.boolean()),
+			noContact: v.optional(v.boolean()),
+			unsubscribed: v.optional(v.boolean()),
+			referred: v.optional(v.boolean()),
+			neverBooked: v.optional(v.boolean()),
+			endingSoon: v.optional(v.boolean()),
+			noWaiver: v.optional(v.boolean()),
+			onWaitlist: v.optional(v.boolean()),
+			paused: v.optional(v.boolean()),
+			noUpcoming: v.optional(v.boolean()),
+			comped: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -92,7 +104,17 @@ export const getMembers = query(
 			opts?.recent,
 			opts?.risk,
 			opts?.family,
-			opts?.birthday
+			opts?.birthday,
+			opts?.noContact,
+			opts?.unsubscribed,
+			opts?.referred,
+			opts?.neverBooked,
+			opts?.endingSoon,
+			opts?.noWaiver,
+			opts?.onWaitlist,
+			opts?.paused,
+			opts?.noUpcoming,
+			opts?.comped
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
@@ -106,12 +128,39 @@ export const addMemberTag = command(memberTagInput, async ({ memberId, tag }) =>
 	void getTags().refresh();
 });
 /** Bulk-tag members from the list's selection toolbar. Returns how many got the tag. */
+export const bulkSetInactive = command(
+	v.object({ memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)) }),
+	async ({ memberIds }) => {
+		const n = await svc.setMembersInactive(await requireOrg(), memberIds);
+		void getMembers().refresh();
+		return n;
+	}
+);
+
 export const tagMembers = command(bulkTagInput, async ({ memberIds, tag }) => {
 	const n = await svc.addTagToMembers(await requireOrg(), memberIds, tag);
 	void getMembers().refresh();
 	void getTags().refresh();
 	return n;
 });
+
+/** Gift cards this member bought or redeemed. */
+export const getMemberGiftCards = query(v.pipe(v.string(), v.minLength(1)), async (memberId) => {
+	return giftcardSvc.listMemberGiftCards((await requireOrg()).orgId, memberId);
+});
+
+/** Grants comp classes to every selected member's active membership. */
+export const bulkGrantCredits = command(
+	v.object({
+		memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)),
+		count: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))
+	}),
+	async ({ memberIds, count }) => {
+		const r = await billingSvc.bulkGrantCredits(await requireOrg(), memberIds, count);
+		void getMembers().refresh();
+		return r;
+	}
+);
 /** Merge a duplicate member into the survivor (admin-only — the loser is deleted). */
 export const mergeMembers = command(memberMergeInput, async ({ keepId, dropId }) => {
 	await svc.mergeMembers(await requireOrg('admin'), keepId, dropId);
@@ -215,14 +264,27 @@ export const getCheckIns = query(
 	v.object({
 		date: v.pipe(v.string(), v.isoDate()),
 		q: v.optional(v.string()),
-		inside: v.optional(v.boolean())
+		inside: v.optional(v.boolean()),
+		guests: v.optional(v.boolean()),
+		method: v.optional(v.picklist(['qr', 'manual'])),
+		locationId: v.optional(idSchema),
+		firstVisit: v.optional(v.boolean())
 	}),
-	async ({ date, q, inside }) => {
+	async ({ date, q, inside, guests, method, locationId, firstVisit }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
 		const until = new Date(since.getTime() + 86400_000);
-		return checkins.listCheckIns(orgId, { since, until, q, inside });
+		return checkins.listCheckIns(orgId, {
+			since,
+			until,
+			q,
+			inside,
+			guestsOnly: guests,
+			method,
+			locationId,
+			firstVisit
+		});
 	}
 );
 export const recordCheckIn = command(checkInInput, async (input) => {
@@ -230,6 +292,14 @@ export const recordCheckIn = command(checkInInput, async (input) => {
 	void getTodayCheckIns().refresh();
 	void getMember(r.member.id).refresh();
 	return r;
+});
+
+/** Kiosk end-of-day: checks out everyone still inside (same rule the cron uses). */
+export const checkOutAll = command(async () => {
+	const { orgId } = await requireOrg();
+	const n = await checkins.checkOutAll(orgId);
+	void getTodayCheckIns().refresh();
+	return n;
 });
 
 /** Staff marks a check-in row as over — the member left. */
@@ -273,16 +343,20 @@ export const getAnnouncementAudience = query(
 		tag: v.optional(v.string()),
 		planId: v.optional(v.string()),
 		locationId: v.optional(v.string()),
-		atRisk: v.optional(v.boolean())
+		atRisk: v.optional(v.boolean()),
+		inactive: v.optional(v.boolean()),
+		recent: v.optional(v.boolean())
 	}),
-	async ({ tag, planId, locationId, atRisk }) =>
+	async ({ tag, planId, locationId, atRisk, inactive, recent }) =>
 		atRisk
 			? (await atRiskMembers((await requireOrg()).orgId)).length
 			: countAnnouncementAudience(
 					(await requireOrg()).orgId,
 					tag || undefined,
 					planId || undefined,
-					locationId || undefined
+					locationId || undefined,
+					inactive,
+					recent
 				)
 );
 
@@ -304,7 +378,9 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 		memberIds,
 		input.tag,
 		input.planId,
-		input.locationId
+		input.locationId,
+		input.inactive,
+		input.recent
 	);
 	void getRecentAnnouncements().refresh();
 	return r;
@@ -320,7 +396,9 @@ export const scheduleEmail = command(scheduledAnnouncementInput, async (input) =
 		tag: input.tag,
 		planId: input.planId,
 		locationId: input.locationId,
-		atRisk: input.atRisk
+		atRisk: input.atRisk,
+		inactive: input.inactive,
+		recent: input.recent
 	});
 	void getRecentAnnouncements().refresh();
 	return r;
@@ -430,6 +508,15 @@ export const logIncident = command(incidentInput, async (input) => {
 	if (input.memberId) void getMember(input.memberId).refresh();
 	return r;
 });
+
+export const resolveMemberIssue = command(
+	v.object({ id: idSchema, memberId: idSchema }),
+	async ({ id, memberId }) => {
+		const r = await svc.resolveIssue(await requireOrg(), id);
+		void getMember(memberId).refresh();
+		return r;
+	}
+);
 
 export const updateIncidentEntry = command(
 	v.object({ ...incidentUpdate.entries, memberId: idSchema }),

@@ -46,7 +46,9 @@ export const memberInput = v.object({
 export const memberImportRow = v.object({
 	name: requiredText('Name'),
 	email: emailField,
-	phone: optionalText
+	phone: optionalText,
+	/** Optional 4th column — YYYY-MM-DD. */
+	birthday: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')))
 });
 export const memberImportInput = v.pipe(
 	v.array(memberImportRow),
@@ -147,6 +149,9 @@ export const classTypeInput = v.object({
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
 	memberBookable: v.optional(v.boolean(), true),
 	minLevelId: v.optional(v.nullable(idSchema)),
+	/** Minimum member age in years to self-book; null = all ages. */
+	minAge: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(3), v.maxValue(99)))),
+	bringNote: v.optional(v.pipe(v.string(), v.maxLength(120))),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
@@ -654,7 +659,11 @@ export const announcementInput = v.object({
 	/** Restrict the batch to members of this location. */
 	locationId: v.optional(idSchema),
 	/** Restrict the batch to the at-risk list (no visit in 30+ days). */
-	atRisk: v.optional(v.boolean())
+	atRisk: v.optional(v.boolean()),
+	/** Target inactive members instead of actives (win-back mail). */
+	inactive: v.optional(v.boolean()),
+	/** Restrict the batch to members who joined in the last 7 days. */
+	recent: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({

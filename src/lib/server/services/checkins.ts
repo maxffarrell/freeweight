@@ -28,6 +28,7 @@ import {
 	gymSettings,
 	location,
 	membership,
+	signRequest,
 	plan,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -401,6 +402,11 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
+	// Join-date anniversary (same MM-DD, at least one year in) — nice flash moment.
+	const anniversary =
+		m.joinedAt && m.joinedAt.slice(5) === today.slice(5)
+			? Number(today.slice(0, 4)) - Number(m.joinedAt.slice(0, 4))
+			: 0;
 	// Same heads-up when the gym requires a waiver and theirs is missing or stale.
 	const waiverMissing =
 		!!st?.waiverText &&
@@ -420,6 +426,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			.where(and(eq(membership.memberId, memberId), eq(membership.status, 'suspended')))
 			.limit(1)
 	).length;
+	// Desk heads-up: a document signature is pending on this member.
+	const [ps] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(signRequest)
+		.where(and(eq(signRequest.memberId, memberId), eq(signRequest.status, 'pending')));
+	const pendingSigns = ps!.n;
 	// Desk heads-up: remaining classes on a capped plan/pack (null = unlimited or none).
 	const credits = await creditUsage(ctx.orgId, memberId);
 	// Desk heads-up: guest passes left this month (null = the plan has none).
@@ -501,10 +513,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		welcomeBack: !!prevVisit && Date.now() - prevVisit.at.getTime() > 30 * 86400_000,
 		attended: attended.length,
 		birthday,
+		anniversary,
 		visits: n,
 		visitsToday,
 		waiverMissing,
 		suspended,
+		pendingSigns,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
 		creditsClass: credits?.className ?? null,
 		guestPassesLeft,
@@ -514,7 +528,20 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 
 export async function listCheckIns(
 	orgId: string,
-	opts: { since: Date; until?: Date; q?: string; inside?: boolean; memberId?: string }
+	opts: {
+		since: Date;
+		until?: Date;
+		q?: string;
+		inside?: boolean;
+		memberId?: string;
+		guestsOnly?: boolean;
+		/** Only scans logged this way — 'qr' or 'manual'. */
+		method?: 'qr' | 'manual';
+		/** Only check-ins at this location. */
+		locationId?: string;
+		/** Only a member's first-ever check-in (guest rows excluded). */
+		firstVisit?: boolean;
+	}
 ) {
 	const term = opts.q?.trim();
 	return db
@@ -522,7 +549,12 @@ export async function listCheckIns(
 			checkIn,
 			memberName: gymMember.name,
 			memberPhotoId: gymMember.photoDocumentId,
-			locationName: location.name
+			locationName: location.name,
+			/** true when this row is the member's first-ever non-guest check-in. */
+			firstVisit:
+				sql<boolean>`${checkIn.checkedAt} = (select min(c2.checked_at) from check_in c2 where c2.member_id = ${checkIn.memberId} and c2.guest_name is null) and ${checkIn.guestName} is null`.mapWith(
+					Boolean
+				)
 		})
 		.from(checkIn)
 		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
@@ -534,6 +566,15 @@ export async function listCheckIns(
 				opts.until ? lt(checkIn.checkedAt, opts.until) : undefined,
 				opts.inside ? isNull(checkIn.checkedOutAt) : undefined,
 				opts.memberId ? eq(checkIn.memberId, opts.memberId) : undefined,
+				opts.guestsOnly ? isNotNull(checkIn.guestName) : undefined,
+				opts.method ? eq(checkIn.method, opts.method) : undefined,
+				opts.locationId ? eq(checkIn.locationId, opts.locationId) : undefined,
+				opts.firstVisit
+					? and(
+							isNull(checkIn.guestName),
+							sql`${checkIn.checkedAt} = (select min(c2.checked_at) from check_in c2 where c2.member_id = ${checkIn.memberId} and c2.guest_name is null)`
+						)
+					: undefined,
 				term
 					? or(ilike(gymMember.name, `%${term}%`), ilike(checkIn.guestName, `%${term}%`))
 					: undefined
@@ -552,7 +593,13 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 		getRoster(ctx.orgId, sessionId)
 	]);
 	const booked = roster.filter((r) => r.booking.status === 'booked');
-	if (!booked.length) return { checkedIn: 0, skipped: 0, birthdays: [] as string[] };
+	if (!booked.length)
+		return {
+			checkedIn: 0,
+			skipped: 0,
+			birthdays: [] as string[],
+			anniversaries: [] as { name: string; years: number }[]
+		};
 	const open = await db
 		.select({ memberId: checkIn.memberId })
 		.from(checkIn)
@@ -570,6 +617,7 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 	let checkedIn = 0;
 	let skipped = 0;
 	const birthdays: string[] = [];
+	const anniversaries: { name: string; years: number }[] = [];
 	for (const r of booked) {
 		if (inside.has(r.booking.memberId)) {
 			skipped++;
@@ -582,11 +630,12 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 			});
 			checkedIn++;
 			if (res.birthday) birthdays.push(r.memberName);
+			if (res.anniversary) anniversaries.push({ name: r.memberName, years: res.anniversary });
 		} catch {
 			skipped++;
 		}
 	}
-	return { checkedIn, skipped, birthdays };
+	return { checkedIn, skipped, birthdays, anniversaries };
 }
 
 /**
@@ -612,6 +661,16 @@ export async function closeStaleCheckIns(orgId: string) {
 				sql`(${checkIn.checkedAt} at time zone ${tz})::date < (now() at time zone ${tz})::date`
 			)
 		)
+		.returning({ id: checkIn.id });
+	return rows.length;
+}
+
+/** Kiosk "Out all": stamps every still-open check-in out right now. */
+export async function checkOutAll(orgId: string) {
+	const rows = await db
+		.update(checkIn)
+		.set({ checkedOutAt: new Date() })
+		.where(and(eq(checkIn.organizationId, orgId), isNull(checkIn.checkedOutAt)))
 		.returning({ id: checkIn.id });
 	return rows.length;
 }

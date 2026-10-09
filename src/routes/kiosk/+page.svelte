@@ -5,6 +5,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import Logo from '#lib/components/app/logo.svelte';
 	import {
+		checkOutAll,
 		getTodayCheckIns,
 		recordCheckIn,
 		checkOut,
@@ -20,7 +21,8 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney, formatRelative } from '#lib/format.ts';
+	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import QrCode from '@lucide/svelte/icons/qr-code';
@@ -36,6 +38,11 @@
 
 	let checkIns = $state(await getTodayCheckIns());
 	const inside = $derived(checkIns.filter((c) => !c.checkIn.checkedOutAt).length);
+	const insideRows = $derived(
+		checkIns
+			.filter((c) => !c.checkIn.checkedOutAt)
+			.sort((a, b) => +new Date(a.checkIn.checkedAt) - +new Date(b.checkIn.checkedAt))
+	);
 	let upNext = $state(await getUpNext());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
@@ -58,6 +65,7 @@
 			photoDocumentId: string | null;
 			deskNote: string | null;
 			tags: string[];
+			lastVisit: Date | string | null;
 		}[]
 	>([]);
 	/** Dependents per suggested member — family check-in rows under each result. */
@@ -134,8 +142,10 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					r.welcomeBack ? 'welcome back' : '',
+					(r.anniversary ?? 0) > 0 ? `${r.anniversary}yr member!` : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
@@ -160,7 +170,10 @@
 				true,
 				r.checkedIn
 					? `Checked in ${r.checkedIn} member${r.checkedIn === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped)` : ''}` +
-							(r.birthdays.length ? ` — happy birthday, ${r.birthdays.join(' + ')}!` : '')
+							(r.birthdays.length ? ` — happy birthday, ${r.birthdays.join(' + ')}!` : '') +
+							(r.anniversaries.length
+								? ` — ${r.anniversaries.map((a) => `${a.name} ${a.years}yr!`).join(', ')}`
+								: '')
 					: 'Nobody left to check in'
 			);
 			await getRoster(rosterSess!.session.id).refresh();
@@ -264,6 +277,7 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					r.welcomeBack ? 'welcome back' : '',
 					r.suspended ? 'membership suspended' : '',
@@ -337,13 +351,44 @@
 					? 'border-amber-500 text-amber-600'
 					: ''}
 			>
-				{checkIns.length} today · {inside} inside{#if settings.occupancyCap != null}
+				{checkIns.length} today · {inside} inside{#if checkIns.some((c) => c.checkIn.guestName)}
+					· {checkIns.filter((c) => c.checkIn.guestName).length} guests{/if}{#if settings.occupancyCap != null}
 					/ {settings.occupancyCap}{/if}{#if settings.occupancyCap != null && inside >= settings.occupancyCap}
 					— at capacity{/if}
 			</Badge>
 			<Button variant="ghost" size="sm" href="/wall">PR board</Button>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
+		{#if insideRows.length}
+			<div class="flex items-center gap-1.5 overflow-x-auto px-4 pb-3">
+				<span class="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+					>Inside</span
+				>
+				{#each insideRows.slice(0, 12) as c (c.checkIn.id)}
+					<Badge variant="outline" class="shrink-0">
+						{c.checkIn.guestName ?? c.memberName}
+						<span class="text-muted-foreground">· in {localTime(c.checkIn.checkedAt, tz)}</span>
+					</Badge>
+				{/each}
+				{#if insideRows.length > 12}
+					<span class="shrink-0 text-xs text-muted-foreground">+{insideRows.length - 12} more</span>
+				{/if}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="ml-auto shrink-0"
+					onclick={async () => {
+						if (!confirm(`Check out all ${insideRows.length} member(s) still inside?`)) return;
+						try {
+							const n = await checkOutAll();
+							toast.success(`Checked out ${n}`);
+						} catch (err) {
+							toast.error(errMsg(err, 'Could not check out'));
+						}
+					}}>Out all</Button
+				>
+			</div>
+		{/if}
 	</header>
 
 	<main class="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 p-6">
@@ -427,6 +472,11 @@
 												>{m.deskNote}</span
 											>
 										{/if}
+										<span class="block truncate text-xs text-muted-foreground"
+											>{m.lastVisit
+												? `last visit ${formatRelative(m.lastVisit)}`
+												: 'no visits yet'}</span
+										>
 									</span>
 								</span>
 								<span class="flex items-center gap-2">

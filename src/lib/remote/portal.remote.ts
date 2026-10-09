@@ -89,6 +89,46 @@ export const getBookable = query(idSchema, async (memberId) => {
 });
 
 /** The member hands an upcoming booking to another member by email. */
+export const logWorkout = command(
+	v.object({
+		memberId: idSchema,
+		day: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+		text: v.pipe(v.string(), v.minLength(1), v.maxLength(500))
+	}),
+	async ({ memberId, day, text }) => {
+		const m = await myMember(memberId);
+		return await svc.logWorkout(
+			m.organizationId,
+			m.id,
+			day ?? new Date().toISOString().slice(0, 10),
+			text
+		);
+	}
+);
+
+export const setMyBookingNote = command(
+	v.object({
+		memberId: idSchema,
+		bookingId: idSchema,
+		note: v.optional(v.pipe(v.string(), v.maxLength(120)))
+	}),
+	async ({ memberId, bookingId, note }) => {
+		const m = await myMember(memberId);
+		return await svc.setMemberNote(m.organizationId, m.id, bookingId, note ?? '');
+	}
+);
+
+export const reportIssue = command(
+	v.object({
+		memberId: idSchema,
+		text: v.pipe(v.string(), v.minLength(1), v.maxLength(300))
+	}),
+	async ({ memberId, text }) => {
+		const m = await myMember(memberId);
+		return await svc.reportIssue(m.organizationId, m.id, text);
+	}
+);
+
 export const memberGiveSpot = command(
 	v.object({
 		memberId: idSchema,
@@ -588,6 +628,12 @@ export const getPortalChallenges = query(idSchema, async (memberId) => {
 	return chalSvc.portalChallenges(m.organizationId, m.id);
 });
 
+export const getPortalBadges = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const st = await getSettings(m.organizationId);
+	return svc.portalBadges(m.organizationId, m.id, st.timezone ?? 'UTC');
+});
+
 /** Announcements this member was actually sent — the portal's News feed. */
 /** Stamps openedAt on the member's announcement rows when the News card renders. */
 export const markNewsRead = command(idSchema, async (memberId) => {
@@ -952,5 +998,18 @@ export const setClassWatch = command(
 				);
 		}
 		await getPortalOverview(m.id).refresh();
+	}
+);
+
+/** Member emails their referral join link to a friend. Deduped per (member, address). */
+export const inviteFriend = command(
+	v.object({
+		memberId: idSchema,
+		email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+		name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60)))
+	}),
+	async ({ memberId, email, name }) => {
+		const m = await myMember(memberId);
+		return notif.sendReferralInvite(m.organizationId, m.id, email, name);
 	}
 );

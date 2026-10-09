@@ -66,6 +66,7 @@
 		rebookCourseSession,
 		checkInWithCode,
 		getPortalChallenges,
+		getPortalBadges,
 		joinChallenge,
 		leaveChallenge,
 		getMakeups,
@@ -98,7 +99,11 @@
 		getMyDataExport,
 		getNpsStatus,
 		submitNps,
-		setClassWatch
+		setClassWatch,
+		logWorkout,
+		reportIssue,
+		inviteFriend,
+		setMyBookingNote
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -111,6 +116,7 @@
 	import Dumbbell from '@lucide/svelte/icons/dumbbell';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
+	import Send from '@lucide/svelte/icons/send';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import * as Field from '#lib/components/ui/field/index.js';
@@ -237,7 +243,11 @@
 		}
 		rateBusy = false;
 	}
+
 	const d = $derived(await getPortalOverview(memberId));
+	const upcomingThisWeek = $derived(
+		d.upcoming.filter((u) => new Date(u.startsAt).getTime() - Date.now() < 7 * 86400000).length
+	);
 	const npsStatus = $derived(await getNpsStatus(memberId));
 	const npsDue = $derived(npsStatus.due);
 	let npsScore = $state<number | null>(null);
@@ -263,6 +273,51 @@
 			toast.error(errMsg(err, 'Could not send'));
 		}
 		npsPending = false;
+	}
+	let wlogText = $state('');
+	let wlogBusy = $state(false);
+	let wlogFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== wlogFor) {
+			wlogFor = memberId;
+			wlogText = '';
+		}
+	});
+	async function addWlog() {
+		const t = wlogText.trim();
+		if (!t) return;
+		wlogBusy = true;
+		try {
+			await logWorkout({ memberId, text: t });
+			wlogText = '';
+			await getPortalOverview(memberId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log'));
+		}
+		wlogBusy = false;
+	}
+	let issueText = $state('');
+	let issueBusy = $state(false);
+	let issueFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== issueFor) {
+			issueFor = memberId;
+			issueText = '';
+		}
+	});
+	async function sendIssue() {
+		const t = issueText.trim();
+		if (!t) return;
+		issueBusy = true;
+		try {
+			await reportIssue({ memberId, text: t });
+			issueText = '';
+			toast.success('Sent — the front desk will take a look');
+			await getPortalOverview(memberId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		issueBusy = false;
 	}
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -536,6 +591,7 @@
 
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
+	const portalBadges = $derived(await getPortalBadges(memberId));
 	const news = $derived(await getPortalAnnouncements(memberId));
 	const makeups = $derived(await getMakeups(memberId));
 	let mkBusy = $state('');
@@ -829,6 +885,22 @@
 			.writeText(refLink)
 			.then(() => toast.success('Referral link copied'))
 			.catch(() => toast.error('Could not copy'));
+	}
+
+	let inviteEmail = $state('');
+	let inviteSending = $state(false);
+	async function sendInvite() {
+		const email = inviteEmail.trim();
+		if (!email) return;
+		inviteSending = true;
+		try {
+			const r = await inviteFriend({ memberId, email });
+			toast.success(r.sent ? `Invite sent to ${email}` : `${email} was already invited`);
+			if (r.sent) inviteEmail = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send invite'));
+		}
+		inviteSending = false;
 	}
 
 	let qrUrl = $state('');
@@ -1868,6 +1940,23 @@
 		</Card.Root>
 	{/if}
 
+	{#if portalBadges.some((b) => b.earned)}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Badges</Card.Title>
+			</Card.Header>
+			<Card.Content class="px-6 pb-4">
+				<div class="flex flex-wrap gap-1.5">
+					{#each portalBadges as b (b.id)}
+						<Badge variant={b.earned ? 'default' : 'outline'} class={b.earned ? '' : 'opacity-50'}>
+							{b.label}
+						</Badge>
+					{/each}
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if portalChallenges.length}
 		<Card.Root class="sm:col-span-2">
 			<Card.Header>
@@ -2070,6 +2159,24 @@
 					>
 					<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
 				</div>
+				<form
+					class="mt-2 flex items-center gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void sendInvite();
+					}}
+				>
+					<Input
+						type="email"
+						required
+						placeholder="friend@email.com"
+						class="h-8 flex-1 text-xs"
+						bind:value={inviteEmail}
+					/>
+					<Button size="sm" variant="outline" type="submit" disabled={inviteSending}
+						><Send /> Email it</Button
+					>
+				</form>
 				{#if d.referrals?.length}
 					<div class="mt-3 space-y-1">
 						{#each d.referrals as r (r.name)}
@@ -2339,6 +2446,11 @@
 			{:else}
 				<p class="text-3xl font-semibold tabular-nums">{formatMoney(d.balance, currency)}</p>
 			{/if}
+			{#if d.nextBill}
+				<p class="text-sm text-muted-foreground">
+					Next bill {localDate(d.nextBill.date, tz)} — {formatMoney(d.nextBill.amount, currency)}
+				</p>
+			{/if}
 			{#if d.openCharges.length}
 				<ul class="space-y-1 text-sm">
 					{#each d.openCharges as c (c.charge.id)}
@@ -2422,6 +2534,54 @@
 				{/each}
 			</Card.Footer>
 		{/if}
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2 text-base"><Dumbbell /> Workout log</Card.Title>
+			<Card.Description>Your own journal — runs, lifts, anything outside class</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="flex gap-2">
+				<Input bind:value={wlogText} placeholder="Ran 5k — 24:30" maxlength={500} />
+				<Button size="sm" disabled={!wlogText.trim() || wlogBusy} onclick={addWlog}>
+					{wlogBusy ? '…' : 'Log'}
+				</Button>
+			</div>
+			{#each d.workouts as w (w.id)}
+				<div class="flex items-baseline gap-2 text-sm">
+					<span class="w-24 shrink-0 text-xs text-muted-foreground">{w.day}</span>
+					<span class="min-w-0 break-words">{w.text}</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">Nothing logged yet.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Report an issue</Card.Title>
+			<Card.Description
+				>Broken equipment, a locker problem — let the front desk know</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="flex gap-2">
+				<Input bind:value={issueText} placeholder="Locker 12's door is broken" maxlength={300} />
+				<Button size="sm" disabled={!issueText.trim() || issueBusy} onclick={sendIssue}>
+					{issueBusy ? '…' : 'Send'}
+				</Button>
+			</div>
+			{#each d.issues as i (i.id)}
+				<div class="flex items-baseline gap-2 text-sm">
+					<Badge variant={i.status === 'resolved' ? 'secondary' : 'outline'} class="shrink-0"
+						>{i.status}</Badge
+					>
+					<span class="min-w-0 break-words">{i.text}</span>
+				</div>
+			{/each}
+		</Card.Content>
 	</Card.Root>
 
 	{#if docs.length}
@@ -2788,7 +2948,12 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base"><CalendarDays /> Upcoming</Card.Title>
+			<Card.Title class="flex items-center gap-2 text-base"
+				><CalendarDays /> Upcoming
+				{#if upcomingThisWeek}<span class="text-sm font-normal text-muted-foreground"
+						>· {upcomingThisWeek} this week</span
+					>{/if}</Card.Title
+			>
 		</Card.Header>
 		<Card.Content class="px-4">
 			{#each d.upcoming as u (u.booking.id)}
@@ -2799,9 +2964,31 @@
 							{localDate(u.startsAt, tz)}
 							{localTime(u.startsAt, tz)}
 						</p>
+						{#if u.bringNote}
+							<p class="mt-0.5 text-xs text-muted-foreground">Bring: {u.bringNote}</p>
+						{/if}
 						{#if u.booking.coachNote}
 							<p class="mt-0.5 text-xs text-primary">Coach: {u.booking.coachNote}</p>
 						{/if}
+						<input
+							class="mt-0.5 w-32 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground"
+							placeholder="+ note for staff"
+							title="Only staff see this on the roster"
+							value={u.booking.memberNote ?? ''}
+							onchange={async (e) => {
+								const v2 = (e.target as HTMLInputElement).value;
+								try {
+									await setMyBookingNote({
+										memberId,
+										bookingId: u.booking.id,
+										note: v2 || undefined
+									});
+									toast.success('Note saved');
+								} catch (err) {
+									toast.error(errMsg(err, 'Could not save'));
+								}
+							}}
+						/>
 						{#if u.workout}
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{u.workout}

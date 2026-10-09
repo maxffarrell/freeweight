@@ -65,6 +65,8 @@
 	);
 	let memberships = $state(await getMemberships());
 	let payments = $state(await getPayments());
+	let payMethodFilter = $state('');
+	const payMethods = $derived([...new Set(payments.map((p) => p.payment.method))].sort());
 	let giftCards = $state(await getGiftCards());
 	let recurring = $state(await getRecurring());
 	let expenses = $state(await getExpenses());
@@ -173,17 +175,25 @@
 	});
 
 	async function filterCharges() {
-		charges = await getCharges({
-			status: chargeFilter || undefined,
-			kind: kindFilter || undefined
-		});
+		charges = applyChargeFilter(
+			await getCharges({
+				status: chargeFilter === '__overdue' ? 'open' : chargeFilter || undefined,
+				kind: kindFilter || undefined
+			})
+		);
+	}
+
+	function applyChargeFilter(rows: Awaited<ReturnType<typeof getCharges>>) {
+		return chargeFilter === '__overdue' ? rows.filter((c) => c.charge.dueDate < todayISO()) : rows;
 	}
 
 	async function refreshCharges() {
-		charges = await getCharges({
-			status: chargeFilter || undefined,
-			kind: kindFilter || undefined
-		});
+		charges = applyChargeFilter(
+			await getCharges({
+				status: chargeFilter === '__overdue' ? 'open' : chargeFilter || undefined,
+				kind: kindFilter || undefined
+			})
+		);
 		openCharges = await getCharges({ status: 'open' });
 	}
 
@@ -610,6 +620,7 @@
 				<NativeSelect bind:value={chargeFilter} onchange={filterCharges}>
 					<option value="">All</option>
 					<option value="open">Open</option>
+					<option value="__overdue">Overdue</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
 					<option value="written_off">Written off</option>
@@ -647,7 +658,12 @@
 									<Table.Cell class="text-muted-foreground"
 										>{c.charge.description ?? c.charge.kind}</Table.Cell
 									>
-									<Table.Cell>{formatDate(c.charge.dueDate)}</Table.Cell>
+									<Table.Cell
+										>{formatDate(
+											c.charge.dueDate
+										)}{#if c.charge.status === 'open' && c.charge.dueDate < todayISO()}
+											<Badge variant="destructive" class="ml-1">overdue</Badge>{/if}</Table.Cell
+									>
 									<Table.Cell><StatusBadge status={c.charge.status} /></Table.Cell>
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(c.charge.amount, currency)}</Table.Cell
@@ -756,8 +772,28 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="payments">
-			<div class="mb-3 flex justify-end">
-				<Button size="sm" variant="outline" onclick={exportPayments}><Download /> Export</Button>
+			<div class="mb-3 flex items-center gap-2">
+				<NativeSelect bind:value={payMethodFilter}>
+					<option value="">All methods</option>
+					{#each payMethods as m (m)}
+						<option value={m} class="capitalize">{m}</option>
+					{/each}
+				</NativeSelect>
+				<span class="text-xs text-muted-foreground"
+					>{formatMoney(
+						payments
+							.filter(
+								(p) =>
+									!p.payment.refundedAt &&
+									(!payMethodFilter || p.payment.method === payMethodFilter)
+							)
+							.reduce((a, p) => a + p.payment.amount, 0),
+						currency
+					)} collected</span
+				>
+				<Button size="sm" variant="outline" class="ml-auto" onclick={exportPayments}
+					><Download /> Export</Button
+				>
 			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
@@ -772,7 +808,7 @@
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each payments as p (p.payment.id)}
+							{#each payments.filter((p) => !payMethodFilter || p.payment.method === payMethodFilter) as p (p.payment.id)}
 								<Table.Row class={p.payment.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>
 										<a class="font-medium hover:underline" href="/members/{p.payment.memberId}"

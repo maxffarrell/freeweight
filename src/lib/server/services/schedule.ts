@@ -37,6 +37,7 @@ import {
 	location,
 	member,
 	membership,
+	payment,
 	plan,
 	sessionFeedback,
 	user,
@@ -154,6 +155,8 @@ export async function createClassType(
 			defaultStreamUrl: input.defaultStreamUrl ?? null,
 			memberBookable: input.memberBookable,
 			minLevelId: input.minLevelId ?? null,
+			minAge: input.minAge ?? null,
+			bringNote: input.bringNote ?? '',
 			active: input.active
 		})
 		.returning();
@@ -194,6 +197,7 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 			color: classType.color,
 			durationMin: classType.durationMin,
 			dropInPrice: classType.dropInPrice,
+			payRate: classType.payRate,
 			locationName: location.name,
 			instructorName: user.name,
 			booked: bookedCount(classSession.id),
@@ -343,6 +347,39 @@ export async function myTeachingSessions(ctx: OrgContext, days = 14) {
 		.orderBy(asc(classSession.startsAt));
 }
 
+/** Instructor's month stats — sessions taught this calendar month + total
+ * attendees booked onto them. For the "This month" card on My classes. */
+export async function myTeachingMonth(ctx: OrgContext) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	if (!me) return { sessions: 0, attendees: 0, cancelled: 0 };
+	const monthStart = new Date().toISOString().slice(0, 8) + '01';
+	const [row] = await db
+		.select({
+			sessions: sql<number>`count(*)::int`.mapWith(Number),
+			attendees:
+				sql<number>`coalesce(sum((select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')), 0)`.mapWith(
+					Number
+				),
+			cancelled:
+				sql<number>`count(*) filter (where ${classSession.cancelledAt} is not null)::int`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, me.id),
+				gte(classSession.startsAt, new Date(`${monthStart}T00:00:00Z`)),
+				lt(classSession.startsAt, new Date())
+			)
+		);
+	return row;
+}
+
 /** Org-wide open cover requests (future, uncancelled) — powers the "Needs
  * cover" card on My classes; excludes sessions the viewer already teaches. */
 export async function sessionsNeedingCover(ctx: OrgContext) {
@@ -441,6 +478,10 @@ export async function getRoster(orgId: string, sessionId: string) {
 			booking,
 			memberName: gymMember.name,
 			memberEmail: gymMember.email,
+			openBalance:
+				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open'), 0)`.mapWith(
+					Number
+				),
 			resultScore: workoutResult.score,
 			resultRx: workoutResult.asRx,
 			// First-timer: no prior check-in or attended booking at this org.
@@ -460,6 +501,32 @@ export async function getRoster(orgId: string, sessionId: string) {
 		)
 		.where(and(eq(booking.organizationId, orgId), eq(booking.sessionId, sessionId)))
 		.orderBy(asc(booking.createdAt));
+}
+
+/** Fill history for a session's class — the last 4 past sessions of the same class type. */
+export async function recentClassSessions(orgId: string, sessionId: string) {
+	const sess = await getSession(orgId, sessionId);
+	return db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			capacity: classSession.capacity,
+			cancelledAt: classSession.cancelledAt,
+			booked:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','attended'))`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.classTypeId, sess.session.classTypeId),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.orderBy(desc(classSession.startsAt))
+		.limit(4);
 }
 
 /** Coach note shared with the member — the member sees it in their portal. */
@@ -1246,6 +1313,7 @@ export async function bookSession(
 				dropInPrice: classType.dropInPrice,
 				waitlistLimit: classType.waitlistLimit,
 				minLevelId: classType.minLevelId,
+				minAge: classType.minAge,
 				className: classType.name
 			})
 			.from(classSession)
@@ -1269,6 +1337,13 @@ export async function bookSession(
 				: [undefined];
 			if (!gate || !held || held.sort < gate.sort)
 				error(409, `${s.className} requires ${gate?.name ?? 'a higher level'}`);
+		}
+		// Age gate: birthday must be set and at least minAge years old.
+		if (s.minAge != null) {
+			const today = new Date().toISOString().slice(0, 10);
+			const cutoff = `${Number(today.slice(0, 4)) - s.minAge}${today.slice(4)}`;
+			if (!m.birthday) error(409, `${s.className} is ${s.minAge}+ — set your birthday first`);
+			if (m.birthday > cutoff) error(409, `${s.className} is ${s.minAge}+`);
 		}
 		// Makeup booking: compFrom marks a free replacement for a booking the
 		// member lost to a gym-side cancellation (same class, no credit drain).
@@ -2090,6 +2165,55 @@ export async function copyWeek(
 			summary: `Copied ${inserted.length} session${inserted.length === 1 ? '' : 's'} to week of ${target}${src.length - rows.length ? ` — ${src.length - rows.length} skipped (closed)` : ''}`
 		});
 	return { created: inserted.length, skipped: src.length - rows.length };
+}
+
+/** Copies one day's sessions onto another date (org-local), skipping closures. */
+export async function copyDay(ctx: OrgContext, tz: string, fromDate: string, toDate: string) {
+	const from = zonedToUtc(`${fromDate}T00:00`, tz);
+	const to = zonedToUtc(`${addDays(fromDate, 1)}T00:00`, tz);
+	const shiftMs = zonedToUtc(`${toDate}T00:00`, tz).getTime() - from.getTime();
+	const [closedDay] = await db
+		.select({ date: closure.date })
+		.from(closure)
+		.where(and(eq(closure.organizationId, ctx.orgId), eq(closure.date, toDate)))
+		.limit(1);
+	const src = await db
+		.select()
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				gte(classSession.startsAt, from),
+				lt(classSession.startsAt, to),
+				isNull(classSession.cancelledAt)
+			)
+		);
+	const rows = closedDay
+		? []
+		: src.map((s) => ({
+				organizationId: ctx.orgId,
+				classTypeId: s.classTypeId,
+				locationId: s.locationId,
+				instructorId: s.instructorId,
+				startsAt: new Date(s.startsAt.getTime() + shiftMs),
+				endsAt: new Date(s.endsAt.getTime() + shiftMs),
+				capacity: s.capacity,
+				note: s.note,
+				checkinCode: sessionCode()
+			}));
+	const inserted = rows.length
+		? await db.insert(classSession).values(rows).returning({ id: classSession.id })
+		: [];
+	if (inserted.length)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'class_session',
+			entityId: inserted[0]!.id,
+			action: 'copied',
+			summary: `Copied ${inserted.length} session${inserted.length === 1 ? '' : 's'} from ${fromDate} to ${toDate}`
+		});
+	return { created: inserted.length, skipped: closedDay ? src.length : 0 };
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

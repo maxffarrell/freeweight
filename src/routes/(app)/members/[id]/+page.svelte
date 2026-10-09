@@ -17,6 +17,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
+	import { toCsv } from '#lib/csv.ts';
 	import { toast } from 'svelte-sonner';
 	import {
 		getMember,
@@ -38,6 +39,7 @@
 		mergeMembers,
 		logIncident,
 		updateIncidentEntry,
+		resolveMemberIssue,
 		sendSignRequest,
 		voidSignRequest,
 		getMemberWorkouts,
@@ -64,7 +66,8 @@
 		releaseLocker,
 		approveTrial,
 		declineTrial,
-		anonymizeMember
+		anonymizeMember,
+		getMemberGiftCards
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -220,6 +223,14 @@
 		}
 		incPending = false;
 	}
+	async function resolveIssue(issueId: string) {
+		try {
+			await resolveMemberIssue({ id: issueId, memberId: id });
+			toast.success('Issue resolved');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not resolve'));
+		}
+	}
 	async function closeIncident(incidentId: string) {
 		const followUp = prompt('Follow-up notes (what was done):') ?? '';
 		try {
@@ -260,6 +271,7 @@
 	const allTags = $derived(await getTags());
 	const memberLocker = $derived(await getMemberLocker(id));
 	const memberLoans = $derived(await getMemberLoans(id));
+	const memberGiftCards = $derived(await getMemberGiftCards(id));
 	const loanables = $derived(await getLoanables());
 	const freeKit = $derived(loanables.filter((k) => k.out < k.item.quantity));
 	let kitPick = $state('');
@@ -332,6 +344,18 @@
 		m.charges
 			.filter((c) => c.charge.status === 'open')
 			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
+	);
+	const openChargesCount = $derived(m.charges.filter((c) => c.charge.status === 'open').length);
+	const memberMonths = $derived(
+		m.member.joinedAt
+			? Math.max(
+					0,
+					Math.floor((Date.now() - new Date(m.member.joinedAt).getTime()) / (30.4 * 86400_000))
+				)
+			: 0
+	);
+	const lifetimePaid = $derived(
+		m.payments.filter((p) => !p.refundedAt).reduce((sum, p) => sum + p.amount, 0)
 	);
 
 	// ------- documents -------
@@ -970,9 +994,21 @@
 					<span class="text-muted-foreground">Status</span><StatusBadge status={m.member.status} />
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground">Email</span><span class="truncate"
-						>{m.member.email ?? '—'}</span
-					>
+					<span class="text-muted-foreground">Email</span>
+					<span class="flex items-center gap-1 truncate">
+						<span class="truncate">{m.member.email ?? '—'}</span>
+						{#if m.member.email}
+							<Button
+								variant="ghost"
+								class="h-6 px-1.5"
+								onclick={() =>
+									navigator.clipboard
+										.writeText(m.member.email!)
+										.then(() => toast.success('Email copied'))
+										.catch(() => toast.error('Could not copy'))}>Copy</Button
+							>
+						{/if}
+					</span>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Phone</span><span>{m.member.phone ?? '—'}</span>
@@ -991,7 +1027,7 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Joined</span><span
-						>{formatDate(m.member.joinedAt)}</span
+						>{formatDate(m.member.joinedAt)}{memberMonths > 0 ? ` · ${memberMonths} mo` : ''}</span
 					>
 				</div>
 				<div class="flex justify-between">
@@ -1012,6 +1048,18 @@
 						</span>
 					</div>
 				{/if}
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Referral link</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() =>
+							navigator.clipboard
+								.writeText(`${location.origin}/j/${m.orgSlug}?ref=${m.member.id}`)
+								.then(() => toast.success('Referral link copied'))
+								.catch(() => toast.error('Could not copy'))}>Copy</Button
+					>
+				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Birthday</span><span
 						>{m.member.birthday ? formatDate(m.member.birthday) : '—'}</span
@@ -1062,10 +1110,47 @@
 						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
 					>
 				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Classes booked</span>
+					<span class="tabular-nums">{m.attendance.bookedMonth} this month</span>
+				</div>
+				{#if m.attendance.waitlisted > 0}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Waitlisted</span>
+						<span class="tabular-nums">{m.attendance.waitlisted} upcoming</span>
+					</div>
+				{/if}
+				{#if m.attendance.firstVisit}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">First visit</span>
+						<span class="tabular-nums">{formatDate(m.attendance.firstVisit)}</span>
+					</div>
+				{/if}
+				{#if m.attendance.lastVisit}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Last visit</span>
+						<span class="tabular-nums">{formatDate(m.attendance.lastVisit)}</span>
+					</div>
+				{/if}
+				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
+				{#if nextMile}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Next milestone</span>
+						<span class="text-muted-foreground tabular-nums"
+							>{nextMile} ({nextMile - m.attendance.visits} to go)</span
+						>
+					</div>
+				{/if}
 				{#if m.loyalty}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Loyalty</span>
 						<Badge variant="secondary" class={m.loyalty.className}>{m.loyalty.name}</Badge>
+					</div>
+				{/if}
+				{#if m.attendance.topClass}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Go-to class</span>
+						<span class="truncate">{m.attendance.topClass}</span>
 					</div>
 				{/if}
 				{#if m.weekStreak > 0}
@@ -1081,12 +1166,26 @@
 					<span class="tabular-nums"
 						>{m.attendance.noShows}{m.attendance.showRate != null
 							? ` · ${m.attendance.showRate}% show rate`
-							: ''}</span
+							: ''}{#if m.bookings.some((b) => b.booking.status === 'no_show')}
+							{@const lastNs = m.bookings
+								.filter((b) => b.booking.status === 'no_show')
+								.map((b) => new Date(b.startsAt).getTime())
+								.reduce((a, t) => Math.max(a, t), 0)}
+							<span class="text-xs text-muted-foreground"
+								>· last {formatDate(new Date(lastNs))}</span
+							>
+						{/if}</span
 					>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Lifetime paid</span>
+					<span class="text-muted-foreground tabular-nums"
+						>{formatMoney(lifetimePaid, currency)}</span
+					>
 				</div>
 				<div class="flex items-center justify-between gap-2">
 					<span class="text-muted-foreground">Level</span>
@@ -1260,6 +1359,10 @@
 								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}{mm
 									.membership.frozenUntil
 									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
+									: ''}{mm.membership.status === 'active' &&
+								!mm.membership.noBill &&
+								mm.membership.nextChargeAt
+									? ` · next bill ${formatDate(mm.membership.nextChargeAt)}`
 									: ''}
 							</p>
 							{#if mm.membership.noBill}
@@ -1545,6 +1648,37 @@
 			</Card.Content>
 		</Card.Root>
 
+		{#if m.issues.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Member issues</Card.Title>
+					<Card.Description>Problems the member reported in the portal</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.issues as i (i.id)}
+						<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+							<span class="min-w-0 break-words">{i.text}</span>
+							<span class="flex shrink-0 items-center gap-2">
+								<span class="text-xs text-muted-foreground">
+									{formatRelative(i.createdAt)}
+								</span>
+								{#if i.status === 'open'}
+									<Button
+										size="sm"
+										variant="ghost"
+										class="h-7 px-1.5"
+										onclick={() => resolveIssue(i.id)}>Resolve</Button
+									>
+								{:else}
+									<Badge variant="secondary">resolved</Badge>
+								{/if}
+							</span>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<Card.Root>
 			<Card.Header class="flex-row items-center justify-between">
 				<div>
@@ -1684,6 +1818,23 @@
 							<span class="w-28 shrink-0 text-xs text-muted-foreground">{pr.recordedOn}</span>
 							<span class="min-w-0 truncate">{pr.label}</span>
 							<span class="ml-auto shrink-0 font-medium">{pr.value}</span>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		{#if m.workoutLogs.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Workout log</Card.Title>
+					<Card.Description>Free-form entries the member logged in the portal</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.workoutLogs as w (w.id)}
+						<div class="flex items-baseline gap-2 py-1 text-sm">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">{w.day}</span>
+							<span class="min-w-0 break-words">{w.text}</span>
 						</div>
 					{/each}
 				</Card.Content>
@@ -1869,10 +2020,15 @@
 		<Tabs.Root value="charges">
 			<Card.Header>
 				<Tabs.List>
-					<Tabs.Trigger value="charges">Charges</Tabs.Trigger>
+					<Tabs.Trigger value="charges"
+						>Charges{#if openChargesCount}
+							<Badge variant="destructive" class="ml-1">{openChargesCount} open</Badge
+							>{/if}</Tabs.Trigger
+					>
 					<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 					<Tabs.Trigger value="bookings">Bookings</Tabs.Trigger>
 					<Tabs.Trigger value="checkins">Check-ins</Tabs.Trigger>
+					<Tabs.Trigger value="giftcards">Gift cards</Tabs.Trigger>
 				</Tabs.List>
 			</Card.Header>
 			<Card.Content class="px-4 pb-4">
@@ -1960,6 +2116,30 @@
 							>Book into a series…</Button
 						>
 					</div>
+					<div class="mb-2 flex justify-end">
+						<Button
+							size="sm"
+							variant="ghost"
+							disabled={!m.bookings.length}
+							onclick={() => {
+								const csv = toCsv([
+									['Class', 'When', 'Status', 'Member note', 'Coach note'],
+									...m.bookings.map((b) => [
+										b.className,
+										new Date(b.startsAt).toISOString(),
+										b.booking.status,
+										b.booking.memberNote ?? '',
+										b.booking.coachNote ?? ''
+									])
+								]);
+								const a = document.createElement('a');
+								a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+								a.download = `bookings-${m.member.name.replaceAll(' ', '-')}.csv`;
+								a.click();
+								URL.revokeObjectURL(a.href);
+							}}>Export CSV</Button
+						>
+					</div>
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
@@ -2005,6 +2185,43 @@
 							{:else}
 								<Table.Row
 									><Table.Cell colspan={3} class="text-muted-foreground">No check-ins.</Table.Cell
+									></Table.Row
+								>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Tabs.Content>
+				<Tabs.Content value="giftcards">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Code</Table.Head>
+								<Table.Head>Amount</Table.Head>
+								<Table.Head>Balance</Table.Head>
+								<Table.Head>Status</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each memberGiftCards as g (g.card.id)}
+								<Table.Row>
+									<Table.Cell class="font-mono text-xs">{g.card.code}</Table.Cell>
+									<Table.Cell class="tabular-nums"
+										>{formatMoney(g.card.amount, currency)}</Table.Cell
+									>
+									<Table.Cell class="tabular-nums"
+										>{formatMoney(g.card.balance, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-muted-foreground"
+										>{g.card.redeemedAt
+											? `redeemed ${formatDate(g.card.redeemedAt)}`
+											: g.card.purchaserMemberId === id
+												? 'purchased — unused'
+												: 'unused'}</Table.Cell
+									>
+								</Table.Row>
+							{:else}
+								<Table.Row
+									><Table.Cell colspan={4} class="text-muted-foreground">No gift cards.</Table.Cell
 									></Table.Row
 								>
 							{/each}

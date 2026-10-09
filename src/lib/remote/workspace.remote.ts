@@ -39,12 +39,24 @@ export const getActivity = query(
 	v.object({
 		entityType: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40))),
 		before: v.optional(v.pipe(v.string(), v.isoTimestamp())),
-		actorId: v.optional(idSchema)
+		actorId: v.optional(idSchema),
+		action: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(40)))
 	}),
 	async (input) => {
 		const { orgId } = await requireOrg();
-		return dashboardSvc.listActivity(orgId, input.entityType, input.before, input.actorId);
+		return dashboardSvc.listActivity(
+			orgId,
+			input.entityType,
+			input.before,
+			input.actorId,
+			input.action
+		);
 	}
+);
+
+/** Distinct action verbs in the audit log — feeds the action filter. */
+export const getActivityActions = query(async () =>
+	dashboardSvc.listActivityActions((await requireOrg()).orgId)
 );
 
 /** Staff members appearing in the audit log — feeds the person filter. */

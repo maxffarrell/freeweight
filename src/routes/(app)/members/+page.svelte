@@ -31,6 +31,8 @@
 		getTags,
 		getDuplicates,
 		importMembers,
+		bulkGrantCredits,
+		bulkSetInactive,
 		tagMembers,
 		getLevels,
 		addLevel,
@@ -58,6 +60,7 @@
 	import Download from '@lucide/svelte/icons/download';
 	import Mail from '@lucide/svelte/icons/mail';
 	import TagIcon from '@lucide/svelte/icons/tag';
+	import TicketCheck from '@lucide/svelte/icons/ticket-check';
 	import Upload from '@lucide/svelte/icons/upload';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -78,7 +81,8 @@
 		name: 'Name A–Z',
 		joined: 'Newest',
 		lastVisit: 'Last visit',
-		balance: 'Balance due'
+		balance: 'Balance due',
+		visits30: 'Most visits (30d)'
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let owesFilter = $state(initOwes ? 'owes' : 'any');
@@ -98,6 +102,9 @@
 	let tagOpen = $state(false);
 	let bulkTag = $state('');
 	let tagPending = $state(false);
+	let compOpen = $state(false);
+	let compCount = $state(1);
+	let compPending = $state(false);
 	function toggleSelect(memberId: string) {
 		if (selected.has(memberId)) selected.delete(memberId);
 		else selected.add(memberId);
@@ -123,6 +130,25 @@
 		}
 		tagPending = false;
 	}
+	async function applyBulkComp(e: SubmitEvent) {
+		e.preventDefault();
+		compPending = true;
+		try {
+			const r = await bulkGrantCredits({ memberIds: [...selected], count: compCount });
+			toast.success(
+				`Granted ${compCount} comp class${compCount === 1 ? '' : 'es'} to ${r.granted} member${r.granted === 1 ? '' : 's'}` +
+					(r.skipped ? ` — ${r.skipped} had no active membership` : '')
+			);
+			if (r.granted) {
+				selected.clear();
+				compOpen = false;
+				await refilter();
+			}
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not grant comp classes'));
+		}
+		compPending = false;
+	}
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
 		members = await getMembers({
@@ -143,7 +169,17 @@
 			recent: owesFilter === '__new' || undefined,
 			risk: owesFilter === '__risk' || undefined,
 			family: owesFilter === '__family' || undefined,
-			birthday: owesFilter === '__bday' || undefined
+			birthday: owesFilter === '__bday' || undefined,
+			noContact: owesFilter === '__nocontact' || undefined,
+			unsubscribed: owesFilter === '__unsub' || undefined,
+			referred: owesFilter === '__referred' || undefined,
+			neverBooked: owesFilter === '__neverbooked' || undefined,
+			endingSoon: owesFilter === '__ending' || undefined,
+			noWaiver: owesFilter === '__nowaiver' || undefined,
+			onWaitlist: owesFilter === '__waitlist' || undefined,
+			paused: owesFilter === '__paused' || undefined,
+			noUpcoming: owesFilter === '__noupcoming' || undefined,
+			comped: owesFilter === '__comped' || undefined
 		});
 	}
 	function search() {
@@ -151,6 +187,7 @@
 		timer = setTimeout(refilter, 150);
 	}
 
+	const joinedWeekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 	let open = $state(page.url.searchParams.get('new') === '1');
 	let pending = $state(false);
 	let name = $state('');
@@ -168,7 +205,8 @@
 		let rows = parseCsv(importText).map((r) => ({
 			name: r[0]?.trim() ?? '',
 			email: r[1]?.trim() ?? '',
-			phone: r[2]?.trim() ?? ''
+			phone: r[2]?.trim() ?? '',
+			birthday: /^\d{4}-\d{2}-\d{2}$/.test(r[3]?.trim() ?? '') ? r[3]!.trim() : undefined
 		}));
 		if (rows.length && rows[0]!.name.toLowerCase() === 'name') rows = rows.slice(1);
 		return rows.filter((r) => r.name);
@@ -183,7 +221,12 @@
 		importPending = true;
 		try {
 			const r = await importMembers(
-				importRows.map((row) => ({ name: row.name, email: row.email, phone: row.phone || null }))
+				importRows.map((row) => ({
+					name: row.name,
+					email: row.email,
+					phone: row.phone || null,
+					birthday: row.birthday
+				}))
 			);
 			toast.success(
 				`Imported ${r.created} member${r.created === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} duplicate${r.skipped === 1 ? '' : 's'}` : ''}`
@@ -242,6 +285,7 @@
 	}
 
 	function exportCsv() {
+		const rows = selected.size ? members.filter((m) => selected.has(m.id)) : members;
 		const csv = toCsv([
 			[
 				'Name',
@@ -253,9 +297,12 @@
 				'Tags',
 				'Open balance',
 				'Joined',
-				'Last visit'
+				'Last visit',
+				'Membership ends',
+				'Visits (30d)',
+				'Referral source'
 			],
-			...members.map((m) => [
+			...rows.map((m) => [
 				m.name,
 				m.email,
 				m.phone,
@@ -265,7 +312,10 @@
 				m.tags.join(' '),
 				(m.openBalance / 100).toFixed(2),
 				m.joinedAt ? formatDate(m.joinedAt) : '',
-				m.lastVisit ? formatDate(m.lastVisit) : ''
+				m.lastVisit ? formatDate(m.lastVisit) : '',
+				m.memberEnds ? formatDate(m.memberEnds) : '',
+				m.visits30,
+				m.referralSource ?? ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -383,11 +433,15 @@
 				? 'At-risk members (no visit in 30+ days)'
 				: emailAudience === '__all'
 					? 'All active members'
-					: audTag
-						? `Tag: ${audTag}`
-						: audLoc
-							? `Location: ${audLocName}`
-							: `Plan: ${audPlanName}`
+					: emailAudience === '__inactive'
+						? 'Inactive members'
+						: emailAudience === '__recent'
+							? 'New this week'
+							: audTag
+								? `Tag: ${audTag}`
+								: audLoc
+									? `Location: ${audLocName}`
+									: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -397,7 +451,9 @@
 						tag: audTag,
 						planId: audPlan,
 						locationId: audLoc,
-						atRisk: emailAudience === '__risk'
+						atRisk: emailAudience === '__risk',
+						inactive: emailAudience === '__inactive',
+						recent: emailAudience === '__recent'
 					})
 				: null
 	);
@@ -413,6 +469,8 @@
 					planId: audPlan,
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
+					inactive: emailAudience === '__inactive',
+					recent: emailAudience === '__recent',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
 				toast.success('Scheduled — the daily job sends it');
@@ -424,6 +482,8 @@
 					planId: audPlan,
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
+					inactive: emailAudience === '__inactive',
+					recent: emailAudience === '__recent',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -534,7 +594,15 @@
 		<Button size="sm" variant="outline" onclick={() => (importOpen = true)}
 			><Upload /> Import</Button
 		>
-		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
+		<span class="self-center text-sm text-muted-foreground"
+			>{formatMoney(
+				members.reduce((a, x) => a + x.openBalance, 0),
+				currency
+			)} open</span
+		>
+		<Button size="sm" variant="outline" onclick={exportCsv}
+			><Download /> Export{selected.size ? ` (${selected.size})` : ''}</Button
+		>
 		<Button
 			size="sm"
 			variant="outline"
@@ -627,7 +695,25 @@
 									? 'Has family'
 									: owesFilter === '__bday'
 										? 'Birthday month'
-										: 'Any balance'}</Select.Trigger
+										: owesFilter === '__nocontact'
+											? 'No contact info'
+											: owesFilter === '__unsub'
+												? 'Unsubscribed'
+												: owesFilter === '__referred'
+													? 'Referred'
+													: owesFilter === '__neverbooked'
+														? 'Never booked'
+														: owesFilter === '__ending'
+															? 'Ending soon'
+															: owesFilter === '__waitlist'
+																? 'On a waitlist'
+																: owesFilter === '__paused'
+																	? 'Paused'
+																	: owesFilter === '__noupcoming'
+																		? 'No upcoming'
+																		: owesFilter === '__comped'
+																			? "Comp'd"
+																			: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -637,6 +723,16 @@
 				<Select.Item value="__risk">At-risk 30d+</Select.Item>
 				<Select.Item value="__family">Has family</Select.Item>
 				<Select.Item value="__bday">Birthday month</Select.Item>
+				<Select.Item value="__nocontact">No contact info</Select.Item>
+				<Select.Item value="__unsub">Unsubscribed</Select.Item>
+				<Select.Item value="__ending">Ending soon</Select.Item>
+				<Select.Item value="__nowaiver">No waiver</Select.Item>
+				<Select.Item value="__waitlist">On a waitlist</Select.Item>
+				<Select.Item value="__paused">Paused</Select.Item>
+				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
+				<Select.Item value="__comped">Comp'd membership</Select.Item>
+				<Select.Item value="__referred">Referred</Select.Item>
+				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
@@ -672,6 +768,29 @@
 		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
 			<span class="font-medium tabular-nums">{selected.size} selected</span>
 			<Button size="sm" variant="outline" onclick={() => (tagOpen = true)}><TagIcon /> Tag</Button>
+			<Button size="sm" variant="outline" onclick={() => (compOpen = true)}
+				><TicketCheck /> Comp classes</Button
+			>
+			<Button
+				size="sm"
+				variant="outline"
+				onclick={async () => {
+					if (
+						!confirm(
+							`Mark ${selected.size} member${selected.size === 1 ? '' : 's'} inactive? Their history is kept.`
+						)
+					)
+						return;
+					try {
+						const n = await bulkSetInactive({ memberIds: [...selected] });
+						toast.success(`Marked ${n} inactive`);
+						selected.clear();
+						await refilter();
+					} catch (e) {
+						toast.error(errMsg(e, 'Could not mark inactive'));
+					}
+				}}>Mark inactive</Button
+			>
 			<Button size="sm" variant="ghost" onclick={() => selected.clear()}>Clear</Button>
 		</div>
 	{/if}
@@ -694,6 +813,7 @@
 						<Table.Head class="hidden md:table-cell">Contact</Table.Head>
 						<Table.Head>Membership</Table.Head>
 						<Table.Head class="hidden lg:table-cell">Last visit</Table.Head>
+						<Table.Head class="hidden lg:table-cell">Visits 30d</Table.Head>
 						<Table.Head>Status</Table.Head>
 						<Table.Head class="text-right">Open balance</Table.Head>
 					</Table.Row>
@@ -725,6 +845,12 @@
 										>
 									{/if}
 									{m.name}
+									{#if m.guardianId}
+										<Badge variant="outline" class="px-1.5 py-0 text-[10px]">family</Badge>
+									{/if}
+									{#if m.joinedAt && m.joinedAt >= joinedWeekAgo}
+										<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">new</Badge>
+									{/if}
 								</span>
 								{#if m.tags.length}
 									<span class="ml-1.5 inline-flex gap-1">
@@ -745,6 +871,9 @@
 							<Table.Cell class="text-muted-foreground">{m.planName ?? '—'}</Table.Cell>
 							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
 								{m.lastVisit ? formatDate(m.lastVisit) : '—'}
+							</Table.Cell>
+							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
+								{m.visits30 || '—'}
 							</Table.Cell>
 							<Table.Cell><StatusBadge status={m.status} /></Table.Cell>
 							<Table.Cell class="text-right tabular-nums">
@@ -796,6 +925,31 @@
 			<Dialog.Footer>
 				<Button type="submit" disabled={tagPending}>
 					{tagPending ? 'Tagging…' : 'Add tag'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={compOpen}>
+	<Dialog.Content class="sm:max-w-sm">
+		<Dialog.Header>
+			<Dialog.Title
+				>Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}</Dialog.Title
+			>
+			<Dialog.Description>
+				Adds bonus class credits to each selected member's active membership — on top of their plan
+				or pack.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={applyBulkComp}>
+			<Field.Field>
+				<Field.Label for="bulk-comp">Classes to grant</Field.Label>
+				<Input id="bulk-comp" type="number" min="1" max="100" bind:value={compCount} required />
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={compPending || compCount < 1}>
+					{compPending ? 'Granting…' : 'Grant'}
 				</Button>
 			</Dialog.Footer>
 		</form>
@@ -1002,6 +1156,8 @@
 							{/if}
 							<Select.Item value="__all">All active members</Select.Item>
 							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
+							<Select.Item value="__inactive">Inactive members</Select.Item>
+							<Select.Item value="__recent">New this week</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}

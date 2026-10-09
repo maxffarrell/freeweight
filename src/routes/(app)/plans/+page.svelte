@@ -14,6 +14,7 @@
 	import { toast } from 'svelte-sonner';
 	import {
 		getPlans,
+		migratePlanMembers,
 		createPlan,
 		updatePlan,
 		getCurrency,
@@ -29,6 +30,8 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import Link2 from '@lucide/svelte/icons/link-2';
+	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 
 	const currency = await getCurrency();
 	const joinInfo = await getJoinInfo();
@@ -44,6 +47,28 @@
 
 	let open = $state(page.url.searchParams.get('new') === '1');
 	let editing = $state<(typeof plans)[number] | null>(null);
+	let migFrom = $state<(typeof plans)[number] | null>(null);
+	let migTarget = $state('');
+	let migBusy = $state(false);
+	async function doMigrate() {
+		if (!migFrom || !migTarget) return;
+		if (
+			!confirm(
+				`Move every active/paused membership from ${migFrom.name} to the selected plan? Pricing and billing dates are kept.`
+			)
+		)
+			return;
+		migBusy = true;
+		try {
+			const r = await migratePlanMembers({ fromPlanId: migFrom.id, toPlanId: migTarget });
+			toast.success(`Moved ${r.moved} membership${r.moved === 1 ? '' : 's'}`);
+			migFrom = null;
+			migTarget = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not move members'));
+		}
+		migBusy = false;
+	}
 	let pending = $state(false);
 	let name = $state('');
 	let description = $state('');
@@ -236,6 +261,15 @@
 								onclick={() => copyPlanLink(p)}><Link2 /></Button
 							>
 						{/if}
+						<Button
+							variant="ghost"
+							size="icon"
+							title="Move members to another plan"
+							onclick={() => {
+								migFrom = p;
+								migTarget = '';
+							}}><ArrowRightLeft /></Button
+						>
 						<Button variant="ghost" size="icon" onclick={() => openEdit(p)}><Pencil /></Button>
 					</div>
 				</Card.Header>
@@ -277,6 +311,19 @@
 									? ' · full'
 									: ''}</Badge
 							>{/if}
+						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
+								>{p.endingSoon} ending soon</Badge
+							>{/if}
+						{#if !p.isPack && p.activeMembers > 0}
+							{@const mrr = Math.round(
+								p.amount *
+									p.activeMembers *
+									(p.interval === 'week' ? 52 / 12 : p.interval === 'year' ? 1 / 12 : 1)
+							)}
+							<Badge variant="outline" class="text-muted-foreground"
+								>≈ {formatMoney(mrr, currency, true)}/mo</Badge
+							>
+						{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
 				</Card.Content>
@@ -401,6 +448,33 @@
 				><Button type="submit" disabled={pending || !pcCode}>Create code</Button></Dialog.Footer
 			>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root open={!!migFrom} onOpenChange={(o) => !o && (migFrom = null)}>
+	<Dialog.Content class="max-w-sm">
+		<Dialog.Title>Move members from {migFrom?.name}</Dialog.Title>
+		<Dialog.Description>
+			Every active and paused membership switches to the new plan — pricing and billing dates are
+			kept.
+		</Dialog.Description>
+		<Field.Field>
+			<Field.Label>To plan</Field.Label>
+			<NativeSelect bind:value={migTarget}>
+				<option value="" disabled>Pick a plan…</option>
+				{#each plans.filter((x) => x.id !== migFrom?.id && !x.isPack) as q (q.id)}
+					<option value={q.id}>
+						{q.name} — {formatMoney(q.amount, currency)}/{q.interval}
+					</option>
+				{/each}
+			</NativeSelect>
+		</Field.Field>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (migFrom = null)}>Cancel</Button>
+			<Button disabled={!migTarget || migBusy} onclick={doMigrate}>
+				{migBusy ? 'Moving…' : 'Move members'}
+			</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
 

@@ -23,7 +23,9 @@
 		updateClassType,
 		createSession,
 		updateSession,
+		copyDay,
 		getRoster,
+		recentClassSessions,
 		setBookingNote,
 		setCoachNote,
 		moveBooking,
@@ -180,7 +182,22 @@
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
+	let copyDayOpen = $state(false);
+	let copyFrom = $state('');
+	let copyTo = $state('');
 	const roster = $derived(focusId ? await getRoster(focusId) : []);
+	const recentFill = $derived(focusId ? await recentClassSessions(focusId) : []);
+	const rosterGuests = $derived(roster.reduce((a, r) => a + (r.booking.guestCount ?? 0), 0));
+	/** Outcome tallies for a finished session (attended / no-show / cancelled). */
+	const rosterOutcome = $derived.by(() => {
+		if (!focus || focus.session.endsAt.getTime() > Date.now()) return null;
+		const c = { attended: 0, no_show: 0, booked: 0, cancelled: 0, waitlisted: 0 } as Record<
+			string,
+			number
+		>;
+		for (const r of roster) c[r.booking.status] = (c[r.booking.status] ?? 0) + 1;
+		return c;
+	});
 	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
 	const printBooked = $derived(
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
@@ -930,6 +947,8 @@
 	let tActive = $state(true);
 	let tMemberBookable = $state(true);
 	let tMinLevel = $state('');
+	let tMinAge = $state<number | null>(null);
+	let tBring = $state('');
 	let tQuals = new SvelteSet<string>();
 	let tStream = $state('');
 	const levels = $derived(await getLevels());
@@ -955,6 +974,8 @@
 		tMemberBookable = c.memberBookable;
 		tStream = c.defaultStreamUrl ?? '';
 		tMinLevel = c.minLevelId ?? '';
+		tMinAge = c.minAge ?? null;
+		tBring = c.bringNote ?? '';
 		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
 	// ------- movement video library -------
@@ -1021,6 +1042,8 @@
 				memberBookable: tMemberBookable,
 				defaultStreamUrl: tStream.trim() || null,
 				minLevelId: tMinLevel || null,
+				minAge: tMinAge,
+				bringNote: tBring,
 				active: tActive
 			};
 			let savedTypeId = editTypeId;
@@ -1035,6 +1058,10 @@
 			toast.error(errMsg(err, 'Could not save'));
 		}
 		pending = false;
+	}
+
+	function dayBooked(day: (typeof days)[number]) {
+		return day.sessions.filter((x) => !x.session.cancelledAt).reduce((a, x) => a + x.booked, 0);
 	}
 </script>
 
@@ -1099,7 +1126,20 @@
 			onclick={async () => ((weekStart = addDays(weekStart, 7)), await reload())}
 			><ChevronRight /></Button
 		>
-		<span class="ml-2 text-sm text-muted-foreground">Week of {weekStart}</span>
+		<span class="ml-2 text-sm text-muted-foreground"
+			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
+				(s) => !s.session.instructorId && !s.session.cancelledAt
+			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
+				? ` · ${sessions.filter((r) => r.session.cancelledAt).length} cancelled`
+				: ''} · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked · {Math.round(
+				(sessions.reduce((a, r) => a + (r.booked ?? 0), 0) /
+					Math.max(
+						1,
+						sessions.reduce((a, r) => a + (r.session.capacity ?? 0), 0)
+					)) *
+					100
+			)}% full</span
+		>
 		<Button
 			variant="outline"
 			size="sm"
@@ -1120,6 +1160,15 @@
 				}
 				pending = false;
 			}}><Copy /> Copy week</Button
+		>
+		<Button
+			variant="outline"
+			size="sm"
+			onclick={() => {
+				copyFrom = localDate(new Date(), tz);
+				copyTo = localDate(new Date(Date.now() + 86400_000), tz);
+				copyDayOpen = true;
+			}}><Copy /> Copy day…</Button
 		>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
 			<NativeSelect bind:value={fType}>
@@ -1146,6 +1195,8 @@
 			<div class="space-y-2">
 				<p class="text-xs font-medium text-muted-foreground">
 					{day.label} <span class="tabular-nums">{day.date.slice(5)}</span>
+					{#if dayBooked(day)}<span class="font-normal tabular-nums">· {dayBooked(day)} booked</span
+						>{/if}
 				</p>
 				{#each day.sessions as s (s.session.id)}
 					<button
@@ -1168,6 +1219,10 @@
 								>{/if}
 							{#if s.session.cancelledAt}<Badge variant="destructive" class="text-xs"
 									>cancelled</Badge
+								>{/if}
+							{#if !s.session.instructorId && !s.session.cancelledAt}<Badge
+									variant="outline"
+									class="border-amber-500/60 text-xs text-amber-600">unstaffed</Badge
 								>{/if}
 							{#if s.session.coverRequestedAt && !s.session.cancelledAt}<Badge
 									variant="outline"
@@ -1193,8 +1248,28 @@
 					></span>{focus.className}
 					· {focus ? localTime(focus.session.startsAt, tz) : ''}{/if}
 			</Sheet.Title>
-			<Sheet.Description>Roster — booked first, waitlist below.</Sheet.Description>
+			<Sheet.Description
+				>Roster — booked first, waitlist below.{#if rosterOutcome}
+					<span class="tabular-nums"
+						>· {rosterOutcome.attended} attended · {rosterOutcome.no_show} no-show · {rosterOutcome.cancelled}
+						cancelled{rosterOutcome.waitlisted
+							? ` · ${rosterOutcome.waitlisted} waitlisted`
+							: ''}</span
+					>{/if}</Sheet.Description
+			>
 		</Sheet.Header>
+		{#if recentFill.length}
+			<div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2">
+				<span class="text-xs text-muted-foreground">Recent:</span>
+				{#each recentFill as rs (rs.id)}
+					<Badge variant="outline" class="text-xs tabular-nums"
+						>{localDate(rs.startsAt, tz).slice(5)}{rs.cancelledAt
+							? ' cancelled'
+							: ` ${rs.booked}/${rs.capacity}`}</Badge
+					>
+				{/each}
+			</div>
+		{/if}
 		{#if focus?.session.note}
 			<p class="border-b px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
 				{focus.session.note}
@@ -1227,8 +1302,19 @@
 								{#if r.firstTimer}
 									<Badge variant="secondary" class="ml-1">1st visit</Badge>
 								{/if}
+								{#if r.openBalance > 0}
+									<Badge variant="destructive" class="ml-1"
+										>owes {formatMoney(r.openBalance, currency)}</Badge
+									>
+								{/if}
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
+								{/if}
+								{#if r.booking.memberNote}
+									<span
+										class="ml-1 text-xs font-normal text-muted-foreground italic"
+										title="Member's own note">· “{r.booking.memberNote}”</span
+									>
 								{/if}
 								{#if r.resultScore}
 									<span class="ml-1 text-xs font-normal text-muted-foreground"
@@ -1516,6 +1602,51 @@
 	</Sheet.Content>
 </Sheet.Root>
 
+<Dialog.Root bind:open={copyDayOpen}>
+	<Dialog.Content class="sm:max-w-xs">
+		<Dialog.Header>
+			<Dialog.Title>Copy a day</Dialog.Title>
+			<Dialog.Description
+				>Duplicate every session from one day onto another — same times, rooms and instructors.</Dialog.Description
+			>
+		</Dialog.Header>
+		<div class="grid grid-cols-2 gap-3">
+			<Field.Field>
+				<Field.Label>From</Field.Label>
+				<Input type="date" bind:value={copyFrom} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>To</Field.Label>
+				<Input type="date" bind:value={copyTo} />
+			</Field.Field>
+		</div>
+		<Dialog.Footer>
+			<Button
+				disabled={pending || !copyFrom || !copyTo}
+				onclick={async () => {
+					pending = true;
+					try {
+						const r = await copyDay({ from: copyFrom, to: copyTo });
+						toast.success(
+							r.created
+								? `Copied ${r.created} session${r.created === 1 ? '' : 's'} to ${copyTo}` +
+										(r.skipped ? ` — ${r.skipped} skipped (gym closed)` : '')
+								: r.skipped
+									? 'Target day is a gym closure'
+									: 'No sessions on that day'
+						);
+						copyDayOpen = false;
+						await reload();
+					} catch (err) {
+						toast.error(errMsg(err, 'Could not copy day'));
+					}
+					pending = false;
+				}}>Copy</Button
+			>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
 {#if focus}
 	<Dialog.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
 		<Dialog.Content class="sm:max-w-sm">
@@ -1554,7 +1685,11 @@
 			)}{#if focus.instructorName}
 				· {focus.instructorName}{/if}{#if focus.locationName}
 				· {focus.locationName}{/if}
-			· {focus.session.capacity} spots
+			· {focus.session.capacity} spots{#if rosterGuests}
+				· {rosterGuests} guest{rosterGuests === 1 ? '' : 's'}{/if}{#if focus.payRate}
+				<span class="text-muted-foreground">
+					· pay {formatMoney(focus.payRate, currency)}</span
+				>{/if}
 		</p>
 		{#if focus.session.note}<p class="mt-1 text-sm italic">{focus.session.note}</p>{/if}
 		<table class="mt-6 w-full border-collapse text-left text-sm">
@@ -2017,6 +2152,22 @@
 				<span class="text-sm">Members can book online — off for front-desk-only classes</span>
 				<Switch bind:checked={tMemberBookable} />
 			</div>
+			<Field.Field>
+				<Field.Label for="t-min-age">Minimum age (optional)</Field.Label>
+				<Input
+					id="t-min-age"
+					type="number"
+					min={3}
+					max={99}
+					bind:value={tMinAge}
+					placeholder="All ages"
+				/>
+				<Field.Description>Under-age members can't book this class.</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-bring">What to bring (optional)</Field.Label>
+				<Input id="t-bring" bind:value={tBring} placeholder="Mat, gloves, towel" maxlength={120} />
+			</Field.Field>
 			{#if levels.length}
 				<Field.Field>
 					<Field.Label for="t-min-level">Required level</Field.Label>

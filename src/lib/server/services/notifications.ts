@@ -151,6 +151,44 @@ async function sendMemberEmail(memberId: string | null | undefined, args: Email)
 	await sendEmail(args);
 }
 
+/**
+ * Member-triggered: emails a friend the member's referral join link.
+ * Deduped per (member, recipient) so a member can't spam the same address.
+ */
+export async function sendReferralInvite(
+	orgId: string,
+	memberId: string,
+	toEmail: string,
+	toName?: string
+) {
+	const [m] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)));
+	if (!m) error(404, 'Member not found');
+	const to = toEmail.trim().toLowerCase();
+	const logged = await logOnce(orgId, 'referral_invite', memberId, to);
+	if (!logged) return { sent: 0 };
+	const [o, brand] = await Promise.all([
+		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
+		orgBrand(orgId)
+	]);
+	const link = `${appOrigin()}/j/${o[0]?.slug}?ref=${memberId}`;
+	const inviter = m.name;
+	const { text, html } = renderEmail({
+		...brand,
+		heading: `${inviter} invited you to ${brand.orgName}`,
+		lines: [
+			toName ? `Hi ${toName},` : 'Hi,',
+			`${inviter} thinks you'd like ${brand.orgName} — their link takes you to the join page:`,
+			link
+		],
+		action: { label: `Join ${brand.orgName}`, url: link }
+	});
+	await sendEmail({ to, subject: `${brand.orgName}: ${inviter} invited you`, text, html });
+	return { sent: 1 };
+}
+
 /** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops.
  * Returns the new row's id, or null when the row already existed. */
 async function logOnce(orgId: string, kind: string, entityId: string, recipient: string) {
@@ -1730,22 +1768,26 @@ export async function sendAnnouncement(
 	memberIds?: string[],
 	tag?: string,
 	planId?: string,
-	locationId?: string
+	locationId?: string,
+	inactive?: boolean,
+	recent?: boolean
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
+	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const members = await db
 		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
 		.from(gymMember)
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
-				eq(gymMember.status, 'active'),
+				eq(gymMember.status, inactive ? 'inactive' : 'active'),
 				memberIds?.length ? inArray(gymMember.id, memberIds) : undefined,
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
+				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1821,20 +1863,24 @@ export async function countAnnouncementAudience(
 	orgId: string,
 	tag?: string,
 	planId?: string,
-	locationId?: string
+	locationId?: string,
+	inactive?: boolean,
+	recent?: boolean
 ) {
+	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(gymMember)
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
-				eq(gymMember.status, 'active'),
+				eq(gymMember.status, inactive ? 'inactive' : 'active'),
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
+				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1854,6 +1900,8 @@ export async function scheduleAnnouncement(
 		planId?: string;
 		locationId?: string;
 		atRisk?: boolean;
+		inactive?: boolean;
+		recent?: boolean;
 	}
 ) {
 	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
@@ -1874,7 +1922,9 @@ export async function scheduleAnnouncement(
 			tag: opts.tag ?? null,
 			planId: opts.planId ?? null,
 			locationId: opts.locationId ?? null,
-			atRisk: opts.atRisk ?? null
+			atRisk: opts.atRisk ?? null,
+			inactive: opts.inactive ?? null,
+			recent: opts.recent ?? null
 		}
 	});
 	return { scheduledFor: opts.sendAt };
@@ -1894,7 +1944,9 @@ export async function sendDueAnnouncements(orgId: string) {
 			tag: sql<string | null>`${activity.data}->>'tag'`,
 			planId: sql<string | null>`${activity.data}->>'planId'`,
 			locationId: sql<string | null>`${activity.data}->>'locationId'`,
-			atRisk: sql<string | null>`${activity.data}->>'atRisk'`
+			atRisk: sql<string | null>`${activity.data}->>'atRisk'`,
+			inactive: sql<string | null>`${activity.data}->>'inactive'`,
+			recent: sql<string | null>`${activity.data}->>'recent'`
 		})
 		.from(activity)
 		.where(
@@ -1916,7 +1968,9 @@ export async function sendDueAnnouncements(orgId: string) {
 			memberIds,
 			a.tag ?? undefined,
 			a.planId ?? undefined,
-			a.locationId ?? undefined
+			a.locationId ?? undefined,
+			a.inactive === 'true',
+			a.recent === 'true'
 		);
 		await db.delete(activity).where(eq(activity.id, a.id));
 		sent++;
@@ -3759,6 +3813,45 @@ export async function notifySignRequest(orgId: string, signRequestId: string) {
 			action: { label: 'Review and sign', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/** Reminder for a sign request still pending ~3 days — one nudge per request ever. */
+export async function sendSignReminders(orgId: string) {
+	const rows = await db
+		.select({
+			id: signRequest.id,
+			memberId: signRequest.memberId,
+			title: signRequest.title,
+			email: gymMember.email,
+			memberName: gymMember.name
+		})
+		.from(signRequest)
+		.innerJoin(gymMember, eq(signRequest.memberId, gymMember.id))
+		.where(
+			and(
+				eq(signRequest.organizationId, orgId),
+				eq(signRequest.status, 'pending'),
+				lte(signRequest.createdAt, new Date(Date.now() - 3 * 86400_000))
+			)
+		);
+	const name = await orgBrand(orgId);
+	for (const r of rows) {
+		if (!r.email) continue;
+		if (!(await logOnce(orgId, 'sign_reminder', r.id, r.email))) continue;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Reminder: please sign "${r.title}" — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `Hi ${r.memberName}, a signature is still needed`,
+				lines: [
+					`"${r.title}" from ${name.orgName} is still waiting for your signature.`,
+					'It only takes a minute in your member portal.'
+				],
+				action: { label: 'Review and sign', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
 }
 
 /**

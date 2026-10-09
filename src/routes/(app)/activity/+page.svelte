@@ -8,19 +8,23 @@
 	import {
 		getActivity,
 		getActivityActors,
+		getActivityActions,
 		getActivityTypes,
 		getSettings
 	} from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatRelative } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 
 	const settings = await getSettings();
 	const types = await getActivityTypes();
 	const actors = await getActivityActors();
+	const actions = await getActivityActions();
 
 	const PAGE = 50;
 	let entityType = $state('all');
 	let actorId = $state('all');
+	let actionFilter = $state('all');
 	// 51 rows come back per fetch — the +1 tells us another page exists.
 	const first = await getActivity({});
 	let items = $state(first.slice(0, PAGE));
@@ -30,7 +34,8 @@
 	async function refilter() {
 		const r = await getActivity({
 			entityType: entityType === 'all' ? undefined : entityType,
-			actorId: actorId === 'all' ? undefined : actorId
+			actorId: actorId === 'all' ? undefined : actorId,
+			action: actionFilter === 'all' ? undefined : actionFilter
 		});
 		items = r.slice(0, PAGE);
 		hasMore = r.length > PAGE;
@@ -44,6 +49,7 @@
 			const next = await getActivity({
 				entityType: entityType === 'all' ? undefined : entityType,
 				actorId: actorId === 'all' ? undefined : actorId,
+				action: actionFilter === 'all' ? undefined : actionFilter,
 				before: new Date(last.createdAt).toISOString()
 			});
 			items = [...items, ...next.slice(0, PAGE)];
@@ -68,6 +74,24 @@
 		closure: 'Closure'
 	};
 	const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replaceAll('_', ' ');
+
+	function exportCsv() {
+		const csv = toCsv([
+			['When', 'Actor', 'Type', 'Action', 'Summary'],
+			...items.map((a) => [
+				new Date(a.createdAt).toISOString(),
+				a.actorName ?? '',
+				typeLabel(a.entityType),
+				a.action,
+				a.summary
+			])
+		]);
+		const el = document.createElement('a');
+		el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		el.download = `activity-${new Date().toISOString().slice(0, 10)}.csv`;
+		el.click();
+		URL.revokeObjectURL(el.href);
+	}
 </script>
 
 <svelte:head><title>Activity · Freeweight</title></svelte:head>
@@ -82,6 +106,9 @@
 				<Card.Description>Every staff and system event — who did what, when.</Card.Description>
 			</div>
 			<div class="flex items-center gap-2">
+				<Button variant="outline" size="sm" onclick={exportCsv} disabled={!items.length}
+					>Export</Button
+				>
 				{#if actors.length > 1}
 					<Select.Root type="single" bind:value={actorId} onValueChange={() => void refilter()}>
 						<Select.Trigger class="w-36">
@@ -91,6 +118,23 @@
 							<Select.Item value="all">Everyone</Select.Item>
 							{#each actors as a (a.id)}
 								<Select.Item value={a.id}>{a.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+				{#if actions.length > 1}
+					<Select.Root
+						type="single"
+						bind:value={actionFilter}
+						onValueChange={() => void refilter()}
+					>
+						<Select.Trigger class="w-32">
+							{actionFilter === 'all' ? 'Any action' : actionFilter}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="all">Any action</Select.Item>
+							{#each actions as act (act)}
+								<Select.Item value={act}>{act}</Select.Item>
 							{/each}
 						</Select.Content>
 					</Select.Root>

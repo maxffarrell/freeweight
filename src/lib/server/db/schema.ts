@@ -359,6 +359,10 @@ export const classType = pgTable(
 		memberBookable: boolean('member_bookable').notNull().default(true),
 		/** Members must hold at least this progression level to book — null = open to all. */
 		minLevelId: text('min_level_id'),
+		/** Minimum member age (years) to book — for kids/adults-only classes; null = all ages. */
+		minAge: integer('min_age'),
+		/** "What to bring" note shown in the portal under this class's bookings (mat, gloves…). */
+		bringNote: text('bring_note').notNull().default(''),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
@@ -510,6 +514,8 @@ export const booking = pgTable(
 		note: text('note'),
 		/** Coach note shared with the member — shown in their portal. */
 		coachNote: text('coach_note'),
+		/** Note the member wrote on their own booking ("riding with sore ankle") — shown to staff on the roster. */
+		memberNote: text('member_note'),
 		/** Cancelled booking this one replaces (member makeup for a gym-cancelled class). */
 		compBookingId: text('comp_booking_id'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
@@ -634,6 +640,44 @@ export const signRequest = pgTable(
 	(t) => [
 		index('sign_request_member_idx').on(t.memberId),
 		index('sign_request_org_idx').on(t.organizationId)
+	]
+);
+
+/** Member's own free-form workout journal, written from the portal ("Ran 5k — 24:30"). */
+export const workoutLog = pgTable(
+	'workout_log',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Entry date YYYY-MM-DD (org-local). */
+		day: text('day').notNull(),
+		text: text('text').notNull(),
+		...timestamps
+	},
+	(t) => [index('workout_log_member_idx').on(t.memberId)]
+);
+
+/** Something a member flagged in the portal ("locker 12 hinge is broken") — Needs attention. */
+export const memberIssue = pgTable(
+	'member_issue',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		text: text('text').notNull(),
+		/** 'open' | 'resolved' */
+		status: text('status').notNull().default('open'),
+		resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [
+		index('member_issue_member_idx').on(t.memberId),
+		index('member_issue_org_idx').on(t.organizationId)
 	]
 );
 

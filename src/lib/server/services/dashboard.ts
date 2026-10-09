@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, ne, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	signRequest,
@@ -16,6 +16,10 @@ import {
 	gymSettings,
 	location,
 	member,
+	memberIssue,
+	instructorTimeOff,
+	equipment,
+	gymEvent,
 	membership,
 	payment,
 	paymentProvider,
@@ -25,12 +29,13 @@ import {
 	ptRequest,
 	recurringCharge,
 	shopItem,
+	shopSale,
 	trialRequest,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
 import { monthlyRecurring } from './billing.ts';
-import { localDate, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 
 /** KPIs and today's schedule for the dashboard. */
 export async function dashboard(orgId: string) {
@@ -65,6 +70,10 @@ export async function dashboard(orgId: string) {
 			overdueTotal:
 				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} < ${today}), 0)`.mapWith(
 					Number
+				),
+			dueWeekTotal:
+				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} >= ${today} and ${outer(charge.dueDate)} <= ${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}), 0)`.mapWith(
+					Number
 				)
 		})
 		.from(charge)
@@ -84,7 +93,83 @@ export async function dashboard(orgId: string) {
 			)
 		);
 
+	const [lastWkDay] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, new Date(dayStart.getTime() - 7 * 86400_000)),
+				lt(checkIn.checkedAt, new Date(dayEnd.getTime() - 7 * 86400_000))
+			)
+		);
+
 	const mrr = await monthlyRecurring(orgId);
+
+	// Trailing-7d check-ins vs the week before — feeds the KPI card.
+	const wk7 = new Date(dayStart.getTime() - 7 * 86400_000);
+	const wk14 = new Date(dayStart.getTime() - 14 * 86400_000);
+	const upcomingEvents = await db
+		.select({
+			event: gymEvent,
+			registered:
+				sql<number>`(select count(*) from event_registration r where r.event_id = ${gymEvent.id} and r.status = 'registered')`.mapWith(
+					Number
+				)
+		})
+		.from(gymEvent)
+		.where(
+			and(
+				eq(gymEvent.organizationId, orgId),
+				eq(gymEvent.active, true),
+				isNull(gymEvent.cancelledAt),
+				gte(gymEvent.startsAt, new Date()),
+				lte(gymEvent.startsAt, new Date(Date.now() + 7 * 86400_000))
+			)
+		)
+		.orderBy(asc(gymEvent.startsAt))
+		.limit(3);
+
+	const now = new Date();
+	const inSessionNow = await db
+		.select({
+			id: classSession.id,
+			name: classType.name,
+			endsAt: classSession.endsAt,
+			capacity: classSession.capacity,
+			booked:
+				sql<number>`(select count(*) from booking b where b.session_id = ${classSession.id} and b.status = 'booked')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classType.id, classSession.classTypeId))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				lte(classSession.startsAt, now),
+				gt(classSession.endsAt, now)
+			)
+		)
+		.orderBy(asc(classSession.endsAt))
+		.limit(4);
+
+	const [checkInsWk] = await db
+		.select({
+			week: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz)`.mapWith(
+				Number
+			),
+			prev: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk14.toISOString()}::timestamptz and ${checkIn.checkedAt} < ${wk7.toISOString()}::timestamptz)`.mapWith(
+				Number
+			),
+			guests:
+				sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz and ${checkIn.guestName} is not null)`.mapWith(
+					Number
+				)
+		})
+		.from(checkIn)
+		.where(eq(checkIn.organizationId, orgId));
 
 	// Payments collected in the org-local today vs yesterday (refunds excluded).
 	const yesterday = new Date(dayStart.getTime() - 86400_000);
@@ -153,6 +238,49 @@ export async function dashboard(orgId: string) {
 			)
 		)
 		.orderBy(asc(classSession.startsAt));
+
+	// Tomorrow's sessions with zero bookings — a same-day cancel warning for the desk.
+	const tomorrowEnd = new Date(dayEnd.getTime() + 86400_000);
+	const emptyTomorrow = await db
+		.select({
+			id: classSession.id,
+			name: classType.name,
+			startsAt: classSession.startsAt,
+			booked:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','waitlisted'))`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, dayEnd),
+				lt(classSession.startsAt, tomorrowEnd)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.then((rows) => rows.filter((r) => r.booked === 0).slice(0, 4));
+
+	const [tm] = await db
+		.select({
+			sessions: sql<number>`count(*)`.mapWith(Number),
+			booked:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','waitlisted'))), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, dayEnd),
+				lt(classSession.startsAt, tomorrowEnd)
+			)
+		);
 
 	const recentActivity = await db
 		.select()
@@ -317,6 +445,74 @@ export async function dashboard(orgId: string) {
 		.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.status, 'pending')))
 		.orderBy(asc(signRequest.createdAt))
 		.limit(50);
+
+	// Problems members flagged in the portal, newest first.
+	const issueOpen = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			text: memberIssue.text,
+			requestedAt: memberIssue.createdAt
+		})
+		.from(memberIssue)
+		.innerJoin(gymMember, eq(memberIssue.memberId, gymMember.id))
+		.where(and(eq(memberIssue.organizationId, orgId), eq(memberIssue.status, 'open')))
+		.orderBy(desc(memberIssue.createdAt))
+		.limit(50);
+
+	// Equipment flagged maintenance/out-of-order — front desk should know.
+	const equipmentDown = await db
+		.select({
+			id: equipment.id,
+			name: equipment.name,
+			status: equipment.status,
+			nextServiceOn: equipment.nextServiceOn
+		})
+		.from(equipment)
+		.where(and(eq(equipment.organizationId, orgId), ne(equipment.status, 'operational')))
+		.limit(20);
+
+	// Shop orders waiting on pickup for over a day — the desk should chase them.
+	const stalePickups = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: shopItem.name,
+			qty: shopSale.qty,
+			soldAt: shopSale.createdAt
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(
+			and(
+				eq(shopSale.organizationId, orgId),
+				isNull(shopSale.pickedUpAt),
+				lt(shopSale.createdAt, new Date(Date.now() - 86_400_000))
+			)
+		)
+		.orderBy(asc(shopSale.createdAt))
+		.limit(10);
+
+	// Instructors/staff with time off starting in the next 14 days (or underway).
+	const offSoon = await db
+		.select({
+			name: user.name,
+			startDate: instructorTimeOff.startDate,
+			endDate: instructorTimeOff.endDate
+		})
+		.from(instructorTimeOff)
+		.innerJoin(member, eq(instructorTimeOff.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(instructorTimeOff.organizationId, orgId),
+				lte(instructorTimeOff.startDate, addDays(today, 14)),
+				gte(instructorTimeOff.endDate, today)
+			)
+		)
+		.orderBy(asc(instructorTimeOff.startDate))
+		.limit(10);
 
 	// Members currently inside (checked in today, not yet checked out).
 	const insideNow = await db
@@ -523,15 +719,23 @@ export async function dashboard(orgId: string) {
 		newThisMonth: memberStats?.newThisMonth ?? 0,
 		openTotal: openStats?.openTotal ?? 0,
 		overdueTotal: openStats?.overdueTotal ?? 0,
+		dueWeekTotal: openStats?.dueWeekTotal ?? 0,
 		collectedToday: collectedToday.today,
 		collectedYesterday: collectedToday.yesterday,
 		collectedWeek: collectedToday.week,
 		collectedPrevWeek: collectedToday.prevWeek,
+		upcomingEvents,
+		inSessionNow,
 		checkInsToday: checkInStats?.today ?? 0,
+		checkInsLastWkDay: lastWkDay?.n ?? 0,
+		checkInsWeek: checkInsWk?.week ?? 0,
+		checkInsPrevWeek: checkInsWk?.prev ?? 0,
+		guestsWeek: checkInsWk?.guests ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
 		insideNames: insideNow.map((r) => r.name),
 		mrr,
 		todaySessions,
+		tomorrow: { sessions: tm?.sessions ?? 0, booked: tm?.booked ?? 0 },
 		recentActivity,
 		recentMembers,
 		pendingRequests: [
@@ -581,6 +785,15 @@ export async function dashboard(orgId: string) {
 				pauseUntil: null,
 				requestReason: null
 			})),
+			...issueOpen.map((i) => ({
+				memberId: i.memberId,
+				memberName: i.memberName,
+				planName: `issue: ${i.text.slice(0, 60)}${i.text.length > 60 ? '…' : ''}`,
+				kind: 'issue' as const,
+				requestedAt: i.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
 			...deletionPending.map((d) => ({
 				memberId: d.memberId,
 				memberName: d.memberName,
@@ -589,9 +802,37 @@ export async function dashboard(orgId: string) {
 				requestedAt: d.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
+			})),
+			...emptyTomorrow.map((t) => ({
+				memberId: '',
+				memberName: t.name,
+				planName: '0 booked tomorrow',
+				kind: 'empty' as const,
+				requestedAt: t.startsAt,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...equipmentDown.map((e) => ({
+				memberId: '',
+				memberName: e.name,
+				planName: `equipment ${e.status}`,
+				kind: 'equipment' as const,
+				requestedAt: new Date(),
+				pauseUntil: null,
+				requestReason: e.nextServiceOn ? `service due ${e.nextServiceOn}` : null
+			})),
+			...stalePickups.map((p) => ({
+				memberId: p.memberId,
+				memberName: p.memberName,
+				planName: `${p.qty}× ${p.itemName} awaiting pickup`,
+				kind: 'pickup' as const,
+				requestedAt: p.soldAt,
+				pauseUntil: null,
+				requestReason: null
 			}))
 		],
 		fullSessions,
+		offSoon,
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,
@@ -611,7 +852,8 @@ export async function listActivity(
 	orgId: string,
 	entityType?: string,
 	before?: string,
-	actorId?: string
+	actorId?: string,
+	action?: string
 ) {
 	return db
 		.select({
@@ -630,11 +872,22 @@ export async function listActivity(
 				eq(activity.organizationId, orgId),
 				entityType ? eq(activity.entityType, entityType) : undefined,
 				actorId ? eq(activity.actorId, actorId) : undefined,
+				action ? eq(activity.action, action) : undefined,
 				before ? lt(activity.createdAt, new Date(before)) : undefined
 			)
 		)
 		.orderBy(desc(activity.createdAt))
 		.limit(51);
+}
+
+/** Distinct action verbs in the org's log — feeds the page's action filter. */
+export async function listActivityActions(orgId: string) {
+	return db
+		.selectDistinct({ action: activity.action })
+		.from(activity)
+		.where(eq(activity.organizationId, orgId))
+		.orderBy(asc(activity.action))
+		.then((rows) => rows.map((r) => r.action));
 }
 
 /** Staff who appear as actors in the org's activity — feeds the page's person filter. */

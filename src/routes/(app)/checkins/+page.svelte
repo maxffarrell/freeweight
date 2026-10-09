@@ -4,6 +4,7 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
@@ -14,7 +15,7 @@
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
 	import Download from '@lucide/svelte/icons/download';
-	import { errMsg } from '#lib/format.ts';
+	import { errMsg, todayISO } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 
@@ -26,11 +27,19 @@
 	let q = $state('');
 	let checkIns = $state(await getCheckIns({ date: viewDate }));
 	let insideOnly = $state(false);
+	let guestsOnly = $state(false);
+	let firstOnly = $state(false);
+	let method = $state<'' | 'qr' | 'manual'>('');
+	let filterLocation = $state('');
 	async function refilter() {
 		checkIns = await getCheckIns({
 			date: viewDate,
 			q: q.trim() || undefined,
-			inside: insideOnly || undefined
+			inside: insideOnly || undefined,
+			guests: guestsOnly || undefined,
+			method: method || undefined,
+			locationId: filterLocation === '__all' ? undefined : filterLocation || undefined,
+			firstVisit: firstOnly || undefined
 		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -64,6 +73,8 @@
 				toast.warning(
 					`${r.member.name} — ${r.visitsToday ?? 0}th visit today. Possible shared card.`
 				);
+			if ((r.pendingSigns ?? 0) > 0)
+				toast.warning(`${r.member.name} — a document needs their signature.`);
 			toast.success(
 				`${r.member.name} checked in` +
 					(r.attended
@@ -80,15 +91,46 @@
 		inputEl?.focus();
 	}
 
+	function dur(from: Date, to: Date) {
+		const m = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
+	}
+
+	const uniqueMembers = $derived(new Set(checkIns.map((c) => c.checkIn.memberId)).size);
+	const peakHour = $derived.by(() => {
+		const counts: Record<string, number> = {};
+		for (const c of checkIns) {
+			const h = localTime(c.checkIn.checkedAt, settings.timezone).slice(0, 2);
+			counts[h] = (counts[h] ?? 0) + 1;
+		}
+		let peak = '';
+		for (const h in counts) if (!peak || counts[h] > counts[peak]) peak = h;
+		return peak ? `${peak}:00 (${counts[peak]})` : '';
+	});
+	const avgVisit = $derived.by(() => {
+		const done = checkIns.filter((c) => c.checkIn.checkedOutAt);
+		if (!done.length) return '';
+		const mins =
+			done.reduce(
+				(a, c) => a + (c.checkIn.checkedOutAt!.getTime() - c.checkIn.checkedAt.getTime()),
+				0
+			) /
+			done.length /
+			60000;
+		const m = Math.round(mins);
+		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
+	});
+
 	function exportCheckIns() {
 		const csv = toCsv([
-			['Member', 'Guest of', 'Checked at', 'Location', 'Method'],
+			['Member', 'Guest of', 'Checked at', 'Location', 'Method', 'Duration'],
 			...checkIns.map((c) => [
 				c.checkIn.guestName ?? c.memberName,
 				c.checkIn.guestName ? c.memberName : '',
 				c.checkIn.checkedAt.toISOString(),
 				c.locationName ?? '',
-				c.checkIn.method
+				c.checkIn.method,
+				c.checkIn.checkedOutAt ? dur(c.checkIn.checkedAt, c.checkIn.checkedOutAt) : ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -158,14 +200,27 @@
 			<Card.Description
 				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
 					? ' so far'
+					: ''}{uniqueMembers !== checkIns.length
+					? ` · ${uniqueMembers} unique`
 					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
 					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
+					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}{peakHour
+					? ` · peak ${peakHour}`
 					: ''}.</Card.Description
 			>
 		</Card.Header>
 		<Card.Content class="px-4">
 			<div class="mb-3 flex gap-2">
 				<Input type="date" class="w-40" bind:value={viewDate} onchange={() => void refilter()} />
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={viewDate === todayISO()}
+					onclick={() => {
+						viewDate = todayISO();
+						void refilter();
+					}}>Today</Button
+				>
 				<Input
 					placeholder="Search member or guest…"
 					class="flex-1"
@@ -177,8 +232,65 @@
 					variant={insideOnly ? 'default' : 'outline'}
 					onclick={() => {
 						insideOnly = !insideOnly;
+						guestsOnly = false;
 						void refilter();
 					}}>Still inside</Button
+				>
+				<Button
+					size="sm"
+					variant={guestsOnly ? 'default' : 'outline'}
+					onclick={() => {
+						guestsOnly = !guestsOnly;
+						if (guestsOnly) insideOnly = false;
+						void refilter();
+					}}>Guests</Button
+				>
+				<Button
+					size="sm"
+					variant={firstOnly ? 'default' : 'outline'}
+					onclick={() => {
+						firstOnly = !firstOnly;
+						if (firstOnly) {
+							guestsOnly = false;
+							insideOnly = false;
+						}
+						void refilter();
+					}}>First visit</Button
+				>
+				{#if locations.length > 1}
+					<Select.Root
+						type="single"
+						bind:value={filterLocation}
+						onValueChange={() => void refilter()}
+					>
+						<Select.Trigger class="w-36"
+							>{filterLocation && filterLocation !== '__all'
+								? (locations.find((l) => l.id === filterLocation)?.name ?? 'Location')
+								: 'All locations'}</Select.Trigger
+						>
+						<Select.Content>
+							<Select.Item value="__all">All locations</Select.Item>
+							{#each locations as l (l.id)}
+								<Select.Item value={l.id}>{l.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+				<Button
+					size="sm"
+					variant={method === 'qr' ? 'default' : 'outline'}
+					onclick={() => {
+						method = method === 'qr' ? '' : 'qr';
+						void refilter();
+					}}>QR</Button
+				>
+				<Button
+					size="sm"
+					variant={method === 'manual' ? 'default' : 'outline'}
+					onclick={() => {
+						method = method === 'manual' ? '' : 'manual';
+						void refilter();
+					}}>Manual</Button
 				>
 			</div>
 			<Table.Root>
@@ -208,6 +320,9 @@
 											? `${c.checkIn.guestName} (guest of ${c.memberName})`
 											: c.memberName}</span
 									>
+									{#if c.firstVisit}
+										<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">1st</Badge>
+									{/if}
 								</span></Table.Cell
 							>
 							<Table.Cell class="text-muted-foreground"
@@ -224,10 +339,13 @@
 								><div class="flex items-center justify-end gap-1">
 									{#if c.checkIn.checkedOutAt}
 										<span class="text-muted-foreground"
-											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)}</span
+											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)} · {dur(
+												c.checkIn.checkedAt,
+												c.checkIn.checkedOutAt
+											)}</span
 										>
 									{:else}
-										<Badge variant="default">In</Badge>
+										<Badge variant="default">In {dur(c.checkIn.checkedAt, new Date())}</Badge>
 									{/if}
 									<Button
 										variant="ghost"

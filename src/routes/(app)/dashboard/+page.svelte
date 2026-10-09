@@ -175,7 +175,8 @@
 			label: 'Check-ins today',
 			value: `${d.checkInsToday} · ${d.inGymNow} inside`,
 			icon: ScanLine,
-			href: '/checkins'
+			href: '/checkins',
+			sub: `last week ${d.checkInsLastWkDay}`
 		},
 		{
 			label: 'Collected today',
@@ -183,6 +184,13 @@
 			icon: Wallet,
 			href: '/billing',
 			sub: `yesterday ${formatMoney(d.collectedYesterday, d.currency, true)} · 7d ${formatMoney(d.collectedWeek, d.currency, true)} vs ${formatMoney(d.collectedPrevWeek, d.currency, true)}`
+		},
+		{
+			label: 'Check-ins this week',
+			value: String(d.checkInsWeek),
+			icon: Users,
+			href: '/checkins',
+			sub: `last week ${d.checkInsPrevWeek}`
 		},
 		{
 			label: 'Monthly recurring',
@@ -194,7 +202,10 @@
 			label: 'Open balance',
 			value: formatMoney(d.openTotal, d.currency),
 			icon: Wallet,
-			href: '/billing'
+			href: '/billing',
+			sub: d.dueWeekTotal
+				? `due this week ${formatMoney(d.dueWeekTotal, d.currency, true)}`
+				: undefined
 		},
 		{
 			label: 'Overdue',
@@ -328,6 +339,13 @@
 						</Table.Body>
 					</Table.Root>
 				{/if}
+				{#if d.tomorrow.sessions > 0}
+					<p class="border-t px-4 py-2 text-xs text-muted-foreground">
+						Tomorrow: {d.tomorrow.sessions} class{d.tomorrow.sessions === 1 ? '' : 'es'} · {d
+							.tomorrow.booked}
+						booked
+					</p>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 
@@ -445,7 +463,9 @@
 							{#each d.pendingRequests as r (r.memberId + r.kind + r.planName)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a
-										href="/members/{r.memberId}"
+										href={r.kind === 'equipment' || r.kind === 'empty'
+											? '/schedule'
+											: `/members/{r.memberId}`}
 										class="truncate hover:underline"
 										title={r.requestReason ?? undefined}>{r.memberName}</a
 									>
@@ -464,7 +484,13 @@
 																? r.planName
 																: r.kind === 'deletion'
 																	? 'delete my data'
-																	: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+																	: r.kind === 'equipment'
+																		? r.planName
+																		: r.kind === 'empty'
+																			? r.planName
+																			: r.kind === 'pickup'
+																				? r.planName
+																				: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
@@ -550,6 +576,57 @@
 											? ` · ${s.instructorName}`
 											: ''}
 									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.offSoon.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Off soon</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.offSoon as o (o.name + o.startDate)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{o.name}</span>
+									<Badge variant="outline" class="shrink-0">
+										{o.startDate === o.endDate ? o.startDate : `${o.startDate} → ${o.endDate}`}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.inSessionNow.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">In session now</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.inSessionNow as sess (sess.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{sess.name}</span>
+									<Badge variant="outline" class="shrink-0"
+										>ends {localTime(sess.endsAt, d.timezone)} · {sess.booked}/{sess.capacity}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.upcomingEvents.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Upcoming events</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.upcomingEvents as e (e.event.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{e.event.name}</span>
+									<Badge variant="outline" class="shrink-0"
+										>{formatDate(e.event.startsAt)} · {e.registered}/{e.event.capacity}</Badge
+									>
 								</li>
 							{/each}
 						</ul>

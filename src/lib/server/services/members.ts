@@ -40,6 +40,8 @@ import {
 	waiver,
 	plan,
 	outer,
+	memberIssue,
+	workoutLog,
 	workoutResult
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -56,13 +58,14 @@ import {
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
-export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance';
+export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance' | 'visits30';
 
 const MEMBER_ORDER = {
 	name: asc(gymMember.name),
 	joined: desc(gymMember.joinedAt),
 	lastVisit: sql`"lastVisit" desc nulls last`,
-	balance: sql`"openBalance" desc`
+	balance: sql`"openBalance" desc`,
+	visits30: sql`"visits30" desc`
 } as const;
 
 /** Dependents billing under a member — the kiosk's family check-in rows. */
@@ -92,9 +95,35 @@ export async function listMembers(
 	recent?: boolean,
 	risk?: boolean,
 	family?: boolean,
-	birthday?: boolean
+	birthday?: boolean,
+	noContact?: boolean,
+	/** Members who hit the unsubscribe link — excluded from member emails. */
+	unsubscribed?: boolean,
+	/** Members brought in by another member's referral link. */
+	referred?: boolean,
+	/** Active members who have never had a booking (any status). */
+	neverBooked?: boolean,
+	/** Members whose active membership (pack or term) ends within 30 days. */
+	endingSoon?: boolean,
+	/** Members missing a signature for the org's current waiver text (no-op when none is set). */
+	noWaiver?: boolean,
+	/** Members currently waitlisted on an upcoming session. */
+	onWaitlist?: boolean,
+	/** Members with a paused membership. */
+	paused?: boolean,
+	/** Members with no upcoming booked sessions. */
+	noUpcoming?: boolean,
+	/** Members on a comp'd (no-bill) membership. */
+	comped?: boolean
 ) {
 	const term = q?.trim();
+	const [st] = noWaiver
+		? await db
+				.select({ waiver: gymSettings.waiver })
+				.from(gymSettings)
+				.where(eq(gymSettings.organizationId, orgId))
+				.limit(1)
+		: [undefined];
 	return db
 		.select({
 			id: gymMember.id,
@@ -105,6 +134,8 @@ export async function listMembers(
 			joinedAt: gymMember.joinedAt,
 			photoDocumentId: gymMember.photoDocumentId,
 			deskNote: gymMember.deskNote,
+			referralSource: gymMember.referralSource,
+			guardianId: gymMember.guardianId,
 			locationName: location.name,
 			tags: sql<
 				string[]
@@ -121,7 +152,14 @@ export async function listMembers(
 			guardianPlanName: sql<
 				string | null
 			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
-			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`
+			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`,
+			/** Nearest end date of an active membership (pack expiry or commitment end); null = open-ended. */
+			memberEnds: sql<Date | null>`(select m6.ends_at from ${membership} m6 where m6.member_id = ${outer(gymMember.id)} and m6.status = 'active' and m6.ends_at is not null order by m6.ends_at asc limit 1)`,
+			/** Member's own visits in the trailing 30 days (excludes their guest check-ins). */
+			visits30:
+				sql<number>`(select count(*)::int from ${checkIn} c where c.member_id = ${outer(gymMember.id)} and c.guest_name is null and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`.mapWith(
+					Number
+				)
 		})
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
@@ -153,6 +191,30 @@ export async function listMembers(
 					: undefined,
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
+					: undefined,
+				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
+				unsubscribed ? isNotNull(gymMember.unsubscribedAt) : undefined,
+				referred ? isNotNull(gymMember.referredByMemberId) : undefined,
+				neverBooked
+					? sql`not exists (select 1 from booking b where b.member_id = ${gymMember.id})`
+					: undefined,
+				endingSoon
+					? sql`exists (select 1 from membership m5 where m5.member_id = ${gymMember.id} and m5.status = 'active' and m5.ends_at is not null and m5.ends_at >= now() and m5.ends_at <= now() + interval '30 days')`
+					: undefined,
+				noWaiver && st?.waiver
+					? sql`not exists (select 1 from waiver w where w.member_id = ${gymMember.id} and w.text = ${st.waiver})`
+					: undefined,
+				onWaitlist
+					? sql`exists (select 1 from booking b6 join class_session s6 on s6.id = b6.session_id where b6.member_id = ${gymMember.id} and b6.status = 'waitlisted' and s6.starts_at > now())`
+					: undefined,
+				paused
+					? sql`exists (select 1 from membership m8 where m8.member_id = ${gymMember.id} and m8.status = 'paused')`
+					: undefined,
+				noUpcoming
+					? sql`not exists (select 1 from booking b7 join class_session s7 on s7.id = b7.session_id where b7.member_id = ${gymMember.id} and b7.status = 'booked' and s7.starts_at > now())`
+					: undefined,
+				comped
+					? sql`exists (select 1 from membership m9 where m9.member_id = ${gymMember.id} and m9.status = 'active' and m9.no_bill)`
 					: undefined,
 				recent
 					? gte(
@@ -265,6 +327,31 @@ export async function addTagToMembers(ctx: OrgContext, memberIds: string[], tag:
 	return rows.length;
 }
 
+/** Bulk-mark members inactive — reversible, keeps all history. */
+export async function setMembersInactive(ctx: OrgContext, memberIds: string[]) {
+	const rows = await db
+		.update(gymMember)
+		.set({ status: 'inactive', updatedAt: new Date() })
+		.where(
+			and(
+				eq(gymMember.organizationId, ctx.orgId),
+				inArray(gymMember.id, memberIds),
+				eq(gymMember.status, 'active')
+			)
+		)
+		.returning({ id: gymMember.id });
+	if (rows.length)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'gym_member',
+			entityId: rows[0].id,
+			action: 'bulk_set_inactive',
+			summary: `${rows.length} member${rows.length === 1 ? '' : 's'} marked inactive`
+		});
+	return rows.length;
+}
+
 export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: string) {
 	await db
 		.delete(memberTag)
@@ -279,7 +366,12 @@ export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: st
 
 export async function getMember(orgId: string, id: string) {
 	const [row] = await db
-		.select({ member: gymMember, locationName: location.name, orgName: organization.name })
+		.select({
+			member: gymMember,
+			locationName: location.name,
+			orgName: organization.name,
+			orgSlug: organization.slug
+		})
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
 		.innerJoin(organization, eq(gymMember.organizationId, organization.id))
@@ -374,7 +466,10 @@ export async function getMember(orgId: string, id: string) {
 		scores,
 		prs,
 		incidents,
-		signRequests
+		signRequests,
+		workoutLogs,
+		issues,
+		topClass
 	] = await Promise.all([
 		db
 			.select({
@@ -382,7 +477,9 @@ export async function getMember(orgId: string, id: string) {
 				thisMonth:
 					sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
 						Number
-					)
+					),
+				firstVisit: sql<Date | null>`min(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`,
+				lastVisit: sql<Date | null>`max(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`
 			})
 			.from(checkIn)
 			.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
@@ -391,9 +488,18 @@ export async function getMember(orgId: string, id: string) {
 				attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(
 					Number
 				),
-				noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number)
+				noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number),
+				thisMonth:
+					sql<number>`count(*) filter (where ${booking.status} != 'cancelled' and ${classSession.startsAt} >= date_trunc('month', now()))`.mapWith(
+						Number
+					),
+				waitlisted:
+					sql<number>`count(*) filter (where ${booking.status} = 'waitlisted' and ${classSession.startsAt} > now())`.mapWith(
+						Number
+					)
 			})
 			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
 			.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id))),
 		row.member.referredByMemberId
 			? db
@@ -476,7 +582,28 @@ export async function getMember(orgId: string, id: string) {
 			.from(signRequest)
 			.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.memberId, id)))
 			.orderBy(desc(signRequest.createdAt))
-			.limit(25)
+			.limit(25),
+		db
+			.select()
+			.from(workoutLog)
+			.where(and(eq(workoutLog.organizationId, orgId), eq(workoutLog.memberId, id)))
+			.orderBy(desc(workoutLog.day), desc(workoutLog.createdAt))
+			.limit(10),
+		db
+			.select()
+			.from(memberIssue)
+			.where(and(eq(memberIssue.organizationId, orgId), eq(memberIssue.memberId, id)))
+			.orderBy(desc(memberIssue.createdAt))
+			.limit(15),
+		db
+			.select({ name: classType.name })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id)))
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`))
+			.limit(1)
 	]);
 	// Current week-streak for the member page (same rule as the portal card).
 	const yearAgo = new Date(Date.now() - 370 * 86400_000);
@@ -551,13 +678,20 @@ export async function getMember(orgId: string, id: string) {
 		prs,
 		incidents,
 		signRequests,
+		workoutLogs,
+		issues,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),
 		attendance: {
+			topClass: topClass[0]?.name ?? null,
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,
+			firstVisit: att?.firstVisit ?? null,
+			lastVisit: att?.lastVisit ?? null,
 			noShows: bs?.noShows ?? 0,
+			bookedMonth: bs?.thisMonth ?? 0,
+			waitlisted: bs?.waitlisted ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:
 				(bs?.attended ?? 0) + (bs?.noShows ?? 0) > 0
@@ -565,6 +699,25 @@ export async function getMember(orgId: string, id: string) {
 					: null
 		}
 	};
+}
+
+/** Staff resolves an issue a member reported in the portal. */
+export async function resolveIssue(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.update(memberIssue)
+		.set({ status: 'resolved', resolvedAt: new Date(), updatedAt: new Date() })
+		.where(and(eq(memberIssue.organizationId, ctx.orgId), eq(memberIssue.id, id)))
+		.returning();
+	if (!row) error(404, 'Issue not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'member_issue',
+		entityId: id,
+		action: 'resolved',
+		summary: 'Resolved a member-reported issue'
+	});
+	return row;
 }
 
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {
@@ -629,7 +782,8 @@ export async function importMembers(
 				organizationId: ctx.orgId,
 				name: r.name,
 				email: r.email || null,
-				phone: r.phone ?? null
+				phone: r.phone ?? null,
+				birthday: r.birthday || null
 			}))
 		);
 	await emit({
@@ -1410,7 +1564,15 @@ export async function prWall(orgId: string) {
 		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
 		.limit(40);
 
-	// Top current week-streaks — one year of check-ins, grouped by ISO week.
+	const streaks = await weekStreakLeaders(orgId, 5);
+	return { records, streaks };
+}
+
+/**
+ * Top current week-streaks — one year of check-ins grouped by ISO week,
+ * streak counted back from this week (or last when this week isn't over).
+ */
+export async function weekStreakLeaders(orgId: string, limit = 5) {
 	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
 	const visits = await db
 		.select({
@@ -1439,7 +1601,7 @@ export async function prWall(orgId: string) {
 		byMember.set(v.memberId, e);
 	}
 	const thisWeek = weekOf(new Date());
-	const streaks = [...byMember.entries()]
+	return [...byMember.entries()]
 		.map(([memberId, e]) => {
 			let w = thisWeek;
 			if (!e.weeks.has(w)) w -= 7 * 86_400_000;
@@ -1452,9 +1614,7 @@ export async function prWall(orgId: string) {
 		})
 		.filter((r) => r.streak >= 2)
 		.sort((a, b) => b.streak - a.streak)
-		.slice(0, 5);
-
-	return { records, streaks };
+		.slice(0, limit);
 }
 
 /** Member asks (via the portal) for their personal data to be deleted. */

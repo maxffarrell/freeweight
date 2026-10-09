@@ -21,6 +21,8 @@ import * as settings from '#lib/server/services/settings.ts';
 import * as trials from '#lib/server/services/trials.ts';
 import * as lockers from '#lib/server/services/lockers.ts';
 import * as loans from '#lib/server/services/loans.ts';
+import * as levels from '#lib/server/services/levels.ts';
+import * as programs from '#lib/server/services/programs.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
 
@@ -440,6 +442,45 @@ export const resources: Record<string, Resource> = {
 					(input as { quantity: number }).quantity
 				)
 		}
+	},
+	rota: {
+		description: 'Weekly staff rota windows (scheduled, not clocked)',
+		list: (ctx) => shifts.listRota(ctx.orgId)
+	},
+	levels: {
+		description: 'Progression levels (belts/ranks) members can hold',
+		list: (ctx) => levels.listLevels(ctx.orgId),
+		create: {
+			schema: v.object({
+				name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+				color: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(20)))
+			}),
+			run: (ctx, input) =>
+				levels.addLevel(
+					ctx.orgId,
+					(input as { name: string }).name,
+					(input as { color?: string }).color
+				)
+		},
+		delete: (ctx, id) => levels.removeLevel(ctx.orgId, id)
+	},
+	workout_programs: {
+		description: 'Workout-program library (weeks of day-by-day routines)',
+		list: (ctx) => programs.listPrograms(ctx.orgId),
+		delete: (ctx, id) => programs.removeProgram(ctx, id)
+	},
+	recurring_expenses: {
+		description: 'Recurring business expenses auto-posted by the daily cron',
+		list: (ctx) => recurring.listRecurringExpenses(ctx.orgId),
+		create: { schema: s.recurringExpenseInput, run: recurring.addRecurringExpense as never },
+		update: { schema: s.recurringExpenseUpdate, run: recurring.updateRecurringExpense as never },
+		delete: (ctx, id) => recurring.removeRecurringExpense(ctx, id)
+	},
+	closures: {
+		description: 'Closed days — sessions are cancelled and templates skipped',
+		list: (ctx) => schedule.listClosures(ctx.orgId),
+		create: { schema: s.closureInput, run: schedule.addClosure as never },
+		delete: (ctx, id) => schedule.removeClosure(ctx, id)
 	}
 };
 
