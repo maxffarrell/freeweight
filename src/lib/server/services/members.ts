@@ -379,7 +379,11 @@ export async function getMember(orgId: string, id: string) {
 			.limit(500),
 		row.member.email
 			? db
-					.select({ kind: notificationLog.kind, createdAt: notificationLog.createdAt })
+					.select({
+						id: notificationLog.id,
+						kind: notificationLog.kind,
+						createdAt: notificationLog.createdAt
+					})
 					.from(notificationLog)
 					.where(
 						and(

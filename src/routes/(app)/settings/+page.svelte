@@ -169,6 +169,7 @@
 	let occupancyCap = $state<number | null>(settings.occupancyCap);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
+	let lateCancelFreebies = $state<number | null>(settings.lateCancelFreebies);
 	let dayPassPrice = $state<number | null>(settings.dayPassPrice);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let referralCredits = $state<number | null>(settings.referralCredits);
@@ -207,6 +208,7 @@
 				occupancyCap,
 				noShowFee,
 				lateCancelFee,
+				lateCancelFreebies,
 				dayPassPrice,
 				suspendAfterDays,
 				referralCredits,
@@ -521,6 +523,20 @@
 							<Field.Description
 								>When set, members can cancel inside the cancel cutoff — for this fee. Leave empty
 								to block late cancels entirely.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-late-free">Free late cancels / month</Field.Label>
+							<Input
+								id="s-late-free"
+								type="number"
+								min={0}
+								bind:value={lateCancelFreebies}
+								placeholder="0"
+							/>
+							<Field.Description
+								>Each member's first N late cancels a month skip the fee — a goodwill budget, not a
+								loophole.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>

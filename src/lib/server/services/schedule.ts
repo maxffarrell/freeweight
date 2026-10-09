@@ -1483,7 +1483,7 @@ export async function cancelBooking(
 	actorId?: string | null,
 	opts?: { notify?: boolean; lateFee?: boolean }
 ) {
-	const { promoted, lateCancel } = await db.transaction(async (tx) => {
+	const { promoted, lateCancel, lateFeeForgiven } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
 			.select({
@@ -1507,7 +1507,8 @@ export async function cancelBooking(
 				.update(charge)
 				.set({ status: 'void', updatedAt: new Date() })
 				.where(and(eq(charge.id, prev.chargeId), eq(charge.status, 'open')));
-		if (prev.status !== 'booked') return { promoted: null, lateCancel: null };
+		if (prev.status !== 'booked')
+			return { promoted: null, lateCancel: null, lateFeeForgiven: false };
 
 		const [[sess], [st]] = await Promise.all([
 			tx
@@ -1525,12 +1526,13 @@ export async function cancelBooking(
 					cutoff: gymSettings.waitlistCutoffMin,
 					cancelCutoffMin: gymSettings.cancelCutoffMin,
 					lateCancelFee: gymSettings.lateCancelFee,
+					lateCancelFreebies: gymSettings.lateCancelFreebies,
 					timezone: gymSettings.timezone
 				})
 				.from(gymSettings)
 				.where(eq(gymSettings.organizationId, ctx.orgId))
 		]);
-		const lateCancel =
+		let lateCancel =
 			sess &&
 			!sess.cancelledAt &&
 			st?.cancelCutoffMin != null &&
@@ -1545,10 +1547,33 @@ export async function cancelBooking(
 					}
 				: null;
 
+		// Forgiveness budget: the first N late cancels a member makes each
+		// calendar month skip the fee entirely.
+		let lateFeeForgiven = false;
+		if (lateCancel && st?.lateCancelFreebies && st.lateCancelFreebies > 0) {
+			const tz = st.timezone ?? 'UTC';
+			const monthStart = zonedToUtc(`${localDate(new Date(), tz).slice(0, 7)}-01`, tz);
+			const [{ used }] = await tx
+				.select({ used: sql<number>`count(*)`.mapWith(Number) })
+				.from(charge)
+				.where(
+					and(
+						eq(charge.memberId, b.memberId),
+						eq(charge.kind, 'other'),
+						sql`${charge.description} like 'Late-cancel fee%'`,
+						gte(charge.createdAt, monthStart)
+					)
+				);
+			if ((used ?? 0) < st.lateCancelFreebies) {
+				lateCancel = null;
+				lateFeeForgiven = true;
+			}
+		}
+
 		// Don't promote when the class is about to start — the member can't
 		// realistically make it. The spot just opens for walk-in booking.
 		if (st?.cutoff && sess && sess.startsAt.getTime() - Date.now() < st.cutoff * 60_000)
-			return { promoted: null, lateCancel };
+			return { promoted: null, lateCancel, lateFeeForgiven };
 
 		// First waitlisted party that fits the freed seats — a bigger party is
 		// skipped rather than blocking the queue behind it.
@@ -1560,7 +1585,7 @@ export async function cancelBooking(
 			.from(booking)
 			.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')));
 		const free = (sess?.capacity ?? 0) - spots;
-		if (free <= 0) return { promoted: null, lateCancel };
+		if (free <= 0) return { promoted: null, lateCancel, lateFeeForgiven };
 		const waiters = await tx
 			.select()
 			.from(booking)
@@ -1568,9 +1593,9 @@ export async function cancelBooking(
 			.orderBy(asc(booking.createdAt))
 			.limit(freed + 2);
 		const next = waiters.find((w) => 1 + w.guestCount <= free);
-		if (!next) return { promoted: null, lateCancel };
+		if (!next) return { promoted: null, lateCancel, lateFeeForgiven };
 		await tx.update(booking).set({ status: 'booked' }).where(eq(booking.id, next.id));
-		return { promoted: next, lateCancel };
+		return { promoted: next, lateCancel, lateFeeForgiven };
 	});
 	const [b] = await db.select().from(booking).where(eq(booking.id, id));
 	await emit({
@@ -1598,7 +1623,7 @@ export async function cancelBooking(
 			.returning({ id: charge.id });
 		if (c) notifyChargePosted(ctx.orgId, c.id).catch(() => {});
 	}
-	return { ...b, lateFeeApplied: lateCancel != null };
+	return { ...b, lateFeeApplied: lateCancel != null, lateFeeForgiven };
 }
 
 /**

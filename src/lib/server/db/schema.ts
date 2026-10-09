@@ -105,6 +105,8 @@ export const gymSettings = pgTable('gym_settings', {
 	rewardCredits: integer('reward_credits'),
 	/** Comp classes granted at week-streak milestones (4/8/13/26/52); null = off. */
 	streakRewardCredits: integer('streak_reward_credits'),
+	/** Late cancels forgiven per member per calendar month before the fee applies. Null/0 = no freebies. */
+	lateCancelFreebies: integer('late_cancel_freebies'),
 	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
 	revenueTarget: integer('revenue_target'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -163,6 +165,8 @@ export const gymMember = pgTable(
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		/** Member's own monthly visit target, set in the portal; drives the progress bar. */
 		goalVisitsPerMonth: integer('goal_visits_per_month'),
+		/** Progression rank (belt/level) the member currently holds — see member_level. */
+		skillLevelId: text('skill_level_id'),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		birthday: date('birthday', { mode: 'string' }),
 		...timestamps
@@ -1407,4 +1411,34 @@ export const recurringAnnouncement = pgTable(
 		...timestamps
 	},
 	(t) => [index('recurring_announcement_org_idx').on(t.organizationId)]
+);
+
+/** Configurable progression ranks — belts/levels staff define, ordered. */
+export const memberLevel = pgTable(
+	'member_level',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0),
+		color: text('color'),
+		...timestamps
+	},
+	(t) => [index('member_level_org_idx').on(t.organizationId)]
+);
+
+/** Saved bulk-email drafts reusable from the Email dialog. */
+export const announcementTemplate = pgTable(
+	'announcement_template',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		subject: text('subject').notNull(),
+		message: text('message').notNull(),
+		tag: text('tag'),
+		createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('announcement_template_org_idx').on(t.organizationId)]
 );

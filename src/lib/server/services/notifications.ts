@@ -42,6 +42,7 @@ import {
 	payment,
 	plan,
 	recurringAnnouncement,
+	announcementTemplate,
 	resourceBooking,
 	rota,
 	sessionFeedback,
@@ -3361,4 +3362,40 @@ export async function notifyReviewRequest(orgId: string, memberId: string, revie
 		html
 	});
 	return true;
+}
+
+export async function listAnnouncementTemplates(orgId: string) {
+	return db
+		.select()
+		.from(announcementTemplate)
+		.where(eq(announcementTemplate.organizationId, orgId))
+		.orderBy(asc(announcementTemplate.createdAt));
+}
+
+export async function createAnnouncementTemplate(
+	orgId: string,
+	userId: string,
+	input: { name: string; subject: string; message: string; tag?: string }
+) {
+	const [row] = await db
+		.insert(announcementTemplate)
+		.values({
+			organizationId: orgId,
+			name: input.name,
+			subject: input.subject,
+			message: input.message,
+			tag: input.tag || null,
+			createdBy: userId
+		})
+		.returning();
+	return row;
+}
+
+export async function deleteAnnouncementTemplate(orgId: string, id: string) {
+	const [row] = await db
+		.delete(announcementTemplate)
+		.where(and(eq(announcementTemplate.id, id), eq(announcementTemplate.organizationId, orgId)))
+		.returning({ id: announcementTemplate.id });
+	if (!row) error(404, 'Template not found');
+	return { ok: true };
 }

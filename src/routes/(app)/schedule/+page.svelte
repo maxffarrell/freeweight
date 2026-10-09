@@ -68,6 +68,7 @@
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
@@ -131,6 +132,42 @@
 			};
 		})
 	);
+
+	// ------- bulk cancel -------
+	let bulkOpen = $state(false);
+	let bulkChecked = new SvelteSet<string>();
+	let bulkPending = $state(false);
+	const bulkSessions = $derived(sessions.filter((s) => !s.session.cancelledAt));
+	function toggleBulk(id: string) {
+		if (bulkChecked.has(id)) bulkChecked.delete(id);
+		else bulkChecked.add(id);
+	}
+	async function runBulkCancel() {
+		if (!bulkChecked.size) return;
+		if (
+			!confirm(
+				`Cancel ${bulkChecked.size} session${bulkChecked.size === 1 ? '' : 's'}? Booked members get the usual cancellation emails and credits back.`
+			)
+		)
+			return;
+		bulkPending = true;
+		let done = 0;
+		for (const id of bulkChecked) {
+			try {
+				await updateSession({ id, cancelled: true });
+				done++;
+			} catch {
+				// keep going — one failing session shouldn't block the rest
+			}
+		}
+		toast.success(
+			`Cancelled ${done} session${done === 1 ? '' : 's'}${done < bulkChecked.size ? ` — ${bulkChecked.size - done} failed` : ''}`
+		);
+		bulkPending = false;
+		bulkChecked.clear();
+		bulkOpen = false;
+		await reload();
+	}
 
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
@@ -919,6 +956,8 @@
 				<DropdownMenu.Item onclick={() => (eqOpen = true)}><Wrench /> Equipment</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => (evOpen = true)}>Events</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => (coursesOpen = true)}>Courses</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={() => (bulkOpen = true)}>Bulk cancel…</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}
@@ -2680,5 +2719,48 @@
 			</Field.Field>
 			<Button type="submit" class="col-span-2" disabled={pending}>Add equipment</Button>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={bulkOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Bulk cancel sessions</Dialog.Title>
+			<Dialog.Description
+				>Cancel several sessions this week at once — booked members get the usual email, credits and
+				drop-in voids.</Dialog.Description
+			>
+		</Dialog.Header>
+		<ul class="max-h-80 divide-y overflow-y-auto">
+			{#each bulkSessions as s (s.session.id)}
+				<li class="flex items-center gap-3 py-2.5 text-sm">
+					<input
+						type="checkbox"
+						class="size-4 accent-primary"
+						checked={bulkChecked.has(s.session.id)}
+						onchange={() => toggleBulk(s.session.id)}
+					/>
+					<div class="flex-1">
+						<p class="font-medium">{s.className}</p>
+						<p class="text-xs text-muted-foreground">
+							{dayFmt.format(s.session.startsAt)}
+							{localTime(s.session.startsAt, tz)} ·
+							{s.booked}/{s.session.capacity} booked
+						</p>
+					</div>
+				</li>
+			{:else}
+				<li class="py-6 text-sm text-muted-foreground">No live sessions this week.</li>
+			{/each}
+		</ul>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (bulkOpen = false)}>Close</Button>
+			<Button
+				variant="destructive"
+				disabled={bulkPending || !bulkChecked.size}
+				onclick={runBulkCancel}
+				>{bulkPending ? 'Cancelling…' : `Cancel ${bulkChecked.size || ''} selected`}</Button
+			>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
