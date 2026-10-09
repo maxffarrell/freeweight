@@ -311,6 +311,9 @@
 									? ' · full'
 									: ''}</Badge
 							>{/if}
+						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
+								>{p.endingSoon} ending soon</Badge
+							>{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
 				</Card.Content>

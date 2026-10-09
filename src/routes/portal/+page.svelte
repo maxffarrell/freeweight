@@ -243,7 +243,11 @@
 		}
 		rateBusy = false;
 	}
+
 	const d = $derived(await getPortalOverview(memberId));
+	const upcomingThisWeek = $derived(
+		d.upcoming.filter((u) => new Date(u.startsAt).getTime() - Date.now() < 7 * 86400000).length
+	);
 	const npsStatus = $derived(await getNpsStatus(memberId));
 	const npsDue = $derived(npsStatus.due);
 	let npsScore = $state<number | null>(null);
@@ -2944,7 +2948,12 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base"><CalendarDays /> Upcoming</Card.Title>
+			<Card.Title class="flex items-center gap-2 text-base"
+				><CalendarDays /> Upcoming
+				{#if upcomingThisWeek}<span class="text-sm font-normal text-muted-foreground"
+						>· {upcomingThisWeek} this week</span
+					>{/if}</Card.Title
+			>
 		</Card.Header>
 		<Card.Content class="px-4">
 			{#each d.upcoming as u (u.booking.id)}

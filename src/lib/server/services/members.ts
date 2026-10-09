@@ -436,7 +436,8 @@ export async function getMember(orgId: string, id: string) {
 		incidents,
 		signRequests,
 		workoutLogs,
-		issues
+		issues,
+		topClass
 	] = await Promise.all([
 		db
 			.select({
@@ -551,7 +552,16 @@ export async function getMember(orgId: string, id: string) {
 			.from(memberIssue)
 			.where(and(eq(memberIssue.organizationId, orgId), eq(memberIssue.memberId, id)))
 			.orderBy(desc(memberIssue.createdAt))
-			.limit(15)
+			.limit(15),
+		db
+			.select({ name: classType.name })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id)))
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`))
+			.limit(1)
 	]);
 	// Current week-streak for the member page (same rule as the portal card).
 	const yearAgo = new Date(Date.now() - 370 * 86400_000);
@@ -632,6 +642,7 @@ export async function getMember(orgId: string, id: string) {
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),
 		attendance: {
+			topClass: topClass[0]?.name ?? null,
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,
 			firstVisit: att?.firstVisit ?? null,
