@@ -2214,6 +2214,125 @@ export async function sendWeeklyDigest(orgId: string) {
 }
 
 /**
+ * Weekly member digest (Mondays, org tz): each active member gets their own
+ * week — check-ins last 7 days, their current week streak, and bookings they
+ * hold for the coming week. Skipped entirely when they'd get an empty email.
+ * Deduped per member per ISO week via the Monday date in the log key.
+ */
+export async function sendMemberDigest(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	if (localWeekday(new Date(), tz) !== 1) return 0; // Mondays only
+
+	const weekAgoTs = zonedToUtc(`${addDays(today, -7)}T00:00`, tz);
+	const weekEndTs = zonedToUtc(`${addDays(today, 7)}T00:00`, tz);
+	const name = await orgBrand(orgId);
+
+	const members = await db
+		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email),
+				isNull(gymMember.unsubscribedAt)
+			)
+		);
+	if (!members.length) return 0;
+
+	// One pass over a year of check-ins → visits last 7d + current week streak per member.
+	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
+	const visits = await db
+		.select({ memberId: checkIn.memberId, checkedAt: checkIn.checkedAt })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNotNull(checkIn.memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, since)
+			)
+		);
+	const weekOf = (d: Date) => {
+		const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+		x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+		return x.getTime();
+	};
+	const thisWeek = weekOf(new Date());
+	const stats = new Map<string, { last7d: number; streak: number }>();
+	const weeksByMember = new Map<string, Set<number>>();
+	for (const v of visits) {
+		weeksByMember.set(v.memberId!, (weeksByMember.get(v.memberId!) ?? new Set()).add(weekOf(v.checkedAt)));
+		if (v.checkedAt >= weekAgoTs) {
+			const e = stats.get(v.memberId!) ?? { last7d: 0, streak: 0 };
+			e.last7d++;
+			stats.set(v.memberId!, e);
+		}
+	}
+	for (const [id, weeks] of weeksByMember) {
+		let w = thisWeek;
+		if (!weeks.has(w)) w -= 7 * 86_400_000; // this week isn't over — count from last week
+		let streak = 0;
+		while (weeks.has(w)) {
+			streak++;
+			w -= 7 * 86_400_000;
+		}
+		const e = stats.get(id) ?? { last7d: 0, streak: 0 };
+		e.streak = streak;
+		stats.set(id, e);
+	}
+
+	// Upcoming bookings for the next 7 days, grouped by member.
+	const upcoming = await db
+		.select({ memberId: booking.memberId, n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, weekEndTs)
+			)
+		)
+		.groupBy(booking.memberId);
+	const upcomingByMember = new Map(upcoming.map((r) => [r.memberId, r.n]));
+
+	let sent = 0;
+	for (const m of members) {
+		if (!m.email) continue;
+		const st = stats.get(m.id) ?? { last7d: 0, streak: 0 };
+		const booked = upcomingByMember.get(m.id) ?? 0;
+		if (!st.last7d && !st.streak && !booked) continue; // nothing worth an email
+		if (!(await logOnce(orgId, 'member_digest', `${today}:${m.id}`, m.id))) continue;
+		const lines = [
+			st.last7d
+				? `You checked in <strong>${st.last7d}</strong> time${st.last7d > 1 ? 's' : ''} this past week${st.streak > 1 ? ` — that's a <strong>${st.streak}-week streak</strong>, keep it going` : ''}.`
+				: st.streak > 1
+					? `You're holding a <strong>${st.streak}-week streak</strong> — one visit keeps it alive.`
+					: `No visits last week — a fresh week starts today.`,
+			booked
+				? `You have <strong>${booked}</strong> class${booked > 1 ? 'es' : ''} booked this week.`
+				: `Nothing booked this week yet — grab a spot before classes fill.`
+		];
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject: `${name.orgName}: your week`,
+			...renderEmail({
+				...name,
+				heading: `Your week at ${name.orgName}`,
+				lines,
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
  * Daily morning briefing to owner/admin staff: today's sessions with booked and
  * waitlisted counts, pending cancel/pause requests, member birthdays, and
  * yesterday's joins. One per gym-local day (logOnce keyed on the date);

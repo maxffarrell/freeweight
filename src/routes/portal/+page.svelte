@@ -2531,11 +2531,21 @@
 				<p class="py-2 text-sm text-muted-foreground">Nothing booked — grab a spot below.</p>
 			{/each}
 			{#if d.upcoming.length}
-				<a
-					class="block pb-2 text-xs text-muted-foreground underline underline-offset-2"
-					href="/portal/feed.ics?m={memberId}&t={d.calendarToken}"
-					>Sync bookings to your calendar app</a
-				>
+				<div class="flex items-center justify-between pb-2">
+					<a
+						class="text-xs text-muted-foreground underline underline-offset-2"
+						href="/portal/feed.ics?m={memberId}&t={d.calendarToken}"
+						>Sync bookings to your calendar app</a
+					>
+					<a
+						class="text-xs text-muted-foreground underline underline-offset-2"
+						href="https://calendar.google.com/calendar/r?cid={encodeURIComponent(
+							`${page.url.origin}/portal/feed.ics?m=${memberId}&t=${d.calendarToken}`
+						)}"
+						target="_blank"
+						rel="noreferrer">Add to Google Calendar</a
+					>
+				</div>
 			{/if}
 		</Card.Content>
 	</Card.Root>

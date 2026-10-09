@@ -135,7 +135,8 @@
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.suspended ? 'membership suspended' : '',
-					r.creditsLeft === 0 ? 'pack empty' : ''
+					r.creditsLeft === 0 ? 'pack empty' : '',
+					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : ''
 				]
 					.filter(Boolean)
 					.join(' · ') || null
@@ -260,6 +261,9 @@
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
+					!r.checkedOut && r.guestPassesLeft != null
+						? `${r.guestPassesLeft} guest passes left this month`
+						: '',
 					r.member.deskNote
 				]
 					.filter(Boolean)
