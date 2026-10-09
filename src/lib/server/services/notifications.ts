@@ -1811,14 +1811,19 @@ export async function sendDueRecurringAnnouncements(orgId: string) {
 		const [hh, mm] = r.time.split(':').map(Number);
 		if ((hh ?? 0) * 60 + (mm ?? 0) > nowMin) continue;
 		if (r.lastSentOn === todayISO) continue;
-		await sendAnnouncement(
-			orgId,
-			r.subject,
-			r.message,
-			undefined,
-			r.tag ?? undefined,
-			r.planId ?? undefined
-		);
+		try {
+			await sendAnnouncement(
+				orgId,
+				r.subject,
+				r.message,
+				undefined,
+				r.tag ?? undefined,
+				r.planId ?? undefined
+			);
+		} catch (err) {
+			console.error(`recurring announcement ${r.id} failed`, err);
+			continue;
+		}
 		await db
 			.update(recurringAnnouncement)
 			.set({ lastSentOn: todayISO, updatedAt: new Date() })

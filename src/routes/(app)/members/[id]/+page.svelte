@@ -1498,7 +1498,7 @@
 				<Card.Title class="text-base">Emails sent</Card.Title>
 			</Card.Header>
 			<Card.Content class="px-4">
-				{#each m.emails as e (e.createdAt + e.kind)}
+				{#each m.emails as e (e.id)}
 					<div class="flex items-center justify-between gap-2 py-1 text-sm">
 						<span class="capitalize">{e.kind.replaceAll('_', ' ')}</span>
 						<span class="shrink-0 text-xs text-muted-foreground">{formatRelative(e.createdAt)}</span
