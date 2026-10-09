@@ -308,6 +308,9 @@
 									>
 									<Table.Cell class="w-28 text-right">
 										<Badge variant="secondary">{s.booked}/{s.capacity}</Badge>
+										{#if s.expected > 0 && new Date(s.startsAt).getTime() > Date.now()}
+											<Badge variant="outline" class="ml-1">{s.expected} due in</Badge>
+										{/if}
 										{#if s.waitlisted > 0}<Badge variant="outline" class="ml-1"
 												>+{s.waitlisted} wait</Badge
 											>{/if}

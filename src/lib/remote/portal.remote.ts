@@ -728,10 +728,16 @@ export const buyShopItem = command(
 		const m = await myMember(memberId);
 		const r = await svc.memberBuyItem(m.organizationId, user.id, memberId, itemId);
 		void getShopItems(memberId).refresh();
+		void getMyPurchases(memberId).refresh();
 		void getPortalOverview(memberId).refresh();
 		return r;
 	}
 );
+
+export const getMyPurchases = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.memberPurchases(m.organizationId, memberId);
+});
 
 export const getPersonalRecords = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);

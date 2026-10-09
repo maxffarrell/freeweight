@@ -31,6 +31,8 @@
 		createShopItem,
 		updateShopItem,
 		sellItem,
+		getPendingPickups,
+		markPickedUp,
 		getGiftCards,
 		sellGiftCard,
 		getRecurring,
@@ -359,6 +361,16 @@
 
 	// ------- shop -------
 	let shopItems = $state(await getShopItems());
+	let pickups = $state(await getPendingPickups());
+	async function pickup(id: string) {
+		try {
+			await markPickedUp(id);
+			toast.success('Marked as picked up');
+			pickups = await getPendingPickups();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 	let itemName = $state('');
 	let itemPrice = $state<number | null>(null);
 	let itemStock = $state<number | null>(null);
@@ -456,6 +468,7 @@
 			sellQty = 1;
 			await refreshCharges();
 			payments = await getPayments();
+			pickups = await getPendingPickups();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not record sale'));
 		}
@@ -848,6 +861,38 @@
 					</Card.Content>
 				</Card.Root>
 			</div>
+
+			{#if pickups.length}
+				<Card.Root class="mt-4">
+					<Card.Header>
+						<Card.Title class="text-base">Awaiting pickup</Card.Title>
+						<Card.Description>Members who bought items — mark when they collect</Card.Description>
+					</Card.Header>
+					<Card.Content class="px-0">
+						<Table.Root>
+							<Table.Body>
+								{#each pickups as p (p.id)}
+									<Table.Row>
+										<Table.Cell class="font-medium">{p.memberName}</Table.Cell>
+										<Table.Cell>{p.itemName}{p.qty > 1 ? ` ×${p.qty}` : ''}</Table.Cell>
+										<Table.Cell class="text-muted-foreground"
+											>{formatDate(p.createdAt)}</Table.Cell
+										>
+										<Table.Cell class="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => pickup(p.id)}>Picked up</Button
+											>
+										</Table.Cell>
+									</Table.Row>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 
 			<Card.Root class="mt-4">
 				<Card.Header class="flex flex-row items-center justify-between space-y-0">

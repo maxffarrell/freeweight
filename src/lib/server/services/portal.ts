@@ -25,6 +25,7 @@ import {
 	document,
 	sessionFeedback,
 	shopItem,
+	shopSale,
 	signRequest,
 	classVideo,
 	workoutResult,
@@ -1310,6 +1311,24 @@ export async function memberShopItems(orgId: string) {
 		.from(shopItem)
 		.where(and(eq(shopItem.organizationId, orgId), eq(shopItem.active, true)))
 		.orderBy(asc(shopItem.name));
+}
+
+/** The member's recent shop purchases with pickup status. */
+export async function memberPurchases(orgId: string, memberId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			createdAt: shopSale.createdAt,
+			pickedUpAt: shopSale.pickedUpAt,
+			itemName: shopItem.name,
+			price: shopItem.price
+		})
+		.from(shopSale)
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(and(eq(shopSale.organizationId, orgId), eq(shopSale.memberId, memberId)))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(15);
 }
 
 /**

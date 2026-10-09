@@ -76,6 +76,7 @@
 		acceptSaveOffer,
 		requestAddonRemoval,
 		getShopItems,
+		getMyPurchases,
 		buyShopItem,
 		getPersonalRecords,
 		addPersonalRecord,
@@ -522,6 +523,8 @@
 
 	// ------- shop -------
 	const shopItems = $derived(await getShopItems(memberId));
+	const purchases = $derived(await getMyPurchases(memberId));
+	const awaitingPickup = $derived(purchases.filter((p) => !p.pickedUpAt));
 	let shopBusy = $state('');
 	async function buyItem(itemId: string) {
 		shopBusy = itemId;
@@ -1912,6 +1915,23 @@
 						</div>
 					{/each}
 				</div>
+				{#if awaitingPickup.length}
+					<div class="mt-4 rounded-lg border bg-muted/30 p-3">
+						<p class="mb-2 text-xs font-medium text-muted-foreground uppercase">
+							Awaiting pickup at the desk
+						</p>
+						<ul class="space-y-1">
+							{#each awaitingPickup as p (p.id)}
+								<li class="flex items-center justify-between text-sm">
+									<span>{p.itemName}{p.qty > 1 ? ` ×${p.qty}` : ''}</span>
+									<Badge variant="outline" class="text-amber-600 dark:text-amber-400"
+										>awaiting pickup</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}

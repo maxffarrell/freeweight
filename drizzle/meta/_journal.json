@@ -750,6 +750,13 @@
       "when": 1791531995750,
       "tag": "0106_comp-makeup",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1791534038805,
+      "tag": "0107_shop-sale",
+      "breakpoints": true
     }
   ]
 }

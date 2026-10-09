@@ -97,6 +97,10 @@ export async function dashboard(orgId: string) {
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended'))`.mapWith(
 					Number
 				),
+			expected:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+					Number
+				),
 			waitlisted:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted')`.mapWith(
 					Number

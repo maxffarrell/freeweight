@@ -286,6 +286,11 @@ export const resources: Record<string, Resource> = {
 		create: { schema: s.shopItemInput, run: billing.createShopItem as never },
 		update: { schema: s.shopItemUpdate, run: billing.updateShopItem as never }
 	},
+	shop_sales: {
+		description:
+			'Retail sales — one row per sold item with member, qty and desk-pickup timestamp (list only; sales post via the app)',
+		list: (ctx) => billing.listShopSales(ctx.orgId)
+	},
 	promo_codes: {
 		description:
 			'Join-page discount codes (percentOff or amountOff in cents, optional maxUses/expiresAt; PATCH toggles active)',

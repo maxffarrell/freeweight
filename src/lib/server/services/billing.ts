@@ -26,6 +26,7 @@ import {
 	plan,
 	promoCode,
 	shopItem,
+	shopSale,
 	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -891,6 +892,13 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 			reference: null,
 			notes: `Shop sale: ${item.name}`
 		});
+	await db.insert(shopSale).values({
+		organizationId: ctx.orgId,
+		itemId: item.id,
+		memberId: input.memberId,
+		chargeId: c!.id,
+		qty: input.qty
+	});
 	if (item.stock !== null) {
 		await db
 			.update(shopItem)
@@ -1252,4 +1260,63 @@ export async function removeExpense(ctx: OrgContext, id: string) {
 		summary: `Expense removed: ${row.label}`
 	});
 	return row;
+}
+
+/** Sales waiting on the member to collect the goods at the desk. */
+export async function pendingPickups(orgId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			createdAt: shopSale.createdAt,
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: shopItem.name
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(and(eq(shopSale.organizationId, orgId), isNull(shopSale.pickedUpAt)))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(25);
+}
+
+export async function markPickedUp(ctx: OrgContext, saleId: string) {
+	const [row] = await db
+		.update(shopSale)
+		.set({ pickedUpAt: new Date() })
+		.where(and(eq(shopSale.organizationId, ctx.orgId), eq(shopSale.id, saleId)))
+		.returning();
+	if (!row) error(404, 'Sale not found');
+	void emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'shop_sale',
+		entityId: row.id,
+		action: 'picked_up',
+		summary: 'Marked a shop purchase as picked up'
+	}).catch(() => {});
+	return row;
+}
+
+/** All retail sales, newest first — REST `shop_sales` list. */
+export async function listShopSales(orgId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			pickedUpAt: shopSale.pickedUpAt,
+			createdAt: shopSale.createdAt,
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemId: shopItem.id,
+			itemName: shopItem.name,
+			chargeId: shopSale.chargeId
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(eq(shopSale.organizationId, orgId))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(200);
 }
