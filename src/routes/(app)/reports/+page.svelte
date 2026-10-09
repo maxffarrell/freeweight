@@ -12,8 +12,7 @@
 	import { emailAllMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg } from '#lib/format.ts';
 	import Mail from '@lucide/svelte/icons/mail';
-	import {
-	markPayrollPaid, getReportsQuery } from '#lib/remote/reports.remote.ts';
+	import { markPayrollPaid, getReportsQuery } from '#lib/remote/reports.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
@@ -184,7 +183,9 @@
 								{@const c = r.heatmap.find((x) => x.dow === dow && x.hour === h)}
 								<td
 									class="p-1 text-center {c?.n ? 'font-medium' : 'text-muted-foreground'}"
-									style="background: {c?.n ? `rgb(37 99 235 / ${Math.round(15 + 85 * (c.n / maxCell))}%)` : 'transparent'}"
+									style="background: {c?.n
+										? `rgb(37 99 235 / ${Math.round(15 + 85 * (c.n / maxCell))}%)`
+										: 'transparent'}"
 									title="{d} {hourLabel(h)} — {c?.n ?? 0} check-ins">{c?.n || ''}</td
 								>
 							{/each}
@@ -436,7 +437,8 @@
 		<Card.Header>
 			<Card.Title class="text-base">Top spenders</Card.Title>
 			<Card.Description>
-				Highest lifetime payments · avg {formatMoney(r.spenders.avg, currency, true)} across {r.spenders.payers} payers
+				Highest lifetime payments · avg {formatMoney(r.spenders.avg, currency, true)} across {r
+					.spenders.payers} payers
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
@@ -454,32 +456,32 @@
 		</Card.Content>
 	</Card.Root>
 
-		<Card.Root>
-			<Card.Header class="pb-2">
-				<Card.Title class="text-base">Pack burn-down</Card.Title>
-				<Card.Description>How much of each sold pack gets used before it ends</Card.Description>
-			</Card.Header>
-			<Card.Content class="grid gap-2 text-sm">
-				{#if r.packBurn.finished === 0 && r.packBurn.active === 0}
-					<p class="text-muted-foreground">No class packs yet.</p>
-				{:else}
-					<div class="flex items-center justify-between">
-						<span class="text-muted-foreground">Finished packs ({r.packBurn.finished})</span>
-						<span>{r.packBurn.finishedPct}% used</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<span class="text-muted-foreground">Active packs ({r.packBurn.active})</span>
-						<span>{r.packBurn.activePct}% used so far</span>
-					</div>
-					{#if r.packBurn.unusedFinished > 0}
-						<p class="text-xs text-muted-foreground">
-							{r.packBurn.unusedFinished} credits expired unused — packs that didn't finish are money
-							left on the table.
-						</p>
-					{/if}
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Pack burn-down</Card.Title>
+			<Card.Description>How much of each sold pack gets used before it ends</Card.Description>
+		</Card.Header>
+		<Card.Content class="grid gap-2 text-sm">
+			{#if r.packBurn.finished === 0 && r.packBurn.active === 0}
+				<p class="text-muted-foreground">No class packs yet.</p>
+			{:else}
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Finished packs ({r.packBurn.finished})</span>
+					<span>{r.packBurn.finishedPct}% used</span>
+				</div>
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Active packs ({r.packBurn.active})</span>
+					<span>{r.packBurn.activePct}% used so far</span>
+				</div>
+				{#if r.packBurn.unusedFinished > 0}
+					<p class="text-xs text-muted-foreground">
+						{r.packBurn.unusedFinished} credits expired unused — packs that didn't finish are money left
+						on the table.
+					</p>
 				{/if}
-			</Card.Content>
-		</Card.Root>
+			{/if}
+		</Card.Content>
+	</Card.Root>
 
 	<Card.Root>
 		<Card.Header class="pb-2">
@@ -523,7 +525,7 @@
 					<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{g.memberId}"
 						>{g.name}</a
 					>
-					<span class="tabular-nums text-muted-foreground"
+					<span class="text-muted-foreground tabular-nums"
 						>{g.guests} guest{g.guests === 1 ? '' : 's'}</span
 					>
 				</div>
@@ -542,7 +544,7 @@
 			{#each r.waitlist as w (w.name)}
 				<div class="flex items-center justify-between gap-2">
 					<span class="min-w-0 flex-1 truncate">{w.name}</span>
-					<span class="tabular-nums text-muted-foreground"
+					<span class="text-muted-foreground tabular-nums"
 						>{w.promoted} promoted · {w.queued} queued · {w.pct}%</span
 					>
 				</div>
@@ -561,7 +563,7 @@
 			{#each r.refunds.slice(0, 6) as m (m.month)}
 				<div class="flex items-center justify-between gap-2">
 					<span>{m.month}</span>
-					<span class="tabular-nums text-muted-foreground"
+					<span class="text-muted-foreground tabular-nums"
 						>{m.n} · {formatMoney(m.total, currency, true)}{m.methods.length
 							? ` (${m.methods.map((x) => x.method).join(', ')})`
 							: ''}</span
@@ -1339,8 +1341,8 @@
 			<Card.Header>
 				<Card.Title class="text-base">Never visited</Card.Title>
 				<Card.Description>
-					{r.never.length} active member{r.never.length === 1 ? '' : 's'} with zero check-ins —
-					signed up but never showed
+					{r.never.length} active member{r.never.length === 1 ? '' : 's'} with zero check-ins — signed
+					up but never showed
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="p-0">
@@ -1548,7 +1550,11 @@
 							<Table.Cell class="text-right">{formatMoney(m.total, currency, true)}</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row><Table.Cell colspan={3} class="text-muted-foreground">No renewals due in the next 90 days.</Table.Cell></Table.Row>
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground"
+								>No renewals due in the next 90 days.</Table.Cell
+							></Table.Row
+						>
 					{/each}
 				</Table.Body>
 			</Table.Root>

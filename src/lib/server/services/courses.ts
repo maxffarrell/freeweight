@@ -81,10 +81,9 @@ export async function listCourses(orgId: string) {
 				n: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = false)`.mapWith(
 					Number
 				),
-				waiting:
-					sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
-						Number
-					)
+				waiting: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
+					Number
+				)
 			})
 			.from(courseEnrollment)
 			.where(eq(courseEnrollment.courseId, r.course.id));
@@ -273,10 +272,9 @@ export async function portalCourses(orgId: string, memberId: string) {
 				n: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = false)`.mapWith(
 					Number
 				),
-				waiting:
-					sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
-						Number
-					)
+				waiting: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
+					Number
+				)
 			})
 			.from(courseEnrollment)
 			.where(eq(courseEnrollment.courseId, r.course.id));
@@ -325,9 +323,7 @@ export async function enrollCourse(orgId: string, memberId: string, courseId: st
 		const [en] = await db
 			.select({ n: sql<number>`count(*)`.mapWith(Number) })
 			.from(courseEnrollment)
-			.where(
-				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false))
-			);
+			.where(and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false)));
 		if ((en?.n ?? 0) >= c.capacity) {
 			// Queue behind the course — no charge and no session bookings until a
 			// spot frees (unenrollCourse promotes the oldest row).
@@ -468,16 +464,12 @@ export async function promoteCourseWaitlist(orgId: string, courseId: string) {
 		const [en] = await db
 			.select({ n: sql<number>`count(*)`.mapWith(Number) })
 			.from(courseEnrollment)
-			.where(
-				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false))
-			);
+			.where(and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false)));
 		if ((en?.n ?? 0) >= c.capacity) break;
 		const [next] = await db
 			.select()
 			.from(courseEnrollment)
-			.where(
-				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, true))
-			)
+			.where(and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, true)))
 			.orderBy(asc(courseEnrollment.createdAt))
 			.limit(1);
 		if (!next) break;

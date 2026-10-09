@@ -138,7 +138,9 @@
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
-					r.nextClass ? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}` : ''
+					r.nextClass
+						? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}`
+						: ''
 				]
 					.filter(Boolean)
 					.join(' · ') || null

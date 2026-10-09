@@ -86,6 +86,29 @@ export async function dashboard(orgId: string) {
 
 	const mrr = await monthlyRecurring(orgId);
 
+	// Payments collected in the org-local today vs yesterday (refunds excluded).
+	const yesterday = new Date(dayStart.getTime() - 86400_000);
+	const [collected] = await db
+		.select({
+			today:
+				sql<number>`coalesce(sum(${payment.amount}) filter (where ${payment.createdAt} >= ${dayStart.toISOString()}::timestamptz), 0)`.mapWith(
+					Number
+				),
+			yesterday:
+				sql<number>`coalesce(sum(${payment.amount}) filter (where ${payment.createdAt} < ${dayStart.toISOString()}::timestamptz), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(payment)
+		.where(
+			and(
+				eq(payment.organizationId, orgId),
+				isNull(payment.refundedAt),
+				gte(payment.createdAt, yesterday)
+			)
+		);
+	const collectedToday = collected ?? { today: 0, yesterday: 0 };
+
 	const todaySessions = await db
 		.select({
 			id: classSession.id,
@@ -491,6 +514,8 @@ export async function dashboard(orgId: string) {
 		newThisMonth: memberStats?.newThisMonth ?? 0,
 		openTotal: openStats?.openTotal ?? 0,
 		overdueTotal: openStats?.overdueTotal ?? 0,
+		collectedToday: collectedToday.today,
+		collectedYesterday: collectedToday.yesterday,
 		checkInsToday: checkInStats?.today ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
 		insideNames: insideNow.map((r) => r.name),

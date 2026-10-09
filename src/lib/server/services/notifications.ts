@@ -17,7 +17,7 @@ import {
 	sql
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { wrongPlan,  atRiskMembers } from '#lib/server/services/reports.ts';
+import { wrongPlan, atRiskMembers } from '#lib/server/services/reports.ts';
 import {
 	equipment,
 	activity,
@@ -859,7 +859,9 @@ export async function sendBirthdayGreetings(orgId: string) {
 				lines: [
 					`Hi ${r.memberName} — everyone at ${name.orgName} is wishing you a great birthday.`,
 					...(comped
-						? [`We've banked ${comped} free class${comped > 1 ? 'es' : ''} on your membership — enjoy.`]
+						? [
+								`We've banked ${comped} free class${comped > 1 ? 'es' : ''} on your membership — enjoy.`
+							]
 						: []),
 					'See you at the gym — first workout of the year is on you.'
 				],
@@ -2417,7 +2419,10 @@ export async function sendMemberDigest(orgId: string) {
 	const stats = new Map<string, { last7d: number; streak: number }>();
 	const weeksByMember = new Map<string, Set<number>>();
 	for (const v of visits) {
-		weeksByMember.set(v.memberId!, (weeksByMember.get(v.memberId!) ?? new Set()).add(weekOf(v.checkedAt)));
+		weeksByMember.set(
+			v.memberId!,
+			(weeksByMember.get(v.memberId!) ?? new Set()).add(weekOf(v.checkedAt))
+		);
 		if (v.checkedAt >= weekAgoTs) {
 			const e = stats.get(v.memberId!) ?? { last7d: 0, streak: 0 };
 			e.last7d++;
@@ -3872,7 +3877,11 @@ export async function notifyDeletionRequested(orgId: string, memberId: string) {
  */
 export async function notifyClassFull(orgId: string, sessionId: string) {
 	const [row] = await db
-		.select({ className: classType.name, startsAt: classSession.startsAt, capacity: classSession.capacity })
+		.select({
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			capacity: classSession.capacity
+		})
 		.from(classSession)
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.where(eq(classSession.id, sessionId));
@@ -3942,7 +3951,11 @@ export async function sendUsualClassNudges(orgId: string) {
 	const name = await orgBrand(orgId);
 	for (const [memberId, h] of top) {
 		const [m] = await db
-			.select({ email: gymMember.email, name: gymMember.name, unsubscribedAt: gymMember.unsubscribedAt })
+			.select({
+				email: gymMember.email,
+				name: gymMember.name,
+				unsubscribedAt: gymMember.unsubscribedAt
+			})
 			.from(gymMember)
 			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
 		if (!m?.email || m.unsubscribedAt) continue;
@@ -4046,9 +4059,11 @@ export async function notifyClassWatchers(orgId: string, sessionIds: string[]) {
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})
-		}).then(async () => {
-			await logOnce(orgId, 'class_watch', `${w.memberId}:${first.id}`, email);
-		}).catch(() => {});
+		})
+			.then(async () => {
+				await logOnce(orgId, 'class_watch', `${w.memberId}:${first.id}`, email);
+			})
+			.catch(() => {});
 	}
 }
 
@@ -4060,7 +4075,12 @@ export async function sendEquipmentServiceReminders(orgId: string) {
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	const due = await db
-		.select({ id: equipment.id, name: equipment.name, kind: equipment.kind, nextServiceOn: equipment.nextServiceOn })
+		.select({
+			id: equipment.id,
+			name: equipment.name,
+			kind: equipment.kind,
+			nextServiceOn: equipment.nextServiceOn
+		})
 		.from(equipment)
 		.where(and(eq(equipment.organizationId, orgId), lte(equipment.nextServiceOn, today)));
 	if (!due.length) return 0;
@@ -4083,7 +4103,10 @@ export async function sendEquipmentServiceReminders(orgId: string) {
 			...renderEmail({
 				...name,
 				heading: 'Equipment service due',
-				lines: [...lines, 'Update the service date or status from Settings → Locations once handled.']
+				lines: [
+					...lines,
+					'Update the service date or status from Settings → Locations once handled.'
+				]
 			})
 		});
 		sent++;
@@ -4099,7 +4122,8 @@ export async function sendOwnerInsights(orgId: string) {
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
 	const today = localDate(new Date(), tz);
 	if (!today.endsWith('-01')) return 0;
-	const lastMonth = today.slice(0, 5) + (Number(today.slice(5, 7)) - 1 || 12).toString().padStart(2, '0') + '-01';
+	const lastMonth =
+		today.slice(0, 5) + (Number(today.slice(5, 7)) - 1 || 12).toString().padStart(2, '0') + '-01';
 	const prevMonthStart = new Date(`${today.slice(0, 8)}01T00:00:00Z`);
 	prevMonthStart.setUTCMonth(prevMonthStart.getUTCMonth() - 1);
 	const [joins, cancels, atRisk, wp] = await Promise.all([

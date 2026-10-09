@@ -604,7 +604,8 @@ export async function requestTrial(
 				})
 				.returning()
 		)[0]!;
-	if (!m) await db.insert(memberTag).values({ organizationId: org.id, memberId: member.id, tag: 'lead' });
+	if (!m)
+		await db.insert(memberTag).values({ organizationId: org.id, memberId: member.id, tag: 'lead' });
 
 	const [alreadyBooked] = await db
 		.select({ id: booking.id })
@@ -633,7 +634,9 @@ export async function requestTrial(
 	if (prior)
 		error(
 			409,
-			prior.status === 'confirmed' ? 'Your trial for this class is already booked' : 'Trial already requested — the gym will confirm shortly'
+			prior.status === 'confirmed'
+				? 'Your trial for this class is already booked'
+				: 'Trial already requested — the gym will confirm shortly'
 		);
 
 	const [req] = await db

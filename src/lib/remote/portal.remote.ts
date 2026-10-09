@@ -3,7 +3,15 @@ import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { classType, classWatch, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
+import {
+	classType,
+	classWatch,
+	document,
+	gymMember,
+	membership,
+	outer,
+	plan
+} from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as billingSvc from '#lib/server/services/billing.ts';

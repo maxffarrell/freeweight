@@ -19,7 +19,7 @@
 		getMembers,
 		createMember,
 		emailAllMembers,
-	previewAnnouncement,
+		previewAnnouncement,
 		emailMeTest,
 		scheduleEmail,
 		cancelScheduledEmail,
@@ -476,7 +476,11 @@
 		if (!confirm(`Resend to the ${n} member${n === 1 ? '' : 's'} who haven't opened it?`)) return;
 		try {
 			const r = await resendToNonOpeners(id);
-			toast.success(r.resent ? `Resent to ${r.resent} member${r.resent === 1 ? '' : 's'}` : 'Nobody left to resend to');
+			toast.success(
+				r.resent
+					? `Resent to ${r.resent} member${r.resent === 1 ? '' : 's'}`
+					: 'Nobody left to resend to'
+			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not resend'));
 		}
@@ -1071,11 +1075,8 @@
 						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
 						>{testPending ? 'Sending…' : 'Send me a test'}</Button
 					>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onclick={togglePreview}>{emailPreview != null ? 'Hide preview' : 'Preview'}</Button
+					<Button type="button" variant="ghost" size="sm" onclick={togglePreview}
+						>{emailPreview != null ? 'Hide preview' : 'Preview'}</Button
 					>
 					<Button
 						type="button"

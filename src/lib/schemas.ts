@@ -41,7 +41,7 @@ export const memberInput = v.object({
 	/** Emergency contact. */
 	emergencyName: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(80)))),
 	emergencyPhone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(30)))),
-		guardianId: v.optional(v.nullable(idSchema))
+	guardianId: v.optional(v.nullable(idSchema))
 });
 export const memberImportRow = v.object({
 	name: requiredText('Name'),
@@ -142,6 +142,8 @@ export const classTypeInput = v.object({
 	waitlistLimit: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** Minutes before start that member booking closes; null = the gym-wide setting. */
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
+	/** Default join link for virtual sessions — new sessions inherit it. */
+	defaultStreamUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
 	memberBookable: v.optional(v.boolean(), true),
 	minLevelId: v.optional(v.nullable(idSchema)),
@@ -253,7 +255,9 @@ export const sessionInput = v.object({
 	durationMin: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 	/** Repeat weekly until this ISO date (inclusive). */
 	repeatUntil: v.optional(v.nullable(isoDate)),
-	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
+	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+	/** Virtual-class join link; null falls back to the class type's default. */
+	streamUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 export const templateInput = v.object({
 	classTypeId: idSchema,
@@ -286,12 +290,16 @@ export const sessionUpdate = v.object({
 	needsCover: v.optional(v.boolean()),
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 	/** Workout of the day shown to booked members (multi-line ok). */
-	workout: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000))))
+	workout: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
+	/** Virtual-class join link. */
+	streamUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
 });
 
 /** Live instructor double-booking check for the session dialogs. */
 export const instructorConflictInput = v.object({
 	instructorId: idSchema,
+	/** Also warn when another session is already booked in this room. */
+	locationId: v.optional(v.nullable(idSchema)),
 	startsAt: localDateTime,
 	durationMin: v.pipe(v.number(), v.integer(), v.minValue(1)),
 	/** Also check weekly recurrences through this date (the create dialog's repeat). */
@@ -733,6 +741,20 @@ export const expenseInput = v.object({
 	amountCents: cents,
 	/** Gym-local date the cost was incurred. */
 	expenseOn: isoDate
+});
+
+export const recurringExpenseInput = v.object({
+	label: requiredText('Label'),
+	category: v.optional(v.picklist(expenseCategories), 'other'),
+	amountCents: cents,
+	interval: v.optional(v.picklist(planIntervals), 'month'),
+	/** First posting date (gym-local YYYY-MM-DD). */
+	nextDue: isoDate
+});
+export const recurringExpenseUpdate = v.object({
+	id: idSchema,
+	active: v.optional(v.boolean()),
+	nextDue: v.optional(isoDate)
 });
 
 /** Multi-week priced program — enrolls the member into every session of a class type in the window. */

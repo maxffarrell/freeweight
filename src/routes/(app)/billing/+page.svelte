@@ -42,7 +42,11 @@
 		removeRecurring,
 		getExpenses,
 		addExpense,
-		removeExpense
+		removeExpense,
+		getRecurringExpenses,
+		addRecurringExpense,
+		updateRecurringExpense,
+		removeRecurringExpense
 	} from '#lib/remote/billing.remote.ts';
 	import { getMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney, todayISO } from '#lib/format.ts';
@@ -64,6 +68,51 @@
 	let giftCards = $state(await getGiftCards());
 	let recurring = $state(await getRecurring());
 	let expenses = $state(await getExpenses());
+	let recExpenses = $state(await getRecurringExpenses());
+	let reLabel = $state('');
+	let reCategory = $state('rent');
+	let reAmount = $state<number | null>(null);
+	let reInterval = $state('month');
+	let reNextDue = $state(todayISO());
+	async function submitRecExpense(e: SubmitEvent) {
+		e.preventDefault();
+		if (!reLabel.trim() || !reAmount) return;
+		pending = true;
+		try {
+			recExpenses = [
+				...recExpenses,
+				await addRecurringExpense({
+					label: reLabel.trim(),
+					category: reCategory as never,
+					amountCents: reAmount,
+					interval: reInterval as never,
+					nextDue: reNextDue
+				})
+			];
+			reLabel = '';
+			reAmount = null;
+			toast.success('Recurring expense added');
+		} catch (e2) {
+			toast.error(errMsg(e2, 'Could not add'));
+		}
+		pending = false;
+	}
+	async function toggleRecExpense(id: string, active: boolean) {
+		try {
+			await updateRecurringExpense({ id, active });
+			recExpenses = await getRecurringExpenses();
+		} catch (e2) {
+			toast.error(errMsg(e2, 'Could not update'));
+		}
+	}
+	async function deleteRecExpense(id: string) {
+		try {
+			await removeRecurringExpense(id);
+			recExpenses = recExpenses.filter((r) => r.id !== id);
+		} catch (e2) {
+			toast.error(errMsg(e2, 'Could not remove'));
+		}
+	}
 	let expLabel = $state('');
 	let expCategory = $state('rent');
 	let expAmount = $state<number | null>(null);
@@ -359,8 +408,7 @@
 		}
 	}
 	async function writeOffCharge(id: string) {
-		if (!confirm('Write this charge off as bad debt? It leaves the member\'s open balance.'))
-			return;
+		if (!confirm("Write this charge off as bad debt? It leaves the member's open balance.")) return;
 		try {
 			await updateCharge({ id, status: 'written_off' });
 			await refreshCharges();
@@ -919,9 +967,7 @@
 									<Table.Row>
 										<Table.Cell class="font-medium">{p.memberName}</Table.Cell>
 										<Table.Cell>{p.itemName}{p.qty > 1 ? ` ×${p.qty}` : ''}</Table.Cell>
-										<Table.Cell class="text-muted-foreground"
-											>{formatDate(p.createdAt)}</Table.Cell
-										>
+										<Table.Cell class="text-muted-foreground">{formatDate(p.createdAt)}</Table.Cell>
 										<Table.Cell class="text-right">
 											<Button
 												variant="ghost"
@@ -1206,6 +1252,78 @@
 					</Card.Content>
 				</Card.Root>
 			</div>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Recurring expenses</Card.Title>
+					<Card.Description>
+						Rent, software, insurance — the cron posts an expense row every period.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-4">
+					{#if recExpenses.length}
+						<div class="divide-y rounded-lg border">
+							{#each recExpenses as r (r.id)}
+								<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+									<div class="min-w-0">
+										<span class="font-medium">{r.label}</span>
+										<span class="text-muted-foreground">
+											· {formatMoney(r.amountCents, currency)}/{r.interval} · next {r.nextDue}
+										</span>
+									</div>
+									<span class="flex items-center gap-2">
+										{#if !r.active}<Badge variant="outline">paused</Badge>{/if}
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											onclick={() => toggleRecExpense(r.id, !r.active)}
+											>{r.active ? 'Pause' : 'Resume'}</Button
+										>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											onclick={() => deleteRecExpense(r.id)}><Trash2 /></Button
+										>
+									</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+					<form class="flex flex-wrap items-end gap-3" onsubmit={submitRecExpense}>
+						<Field.Field class="min-w-40 flex-1">
+							<Field.Label for="re-label">Item</Field.Label>
+							<Input id="re-label" required bind:value={reLabel} placeholder="Monthly rent" />
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Category</Field.Label>
+							<NativeSelect bind:value={reCategory} class="capitalize">
+								{#each expenseCategories as c (c)}
+									<option value={c} class="capitalize">{c}</option>
+								{/each}
+							</NativeSelect>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Amount</Field.Label>
+							<MoneyInput bind:value={reAmount} />
+						</Field.Field>
+						<Field.Field>
+							<Field.Label>Every</Field.Label>
+							<NativeSelect bind:value={reInterval}>
+								<option value="week">week</option>
+								<option value="month">month</option>
+								<option value="year">year</option>
+							</NativeSelect>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="re-due">Starting</Field.Label>
+							<Input id="re-due" type="date" required bind:value={reNextDue} />
+						</Field.Field>
+						<Button type="submit" disabled={pending || !reAmount || !reLabel.trim()}>Add</Button>
+					</form>
+				</Card.Content>
+			</Card.Root>
 		</Tabs.Content>
 	</Tabs.Root>
 </div>

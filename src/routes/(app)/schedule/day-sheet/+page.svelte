@@ -9,9 +9,7 @@
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
 	const join = await getJoinInfo();
-	let date = $state(
-		page.url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10)
-	);
+	let date = $state(page.url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10));
 	let sheet = $state(await getDaySheet(date));
 	async function reload() {
 		if (isNaN(Date.parse(`${date}T00:00:00Z`))) return;
@@ -69,10 +67,13 @@
 					<tbody>
 						{#each sess.roster as r (r.name + r.status)}
 							<tr class="border-b border-dashed last:border-0">
-								<td class="w-6 py-1 align-top"><span class="inline-block h-3 w-3 rounded-sm border"></span></td>
+								<td class="w-6 py-1 align-top"
+									><span class="inline-block h-3 w-3 rounded-sm border"></span></td
+								>
 								<td class="py-1">
 									{r.name}{#if r.guests}
-										<span class="text-muted-foreground"> +{r.guests} guest{r.guests > 1 ? 's' : ''}</span
+										<span class="text-muted-foreground">
+											+{r.guests} guest{r.guests > 1 ? 's' : ''}</span
 										>{/if}
 								</td>
 								<td class="py-1 text-right text-xs text-muted-foreground capitalize">

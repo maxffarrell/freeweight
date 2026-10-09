@@ -178,6 +178,13 @@
 			href: '/checkins'
 		},
 		{
+			label: 'Collected today',
+			value: formatMoney(d.collectedToday, d.currency, true),
+			icon: Wallet,
+			href: '/billing',
+			sub: `yesterday ${formatMoney(d.collectedYesterday, d.currency, true)}`
+		},
+		{
 			label: 'Monthly recurring',
 			value: formatMoney(d.mrr, d.currency, true),
 			icon: CalendarDays,
@@ -245,6 +252,7 @@
 						<k.icon class="size-3.5" />{k.label}
 					</div>
 					<div class="mt-1 text-2xl font-semibold tracking-tight">{k.value}</div>
+					{#if 'sub' in k && k.sub}<div class="text-xs text-muted-foreground">{k.sub}</div>{/if}
 				</Card.Content>
 			</Card.Root>
 		{/each}
@@ -455,8 +463,8 @@
 															: r.kind === 'sign'
 																? r.planName
 																: r.kind === 'deletion'
-																? 'delete my data'
-																: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+																	? 'delete my data'
+																	: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
@@ -468,14 +476,18 @@
 			{/if}
 			{#if d.inGymNow > 0}
 				<Card.Root>
-					<Card.Header><Card.Title class="text-base">Inside now · {d.inGymNow}</Card.Title></Card.Header>
+					<Card.Header
+						><Card.Title class="text-base">Inside now · {d.inGymNow}</Card.Title></Card.Header
+					>
 					<Card.Content class="px-4">
 						<p class="text-sm">
 							{d.insideNames.slice(0, 8).join(', ')}{d.inGymNow > 8
 								? ` +${d.inGymNow - 8} more`
 								: ''}
 						</p>
-						<a href="/checkins" class="mt-2 inline-block text-xs text-muted-foreground hover:underline"
+						<a
+							href="/checkins"
+							class="mt-2 inline-block text-xs text-muted-foreground hover:underline"
 							>Check-in log</a
 						>
 					</Card.Content>
@@ -489,14 +501,11 @@
 							{#each d.fullSessions as s (s.sessionId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a href="/schedule?focus={s.sessionId}" class="truncate hover:underline"
-										>{s.className} {localDate(s.startsAt, d.timezone)} {localTime(
-											s.startsAt,
-											d.timezone
-										)}</a
+										>{s.className}
+										{localDate(s.startsAt, d.timezone)}
+										{localTime(s.startsAt, d.timezone)}</a
 									>
-									<Badge variant="outline" class="shrink-0"
-										>{s.waiting} waiting</Badge
-									>
+									<Badge variant="outline" class="shrink-0">{s.waiting} waiting</Badge>
 								</li>
 							{/each}
 						</ul>
