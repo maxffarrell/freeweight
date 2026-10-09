@@ -14,6 +14,7 @@
 	);
 	let sheet = $state(await getDaySheet(date));
 	async function reload() {
+		if (isNaN(Date.parse(`${date}T00:00:00Z`))) return;
 		sheet = await getDaySheet(date);
 	}
 </script>

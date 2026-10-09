@@ -149,7 +149,7 @@ export async function listMembers(
 					: undefined,
 				// At-risk: active member with no check-in in the last 30 days (or ever).
 				risk
-					? sql`${gymMember.status} = 'active' and not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000)})`
+					? sql`${gymMember.status} = 'active' and not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`
 					: undefined
 			)
 		)
