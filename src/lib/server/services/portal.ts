@@ -744,6 +744,7 @@ export async function memberBook(
 	const [s] = await db
 		.select({
 			startsAt: classSession.startsAt,
+			bookingClosed: classSession.bookingClosed,
 			classCutoff: classType.bookCutoffMin,
 			memberBookable: classType.memberBookable,
 			dropInPrice: classType.dropInPrice
@@ -753,6 +754,7 @@ export async function memberBook(
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
 	if (!s.memberBookable) error(409, 'This class is booked at the front desk');
+	if (s.bookingClosed) error(409, 'Bookings are closed for this class');
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
 	// Members without an active plan buy the visit as a drop-in — the class's
 	// drop-in charge lands on their balance to pay online or at the desk.

@@ -466,6 +466,8 @@ export const classSession = pgTable(
 		coverRequestedAt: timestamp('cover_requested_at', { withTimezone: true }),
 		/** Staff note on this session ("pool closed — bring mats"); shown on the roster. */
 		note: text('note'),
+		/** Member self-booking is locked for this session (staff can still add from the roster). */
+		bookingClosed: boolean('booking_closed').notNull().default(false),
 		/** Workout of the day — set by staff, shown to booked members in the portal. */
 		workout: text('workout'),
 		/** Virtual-class join link (Zoom/Meet); booked members see a Join button in the portal. */

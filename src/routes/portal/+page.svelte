@@ -3198,6 +3198,8 @@
 									disabled={busy === b.session.id}
 									onclick={() => cancel(myBookingId(b)!, b.session.id)}>Cancel</Button
 								>
+							{:else if b.session.bookingClosed}
+								<span class="text-xs whitespace-nowrap text-muted-foreground">Bookings closed</span>
 							{:else if !b.memberBookable}
 								<span class="text-xs whitespace-nowrap text-muted-foreground">Book at the desk</span
 								>

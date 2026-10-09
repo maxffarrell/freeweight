@@ -299,7 +299,9 @@ export const sessionUpdate = v.object({
 	/** Workout of the day shown to booked members (multi-line ok). */
 	workout: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 	/** Virtual-class join link. */
-	streamUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))))
+	streamUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+	/** Lock member self-booking on this session (roster stays open to staff). */
+	bookingClosed: v.optional(v.boolean())
 });
 
 /** Live instructor double-booking check for the session dialogs. */
