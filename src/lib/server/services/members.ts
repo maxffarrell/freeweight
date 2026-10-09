@@ -58,14 +58,15 @@ import {
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
-export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance' | 'visits30';
+export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'stale' | 'balance' | 'visits30';
 
 const MEMBER_ORDER = {
 	name: asc(gymMember.name),
 	joined: desc(gymMember.joinedAt),
 	lastVisit: sql`"lastVisit" desc nulls last`,
 	balance: sql`"openBalance" desc`,
-	visits30: sql`"visits30" desc`
+	visits30: sql`"visits30" desc`,
+	stale: sql`"lastVisit" asc nulls first`
 } as const;
 
 /** Dependents billing under a member — the kiosk's family check-in rows. */
