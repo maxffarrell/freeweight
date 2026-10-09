@@ -218,14 +218,22 @@ export const getCheckIns = query(
 		date: v.pipe(v.string(), v.isoDate()),
 		q: v.optional(v.string()),
 		inside: v.optional(v.boolean()),
-		guests: v.optional(v.boolean())
+		guests: v.optional(v.boolean()),
+		method: v.optional(v.picklist(['qr', 'manual']))
 	}),
-	async ({ date, q, inside, guests }) => {
+	async ({ date, q, inside, guests, method }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
 		const until = new Date(since.getTime() + 86400_000);
-		return checkins.listCheckIns(orgId, { since, until, q, inside, guestsOnly: guests });
+		return checkins.listCheckIns(orgId, {
+			since,
+			until,
+			q,
+			inside,
+			guestsOnly: guests,
+			method
+		});
 	}
 );
 export const recordCheckIn = command(checkInInput, async (input) => {

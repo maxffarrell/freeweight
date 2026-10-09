@@ -607,6 +607,33 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.checkInMethods.total}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Check-in methods</Card.Title>
+				<Card.Description>How visits were logged this month</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				<div class="flex items-center justify-between">
+					<span>QR self-scan</span>
+					<span class="text-muted-foreground tabular-nums">
+						{r.checkInMethods.qr} ({Math.round(
+							(r.checkInMethods.qr / r.checkInMethods.total) * 100
+						)}%)</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>Manual desk entry</span>
+					<span class="text-muted-foreground tabular-nums">
+						{r.checkInMethods.manual} ({Math.round(
+							(r.checkInMethods.manual / r.checkInMethods.total) * 100
+						)}%)</span
+					>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>

@@ -529,6 +529,8 @@ export async function listCheckIns(
 		inside?: boolean;
 		memberId?: string;
 		guestsOnly?: boolean;
+		/** Only scans logged this way — 'qr' or 'manual'. */
+		method?: 'qr' | 'manual';
 	}
 ) {
 	const term = opts.q?.trim();
@@ -550,6 +552,7 @@ export async function listCheckIns(
 				opts.inside ? isNull(checkIn.checkedOutAt) : undefined,
 				opts.memberId ? eq(checkIn.memberId, opts.memberId) : undefined,
 				opts.guestsOnly ? isNotNull(checkIn.guestName) : undefined,
+				opts.method ? eq(checkIn.method, opts.method) : undefined,
 				term
 					? or(ilike(gymMember.name, `%${term}%`), ilike(checkIn.guestName, `%${term}%`))
 					: undefined

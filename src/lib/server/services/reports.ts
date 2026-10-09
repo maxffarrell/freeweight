@@ -12,7 +12,8 @@ import {
 	lte,
 	ne,
 	notInArray,
-	sql
+	sql,
+	count
 } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { error } from '@sveltejs/kit';
@@ -678,6 +679,19 @@ async function guestStats(orgId: string) {
 		monthTotal: rows.reduce((a, r) => a + r.guests, 0),
 		bringers: rows.slice(0, 8)
 	};
+}
+
+/** Check-ins this month split by method — QR self-scan vs manual desk entry. */
+async function checkInMethods(orgId: string) {
+	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
+	const rows = await db
+		.select({ method: checkIn.method, n: count() })
+		.from(checkIn)
+		.where(and(eq(checkIn.organizationId, orgId), sql`${checkIn.checkedAt} >= ${monthStart}`))
+		.groupBy(checkIn.method);
+	const qr = rows.find((r) => r.method === 'qr')?.n ?? 0;
+	const manual = rows.find((r) => r.method === 'manual')?.n ?? 0;
+	return { qr, manual, total: qr + manual };
 }
 
 /** Member age distribution from stored birthdays (date-mode strings). */
@@ -1435,7 +1449,8 @@ export async function getReports(orgId: string) {
 		saveOffers,
 		visitFreq,
 		lockers,
-		ages
+		ages,
+		cim
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1497,7 +1512,8 @@ export async function getReports(orgId: string) {
 		saveOfferStats(orgId),
 		visitFrequency(orgId),
 		lockerStats(orgId),
-		ageDistribution(orgId)
+		ageDistribution(orgId),
+		checkInMethods(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1571,7 +1587,8 @@ export async function getReports(orgId: string) {
 		saveOffers,
 		visitFrequency: visitFreq,
 		lockers,
-		ages
+		ages,
+		checkInMethods: cim
 	};
 }
 
