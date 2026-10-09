@@ -11,6 +11,7 @@ import {
 	gymSettings,
 	member,
 	organization,
+	outer,
 	payment
 } from '#lib/server/db/schema.ts';
 import { monthlyRecurring } from '#lib/server/services/reports.ts';
@@ -201,7 +202,7 @@ export async function franchiseMemberSearch(userId: string, q: string) {
 			email: gymMember.email,
 			status: gymMember.status,
 			memberships:
-				sql<number>`(select count(*) from ${membership} ms where ms.member_id = ${gymMember.id} and ms.status = 'active')`.mapWith(
+				sql<number>`(select count(*) from ${membership} ms where ms.member_id = ${outer(gymMember.id)} and ms.status = 'active')`.mapWith(
 					Number
 				)
 		})
