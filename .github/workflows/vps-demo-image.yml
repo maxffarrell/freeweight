@@ -8,6 +8,19 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: demo_test
+          POSTGRES_PASSWORD: runner-test-only
+          POSTGRES_DB: demo_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U demo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,7 +28,7 @@ jobs:
           node-version: '26'
       - name: Install and validate app
         env:
-          DATABASE_URL: postgres://build@localhost/build
+          DATABASE_URL: postgres://demo_test:runner-test-only@localhost:5432/demo_test
           BETTER_AUTH_SECRET: build-placeholder
         run: |
           npm install -g pnpm@12.4.1
@@ -24,7 +37,8 @@ jobs:
           pnpm exec prettier --write 'src/routes/(app)/+layout.svelte' 'src/routes/(app)/+layout.server.ts' src/lib/components/app/demo-banner.svelte
           pnpm check
           pnpm lint
-          # Seeded-database integration tests run separately from this unit suite.
+          node scripts/migrate.ts
+          # Demo seeding smoke test uses the fresh runner database; gift-card fixtures are separate.
           pnpm test $(git ls-files '*.test.ts' '*.spec.ts' | sed '/\.it\.test\.ts$/d')
       - uses: docker/setup-buildx-action@v3
       - name: Build linux/amd64 image
