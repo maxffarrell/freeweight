@@ -64,9 +64,11 @@
 		removeEquipment,
 		getClassVideos,
 		addClassVideo,
-		deleteClassVideo
+		deleteClassVideo,
+		getClassTypeQuals,
+		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
-	import { getMembers } from '#lib/remote/members.remote.ts';
+	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
@@ -379,6 +381,13 @@
 	let sessNote = $state('');
 	let pending = $state(false);
 	const noConflicts: { id: string; startsAt: Date; endsAt: Date; className: string }[] = [];
+	/** Name of the picked instructor when the type has quals and they're not in the list. */
+	function unqualWarn(typeId: string | null | undefined, instructorId: string | null | undefined) {
+		if (!typeId || !instructorId) return null;
+		const quals = cQualsByType[typeId];
+		if (!quals?.length || quals.includes(instructorId)) return null;
+		return instructors.find((i) => i.id === instructorId)?.name ?? 'Instructor';
+	}
 	let sessConflicts = $derived(
 		await (sessInstructorId && sessStart && sessStartTime
 			? getInstructorConflicts({
@@ -835,6 +844,15 @@
 	let tDescription = $state('');
 	let tActive = $state(true);
 	let tMemberBookable = $state(true);
+	let tMinLevel = $state('');
+	let tQuals = new SvelteSet<string>();
+	const levels = $derived(await getLevels());
+	const classTypeQuals = $derived(await getClassTypeQuals());
+	const cQualsByType: Record<string, string[]> = $derived.by(() => {
+		const map: Record<string, string[]> = {};
+		for (const q of classTypeQuals) (map[q.classTypeId] ??= []).push(q.memberId);
+		return map;
+	});
 	function editType(c: (typeof classTypes)[number]) {
 		editTypeId = c.id;
 		tName = c.name;
@@ -849,6 +867,8 @@
 		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
 		tMemberBookable = c.memberBookable;
+		tMinLevel = c.minLevelId ?? '';
+		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
 	// ------- movement video library -------
 	const classVideos = $derived(await getClassVideos());
@@ -911,10 +931,14 @@
 				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
 				memberBookable: tMemberBookable,
+				minLevelId: tMinLevel || null,
 				active: tActive
 			};
+			let savedTypeId = editTypeId;
 			if (editTypeId) await updateClassType({ id: editTypeId, ...body });
-			else await createClassType(body);
+			else savedTypeId = (await createClassType(body)).id;
+			if (savedTypeId)
+				await setClassTypeQuals({ classTypeId: savedTypeId, memberIds: [...tQuals] });
 			await getClassTypes().refresh();
 			toast.success(editTypeId ? 'Class updated' : 'Class type created');
 			resetTypeForm();
@@ -1427,6 +1451,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if focus && unqualWarn(focus.session.classTypeId, editInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(focus.session.classTypeId, editInstructorId)} isn't marked qualified for
+						{focus.session.className}.
+					</p>
+				{/if}
 				{#if editConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{editConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
@@ -1531,6 +1561,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if unqualWarn(sessTypeId, sessInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(sessTypeId, sessInstructorId)} isn't marked qualified for
+						{classTypes.find((c) => c.id === sessTypeId)?.name ?? 'this class'}.
+					</p>
+				{/if}
 				{#if sessConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{sessConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
@@ -1716,6 +1752,39 @@
 				<span class="text-sm">Members can book online — off for front-desk-only classes</span>
 				<Switch bind:checked={tMemberBookable} />
 			</div>
+			{#if levels.length}
+				<Field.Field>
+					<Field.Label for="t-min-level">Required level</Field.Label>
+					<NativeSelect id="t-min-level" bind:value={tMinLevel}>
+						<option value="">Open to all levels</option>
+						{#each levels as l (l.id)}
+							<option value={l.id}>{l.name}</option>
+						{/each}
+					</NativeSelect>
+					<Field.Description>
+						Members must hold at least this progression level to book (portal or desk).
+					</Field.Description>
+				</Field.Field>
+			{/if}
+			{#if instructors.length}
+				<Field.Field>
+					<Field.Label>Qualified to teach (blank = anyone)</Field.Label>
+					<div class="flex flex-wrap gap-1.5">
+						{#each instructors as st (st.id)}
+							<button
+								type="button"
+								class="rounded-full border px-2.5 py-1 text-xs transition-colors {tQuals.has(st.id)
+									? 'border-primary bg-primary/10 font-medium'
+									: 'text-muted-foreground'}"
+								onclick={() => {
+									if (tQuals.has(st.id)) tQuals.delete(st.id);
+									else tQuals.add(st.id);
+								}}>{st.name}</button
+							>
+						{/each}
+					</div>
+				</Field.Field>
+			{/if}
 			{#if editTypeId}
 				<div class="flex items-center justify-between rounded-lg border px-3 py-2">
 					<span class="text-sm">Active — shows in booking picks</span>

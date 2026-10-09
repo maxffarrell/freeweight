@@ -470,3 +470,16 @@ export const deleteClassVideo = command(idSchema, async (id) => {
 	void getClassVideos().refresh();
 	return r;
 });
+
+export const getClassTypeQuals = query(async () =>
+	svc.listClassTypeQuals((await requireOrg()).orgId)
+);
+
+export const setClassTypeQuals = command(
+	v.object({ classTypeId: idSchema, memberIds: v.array(idSchema) }),
+	async (input) => {
+		const r = await svc.setClassTypeQuals(await requireOrg(), input.classTypeId, input.memberIds);
+		void getClassTypeQuals().refresh();
+		return r;
+	}
+);

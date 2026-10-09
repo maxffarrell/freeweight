@@ -1222,6 +1222,39 @@
 	{#if r.courses.length}
 		<Card.Root>
 			<Card.Header>
+				<Card.Title class="text-base">Member feedback</Card.Title>
+				<Card.Description
+					>One-tap scores members leave in the portal — promoters minus detractors is the NPS.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				{#if r.nps.n}
+					<div class="flex items-baseline gap-2">
+						<span class="text-2xl font-bold tabular-nums">{r.nps.score ?? '—'}</span>
+						<span class="text-sm text-muted-foreground"
+							>NPS · {r.nps.avg}/10 avg across {r.nps.n} response{r.nps.n === 1 ? '' : 's'}</span
+						>
+					</div>
+					{#if r.nps.recent.length}
+						<ul class="mt-3 divide-y text-sm">
+							{#each r.nps.recent as nr (nr.createdAt)}
+								<li class="flex items-baseline justify-between gap-2 py-1.5">
+									<span class="font-medium">{nr.memberName}</span>
+									<span class="text-muted-foreground"
+										>{nr.score}/10{nr.comment ? ` — ${nr.comment}` : ''}</span
+									>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				{:else}
+					<p class="text-sm text-muted-foreground">No feedback yet.</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title class="text-base">Courses</Card.Title>
 				<Card.Description
 					>Enrollees, sessions held, attendance, and revenue per course</Card.Description

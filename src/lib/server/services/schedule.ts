@@ -19,6 +19,8 @@ import {
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
+	memberLevel,
+	instructorQual,
 	booking,
 	charge,
 	checkIn,
@@ -148,6 +150,7 @@ export async function createClassType(
 			waitlistLimit: input.waitlistLimit ?? null,
 			bookCutoffMin: input.bookCutoffMin ?? null,
 			memberBookable: input.memberBookable,
+			minLevelId: input.minLevelId ?? null,
 			active: input.active
 		})
 		.returning();
@@ -1196,6 +1199,7 @@ export async function bookSession(
 				classTypeId: classSession.classTypeId,
 				dropInPrice: classType.dropInPrice,
 				waitlistLimit: classType.waitlistLimit,
+				minLevelId: classType.minLevelId,
 				className: classType.name
 			})
 			.from(classSession)
@@ -1204,6 +1208,22 @@ export async function bookSession(
 			.for('update');
 		if (!s) error(404, 'Session not found');
 		if (s.cancelledAt) error(409, 'This session is cancelled');
+		// Level gate: gated classes need the member to hold at least the
+		// required progression level (compare rank order).
+		if (s.minLevelId) {
+			const [gate] = await tx
+				.select({ sort: memberLevel.sortOrder, name: memberLevel.name })
+				.from(memberLevel)
+				.where(eq(memberLevel.id, s.minLevelId));
+			const [held] = m.skillLevelId
+				? await tx
+						.select({ sort: memberLevel.sortOrder })
+						.from(memberLevel)
+						.where(eq(memberLevel.id, m.skillLevelId))
+				: [undefined];
+			if (!gate || !held || held.sort < gate.sort)
+				error(409, `${s.className} requires ${gate?.name ?? 'a higher level'}`);
+		}
 		// Which membership pays for this booking — restricted pack for its own
 		// class first, then a plan, then an open pack. Drop-ins never drain credits.
 		const ms = input.dropIn
@@ -2654,6 +2674,41 @@ export async function forgiveNoShow(ctx: OrgContext, bookingId: string, actorId?
 		entityId: b.id,
 		action: 'forgiven',
 		summary: `Forgave a no-show — ${b.className}`
+	});
+	return { ok: true };
+}
+
+/** Staff qualified per class type — flat rows the dialog groups by type. */
+export async function listClassTypeQuals(orgId: string) {
+	return db
+		.select({ classTypeId: instructorQual.classTypeId, memberId: instructorQual.memberId })
+		.from(instructorQual)
+		.where(eq(instructorQual.organizationId, orgId));
+}
+
+export async function setClassTypeQuals(ctx: OrgContext, classTypeId: string, memberIds: string[]) {
+	const [ct] = await db
+		.select({ id: classType.id })
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, classTypeId)));
+	if (!ct) error(404, 'Class not found');
+	await db.transaction(async (tx) => {
+		await tx
+			.delete(instructorQual)
+			.where(
+				and(
+					eq(instructorQual.organizationId, ctx.orgId),
+					eq(instructorQual.classTypeId, classTypeId)
+				)
+			);
+		if (memberIds.length)
+			await tx.insert(instructorQual).values(
+				memberIds.map((mid) => ({
+					organizationId: ctx.orgId,
+					classTypeId,
+					memberId: mid
+				}))
+			);
 	});
 	return { ok: true };
 }

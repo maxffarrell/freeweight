@@ -49,6 +49,10 @@
 		getLockers,
 		getLevels,
 		setMemberLevel,
+		getMemberLoans,
+		getLoanables,
+		loanItem,
+		returnLoan,
 		assignLocker,
 		releaseLocker
 	} from '#lib/remote/members.remote.ts';
@@ -212,6 +216,19 @@
 	// ------- tags -------
 	const allTags = $derived(await getTags());
 	const memberLocker = $derived(await getMemberLocker(id));
+	const memberLoans = $derived(await getMemberLoans(id));
+	const loanables = $derived(await getLoanables());
+	const freeKit = $derived(loanables.filter((k) => k.out < k.item.quantity));
+	let kitPick = $state('');
+	$effect(() => {
+		if (kitPick) {
+			const itemId = kitPick;
+			kitPick = '';
+			loanItem({ itemId, memberId: id })
+				.then(() => toast.success('Checked out'))
+				.catch((err) => toast.error(errMsg(err, 'Could not check out')));
+		}
+	});
 	const levels = $derived(await getLevels());
 	const levelName = $derived(levels.find((l) => l.id === m.member.skillLevelId)?.name ?? null);
 	let levelPick = $state('');
@@ -983,6 +1000,38 @@
 							</NativeSelect>
 						{:else}
 							<span class="text-muted-foreground">—</span>
+						{/if}
+					</span>
+				</div>
+				<div class="flex items-start justify-between gap-2">
+					<span class="pt-0.5 text-muted-foreground">Kit out</span>
+					<span class="flex max-w-56 flex-wrap justify-end gap-1">
+						{#each memberLoans.filter((l) => !l.loan.returnedAt) as l (l.loan.id)}
+							<Badge variant="secondary" class="gap-1">
+								{l.itemName}
+								<button
+									class="text-muted-foreground hover:text-foreground"
+									aria-label="Return {l.itemName}"
+									onclick={async () => {
+										try {
+											await returnLoan({ loanId: l.loan.id, memberId: id });
+											toast.success('Returned');
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not return'));
+										}
+									}}>×</button
+								>
+							</Badge>
+						{:else}
+							<span class="text-muted-foreground">—</span>
+						{/each}
+						{#if freeKit.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={kitPick}>
+								<option value="">lend…</option>
+								{#each freeKit as k (k.item.id)}
+									<option value={k.item.id}>{k.item.name}</option>
+								{/each}
+							</NativeSelect>
 						{/if}
 					</span>
 				</div>

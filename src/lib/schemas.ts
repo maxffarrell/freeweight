@@ -139,6 +139,7 @@ export const classTypeInput = v.object({
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
@@ -212,6 +213,7 @@ export const eventInput = v.object({
 	/** Signup price in cents; null/0 = free. */
 	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	active: v.optional(v.boolean(), true)
 });
 /** Times aren't editable — recreate the event (registrations keep the old row). */
@@ -718,6 +720,7 @@ export const courseInput = v.object({
 	/** Program-wide enrollment cap; null = per-session capacities only. */
 	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	/** Split the price into this many monthly installments (1 = pay up front). */
 	installments: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(12)))

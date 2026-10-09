@@ -45,7 +45,10 @@
 		getLockers,
 		addLocker,
 		removeLocker,
-		releaseLocker
+		releaseLocker,
+		getLoanables,
+		addLoanable,
+		removeLoanable
 	} from '#lib/remote/members.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
@@ -61,6 +64,20 @@
 	let settings = $state(await getSettings());
 	let locations = $state(await getLocations());
 	const lockers = $derived(await getLockers());
+	const loanables = $derived(await getLoanables());
+	let newKit = $state('');
+	let newKitQty = $state<number>(1);
+	async function addKitSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLoanable({ name: newKit, quantity: newKitQty || 1 });
+			newKit = '';
+			newKitQty = 1;
+			toast.success('Item added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+	}
 	let newLocker = $state('');
 	async function addLockerSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -852,6 +869,45 @@
 							</li>
 						{:else}
 							<li class="py-6 text-sm text-muted-foreground">No lockers — add your bank above.</li>
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="max-w-2xl">
+				<Card.Header class="flex-row items-center justify-between">
+					<div>
+						<Card.Title class="text-base">Loanable kit</Card.Title>
+						<Card.Description
+							>Ropes, bands, mats members can borrow — lent out on their page.</Card.Description
+						>
+					</div>
+					<form class="flex items-center gap-2" onsubmit={addKitSubmit}>
+						<Input placeholder="Skipping rope" class="h-8 w-36" bind:value={newKit} required />
+						<Input type="number" min={1} class="h-8 w-16" bind:value={newKitQty} required />
+						<Button size="sm" variant="outline" type="submit">Add</Button>
+					</form>
+				</Card.Header>
+				<Card.Content class="px-6">
+					<ul class="divide-y">
+						{#each loanables as k (k.item.id)}
+							<li class="flex items-center justify-between py-2.5 text-sm">
+								<span class="font-medium">{k.item.name} ×{k.item.quantity}</span>
+								<span class="flex items-center gap-2">
+									<span class="text-muted-foreground">{k.out > 0 ? `${k.out} out` : 'all in'}</span>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs text-destructive"
+										onclick={async () => {
+											await removeLoanable(k.item.id);
+											toast.success('Removed');
+										}}>Remove</Button
+									>
+								</span>
+							</li>
+						{:else}
+							<li class="py-6 text-sm text-muted-foreground">No loanable items yet.</li>
 						{/each}
 					</ul>
 				</Card.Content>
