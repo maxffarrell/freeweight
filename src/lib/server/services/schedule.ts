@@ -1552,7 +1552,7 @@ export async function cancelBooking(
 		let lateFeeForgiven = false;
 		if (lateCancel && st?.lateCancelFreebies && st.lateCancelFreebies > 0) {
 			const tz = st.timezone ?? 'UTC';
-			const monthStart = zonedToUtc(`${localDate(new Date(), tz).slice(0, 7)}-01`, tz);
+			const monthStart = zonedToUtc(`${localDate(new Date(), tz).slice(0, 7)}-01T00:00`, tz);
 			const [{ used }] = await tx
 				.select({ used: sql<number>`count(*)`.mapWith(Number) })
 				.from(charge)
