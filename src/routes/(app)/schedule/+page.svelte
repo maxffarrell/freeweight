@@ -1221,6 +1221,12 @@
 						class="w-full"
 						title="Cancel this session and try booking its members into the next session of this class"
 						onclick={async () => {
+							if (
+								!confirm(
+									'Cancel this session and try booking its members into the next session of this class?'
+								)
+							)
+								return;
 							try {
 								await updateSession({ id: focusId, cancelled: true, rebookNext: true });
 								toast.success('Session cancelled — members moved to the next class if one exists');
