@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
@@ -414,7 +415,7 @@ import Trophy from '@lucide/svelte/icons/trophy';
 		amenityBusy = 0;
 	}
 	const multiClassTypes = $derived.by(() => {
-		const byType = new Map<string, { classTypeId: string; name: string; n: number }>();
+		const byType = new SvelteMap<string, { classTypeId: string; name: string; n: number }>();
 		for (const u of d.upcoming) {
 			if (u.booking.status !== 'booked') continue;
 			const key = u.classTypeId;
