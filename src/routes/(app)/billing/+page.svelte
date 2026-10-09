@@ -358,6 +358,16 @@
 			toast.error(errMsg(err, 'Could not void'));
 		}
 	}
+	async function writeOffCharge(id: string) {
+		if (!confirm('Write this charge off as bad debt? It leaves the member\'s open balance.'))
+			return;
+		try {
+			await updateCharge({ id, status: 'written_off' });
+			await refreshCharges();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not write off'));
+		}
+	}
 	async function setMembership(id: string, status: 'paused' | 'cancelled' | 'active') {
 		try {
 			await updateMembership({ id, status });
@@ -554,6 +564,7 @@
 					<option value="open">Open</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
+					<option value="written_off">Written off</option>
 				</NativeSelect>
 				<NativeSelect bind:value={kindFilter} onchange={filterCharges}>
 					<option value="">All kinds</option>
@@ -603,6 +614,12 @@
 												size="sm"
 												class="h-7 px-2 text-xs"
 												onclick={() => voidCharge(c.charge.id)}>Void</Button
+											>
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => writeOffCharge(c.charge.id)}>Write off</Button
 											>
 										{/if}
 									</Table.Cell>

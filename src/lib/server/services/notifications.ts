@@ -3899,3 +3899,103 @@ export async function notifyClassFull(orgId: string, sessionId: string) {
 		});
 	}
 }
+
+/**
+ * "Your usual class" nudge — for each member's most-attended class over the
+ * last 6 weeks, if the next session is within 4 days and has room (and they
+ * aren't already in it), email a friendly "spots left" prompt. logOnce dedupes
+ * per member+session, so each upcoming session nudges at most once.
+ */
+export async function sendUsualClassNudges(orgId: string) {
+	const [gs] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const habits = await db
+		.select({
+			memberId: booking.memberId,
+			classTypeId: classSession.classTypeId,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'attended'),
+				gte(classSession.startsAt, new Date(Date.now() - 42 * 86_400_000))
+			)
+		)
+		.groupBy(booking.memberId, classSession.classTypeId)
+		.having(sql`count(*) >= 2`);
+	// Each member's single top class.
+	const top = new Map<string, { classTypeId: string; n: number }>();
+	for (const h of habits) {
+		const cur = top.get(h.memberId);
+		if (!cur || h.n > cur.n) top.set(h.memberId, { classTypeId: h.classTypeId, n: h.n });
+	}
+	if (!top.size) return 0;
+	const horizon = new Date(Date.now() + 4 * 86_400_000);
+	let sent = 0;
+	const name = await orgBrand(orgId);
+	for (const [memberId, h] of top) {
+		const [m] = await db
+			.select({ email: gymMember.email, name: gymMember.name, unsubscribedAt: gymMember.unsubscribedAt })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+		if (!m?.email || m.unsubscribedAt) continue;
+		// Next upcoming session of that class — spots left, member not already in.
+		const next = await db
+			.select({
+				id: classSession.id,
+				startsAt: classSession.startsAt,
+				capacity: classSession.capacity,
+				className: classType.name,
+				filled:
+					sql<number>`(select count(*) + coalesce(sum(b.guest_count),0) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','attended','no_show'))`.mapWith(
+						Number
+					)
+			})
+			.from(classSession)
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(classSession.organizationId, orgId),
+					eq(classSession.classTypeId, h.classTypeId),
+					gte(classSession.startsAt, new Date()),
+					lt(classSession.startsAt, horizon),
+					isNull(classSession.cancelledAt),
+					sql`not exists (select 1 from ${booking} b2 where b2.session_id = ${classSession.id} and b2.member_id = ${memberId} and b2.status in ('booked','attended'))`
+				)
+			)
+			.orderBy(classSession.startsAt)
+			.limit(1);
+		const session = next[0];
+		if (!session || session.filled >= session.capacity) continue;
+		const spots = session.capacity - session.filled;
+		if (!(await logOnce(orgId, 'usual_nudge', `${memberId}:${session.id}`, m.email))) continue;
+		const when = session.startsAt.toLocaleString('en-US', {
+			timeZone: gs?.timezone ?? 'UTC',
+			weekday: 'long',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+		await sendMemberEmail(memberId, {
+			to: m.email,
+			subject: `${session.className} is back ${when.split(',')[0]} — ${spots} spot${spots === 1 ? '' : 's'} left`,
+			...renderEmail({
+				...name,
+				heading: `Your usual ${session.className} is coming up`,
+				lines: [
+					`${when} — and ${spots} spot${spots === 1 ? "'s" : 's'} still open.`,
+					`You've been ${h.n} times in the last six weeks — grab yours before it fills.`
+				],
+				action: { label: 'Book it', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}

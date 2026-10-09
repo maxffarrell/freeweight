@@ -23,7 +23,7 @@ export const bookingStatuses = [
 	'no_show'
 ] as const;
 export const chargeKinds = ['membership', 'signup', 'dropin', 'other'] as const;
-export const chargeStatuses = ['open', 'paid', 'void'] as const;
+export const chargeStatuses = ['open', 'paid', 'void', 'written_off'] as const;
 export const paymentMethods = ['card', 'cash', 'bank', 'stripe', 'other'] as const;
 
 export const memberInput = v.object({
