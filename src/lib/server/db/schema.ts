@@ -500,7 +500,7 @@ export const booking = pgTable(
 			.where(sql`${t.status} != 'cancelled'`),
 		uniqueIndex('booking_comp_idx')
 			.on(t.compBookingId)
-			.where(sql`${t.compBookingId} is not null`)
+			.where(sql`${t.compBookingId} is not null and ${t.status} != 'cancelled'`)
 	]
 );
 

@@ -659,7 +659,7 @@ export async function memberMakeups(orgId: string, memberId: string) {
 			and(
 				eq(booking.organizationId, orgId),
 				eq(booking.memberId, memberId),
-				eq(booking.status, 'cancelled'),
+				eq(booking.status, 'booked'),
 				isNotNull(classSession.cancelledAt)
 			)
 		)

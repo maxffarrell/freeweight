@@ -1262,7 +1262,7 @@ export async function bookSession(
 					)
 				)
 				.for('update');
-			if (!src || src.status !== 'cancelled' || !src.sessionCancelled)
+			if (!src || src.status !== 'booked' || !src.sessionCancelled)
 				error(409, 'Only a booking lost to a class cancellation earns a makeup');
 			if (src.srcClassTypeId !== s.classTypeId)
 				error(409, 'Makeup bookings must be for the same class');
