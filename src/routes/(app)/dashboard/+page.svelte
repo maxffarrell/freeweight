@@ -445,7 +445,9 @@
 												? `stop ${r.planName}`
 												: r.kind === 'pt'
 													? r.planName
-													: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+													: r.kind === 'loan'
+														? `kit ${r.planName}`
+														: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
