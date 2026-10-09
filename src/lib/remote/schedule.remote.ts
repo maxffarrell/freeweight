@@ -487,6 +487,17 @@ export const enrollMemberInCourse = command(
 	}
 );
 
+/** Staff removes a member from a course (frees the seat, promotes the waitlist). */
+export const unenrollCourseMember = command(
+	v.object({ courseId: idSchema, enrollmentId: idSchema }),
+	async ({ courseId, enrollmentId }) => {
+		const r = await crs.cancelCourseEnrollment((await requireOrg()).orgId, enrollmentId);
+		void getCourseRoster(courseId).refresh();
+		void getCourses().refresh();
+		return r;
+	}
+);
+
 /** Publishes bookable sessions inside an instructor's availability windows. */
 export const generateOpenSlots = command(slotGenInput, async (input) => {
 	const r = await svc.generateSlots(await requireOrg('admin'), input);

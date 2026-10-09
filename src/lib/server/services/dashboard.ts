@@ -24,6 +24,7 @@ import {
 	ptRequest,
 	recurringCharge,
 	shopItem,
+	trialRequest,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -241,6 +242,51 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(equipmentLoan.outAt))
 		.limit(50);
 
+	// Free-trial requests waiting on a staff confirm.
+	const trialPending = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			requestedAt: trialRequest.createdAt
+		})
+		.from(trialRequest)
+		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
+		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(trialRequest.organizationId, orgId), eq(trialRequest.status, 'pending')))
+		.orderBy(asc(classSession.startsAt))
+		.limit(50);
+
+	// Members who asked for their personal data to be deleted.
+	const deletionPending = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			requestedAt: gymMember.deletionRequestedAt
+		})
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), isNotNull(gymMember.deletionRequestedAt)))
+		.orderBy(asc(gymMember.deletionRequestedAt))
+		.limit(50);
+
+	// Members currently inside (checked in today, not yet checked out).
+	const insideNow = await db
+		.select({ name: gymMember.name })
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, dayStart),
+				lt(checkIn.checkedAt, dayEnd),
+				isNull(checkIn.checkedOutAt)
+			)
+		)
+		.orderBy(desc(checkIn.checkedAt))
+		.limit(8);
+
 	// Upcoming sessions flagged as needing a substitute instructor.
 	const coverNeeded = await db
 		.select({
@@ -432,6 +478,7 @@ export async function dashboard(orgId: string) {
 		overdueTotal: openStats?.overdueTotal ?? 0,
 		checkInsToday: checkInStats?.today ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
+		insideNames: insideNow.map((r) => r.name),
 		mrr,
 		todaySessions,
 		recentActivity,
@@ -462,6 +509,24 @@ export async function dashboard(orgId: string) {
 				planName: `${l.itemName} out ${Math.floor((Date.now() - l.outAt.getTime()) / 86400000)}d`,
 				kind: 'loan' as const,
 				requestedAt: l.outAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...trialPending.map((t) => ({
+				memberId: t.memberId,
+				memberName: t.memberName,
+				planName: `trial ${t.className} ${localDate(t.startsAt, tz)}`,
+				kind: 'trial' as const,
+				requestedAt: t.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...deletionPending.map((d) => ({
+				memberId: d.memberId,
+				memberName: d.memberName,
+				planName: 'delete my data',
+				kind: 'deletion' as const,
+				requestedAt: d.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
 			}))

@@ -56,6 +56,7 @@
 		getCourseRoster,
 		removeCourse,
 		enrollMemberInCourse,
+		unenrollCourseMember,
 		generateOpenSlots,
 		registerMemberForEvent,
 		cancelEventRegistration,
@@ -596,6 +597,18 @@
 			await getCourseRoster(cRosterId).refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not enroll member'));
+		}
+	}
+
+	async function unenrollRow(enrollmentId: string, name: string) {
+		if (!cRosterId) return;
+		if (!confirm(`Remove ${name} from this course? Their seat frees up for the waitlist.`)) return;
+		try {
+			await unenrollCourseMember({ courseId: cRosterId, enrollmentId });
+			toast.success(`${name} removed`);
+			await getCourseRoster(cRosterId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
 		}
 	}
 
@@ -2650,14 +2663,22 @@
 								{#if cRoster}
 									{#each cRoster as r (r.enrollment.id)}
 										<div class="flex items-center justify-between py-1 text-sm">
-											<span class="flex items-center gap-1.5"
-												>{r.memberName}{#if r.enrollment.waitlisted}<Badge variant="outline"
-														>waitlist</Badge
+											<span class="flex min-w-0 items-center gap-1.5"
+												><span class="truncate">{r.memberName}</span
+												>{#if r.enrollment.waitlisted}<Badge variant="outline">waitlist</Badge
 													>{/if}</span
 											>
-											<span class="text-xs text-muted-foreground"
-												>{localDate(r.enrollment.createdAt, tz)}</span
-											>
+											<span class="flex shrink-0 items-center gap-1">
+												<span class="text-xs text-muted-foreground"
+													>{localDate(r.enrollment.createdAt, tz)}</span
+												>
+												<Button
+													variant="ghost"
+													size="sm"
+													class="h-6 px-1.5 text-xs text-destructive"
+													onclick={() => unenrollRow(r.enrollment.id, r.memberName)}>Remove</Button
+												>
+											</span>
 										</div>
 									{:else}
 										<p class="py-1 text-xs text-muted-foreground">Nobody enrolled yet.</p>

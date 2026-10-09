@@ -378,6 +378,14 @@ export const updateProfile = command(
 	}
 );
 
+/** Member asks for their personal data to be deleted — staff anonymize. */
+export const requestDataDeletion = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const r = await memberSvc.requestDataDeletion(m.organizationId, m.id);
+	void getPortalOverview(memberId).refresh();
+	return r;
+});
+
 // ---------- Resource reservations (sauna, court, child care) ----------
 
 /** Active bookable amenities for the member's gym. */

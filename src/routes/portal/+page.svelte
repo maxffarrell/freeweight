@@ -40,6 +40,7 @@
 		buyPack,
 		changePlan,
 		updateProfile,
+		requestDataDeletion,
 		getPortalResources,
 		getResourceDay,
 		bookResource,
@@ -117,6 +118,23 @@
 
 	// ------- data export -------
 	let exportPending = $state(false);
+	let delPending = $state(false);
+	async function askDataDeletion() {
+		if (
+			!confirm(
+				'Request deletion of your personal data? The gym will scrub your name, contact details and profile. Your booking and payment history is kept anonymized for their records.'
+			)
+		)
+			return;
+		delPending = true;
+		try {
+			await requestDataDeletion(memberId);
+			toast.success('Request sent — the gym will confirm');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send the request'));
+		}
+		delPending = false;
+	}
 	async function downloadMyData() {
 		exportPending = true;
 		try {
@@ -1211,6 +1229,17 @@
 									? 'Change photo'
 									: 'Add photo'}</button
 						>
+						·
+						{#if d.member.deletionRequestedAt}
+							<span class="text-muted-foreground">Deletion requested</span>
+						{:else}
+							<button
+								class="text-muted-foreground underline"
+								disabled={delPending}
+								onclick={askDataDeletion}
+								>{delPending ? 'Sending…' : 'Delete my data'}</button
+							>
+						{/if}
 					</p>
 					{#if profileOpen}
 						<form class="mt-1 w-full max-w-xs space-y-2" onsubmit={saveProfile}>

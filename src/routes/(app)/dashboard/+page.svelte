@@ -434,7 +434,7 @@
 					<Card.Header><Card.Title class="text-base">Needs attention</Card.Title></Card.Header>
 					<Card.Content class="px-4">
 						<ul class="space-y-2">
-							{#each d.pendingRequests as r (r.memberId)}
+							{#each d.pendingRequests as r (r.memberId + r.kind + r.planName)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a
 										href="/members/{r.memberId}"
@@ -450,13 +450,32 @@
 													? r.planName
 													: r.kind === 'loan'
 														? `kit ${r.planName}`
-														: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+														: r.kind === 'trial'
+															? r.planName
+															: r.kind === 'deletion'
+																? 'delete my data'
+																: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
 								</li>
 							{/each}
 						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.inGymNow > 0}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Inside now · {d.inGymNow}</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<p class="text-sm">
+							{d.insideNames.slice(0, 8).join(', ')}{d.inGymNow > 8
+								? ` +${d.inGymNow - 8} more`
+								: ''}
+						</p>
+						<a href="/checkins" class="mt-2 inline-block text-xs text-muted-foreground hover:underline"
+							>Check-in log</a
+						>
 					</Card.Content>
 				</Card.Root>
 			{/if}

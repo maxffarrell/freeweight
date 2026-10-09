@@ -1,11 +1,12 @@
 import { command, getRequestEvent, query } from '$app/server';
-import { dayPassInput, dropInInput, joinInput, leadInput } from '#lib/schemas.ts';
+import { dayPassInput, dropInInput, joinInput, leadInput, trialInput } from '#lib/schemas.ts';
 import {
 	bookDropIn,
 	buyDayPass,
 	captureLead,
 	joinGym,
-	referrerName
+	referrerName,
+	requestTrial
 } from '#lib/server/services/public.ts';
 import * as v from 'valibot';
 
@@ -72,5 +73,20 @@ export const buyDayPassForm = command(
 			// adapter without client IPs
 		}
 		return buyDayPass(slug, ip, input);
+	}
+);
+
+/** Public free-trial request on /j/[slug]/schedule — unauthenticated + rate-limited. */
+export const requestTrialForm = command(
+	v.object({ slug: v.string(), input: trialInput }),
+	async ({ slug, input }) => {
+		const event = getRequestEvent();
+		let ip = 'unknown';
+		try {
+			ip = event.getClientAddress();
+		} catch {
+			// adapter without client IPs
+		}
+		return requestTrial(slug, ip, input);
 	}
 );

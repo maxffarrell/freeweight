@@ -34,6 +34,7 @@ import {
 	payment,
 	personalRecord,
 	signRequest,
+	trialRequest,
 	user,
 	waiver,
 	plan,
@@ -44,7 +45,11 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
 import { emit } from './events.ts';
 import { creditUsage, creditsUsedIn } from './schedule.ts';
-import { notifyCreditsGifted, notifySignRequest } from './notifications.ts';
+import {
+	notifyCreditsGifted,
+	notifyDeletionRequested,
+	notifySignRequest
+} from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -467,12 +472,24 @@ export async function getMember(orgId: string, id: string) {
 			.orderBy(desc(signRequest.createdAt))
 			.limit(25)
 	]);
+	const trialRequests = await db
+		.select({
+			request: trialRequest,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(trialRequest)
+		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(trialRequest.memberId, id), eq(trialRequest.status, 'pending')));
+
 	return {
 		...row,
 		memberships,
 		charges,
 		payments,
 		bookings,
+		trialRequests,
 		checkIns,
 		credits,
 		signedWaiver,
@@ -1362,4 +1379,78 @@ export async function prWall(orgId: string) {
 		.slice(0, 5);
 
 	return { records, streaks };
+}
+
+/** Member asks (via the portal) for their personal data to be deleted. */
+export async function requestDataDeletion(orgId: string, memberId: string) {
+	const [m] = await db
+		.update(gymMember)
+		.set({ deletionRequestedAt: new Date(), updatedAt: new Date() })
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.id, memberId),
+				isNull(gymMember.deletionRequestedAt)
+			)
+		)
+		.returning();
+	if (!m) return { ok: true, already: true };
+	await emit({
+		orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'deletion_requested',
+		summary: `${m.name} requested deletion of their personal data`
+	});
+	notifyDeletionRequested(orgId, memberId).catch(() => {});
+	return { ok: true };
+}
+
+/**
+ * Anonymize a member's personal data (staff action on a deletion request, or
+ * manual). Scrubs name/contact/profile fields — bookings, charges and payments
+ * keep pointing at the row so financial history stays intact.
+ */
+export async function anonymizeMember(ctx: OrgContext, memberId: string) {
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	await db
+		.update(gymMember)
+		.set({
+			name: 'Former member',
+			email: null,
+			phone: null,
+			birthday: null,
+			notes: null,
+			deskNote: null,
+			emergencyName: null,
+			emergencyPhone: null,
+			referralSource: null,
+			photoDocumentId: null,
+			goalVisitsPerMonth: null,
+			deletionRequestedAt: null,
+			updatedAt: new Date()
+		})
+		.where(eq(gymMember.id, memberId));
+	// Drop free-text staff notes and measurements too — they're personal data.
+	await db
+		.delete(memberNote)
+		.where(and(eq(memberNote.organizationId, ctx.orgId), eq(memberNote.memberId, memberId)));
+	await db
+		.delete(memberMeasurement)
+		.where(
+			and(eq(memberMeasurement.organizationId, ctx.orgId), eq(memberMeasurement.memberId, memberId))
+		);
+	await emit({
+		orgId: ctx.orgId,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'anonymized',
+		summary: `Personal data anonymized for ${m.name}`,
+		actorId: ctx.userId
+	});
+	return { ok: true };
 }

@@ -61,7 +61,10 @@
 		loanItem,
 		returnLoan,
 		assignLocker,
-		releaseLocker
+		releaseLocker,
+		approveTrial,
+		declineTrial,
+		anonymizeMember
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -846,6 +849,38 @@
 			toast.error(errMsg(err, 'Could not load card'));
 		}
 	}
+
+	let trialBusy = $state('');
+	async function trialDecision(requestId: string, approve: boolean) {
+		trialBusy = requestId;
+		try {
+			if (approve) {
+				await approveTrial({ requestId, memberId: id });
+				toast.success('Trial confirmed — seat booked, member emailed');
+			} else {
+				await declineTrial({ requestId, memberId: id });
+				toast.success('Trial declined — member emailed');
+			}
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update the request'));
+		}
+		trialBusy = '';
+	}
+
+	async function doAnonymize() {
+		if (
+			!confirm(
+				'Anonymize this member? Name, email, phone, birthday, notes, photo and measurements are permanently scrubbed. Booking and payment history is kept for accounting. This cannot be undone.'
+			)
+		)
+			return;
+		try {
+			await anonymizeMember(id);
+			toast.success('Personal data anonymized');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not anonymize'));
+		}
+	}
 </script>
 
 <PageHeader title={m.member.name} crumbs={[{ label: 'Members', href: '/members' }]}>
@@ -874,6 +909,9 @@
 				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive"
+					>Anonymize personal data…</DropdownMenu.Item
+				>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}
@@ -918,6 +956,14 @@
 						class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-amber-700 dark:text-amber-400"
 					>
 						{m.member.deskNote}
+					</div>
+				{/if}
+				{#if m.member.deletionRequestedAt}
+					<div
+						class="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-destructive"
+					>
+						Requested deletion of their personal data {formatDate(m.member.deletionRequestedAt)} —
+						use "Anonymize personal data" in the menu.
 					</div>
 				{/if}
 				<div class="flex justify-between">
@@ -1148,6 +1194,40 @@
 			{/if}
 		</Card.Root>
 
+		{#if m.trialRequests.length}
+			<Card.Root class="border-amber-500/50">
+				<Card.Header>
+					<Card.Title class="text-base">Trial requests</Card.Title>
+					<Card.Description>Free-trial classes this member asked for</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.trialRequests as t (t.request.id)}
+						<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+							<span class="min-w-0 truncate font-medium">{t.className}</span>
+							<span class="flex shrink-0 items-center gap-1.5">
+								<span class="text-xs text-muted-foreground"
+									>{formatDate(t.startsAt)} · {localTime(t.startsAt, tz)}</span
+								>
+								<Button
+									size="sm"
+									variant="outline"
+									class="h-7 px-2"
+									disabled={trialBusy === t.request.id}
+									onclick={() => trialDecision(t.request.id, true)}>Confirm</Button
+								>
+								<Button
+									size="sm"
+									variant="ghost"
+									class="h-7 px-2 text-destructive"
+									disabled={trialBusy === t.request.id}
+									onclick={() => trialDecision(t.request.id, false)}>Decline</Button
+								>
+							</span>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
 		<Card.Root>
 			<Card.Header class="flex-row items-center justify-between">
 				<Card.Title class="text-base">Memberships</Card.Title>

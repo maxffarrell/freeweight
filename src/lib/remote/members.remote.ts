@@ -6,6 +6,7 @@ import * as svc from '#lib/server/services/members.ts';
 import * as workoutSvc from '#lib/server/services/workouts.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as sched from '#lib/server/services/schedule.ts';
+import * as trialSvc from '#lib/server/services/trials.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
@@ -124,6 +125,34 @@ export const removeMemberTag = command(memberTagInput, async ({ memberId, tag })
 export const getMember = query(idSchema, async (id) =>
 	svc.getMember((await requireOrg()).orgId, id)
 );
+
+/** Confirm a free-trial request — books a comp'd seat and emails the member. */
+export const approveTrial = command(
+	v.object({ requestId: idSchema, memberId: idSchema }),
+	async ({ requestId, memberId }) => {
+		const r = await trialSvc.approveTrialRequest(await requireOrg(), requestId);
+		void getMember(memberId).refresh();
+		return r;
+	}
+);
+
+/** Decline a free-trial request — member gets a polite no. */
+export const declineTrial = command(
+	v.object({ requestId: idSchema, memberId: idSchema }),
+	async ({ requestId, memberId }) => {
+		const r = await trialSvc.declineTrialRequest(await requireOrg(), requestId);
+		void getMember(memberId).refresh();
+		return r;
+	}
+);
+
+/** Scrub a member's personal data (deletion requests, GDPR-style erasure). */
+export const anonymizeMember = command(idSchema, async (memberId) => {
+	const r = await svc.anonymizeMember(await requireOrg('admin'), memberId);
+	void getMember(memberId).refresh();
+	void getMembers().refresh();
+	return r;
+});
 
 /** Push a pack's expiry out N days — "she paid before it lapsed" fixes. */
 export const extendPack = command(

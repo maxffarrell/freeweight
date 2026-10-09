@@ -417,6 +417,28 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Top spenders</Card.Title>
+			<Card.Description>
+				Highest lifetime payments · avg {formatMoney(r.spenders.avg, currency, true)} across {r.spenders.payers} payers
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			{#each r.spenders.rows as row, i (row.memberId)}
+				<div class="flex items-center justify-between gap-2 py-1 text-sm">
+					<span class="min-w-0 truncate">
+						<span class="mr-1.5 text-xs text-muted-foreground tabular-nums">{i + 1}.</span>
+						<a href="/members/{row.memberId}" class="hover:underline">{row.name}</a>
+					</span>
+					<span class="shrink-0 tabular-nums">{formatMoney(row.total, currency, true)}</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">No payments collected yet.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
 			<Card.Description
 				>Unredeemed balance — services the gym still owes cardholders</Card.Description

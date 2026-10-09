@@ -1094,7 +1094,8 @@ export async function getReports(orgId: string) {
 		tags,
 		never,
 		renewals,
-		heatmap
+		heatmap,
+		spenders
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1143,7 +1144,8 @@ export async function getReports(orgId: string) {
 		tagBreakdown(orgId),
 		neverVisited(orgId),
 		renewalForecast(orgId),
-		checkinHeatmap(orgId)
+		checkinHeatmap(orgId),
+		topSpenders(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1204,7 +1206,8 @@ export async function getReports(orgId: string) {
 		tags,
 		never,
 		renewals,
-		heatmap
+		heatmap,
+		spenders
 	};
 }
 
@@ -1526,4 +1529,31 @@ async function checkinHeatmap(orgId: string) {
 		.from(checkIn)
 		.where(and(eq(checkIn.organizationId, orgId), gte(checkIn.checkedAt, since)))
 		.groupBy(sql`1, 2`);
+}
+
+/**
+ * Top-spending members — lifetime collected payments per member, plus the
+ * average across every member who has paid. Answers "who's worth the most".
+ */
+async function topSpenders(orgId: string) {
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
+		})
+		.from(payment)
+		.innerJoin(gymMember, eq(payment.memberId, gymMember.id))
+		.where(and(eq(payment.organizationId, orgId), isNull(payment.refundedAt)))
+		.groupBy(gymMember.id, gymMember.name)
+		.orderBy(desc(sql`sum(${payment.amount})`))
+		.limit(10);
+	const [agg] = await db
+		.select({
+			payers: sql<number>`count(distinct ${payment.memberId})`.mapWith(Number),
+			total: sql<number>`coalesce(sum(${payment.amount}),0)`.mapWith(Number)
+		})
+		.from(payment)
+		.where(and(eq(payment.organizationId, orgId), isNull(payment.refundedAt)));
+	return { rows, payers: agg?.payers ?? 0, avg: agg?.payers ? Math.round(agg.total / agg.payers) : 0 };
 }

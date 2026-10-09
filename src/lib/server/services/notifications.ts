@@ -49,6 +49,7 @@ import {
 	sessionFeedback,
 	shopItem,
 	signRequest,
+	trialRequest,
 	user,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -3698,4 +3699,139 @@ export async function deleteAnnouncementTemplate(orgId: string, id: string) {
 		.returning({ id: announcementTemplate.id });
 	if (!row) error(404, 'Template not found');
 	return { ok: true };
+}
+
+/** Staff heads-up when a visitor requests a free trial class on the public page. */
+export async function notifyTrialRequested(orgId: string, requestId: string) {
+	const [row] = await db
+		.select({
+			memberName: gymMember.name,
+			className: classType.name,
+			startsAt: classSession.startsAt
+		})
+		.from(trialRequest)
+		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
+		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(eq(trialRequest.id, requestId));
+	if (!row) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'trial_request_staff', requestId, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Trial request — ${row.memberName} · ${row.className}`,
+			...renderEmail({
+				...name,
+				heading: `${row.memberName} wants a free trial`,
+				lines: [
+					`${row.memberName} requested a free trial in ${row.className} on ${localDate(row.startsAt, tz)} ${localTime(row.startsAt, tz)}.`,
+					'Confirm or decline from their member page or the Needs-attention card on the dashboard.'
+				]
+			})
+		});
+	}
+}
+
+/** "You're in" when staff confirm a free-trial request — the comp'd seat is booked. */
+export async function notifyTrialConfirmed(orgId: string, requestId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			email: gymMember.email,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			locationName: location.name
+		})
+		.from(trialRequest)
+		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
+		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.where(eq(trialRequest.id, requestId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'trial_confirmed', requestId, row.email))) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Your free trial is booked — ${row.className}`,
+		...renderEmail({
+			...name,
+			heading: `See you in class, ${row.memberName}`,
+			lines: [
+				`Your free trial in ${row.className} is confirmed for ${localDate(row.startsAt, tz)} at ${localTime(row.startsAt, tz)}${row.locationName ? ` · ${row.locationName}` : ''}.`,
+				'Just show up a few minutes early — no membership needed. We hope you love it.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/** Polite no when staff decline a free-trial request. */
+export async function notifyTrialDeclined(orgId: string, requestId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			email: gymMember.email,
+			className: classType.name
+		})
+		.from(trialRequest)
+		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
+		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(eq(trialRequest.id, requestId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'trial_declined', requestId, row.email))) return;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `About your trial request — ${row.className}`,
+		...renderEmail({
+			...name,
+			heading: `Hi ${row.memberName}`,
+			lines: [
+				`Unfortunately we couldn't fit your free-trial request for ${row.className} this time.`,
+				`If you'd still like to train with us, another session or a drop-in might work — the team at ${name.orgName} can help you find a spot.`
+			]
+		})
+	});
+}
+
+/** Staff heads-up when a member requests deletion of their personal data. */
+export async function notifyDeletionRequested(orgId: string, memberId: string) {
+	const [row] = await db
+		.select({ memberName: gymMember.name })
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId));
+	if (!row) return;
+	const name = await orgBrand(orgId);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	const today = new Date().toISOString().slice(0, 10);
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'deletion_request_staff', `${memberId}:${today}`, s.email)))
+			continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Data deletion request — ${row.memberName}`,
+			...renderEmail({
+				...name,
+				heading: `${row.memberName} asked for their data to be deleted`,
+				lines: [
+					`${row.memberName} requested deletion of their personal data from the member portal.`,
+					'Open their member page to anonymize the record — booking and payment history is kept for accounting, but name, contact and profile fields are scrubbed.'
+				]
+			})
+		});
+	}
 }
