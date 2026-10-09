@@ -102,7 +102,9 @@ export async function listMembers(
 	/** Members brought in by another member's referral link. */
 	referred?: boolean,
 	/** Active members who have never had a booking (any status). */
-	neverBooked?: boolean
+	neverBooked?: boolean,
+	/** Members whose active membership (pack or term) ends within 30 days. */
+	endingSoon?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -176,6 +178,9 @@ export async function listMembers(
 				referred ? isNotNull(gymMember.referredByMemberId) : undefined,
 				neverBooked
 					? sql`not exists (select 1 from booking b where b.member_id = ${gymMember.id})`
+					: undefined,
+				endingSoon
+					? sql`exists (select 1 from membership m5 where m5.member_id = ${gymMember.id} and m5.status = 'active' and m5.ends_at is not null and m5.ends_at >= now() and m5.ends_at <= now() + interval '30 days')`
 					: undefined,
 				recent
 					? gte(

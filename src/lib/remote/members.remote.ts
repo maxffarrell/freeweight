@@ -80,7 +80,8 @@ export const getMembers = query(
 			noContact: v.optional(v.boolean()),
 			unsubscribed: v.optional(v.boolean()),
 			referred: v.optional(v.boolean()),
-			neverBooked: v.optional(v.boolean())
+			neverBooked: v.optional(v.boolean()),
+			endingSoon: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -100,7 +101,8 @@ export const getMembers = query(
 			opts?.noContact,
 			opts?.unsubscribed,
 			opts?.referred,
-			opts?.neverBooked
+			opts?.neverBooked,
+			opts?.endingSoon
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

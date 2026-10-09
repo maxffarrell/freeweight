@@ -682,6 +682,31 @@ async function guestStats(orgId: string) {
 }
 
 /** Sessions in the next 14 days with people still on the waitlist. */
+/** Per-plan average months a membership lasted before cancelling (last 12 months). */
+async function tenureAtCancel(orgId: string) {
+	const yr = new Date(Date.now() - 365 * 86400_000);
+	const rows = await db
+		.select({
+			name: plan.name,
+			n: count().mapWith(Number),
+			avgDays:
+				sql<number>`avg(extract(epoch from (${membership.cancelledAt} - ${membership.startsAt})) / 86400)`.mapWith(
+					Number
+				)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(plan.id, membership.planId))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				isNotNull(membership.cancelledAt),
+				gte(membership.cancelledAt, sql`${yr.toISOString()}::timestamptz`)
+			)
+		)
+		.groupBy(plan.name);
+	return rows.sort((a, b) => a.avgDays - b.avgDays).slice(0, 8);
+}
+
 async function waitlistedNow(orgId: string) {
 	return db
 		.select({
@@ -1546,7 +1571,8 @@ export async function getReports(orgId: string) {
 		planRev,
 		refConv,
 		nvr,
-		wl
+		wl,
+		tenure
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1613,7 +1639,8 @@ export async function getReports(orgId: string) {
 		planRevenue(orgId),
 		referralConversion(orgId),
 		newVsReturning(orgId),
-		waitlistedNow(orgId)
+		waitlistedNow(orgId),
+		tenureAtCancel(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1692,7 +1719,8 @@ export async function getReports(orgId: string) {
 		planRevenue: planRev,
 		referralConversion: refConv,
 		newVsReturning: nvr,
-		waitlistedNow: wl
+		waitlistedNow: wl,
+		tenureAtCancel: tenure
 	};
 }
 

@@ -582,6 +582,23 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.inSessionNow.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">In session now</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.inSessionNow as sess (sess.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{sess.name}</span>
+									<Badge variant="outline" class="shrink-0"
+										>ends {localTime(sess.endsAt, d.timezone)} · {sess.booked}/{sess.capacity}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.upcomingEvents.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Upcoming events</Card.Title></Card.Header>

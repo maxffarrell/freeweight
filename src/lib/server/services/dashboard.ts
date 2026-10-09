@@ -114,6 +114,31 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(gymEvent.startsAt))
 		.limit(3);
 
+	const now = new Date();
+	const inSessionNow = await db
+		.select({
+			id: classSession.id,
+			name: classType.name,
+			endsAt: classSession.endsAt,
+			capacity: classSession.capacity,
+			booked:
+				sql<number>`(select count(*) from booking b where b.session_id = ${classSession.id} and b.status = 'booked')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classType.id, classSession.classTypeId))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				lte(classSession.startsAt, now),
+				gt(classSession.endsAt, now)
+			)
+		)
+		.orderBy(asc(classSession.endsAt))
+		.limit(4);
+
 	const [checkInsWk] = await db
 		.select({
 			week: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz)`.mapWith(
@@ -618,6 +643,7 @@ export async function dashboard(orgId: string) {
 		collectedWeek: collectedToday.week,
 		collectedPrevWeek: collectedToday.prevWeek,
 		upcomingEvents,
+		inSessionNow,
 		checkInsToday: checkInStats?.today ?? 0,
 		checkInsWeek: checkInsWk?.week ?? 0,
 		checkInsPrevWeek: checkInsWk?.prev ?? 0,

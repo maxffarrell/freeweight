@@ -149,7 +149,8 @@
 			noContact: owesFilter === '__nocontact' || undefined,
 			unsubscribed: owesFilter === '__unsub' || undefined,
 			referred: owesFilter === '__referred' || undefined,
-			neverBooked: owesFilter === '__neverbooked' || undefined
+			neverBooked: owesFilter === '__neverbooked' || undefined,
+			endingSoon: owesFilter === '__ending' || undefined
 		});
 	}
 	function search() {
@@ -651,7 +652,9 @@
 													? 'Referred'
 													: owesFilter === '__neverbooked'
 														? 'Never booked'
-														: 'Any balance'}</Select.Trigger
+														: owesFilter === '__ending'
+															? 'Ending soon'
+															: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -663,6 +666,7 @@
 				<Select.Item value="__bday">Birthday month</Select.Item>
 				<Select.Item value="__nocontact">No contact info</Select.Item>
 				<Select.Item value="__unsub">Unsubscribed</Select.Item>
+				<Select.Item value="__ending">Ending soon</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
