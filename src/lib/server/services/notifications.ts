@@ -17,6 +17,7 @@ import {
 	sql
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
+import { atRiskMembers } from '#lib/server/services/reports.ts';
 import {
 	activity,
 	booking,
@@ -1692,10 +1693,17 @@ export async function countAnnouncementAudience(orgId: string, tag?: string, pla
 export async function scheduleAnnouncement(
 	orgId: string,
 	actorId: string | null | undefined,
-	opts: { subject: string; message: string; sendAt: Date; tag?: string; planId?: string }
+	opts: {
+		subject: string;
+		message: string;
+		sendAt: Date;
+		tag?: string;
+		planId?: string;
+		atRisk?: boolean;
+	}
 ) {
 	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
-	if (!opts.tag && !opts.planId && !(await countAnnouncementAudience(orgId)))
+	if (!opts.tag && !opts.planId && !opts.atRisk && !(await countAnnouncementAudience(orgId)))
 		error(409, 'No members to email');
 	const entityId = `scheduled:${crypto.randomUUID()}`;
 	await emit({
@@ -1710,7 +1718,8 @@ export async function scheduleAnnouncement(
 			message: opts.message,
 			sendAt: opts.sendAt.toISOString(),
 			tag: opts.tag ?? null,
-			planId: opts.planId ?? null
+			planId: opts.planId ?? null,
+			atRisk: opts.atRisk ?? null
 		}
 	});
 	return { scheduledFor: opts.sendAt };
@@ -1728,7 +1737,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			subject: sql<string>`${activity.data}->>'subject'`,
 			message: sql<string>`${activity.data}->>'message'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
-			planId: sql<string | null>`${activity.data}->>'planId'`
+			planId: sql<string | null>`${activity.data}->>'planId'`,
+			atRisk: sql<string | null>`${activity.data}->>'atRisk'`
 		})
 		.from(activity)
 		.where(
@@ -1741,11 +1751,13 @@ export async function sendDueAnnouncements(orgId: string) {
 		);
 	let sent = 0;
 	for (const a of due) {
+		const memberIds =
+			a.atRisk === 'true' ? (await atRiskMembers(orgId)).map((m) => m.memberId) : undefined;
 		await sendAnnouncement(
 			orgId,
 			a.subject,
 			a.message,
-			undefined,
+			memberIds,
 			a.tag ?? undefined,
 			a.planId ?? undefined
 		);

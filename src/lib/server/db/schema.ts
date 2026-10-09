@@ -304,6 +304,8 @@ export const membership = pgTable(
 		saveOfferAt: timestamp('save_offer_at', { withTimezone: true }),
 		/** Pack memberships: buy the same pack again when it runs out or expires. */
 		autoRenew: boolean('auto_renew').notNull().default(false),
+		/** Comp'd membership — the billing cron never posts a charge for it. */
+		noBill: boolean('no_bill').notNull().default(false),
 		...timestamps
 	},
 	(t) => [

@@ -1,0 +1,1 @@
+ALTER TABLE "membership" ADD COLUMN "no_bill" boolean DEFAULT false NOT NULL;

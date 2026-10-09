@@ -353,17 +353,23 @@
 	const audLabel = $derived(
 		emailAudience === '__sel'
 			? `Selected members (${selected.size})`
-			: emailAudience === '__all'
-				? 'All active members'
-				: audTag
-					? `Tag: ${audTag}`
-					: `Plan: ${audPlanName}`
+			: emailAudience === '__risk'
+				? 'At-risk members (no visit in 30+ days)'
+				: emailAudience === '__all'
+					? 'All active members'
+					: audTag
+						? `Tag: ${audTag}`
+						: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
 			? selected.size
 			: emailOpen
-				? await getAnnouncementAudience({ tag: audTag, planId: audPlan })
+				? await getAnnouncementAudience({
+						tag: audTag,
+						planId: audPlan,
+						atRisk: emailAudience === '__risk'
+					})
 				: null
 	);
 	async function submitAnnouncement(e: SubmitEvent) {
@@ -376,6 +382,7 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					atRisk: emailAudience === '__risk',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
 				toast.success('Scheduled — the daily job sends it');
@@ -385,6 +392,7 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					atRisk: emailAudience === '__risk',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -924,6 +932,7 @@
 								<Select.Item value="__sel">Selected members ({selected.size})</Select.Item>
 							{/if}
 							<Select.Item value="__all">All active members</Select.Item>
+							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}

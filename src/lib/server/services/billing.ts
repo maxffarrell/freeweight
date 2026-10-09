@@ -480,6 +480,7 @@ export async function updateMembership(
 				? (current.requestReason ?? null)
 				: null;
 	}
+	if (input.noBill !== undefined) set.noBill = input.noBill;
 	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
 	if (input.clearPauseRequest) {
 		set.pauseRequestedAt = null;
@@ -611,7 +612,7 @@ export async function runBilling(orgId: string) {
 		let period = m.nextChargeAt.toISOString().slice(0, 10);
 		// Catch up on any missed periods (install was offline).
 		while (new Date(`${period}T00:00:00Z`) < now) {
-			if (p.amount > 0) await postMembershipCharge(orgId, m.id, period, p);
+			if (p.amount > 0 && !m.noBill) await postMembershipCharge(orgId, m.id, period, p);
 			posted++;
 			period = nextPeriod(period, p.interval);
 		}

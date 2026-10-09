@@ -1140,6 +1140,9 @@
 									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
 									: ''}
 							</p>
+							{#if mm.membership.noBill}
+								<p class="text-xs text-emerald-600 dark:text-emerald-400">Comp'd — never bills</p>
+							{/if}
 							{#if mm.membership.bonusCredits}
 								<p class="text-xs text-emerald-600 dark:text-emerald-400">
 									{mm.membership.bonusCredits} comp class{mm.membership.bonusCredits === 1
@@ -1196,6 +1199,24 @@
 										onclick={() => void openTransfer(mm.membership.id)}>Gift</Button
 									>
 								{:else}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Comp'd membership — the billing job never charges it"
+										onclick={() =>
+											updateMembership({
+												id: mm.membership.id,
+												noBill: !mm.membership.noBill
+											})
+												.then(() =>
+													toast.success(
+														mm.membership.noBill ? 'Will bill again' : "Comp'd — never bills"
+													)
+												)
+												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
+										>{mm.membership.noBill ? 'Comp’d ✓' : 'Comp'}</Button
+									>
 									<Button
 										variant="ghost"
 										size="sm"
