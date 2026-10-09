@@ -81,7 +81,7 @@ export async function requestPt(
 		.where(eq(gymMember.id, memberId));
 	void emit({
 		orgId,
-		actorId: memberId,
+		actorId: null,
 		entityType: 'pt_request',
 		entityId: row.id,
 		action: 'created',
