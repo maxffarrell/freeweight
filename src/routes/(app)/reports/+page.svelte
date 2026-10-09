@@ -554,6 +554,43 @@
 
 	<Card.Root>
 		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Visit frequency</Card.Title>
+			<Card.Description
+				>Active members bucketed by check-ins this month (of {r.visitFrequency
+					.total})</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			<div class="flex items-center justify-between">
+				<span>0 visits</span><span class="text-muted-foreground tabular-nums"
+					>{r.visitFrequency.buckets.zero}</span
+				>
+			</div>
+			<div class="flex items-center justify-between">
+				<span>1 visit</span><span class="text-muted-foreground tabular-nums"
+					>{r.visitFrequency.buckets.one}</span
+				>
+			</div>
+			<div class="flex items-center justify-between">
+				<span>2–3 visits</span><span class="text-muted-foreground tabular-nums"
+					>{r.visitFrequency.buckets.few}</span
+				>
+			</div>
+			<div class="flex items-center justify-between">
+				<span>4–7 visits</span><span class="text-muted-foreground tabular-nums"
+					>{r.visitFrequency.buckets.regular}</span
+				>
+			</div>
+			<div class="flex items-center justify-between">
+				<span>8+ visits</span><span class="text-muted-foreground tabular-nums"
+					>{r.visitFrequency.buckets.frequent}</span
+				>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Waitlist conversion</Card.Title>
 			<Card.Description>Last 90 days — promoted off the queue vs still waiting</Card.Description>
 		</Card.Header>

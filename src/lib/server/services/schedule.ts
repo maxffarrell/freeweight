@@ -345,6 +345,39 @@ export async function myTeachingSessions(ctx: OrgContext, days = 14) {
 		.orderBy(asc(classSession.startsAt));
 }
 
+/** Instructor's month stats — sessions taught this calendar month + total
+ * attendees booked onto them. For the "This month" card on My classes. */
+export async function myTeachingMonth(ctx: OrgContext) {
+	const [me] = await db
+		.select({ id: member.id })
+		.from(member)
+		.where(and(eq(member.organizationId, ctx.orgId), eq(member.userId, ctx.userId)));
+	if (!me) return { sessions: 0, attendees: 0, cancelled: 0 };
+	const monthStart = new Date().toISOString().slice(0, 8) + '01';
+	const [row] = await db
+		.select({
+			sessions: sql<number>`count(*)::int`.mapWith(Number),
+			attendees:
+				sql<number>`coalesce(sum((select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')), 0)`.mapWith(
+					Number
+				),
+			cancelled:
+				sql<number>`count(*) filter (where ${classSession.cancelledAt} is not null)::int`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				eq(classSession.instructorId, me.id),
+				gte(classSession.startsAt, new Date(`${monthStart}T00:00:00Z`)),
+				lt(classSession.startsAt, new Date())
+			)
+		);
+	return row;
+}
+
 /** Org-wide open cover requests (future, uncancelled) — powers the "Needs
  * cover" card on My classes; excludes sessions the viewer already teaches. */
 export async function sessionsNeedingCover(ctx: OrgContext) {

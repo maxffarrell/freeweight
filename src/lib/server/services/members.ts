@@ -123,7 +123,12 @@ export async function listMembers(
 			guardianPlanName: sql<
 				string | null
 			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
-			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`
+			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`,
+			/** Member's own visits in the trailing 30 days (excludes their guest check-ins). */
+			visits30:
+				sql<number>`(select count(*)::int from ${checkIn} c where c.member_id = ${outer(gymMember.id)} and c.guest_name is null and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`.mapWith(
+					Number
+				)
 		})
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
