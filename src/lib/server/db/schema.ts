@@ -488,6 +488,8 @@ export const booking = pgTable(
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		/** Staff note on this booking ("first visit", "spot near fan") — roster + sign-in sheet. */
 		note: text('note'),
+		/** Cancelled booking this one replaces (member makeup for a gym-cancelled class). */
+		compBookingId: text('comp_booking_id'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
@@ -495,7 +497,10 @@ export const booking = pgTable(
 		index('booking_member_idx').on(t.memberId),
 		uniqueIndex('booking_open_idx')
 			.on(t.sessionId, t.memberId)
-			.where(sql`${t.status} != 'cancelled'`)
+			.where(sql`${t.status} != 'cancelled'`),
+		uniqueIndex('booking_comp_idx')
+			.on(t.compBookingId)
+			.where(sql`${t.compBookingId} is not null`)
 	]
 );
 

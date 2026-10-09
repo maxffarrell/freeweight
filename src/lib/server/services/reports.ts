@@ -1086,7 +1086,8 @@ export async function getReports(orgId: string) {
 		planChurn,
 		funnel,
 		courses,
-		nps
+		nps,
+		paused
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1129,7 +1130,8 @@ export async function getReports(orgId: string) {
 		churnByPlan(orgId),
 		memberFunnel(orgId),
 		courseStats(orgId),
-		npsStats(orgId)
+		npsStats(orgId),
+		pausedMemberships(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1184,7 +1186,8 @@ export async function getReports(orgId: string) {
 		planChurn,
 		funnel,
 		courses,
-		nps
+		nps,
+		paused
 	};
 }
 
@@ -1359,4 +1362,25 @@ async function churnByPlan(orgId: string) {
 			)
 		);
 	return rows.filter((r) => r.active + r.cancelled > 0);
+}
+
+/**
+ * Currently paused memberships — who's on ice, which plan, and when they
+ * auto-resume (frozenUntil) or asked to stay out until (pauseUntil).
+ */
+async function pausedMemberships(orgId: string) {
+	return db
+		.select({
+			memberName: gymMember.name,
+			planName: plan.name,
+			frozenUntil: membership.frozenUntil,
+			pauseUntil: membership.pauseUntil,
+			pausedAt: membership.updatedAt
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'paused')))
+		.orderBy(asc(membership.frozenUntil), asc(gymMember.name))
+		.limit(50);
 }

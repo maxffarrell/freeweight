@@ -179,3 +179,41 @@ export async function franchiseOverview(userId: string) {
 		}
 	};
 }
+
+/**
+ * Find a member by email/name across every org the caller owns or administers —
+ * "which of my gyms is this person a member of".
+ */
+export async function franchiseMemberSearch(userId: string, q: string) {
+	const orgs = await db
+		.select({ id: organization.id, name: organization.name })
+		.from(member)
+		.innerJoin(organization, eq(member.organizationId, organization.id))
+		.where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])));
+	if (!orgs.length || q.trim().length < 2) return [];
+	const orgIds = orgs.map((o) => o.id);
+	const pattern = `%${q.trim().toLowerCase().replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+	const rows = await db
+		.select({
+			orgId: gymMember.organizationId,
+			memberId: gymMember.id,
+			name: gymMember.name,
+			email: gymMember.email,
+			status: gymMember.status,
+			memberships:
+				sql<number>`(select count(*) from ${membership} ms where ms.member_id = ${gymMember.id} and ms.status = 'active')`.mapWith(
+					Number
+				)
+		})
+		.from(gymMember)
+		.where(
+			and(
+				inArray(gymMember.organizationId, orgIds),
+				sql`(lower(${gymMember.email}) like ${pattern} escape '\\' or lower(${gymMember.name}) like ${pattern} escape '\\')`
+			)
+		)
+		.orderBy(asc(gymMember.name))
+		.limit(20);
+	const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+	return rows.map((r) => ({ ...r, orgName: orgName.get(r.orgId) ?? '' }));
+}
