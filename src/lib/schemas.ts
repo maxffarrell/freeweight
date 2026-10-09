@@ -38,7 +38,10 @@ export const memberInput = v.object({
 	joinedAt: v.optional(v.nullable(isoDate)),
 	birthday: v.optional(v.nullable(isoDate)),
 	/** Household payer — membership charges post under this member instead. */
-	guardianId: v.optional(v.nullable(idSchema))
+	/** Emergency contact. */
+	emergencyName: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(80)))),
+	emergencyPhone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(30)))),
+		guardianId: v.optional(v.nullable(idSchema))
 });
 export const memberImportRow = v.object({
 	name: requiredText('Name'),

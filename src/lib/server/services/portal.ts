@@ -1184,7 +1184,13 @@ export async function resubscribe(memberId: string) {
 export async function updatePortalProfile(
 	orgId: string,
 	memberId: string,
-	input: { name: string; phone?: string | null; birthday?: string | null }
+	input: {
+		name: string;
+		phone?: string | null;
+		birthday?: string | null;
+		emergencyName?: string | null;
+		emergencyPhone?: string | null;
+	}
 ) {
 	const name = input.name.trim();
 	if (!name) error(400, 'Name is required');
@@ -1193,7 +1199,9 @@ export async function updatePortalProfile(
 		.set({
 			name,
 			phone: input.phone?.trim() || null,
-			birthday: input.birthday || null
+			birthday: input.birthday || null,
+			emergencyName: input.emergencyName?.trim() || null,
+			emergencyPhone: input.emergencyPhone?.trim() || null
 		})
 		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
 		.returning({ id: gymMember.id });

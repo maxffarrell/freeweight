@@ -6,11 +6,21 @@
 	import { localDate, localTime } from '#lib/tz.ts';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import { page } from '$app/state';
+	import { tick } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 	const { org, settings, sessions } = $derived(data);
 	const tz = $derived(settings.timezone);
+	/** Deep link: /j/{slug}/schedule?session=<id> scrolls to + highlights one class. */
+	const focusId = $derived(page.url.searchParams.get('session'));
+	$effect(() => {
+		if (!focusId) return;
+		void tick().then(() =>
+			document.getElementById(`s-${focusId}`)?.scrollIntoView({ block: 'center' })
+		);
+	});
 	const currency = $derived(settings.currency);
 
 	const dayLabel = (d: Date) =>
@@ -84,7 +94,13 @@
 				<div class="divide-y rounded-lg border">
 					{#each rows as s (s.session.id)}
 						{@const spots = s.session.capacity - s.booked}
-						<div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+						<div
+							id={`s-${s.session.id}`}
+							class="flex items-center justify-between gap-3 px-4 py-3 text-sm {s.session.id ===
+							focusId
+								? 'bg-primary/5 -m-px rounded-lg ring-2 ring-primary'
+								: ''}"
+						>
 							<div class="flex min-w-0 items-center gap-2.5">
 								<span class="w-12 shrink-0 text-muted-foreground tabular-nums"
 									>{localTime(s.session.startsAt, tz)}</span

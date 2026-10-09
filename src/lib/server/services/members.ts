@@ -710,11 +710,31 @@ export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof 
 			deskNote: set.deskNote === undefined ? undefined : set.deskNote || null,
 			joinedAt: set.joinedAt,
 			birthday: set.birthday,
+			emergencyName: set.emergencyName === undefined ? undefined : set.emergencyName || null,
+			emergencyPhone: set.emergencyPhone === undefined ? undefined : set.emergencyPhone || null,
 			guardianId: set.guardianId === undefined ? undefined : set.guardianId || null
 		})
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, id)))
 		.returning();
 	if (!row) error(404, 'Member not found');
+	return row;
+}
+
+/** Push a pack's expiry out by N days (or to today+N if it already lapsed). */
+export async function extendPack(ctx: OrgContext, membershipId: string, days: number) {
+	const [ms] = await db
+		.select({ endsAt: membership.endsAt, memberId: membership.memberId })
+		.from(membership)
+		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, membershipId)));
+	if (!ms) error(404, 'Membership not found');
+	const base =
+		ms.endsAt && ms.endsAt.getTime() > Date.now() ? ms.endsAt.getTime() : Date.now();
+	const endsAt = new Date(base + days * 86_400_000);
+	const [row] = await db
+		.update(membership)
+		.set({ endsAt })
+		.where(eq(membership.id, membershipId))
+		.returning();
 	return row;
 }
 

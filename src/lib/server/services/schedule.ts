@@ -791,7 +791,7 @@ export async function activeMembership(orgId: string, memberId: string) {
  * Daily housekeeping: 'booked' rows for sessions that already ended become 'no_show'
  * (check-ins have already flipped attendees to 'attended'). Cancelled sessions skip.
  */
-export async function markPastNoShows(orgId: string) {
+export async function markPastNoShows(orgId: string, sessionId?: string) {
 	// Read before flip: need member/class for the optional no-show fee charge.
 	const rows = await db
 		.select({
@@ -808,7 +808,8 @@ export async function markPastNoShows(orgId: string) {
 				eq(booking.organizationId, orgId),
 				eq(booking.status, 'booked'),
 				lt(classSession.endsAt, new Date()),
-				isNull(classSession.cancelledAt)
+				isNull(classSession.cancelledAt),
+				sessionId ? eq(classSession.id, sessionId) : undefined
 			)
 		);
 	if (!rows.length) return 0;
