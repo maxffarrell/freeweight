@@ -24,6 +24,7 @@ import {
 	sendStaffBriefing,
 	sendTrialEndingNotices,
 	sendWaiverReminders,
+	sendMemberDigest,
 	sendWeeklyDigest,
 	sendWinBackNudges,
 	sendLeadNudges
@@ -67,6 +68,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let generated = 0;
 	let amenityBookings = 0;
 	let digests = 0;
+	let memberDigests = 0;
 	let winbacks = 0;
 	let leadNudges = 0;
 	let rosters = 0;
@@ -219,6 +221,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 		try {
 			digests += await sendWeeklyDigest(o.id);
+			memberDigests += await sendMemberDigest(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`digest cron failed for ${o.id}`, err);
@@ -285,6 +288,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		generated,
 		amenityBookings,
 		digests,
+		memberDigests,
 		winbacks,
 		leadNudges,
 		rosters,

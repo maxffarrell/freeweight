@@ -80,7 +80,8 @@ export async function listMembers(
 	planId?: string,
 	sort: MemberSort = 'name',
 	owes?: boolean,
-	suspended?: boolean
+	suspended?: boolean,
+	recent?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -141,7 +142,8 @@ export async function listMembers(
 					: undefined,
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
-					: undefined
+					: undefined,
+				recent ? gte(gymMember.joinedAt, new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)) : undefined
 			)
 		)
 		.orderBy(MEMBER_ORDER[sort]);

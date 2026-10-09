@@ -421,6 +421,36 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 	).length;
 	// Desk heads-up: remaining classes on a capped plan/pack (null = unlimited or none).
 	const credits = await creditUsage(ctx.orgId, memberId);
+	// Desk heads-up: guest passes left this month (null = the plan has none).
+	const [gp] = await db
+		.select({ guestPasses: plan.guestPasses })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active'),
+				or(isNull(membership.endsAt), gt(membership.endsAt, new Date()))
+			)
+		)
+		.orderBy(desc(membership.createdAt))
+		.limit(1);
+	let guestPassesLeft: number | null = null;
+	if (gp?.guestPasses) {
+		const [used] = await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.organizationId, ctx.orgId),
+					eq(checkIn.memberId, memberId),
+					isNotNull(checkIn.guestName),
+					gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
+				)
+			);
+		guestPassesLeft = Math.max(0, gp.guestPasses - used!.n);
+	}
 	return {
 		checkIn: row!,
 		member: m,
@@ -430,7 +460,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		waiverMissing,
 		suspended,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
-		creditsClass: credits?.className ?? null
+		creditsClass: credits?.className ?? null,
+		guestPassesLeft
 	};
 }
 

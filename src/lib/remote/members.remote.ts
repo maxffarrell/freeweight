@@ -69,7 +69,8 @@ export const getMembers = query(
 			planId: v.optional(v.string()),
 			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance'])),
 			owes: v.optional(v.boolean()),
-			suspended: v.optional(v.boolean())
+			suspended: v.optional(v.boolean()),
+			recent: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -81,7 +82,8 @@ export const getMembers = query(
 			opts?.planId,
 			opts?.sort,
 			opts?.owes,
-			opts?.suspended
+			opts?.suspended,
+			opts?.recent
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
