@@ -576,6 +576,25 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Booking lead time</Card.Title>
+			<Card.Description>How far ahead members book — last 30 days</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			{#each r.leadTimes as c (c.name)}
+				<div class="flex items-center justify-between">
+					<span class="min-w-0 flex-1 truncate">{c.name}</span>
+					<span class="text-muted-foreground tabular-nums"
+						>{c.avgHours >= 24 ? `${Math.round(c.avgHours / 24)}d` : `${c.avgHours}h`} ahead</span
+					>
+				</div>
+			{:else}
+				<p class="text-muted-foreground">No bookings in the last 30 days.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
 	{#if r.lockers.total}
 		<Card.Root>
 			<Card.Header class="pb-2">

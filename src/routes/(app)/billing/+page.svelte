@@ -419,6 +419,24 @@
 		URL.revokeObjectURL(a.href);
 	}
 
+	let selectedCharges = $state<string[]>([]);
+	let voidingMany = $state(false);
+	async function voidSelected() {
+		if (!selectedCharges.length) return;
+		if (!confirm(`Void ${selectedCharges.length} open charge(s)?`)) return;
+		voidingMany = true;
+		try {
+			for (const id of selectedCharges) await updateCharge({ id, status: 'void' });
+			toast.success(`${selectedCharges.length} charge(s) voided`);
+			selectedCharges = [];
+			await refreshCharges();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not void all'));
+		} finally {
+			voidingMany = false;
+		}
+	}
+
 	async function voidCharge(id: string) {
 		try {
 			await updateCharge({ id, status: 'void' });
@@ -641,6 +659,11 @@
 						<option value={k} class="capitalize">{k}</option>
 					{/each}
 				</NativeSelect>
+				{#if selectedCharges.length}
+					<Button size="sm" variant="destructive" disabled={voidingMany} onclick={voidSelected}
+						>Void {selectedCharges.length}</Button
+					>
+				{/if}
 				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>
 			<Card.Root class="py-0">
@@ -648,6 +671,7 @@
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
+								<Table.Head class="w-8"></Table.Head>
 								<Table.Head>Member</Table.Head>
 								<Table.Head>Description</Table.Head>
 								<Table.Head>Due</Table.Head>
@@ -660,6 +684,18 @@
 						<Table.Body>
 							{#each charges as c (c.charge.id)}
 								<Table.Row>
+									<Table.Cell>
+										{#if c.charge.status === 'open'}
+											<input
+												type="checkbox"
+												checked={selectedCharges.includes(c.charge.id)}
+												onchange={() =>
+													(selectedCharges = selectedCharges.includes(c.charge.id)
+														? selectedCharges.filter((x) => x !== c.charge.id)
+														: [...selectedCharges, c.charge.id])}
+											/>
+										{/if}
+									</Table.Cell>
 									<Table.Cell>
 										<a class="font-medium hover:underline" href="/members/{c.charge.memberId}"
 											>{c.memberName}</a

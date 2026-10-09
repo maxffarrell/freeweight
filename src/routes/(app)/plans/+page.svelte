@@ -314,6 +314,7 @@
 						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
 								>{p.endingSoon} ending soon</Badge
 							>{/if}
+						{#if p.comped > 0}<Badge variant="outline">{p.comped} comp'd</Badge>{/if}
 						{#if !p.isPack && p.activeMembers > 0}
 							{@const mrr = Math.round(
 								p.amount *
