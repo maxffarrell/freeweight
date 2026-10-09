@@ -436,9 +436,11 @@
 		try {
 			const r = await enrollCourse({ memberId, courseId });
 			toast.success(
-				r.charge
-					? `Enrolled — ${formatMoney(r.charge.amount, currency)} added to your balance`
-					: `Enrolled — booked into ${r.booked} session${r.booked === 1 ? '' : 's'}${r.waitlisted ? `, waitlisted on ${r.waitlisted}` : ''}`
+				r.courseWaitlisted
+					? "Course is full — you're on the waitlist"
+					: r.charge
+						? `Enrolled — ${formatMoney(r.charge.amount, currency)} added to your balance`
+						: `Enrolled — booked into ${r.booked} session${r.booked === 1 ? '' : 's'}${r.waitlisted ? `, waitlisted on ${r.waitlisted}` : ''}`
 			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not enroll'));
@@ -1708,17 +1710,21 @@
 								variant="ghost"
 								size="sm"
 								disabled={cBusy === c.course.id}
-								onclick={() => quitCourse(c.course.id)}>Leave</Button
+								onclick={() => quitCourse(c.course.id)}
+								>{c.myWaitlisted ? 'Leave waitlist' : 'Leave'}</Button
 							>
-						{:else if !c.full}
+						{:else}
 							<Button
 								size="sm"
+								variant={c.full ? 'outline' : 'default'}
 								disabled={cBusy === c.course.id}
 								onclick={() => joinCourse(c.course.id)}
 							>
-								{c.course.priceCents
-									? `Enroll — ${formatMoney(c.course.priceCents, currency)}${c.course.installments > 1 ? ` (${c.course.installments}×${formatMoney(Math.ceil(c.course.priceCents / c.course.installments), currency)}/mo)` : ''}`
-									: 'Enroll'}
+								{c.full
+									? 'Join waitlist'
+									: c.course.priceCents
+										? `Enroll — ${formatMoney(c.course.priceCents, currency)}${c.course.installments > 1 ? ` (${c.course.installments}×${formatMoney(Math.ceil(c.course.priceCents / c.course.installments), currency)}/mo)` : ''}`
+										: 'Enroll'}
 							</Button>
 						{/if}
 					</div>

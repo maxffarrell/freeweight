@@ -1,0 +1,1 @@
+ALTER TABLE "course_enrollment" ADD COLUMN "waitlisted" boolean DEFAULT false NOT NULL;
