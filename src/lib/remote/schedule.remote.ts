@@ -244,6 +244,25 @@ export const copyWeek = command(
 	}
 );
 
+/** Copies all of one day's sessions onto another date. */
+export const copyDay = command(
+	v.object({
+		from: v.pipe(v.string(), v.isoDate()),
+		to: v.pipe(v.string(), v.isoDate())
+	}),
+	async (input) => {
+		const r = await svc.copyDay(await requireOrg(), await tz(), input.from, input.to);
+		void getSessions().refresh();
+		return r;
+	}
+);
+
+/** Fill history for a session's class — the last 4 past sessions of the same class type. */
+export const recentClassSessions = query(v.pipe(v.string(), v.minLength(1)), async (sessionId) => {
+	const ctx = await requireOrg();
+	return svc.recentClassSessions(ctx.orgId, sessionId);
+});
+
 /** Preview counts for the instructor-handoff dialog. */
 export const getInstructorUpcoming = query(
 	v.object({ instructorId: idSchema, classTypeId: v.optional(v.string()) }),
