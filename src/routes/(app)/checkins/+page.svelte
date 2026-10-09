@@ -311,6 +311,9 @@
 											? `${c.checkIn.guestName} (guest of ${c.memberName})`
 											: c.memberName}</span
 									>
+									{#if c.firstVisit}
+										<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">1st</Badge>
+									{/if}
 								</span></Table.Cell
 							>
 							<Table.Cell class="text-muted-foreground"

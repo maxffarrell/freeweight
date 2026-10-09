@@ -175,7 +175,8 @@
 			label: 'Check-ins today',
 			value: `${d.checkInsToday} · ${d.inGymNow} inside`,
 			icon: ScanLine,
-			href: '/checkins'
+			href: '/checkins',
+			sub: `last week ${d.checkInsLastWkDay}`
 		},
 		{
 			label: 'Collected today',

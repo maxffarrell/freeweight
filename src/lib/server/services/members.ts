@@ -456,9 +456,14 @@ export async function getMember(orgId: string, id: string) {
 				attended: sql<number>`count(*) filter (where ${booking.status} = 'attended')`.mapWith(
 					Number
 				),
-				noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number)
+				noShows: sql<number>`count(*) filter (where ${booking.status} = 'no_show')`.mapWith(Number),
+				thisMonth:
+					sql<number>`count(*) filter (where ${booking.status} != 'cancelled' and ${classSession.startsAt} >= date_trunc('month', now()))`.mapWith(
+						Number
+					)
 			})
 			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
 			.where(and(eq(booking.organizationId, orgId), eq(booking.memberId, id))),
 		row.member.referredByMemberId
 			? db
@@ -649,6 +654,7 @@ export async function getMember(orgId: string, id: string) {
 			firstVisit: att?.firstVisit ?? null,
 			lastVisit: att?.lastVisit ?? null,
 			noShows: bs?.noShows ?? 0,
+			bookedMonth: bs?.thisMonth ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:
 				(bs?.attended ?? 0) + (bs?.noShows ?? 0) > 0

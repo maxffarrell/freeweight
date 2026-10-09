@@ -549,7 +549,12 @@ export async function listCheckIns(
 			checkIn,
 			memberName: gymMember.name,
 			memberPhotoId: gymMember.photoDocumentId,
-			locationName: location.name
+			locationName: location.name,
+			/** true when this row is the member's first-ever non-guest check-in. */
+			firstVisit:
+				sql<boolean>`${checkIn.checkedAt} = (select min(c2.checked_at) from check_in c2 where c2.member_id = ${checkIn.memberId} and c2.guest_name is null) and ${checkIn.guestName} is null`.mapWith(
+					Boolean
+				)
 		})
 		.from(checkIn)
 		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
