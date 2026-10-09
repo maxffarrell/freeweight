@@ -4,6 +4,7 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getActivity,
@@ -28,6 +29,10 @@
 	// 51 rows come back per fetch — the +1 tells us another page exists.
 	const first = await getActivity({});
 	let items = $state(first.slice(0, PAGE));
+	let q = $state('');
+	const shown = $derived(
+		q.trim() ? items.filter((a) => a.summary.toLowerCase().includes(q.trim().toLowerCase())) : items
+	);
 	let hasMore = $state(first.length > PAGE);
 	let loadingMore = $state(false);
 
@@ -110,6 +115,7 @@
 					>Export</Button
 				>
 				{#if actors.length > 1}
+					<Input placeholder="Search…" class="w-36" bind:value={q} />
 					<Select.Root type="single" bind:value={actorId} onValueChange={() => void refilter()}>
 						<Select.Trigger class="w-36">
 							{actorId === 'all' ? 'Everyone' : actors.find((a) => a.id === actorId)?.name}
@@ -153,7 +159,7 @@
 			</div>
 		</Card.Header>
 		<Card.Content class="divide-y p-0">
-			{#each items as a (a.id)}
+			{#each shown as a (a.id)}
 				<div class="flex items-start gap-3 px-6 py-3">
 					<div class="mt-0.5 w-20 shrink-0 text-xs text-muted-foreground">
 						{formatRelative(a.createdAt)}
