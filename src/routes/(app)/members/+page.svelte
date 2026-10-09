@@ -1045,7 +1045,7 @@
 						? ''
 						: `Goes to ${audienceCount} member${audienceCount === 1 ? '' : 's'}`}
 				</span>
-				<div class="flex items-center gap-2">
+				<div class="flex flex-wrap items-center justify-end gap-2">
 					<Button
 						type="button"
 						variant="ghost"

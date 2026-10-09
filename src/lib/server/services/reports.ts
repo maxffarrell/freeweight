@@ -577,7 +577,7 @@ async function wrongPlan(orgId: string) {
 				name: m.memberName,
 				plan: m.planName,
 				monthly: Math.round(monthly),
-				alt: `~${vpm.toFixed(0)} visits/mo — drop-ins would cost ~${Math.round(vpm * (dropIn / 100))}`
+				alt: `~${vpm.toFixed(0)} visits/mo — drop-ins would cost ~$${Math.round(vpm * (dropIn / 100))}`
 			});
 		}
 		if (m.isPack && cheapest && vpm * (dropIn / 100) > monthlyOf(cheapest.amount, cheapest.interval)) {
@@ -586,7 +586,7 @@ async function wrongPlan(orgId: string) {
 				name: m.memberName,
 				plan: m.planName,
 				monthly: Math.round(vpm * (dropIn / 100)),
-				alt: `~${vpm.toFixed(0)} visits/mo — ${cheapest.name} would be ${Math.round(monthlyOf(cheapest.amount, cheapest.interval))}/mo`
+				alt: `~${vpm.toFixed(0)} visits/mo — ${cheapest.name} would be $${Math.round(monthlyOf(cheapest.amount, cheapest.interval))}/mo`
 			});
 		}
 	}
