@@ -94,6 +94,7 @@
 		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
 	}
 
+	const uniqueMembers = $derived(new Set(checkIns.map((c) => c.checkIn.memberId)).size);
 	const avgVisit = $derived.by(() => {
 		const done = checkIns.filter((c) => c.checkIn.checkedOutAt);
 		if (!done.length) return '';
@@ -187,6 +188,8 @@
 			<Card.Description
 				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
 					? ' so far'
+					: ''}{uniqueMembers !== checkIns.length
+					? ` · ${uniqueMembers} unique`
 					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
 					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
 					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}.</Card.Description

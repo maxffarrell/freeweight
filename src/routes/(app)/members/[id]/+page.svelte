@@ -345,6 +345,7 @@
 			.filter((c) => c.charge.status === 'open')
 			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
 	);
+	const openChargesCount = $derived(m.charges.filter((c) => c.charge.status === 'open').length);
 	const memberMonths = $derived(
 		m.member.joinedAt
 			? Math.max(
@@ -1997,7 +1998,11 @@
 		<Tabs.Root value="charges">
 			<Card.Header>
 				<Tabs.List>
-					<Tabs.Trigger value="charges">Charges</Tabs.Trigger>
+					<Tabs.Trigger value="charges"
+						>Charges{#if openChargesCount}
+							<Badge variant="destructive" class="ml-1">{openChargesCount} open</Badge
+							>{/if}</Tabs.Trigger
+					>
 					<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 					<Tabs.Trigger value="bookings">Bookings</Tabs.Trigger>
 					<Tabs.Trigger value="checkins">Check-ins</Tabs.Trigger>
