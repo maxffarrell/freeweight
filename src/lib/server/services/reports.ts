@@ -44,6 +44,8 @@ import {
 	locker,
 	rota,
 	shift,
+	shopItem,
+	shopSale,
 	member,
 	memberTag,
 	membership,
@@ -1627,7 +1629,8 @@ export async function getReports(orgId: string) {
 		arpuNow,
 		lost,
 		streaks,
-		rel
+		rel,
+		shopTop
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1699,7 +1702,8 @@ export async function getReports(orgId: string) {
 		arpu(orgId),
 		lostMrr(orgId),
 		weekStreakLeaders(orgId, 8),
-		instructorReliability(orgId)
+		instructorReliability(orgId),
+		shopSales30d(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1783,7 +1787,8 @@ export async function getReports(orgId: string) {
 		arpu: arpuNow,
 		lostMrr: lost,
 		streakLeaders: streaks,
-		instructorReliability: rel
+		instructorReliability: rel,
+		shopTop
 	};
 }
 
@@ -1812,6 +1817,23 @@ async function instructorReliability(orgId: string) {
 		.groupBy(user.name)
 		.orderBy(desc(sql`count(*) filter (where ${classSession.cancelledAt} is not null)`))
 		.limit(8);
+}
+
+/** Retail shop sales for the last 30 days — top items by units sold + revenue. */
+async function shopSales30d(orgId: string) {
+	const since = new Date(Date.now() - 30 * 86400_000);
+	return db
+		.select({
+			itemName: shopItem.name,
+			units: sql<number>`coalesce(sum(${shopSale.qty}), 0)`.mapWith(Number),
+			revenue: sql<number>`coalesce(sum(${shopSale.qty} * ${shopItem.price}), 0)`.mapWith(Number)
+		})
+		.from(shopSale)
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(and(eq(shopSale.organizationId, orgId), gte(shopSale.createdAt, since)))
+		.groupBy(shopItem.name)
+		.orderBy(desc(sql`sum(${shopSale.qty} * ${shopItem.price})`))
+		.limit(6);
 }
 
 async function npsStats(orgId: string) {

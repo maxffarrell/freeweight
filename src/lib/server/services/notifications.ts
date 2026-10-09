@@ -1769,9 +1769,11 @@ export async function sendAnnouncement(
 	tag?: string,
 	planId?: string,
 	locationId?: string,
-	inactive?: boolean
+	inactive?: boolean,
+	recent?: boolean
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
+	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const members = await db
 		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
 		.from(gymMember)
@@ -1785,6 +1787,7 @@ export async function sendAnnouncement(
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
+				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1861,8 +1864,10 @@ export async function countAnnouncementAudience(
 	tag?: string,
 	planId?: string,
 	locationId?: string,
-	inactive?: boolean
+	inactive?: boolean,
+	recent?: boolean
 ) {
+	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(gymMember)
@@ -1875,6 +1880,7 @@ export async function countAnnouncementAudience(
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
+				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1895,6 +1901,7 @@ export async function scheduleAnnouncement(
 		locationId?: string;
 		atRisk?: boolean;
 		inactive?: boolean;
+		recent?: boolean;
 	}
 ) {
 	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
@@ -1916,7 +1923,8 @@ export async function scheduleAnnouncement(
 			planId: opts.planId ?? null,
 			locationId: opts.locationId ?? null,
 			atRisk: opts.atRisk ?? null,
-			inactive: opts.inactive ?? null
+			inactive: opts.inactive ?? null,
+			recent: opts.recent ?? null
 		}
 	});
 	return { scheduledFor: opts.sendAt };
@@ -1937,7 +1945,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			planId: sql<string | null>`${activity.data}->>'planId'`,
 			locationId: sql<string | null>`${activity.data}->>'locationId'`,
 			atRisk: sql<string | null>`${activity.data}->>'atRisk'`,
-			inactive: sql<string | null>`${activity.data}->>'inactive'`
+			inactive: sql<string | null>`${activity.data}->>'inactive'`,
+			recent: sql<string | null>`${activity.data}->>'recent'`
 		})
 		.from(activity)
 		.where(
@@ -1960,7 +1969,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			a.tag ?? undefined,
 			a.planId ?? undefined,
 			a.locationId ?? undefined,
-			a.inactive === 'true'
+			a.inactive === 'true',
+			a.recent === 'true'
 		);
 		await db.delete(activity).where(eq(activity.id, a.id));
 		sent++;

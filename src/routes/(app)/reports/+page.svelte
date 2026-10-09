@@ -820,6 +820,28 @@
 				{/if}
 			</Card.Content>
 		</Card.Root>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Shop sales</Card.Title>
+				<Card.Description>Top retail items, last 30 days.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				{#if !r.shopTop.length}
+					<p class="text-sm text-muted-foreground">No sales yet.</p>
+				{:else}
+					<ul class="space-y-1.5 text-sm">
+						{#each r.shopTop as i (i.itemName)}
+							<li class="flex items-center justify-between gap-2">
+								<span class="truncate">{i.itemName}</span>
+								<span class="shrink-0 text-muted-foreground tabular-nums"
+									>{i.units} × · {formatMoney(i.revenue, currency)}</span
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<Card.Root>
