@@ -539,6 +539,12 @@
 		<Button size="sm" variant="outline" onclick={() => (importOpen = true)}
 			><Upload /> Import</Button
 		>
+		<span class="self-center text-sm text-muted-foreground"
+			>{formatMoney(
+				members.reduce((a, x) => a + x.openBalance, 0),
+				currency
+			)} open</span
+		>
 		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
 		<Button
 			size="sm"

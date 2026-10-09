@@ -1571,7 +1571,10 @@
 			)}{#if focus.instructorName}
 				· {focus.instructorName}{/if}{#if focus.locationName}
 				· {focus.locationName}{/if}
-			· {focus.session.capacity} spots
+			· {focus.session.capacity} spots{#if focus.payRate}
+				<span class="text-muted-foreground">
+					· pay {formatMoney(focus.payRate, currency)}</span
+				>{/if}
 		</p>
 		{#if focus.session.note}<p class="mt-1 text-sm italic">{focus.session.note}</p>{/if}
 		<table class="mt-6 w-full border-collapse text-left text-sm">
