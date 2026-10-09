@@ -31,6 +31,7 @@
 		getTags,
 		getDuplicates,
 		importMembers,
+		bulkSetInactive,
 		tagMembers,
 		getLevels,
 		addLevel,
@@ -699,6 +700,26 @@
 		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
 			<span class="font-medium tabular-nums">{selected.size} selected</span>
 			<Button size="sm" variant="outline" onclick={() => (tagOpen = true)}><TagIcon /> Tag</Button>
+			<Button
+				size="sm"
+				variant="outline"
+				onclick={async () => {
+					if (
+						!confirm(
+							`Mark ${selected.size} member${selected.size === 1 ? '' : 's'} inactive? Their history is kept.`
+						)
+					)
+						return;
+					try {
+						const n = await bulkSetInactive({ memberIds: [...selected] });
+						toast.success(`Marked ${n} inactive`);
+						selected.clear();
+						await refilter();
+					} catch (e) {
+						toast.error(errMsg(e, 'Could not mark inactive'));
+					}
+				}}>Mark inactive</Button
+			>
 			<Button size="sm" variant="ghost" onclick={() => selected.clear()}>Clear</Button>
 		</div>
 	{/if}

@@ -681,6 +681,32 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Sessions in the next 14 days with people still on the waitlist. */
+async function waitlistedNow(orgId: string) {
+	return db
+		.select({
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			waiting:
+				sql<number>`(select count(*) from booking b where b.session_id = ${classSession.id} and b.status = 'waitlisted')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, new Date()),
+				lte(classSession.startsAt, new Date(Date.now() + 14 * 86400_000)),
+				isNull(classSession.cancelledAt)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(20)
+		.then((rows) => rows.filter((r) => r.waiting > 0).slice(0, 5));
+}
+
 /** This month's check-ins split by member tenure — new (<30d) vs returning. */
 async function newVsReturning(orgId: string) {
 	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
@@ -1519,7 +1545,8 @@ export async function getReports(orgId: string) {
 		cim,
 		planRev,
 		refConv,
-		nvr
+		nvr,
+		wl
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1585,7 +1612,8 @@ export async function getReports(orgId: string) {
 		checkInMethods(orgId),
 		planRevenue(orgId),
 		referralConversion(orgId),
-		newVsReturning(orgId)
+		newVsReturning(orgId),
+		waitlistedNow(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1663,7 +1691,8 @@ export async function getReports(orgId: string) {
 		checkInMethods: cim,
 		planRevenue: planRev,
 		referralConversion: refConv,
-		newVsReturning: nvr
+		newVsReturning: nvr,
+		waitlistedNow: wl
 	};
 }
 

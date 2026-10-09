@@ -704,6 +704,25 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.waitlistedNow.length}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Waitlisted now</Card.Title>
+				<Card.Description>Members still queueing for upcoming sessions</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				{#each r.waitlistedNow as w (w.startsAt + w.className)}
+					<div class="flex items-center justify-between">
+						<span class="truncate">{w.className}</span>
+						<span class="text-muted-foreground tabular-nums"
+							>{formatDate(w.startsAt)} · {w.waiting} waiting</span
+						>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>

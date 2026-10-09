@@ -1096,6 +1096,12 @@
 						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
 					>
 				</div>
+				{#if m.attendance.firstVisit}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">First visit</span>
+						<span class="tabular-nums">{formatDate(m.attendance.firstVisit)}</span>
+					</div>
+				{/if}
 				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
 				{#if nextMile}
 					<div class="flex justify-between">
