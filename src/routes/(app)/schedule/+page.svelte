@@ -181,6 +181,7 @@
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
 	const roster = $derived(focusId ? await getRoster(focusId) : []);
+	const rosterGuests = $derived(roster.reduce((a, r) => a + (r.booking.guestCount ?? 0), 0));
 	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
 	const printBooked = $derived(
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
@@ -1574,7 +1575,8 @@
 			)}{#if focus.instructorName}
 				· {focus.instructorName}{/if}{#if focus.locationName}
 				· {focus.locationName}{/if}
-			· {focus.session.capacity} spots{#if focus.payRate}
+			· {focus.session.capacity} spots{#if rosterGuests}
+				· {rosterGuests} guest{rosterGuests === 1 ? '' : 's'}{/if}{#if focus.payRate}
 				<span class="text-muted-foreground">
 					· pay {formatMoney(focus.payRate, currency)}</span
 				>{/if}

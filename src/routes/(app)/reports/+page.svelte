@@ -634,6 +634,27 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.planRevenue.length}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Revenue by plan</Card.Title>
+				<Card.Description>Membership charges collected this month</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				{#each r.planRevenue as p (p.planName)}
+					<div class="flex items-center justify-between">
+						<span class="truncate">{p.planName}</span>
+						<span class="text-muted-foreground tabular-nums"
+							>{formatMoney(p.collected, currency, true)} · {p.payers} payer{p.payers === 1
+								? ''
+								: 's'}</span
+						>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>

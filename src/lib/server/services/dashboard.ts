@@ -89,6 +89,21 @@ export async function dashboard(orgId: string) {
 
 	const mrr = await monthlyRecurring(orgId);
 
+	// Trailing-7d check-ins vs the week before — feeds the KPI card.
+	const wk7 = new Date(dayStart.getTime() - 7 * 86400_000);
+	const wk14 = new Date(dayStart.getTime() - 14 * 86400_000);
+	const [checkInsWk] = await db
+		.select({
+			week: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz)`.mapWith(
+				Number
+			),
+			prev: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk14.toISOString()}::timestamptz and ${checkIn.checkedAt} < ${wk7.toISOString()}::timestamptz)`.mapWith(
+				Number
+			)
+		})
+		.from(checkIn)
+		.where(eq(checkIn.organizationId, orgId));
+
 	// Payments collected in the org-local today vs yesterday (refunds excluded).
 	const yesterday = new Date(dayStart.getTime() - 86400_000);
 	const weekAgo = new Date(dayStart.getTime() - 7 * 86400_000);
@@ -577,6 +592,8 @@ export async function dashboard(orgId: string) {
 		collectedWeek: collectedToday.week,
 		collectedPrevWeek: collectedToday.prevWeek,
 		checkInsToday: checkInStats?.today ?? 0,
+		checkInsWeek: checkInsWk?.week ?? 0,
+		checkInsPrevWeek: checkInsWk?.prev ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
 		insideNames: insideNow.map((r) => r.name),
 		mrr,
