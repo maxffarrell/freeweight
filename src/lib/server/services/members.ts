@@ -155,7 +155,7 @@ export async function listMembers(
 					: undefined,
 				// Birthday this calendar month (member's stored MM, today-anchored).
 				birthday
-					? sql`substring(${gymMember.birthday} from 6 for 2) = ${new Date().toISOString().slice(5, 7)}`
+					? sql`extract(month from ${gymMember.birthday}) = ${new Date().getUTCMonth() + 1}`
 					: undefined,
 				// In a household: has a guardian payer, or is the guardian of someone.
 				family
