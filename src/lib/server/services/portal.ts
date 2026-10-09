@@ -422,7 +422,30 @@ async function attendanceStats(orgId: string, memberId: string, tz: string) {
 		prev.setUTCDate(prev.getUTCDate() - 7);
 		w = prev.toISOString().slice(0, 10);
 	}
-	return { visitsThisMonth, weekStreak, totalVisits: rows.length, recent: rows.slice(0, 10) };
+	// Longest run of consecutive visited weeks (for the streak card).
+	const sortedWeeks = [...weeks].sort();
+	let longestStreak = 0;
+	let run = 0;
+	let prevW = '';
+	for (const wk of sortedWeeks) {
+		const expect = prevW
+			? new Date(new Date(`${prevW}T12:00:00Z`).getTime() + 7 * 86400_000)
+					.toISOString()
+					.slice(0, 10)
+			: '';
+		run = wk === expect ? run + 1 : 1;
+		if (run > longestStreak) longestStreak = run;
+		prevW = wk;
+	}
+	const nextMilestone = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > rows.length) ?? null;
+	return {
+		visitsThisMonth,
+		weekStreak,
+		longestStreak,
+		nextMilestone,
+		totalVisits: rows.length,
+		recent: rows.slice(0, 10)
+	};
 }
 
 /**

@@ -24,6 +24,7 @@
 		updateSession,
 		getRoster,
 		bookSession,
+		forgiveNoShow,
 		updateBooking,
 		getInstructors,
 		getTemplates,
@@ -1106,6 +1107,23 @@
 										size="sm"
 										class="h-7 px-2 text-xs"
 										onclick={() => setBooking(r.booking.id, 'booked')}>Promote</Button
+									>
+								{/if}
+								{#if r.booking.status === 'no_show'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={async () => {
+											try {
+												await forgiveNoShow(r.booking.id);
+												toast.success('No-show forgiven');
+												await getRoster(focusId).refresh();
+												await reload();
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not forgive'));
+											}
+										}}>Forgive</Button
 									>
 								{/if}
 								<Button

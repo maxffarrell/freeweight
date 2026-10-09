@@ -1348,3 +1348,25 @@ export const memberWorkout = pgTable(
 		index('member_workout_org_idx').on(t.organizationId)
 	]
 );
+
+/** A member's request for a 1:1 training slot — staff approve into a session + booking. */
+export const ptRequest = pgTable(
+	'pt_request',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Preferred coach; null = any. */
+		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
+		preferredAt: timestamp('preferred_at', { withTimezone: true }).notNull(),
+		note: text('note').notNull().default(''),
+		/** 'pending' | 'approved' | 'declined' */
+		status: text('status').notNull().default('pending'),
+		/** Session created on approval. */
+		sessionId: text('session_id').references(() => classSession.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('pt_request_org_idx').on(t.organizationId, t.status)]
+);
