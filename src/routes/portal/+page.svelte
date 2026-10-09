@@ -2421,6 +2421,9 @@ import Trophy from '@lucide/svelte/icons/trophy';
 					</p>
 				</div>
 			</div>
+			<p class="text-xs text-muted-foreground">
+				In the gym right now: {d.insideNow} {d.insideNow === 1 ? 'person' : 'people'}
+			</p>
 			{#if d.attendance.nextMilestone}
 				<p class="text-xs text-muted-foreground">
 					{d.attendance.nextMilestone - d.attendance.totalVisits} visits to your

@@ -427,6 +427,11 @@ export async function portalOverview(memberId: string) {
 		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC'),
 		leaderboard: await membersLeaderboard(orgId, memberId, settings?.timezone ?? 'UTC'),
 		loyalty: loyaltyTier(await lifetimeVisits(orgId, memberId)),
+		insideNow: await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(checkIn)
+			.where(and(eq(checkIn.organizationId, orgId), isNull(checkIn.checkedOutAt)))
+			.then((r) => r[0]?.n ?? 0),
 		year: await yearRecap(orgId, memberId),
 		watchList: await watchList(orgId, memberId)
 	};

@@ -21,6 +21,7 @@ import { db } from '#lib/server/db/index.ts';
 import { emit } from './events.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
 import {
+	notificationLog,
 	memberNps,
 	activity,
 	booking,
@@ -554,7 +555,7 @@ export async function markPayrollPaid(ctx: OrgContext) {
  * would cost less, and pack members burning through classes so fast the
  * cheapest unlimited plan would save them money.
  */
-async function wrongPlan(orgId: string) {
+export async function wrongPlan(orgId: string) {
 	const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000);
 	// Monthly visit rate per member over the last 60 days.
 	const visitRows = await db
@@ -1326,6 +1327,7 @@ export async function getReports(orgId: string) {
 		heatmap,
 		spenders,
 		packBurn,
+		waitlist,
 		planMisfits,
 		guests,
 		payrollPaid
@@ -1380,6 +1382,7 @@ export async function getReports(orgId: string) {
 		checkinHeatmap(orgId),
 		topSpenders(orgId),
 		packBurnDown(orgId),
+		waitlistConversion(orgId),
 		wrongPlan(orgId),
 		guestStats(orgId),
 		payrollPaidThrough(orgId)
@@ -1446,6 +1449,7 @@ export async function getReports(orgId: string) {
 		heatmap,
 		spenders,
 		packBurn,
+		waitlist,
 		wrongPlan: planMisfits,
 		guestStats: guests,
 		payrollPaid
@@ -1797,4 +1801,52 @@ async function topSpenders(orgId: string) {
 		.from(payment)
 		.where(and(eq(payment.organizationId, orgId), isNull(payment.refundedAt)));
 	return { rows, payers: agg?.payers ?? 0, avg: agg?.payers ? Math.round(agg.total / agg.payers) : 0 };
+}
+
+/**
+ * Waitlist outcomes per class over the last 90 days: bookings promoted off the
+ * waitlist (from the notification log) vs members still queued — shows whether a
+ * full class's waitlist actually converts or is a dead end.
+ */
+export async function waitlistConversion(orgId: string) {
+	const cutoff = new Date(Date.now() - 90 * 24 * 3600_000);
+	const [promoted, queued] = await Promise.all([
+		db
+			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+			.from(notificationLog)
+			.innerJoin(booking, eq(notificationLog.entityId, booking.id))
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(notificationLog.organizationId, orgId),
+					eq(notificationLog.kind, 'waitlist_promoted'),
+					gte(notificationLog.createdAt, cutoff)
+				)
+			)
+			.groupBy(classType.name),
+		db
+			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(booking.organizationId, orgId),
+					eq(booking.status, 'waitlisted'),
+					gte(booking.createdAt, cutoff)
+				)
+			)
+			.groupBy(classType.name)
+	]);
+	const byName = new Map<string, { promoted: number; queued: number }>();
+	for (const r of promoted) byName.set(r.name, { promoted: r.n, queued: 0 });
+	for (const r of queued) {
+		const row = byName.get(r.name) ?? { promoted: 0, queued: 0 };
+		row.queued = r.n;
+		byName.set(r.name, row);
+	}
+	return [...byName.entries()]
+		.map(([name, v]) => ({ name, ...v, pct: Math.round((100 * v.promoted) / (v.promoted + v.queued)) }))
+		.sort((a, b) => b.promoted + b.queued - (a.promoted + a.queued));
 }
