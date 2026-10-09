@@ -19,7 +19,9 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
-		"start": "node scripts/migrate.ts && PROTOCOL_HEADER=x-forwarded-proto node scripts/server.ts"
+		"start": "node scripts/migrate.ts && PROTOCOL_HEADER=x-forwarded-proto node scripts/server.ts",
+		"changeset": "pnpm dlx @changesets/cli@2.31.1",
+		"release:version": "pnpm changeset version && pnpm install --ignore-scripts && pnpm exec prettier --write package.json pnpm-lock.yaml CHANGELOG.md .changeset"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
