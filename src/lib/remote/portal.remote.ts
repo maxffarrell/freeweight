@@ -366,7 +366,9 @@ export const updateProfile = command(
 		memberId: idSchema,
 		name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
 		phone: v.optional(v.nullable(v.string())),
-		birthday: v.optional(v.nullable(v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD'))))
+		birthday: v.optional(v.nullable(v.pipe(v.string(), v.isoDate('Use YYYY-MM-DD')))),
+		emergencyName: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(80)))),
+		emergencyPhone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(30))))
 	}),
 	async ({ memberId, ...input }) => {
 		const m = await myMember(memberId);

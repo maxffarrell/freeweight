@@ -35,6 +35,7 @@
 		updateTemplate,
 		deleteTemplate,
 		emailSessionRoster,
+		markSessionNoShows,
 		emailEventRoster,
 		copyWeek,
 		getInstructorUpcoming,
@@ -1278,6 +1279,22 @@
 				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
 					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
 				>
+				{#if focus && new Date(focus.session.endsAt).getTime() < Date.now() && roster.some((r) => r.booking.status === 'booked')}
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-7 px-2 text-xs"
+						title="Flip remaining 'booked' rows to no-show now (same as tonight's sweep)"
+						onclick={async () => {
+							try {
+								const r = await markSessionNoShows(focusId);
+								toast.success(`${r.marked} marked no-show`);
+							} catch (err) {
+								toast.error(errMsg(err, 'Could not mark no-shows'));
+							}
+						}}>Mark no-shows</Button
+					>
+				{/if}
 			</div>
 			<div class="flex gap-2 border-t pt-4">
 				<Select.Root type="single" bind:value={bookMemberId}>

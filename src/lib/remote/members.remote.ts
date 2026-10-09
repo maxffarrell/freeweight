@@ -122,6 +122,19 @@ export const removeMemberTag = command(memberTagInput, async ({ memberId, tag })
 export const getMember = query(idSchema, async (id) =>
 	svc.getMember((await requireOrg()).orgId, id)
 );
+
+/** Push a pack's expiry out N days — "she paid before it lapsed" fixes. */
+export const extendPack = command(
+	v.object({
+		membershipId: idSchema,
+		days: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365))
+	}),
+	async ({ membershipId, days }) => {
+		const r = await svc.extendPack(await requireOrg(), membershipId, days);
+		void getMember(r.memberId).refresh();
+		return r;
+	}
+);
 export const createMember = command(memberInput, async (input) => {
 	const m = await svc.createMember(await requireOrg(), input);
 	void getMembers().refresh();

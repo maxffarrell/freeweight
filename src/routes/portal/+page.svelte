@@ -712,11 +712,15 @@
 	let pName = $state('');
 	let pPhone = $state('');
 	let pBirthday = $state('');
+	let pEmName = $state('');
+	let pEmPhone = $state('');
 	let pSaving = $state(false);
 	function openProfile() {
 		pName = d.member.name;
 		pPhone = d.member.phone ?? '';
 		pBirthday = d.member.birthday ?? '';
+		pEmName = d.member.emergencyName ?? '';
+		pEmPhone = d.member.emergencyPhone ?? '';
 		profileOpen = !profileOpen;
 	}
 	async function saveProfile(e: SubmitEvent) {
@@ -727,7 +731,9 @@
 				memberId,
 				name: pName,
 				phone: pPhone || null,
-				birthday: pBirthday || null
+				birthday: pBirthday || null,
+				emergencyName: pEmName || null,
+				emergencyPhone: pEmPhone || null
 			});
 			toast.success('Profile updated');
 			profileOpen = false;
@@ -1209,6 +1215,16 @@
 							<Input bind:value={pName} required placeholder="Name" class="h-8 text-sm" />
 							<Input bind:value={pPhone} placeholder="Phone" class="h-8 text-sm" />
 							<Input bind:value={pBirthday} type="date" aria-label="Birthday" class="h-8 text-sm" />
+							<Input
+								bind:value={pEmName}
+								placeholder="Emergency contact name"
+								class="h-8 text-sm"
+							/>
+							<Input
+								bind:value={pEmPhone}
+								placeholder="Emergency contact phone"
+								class="h-8 text-sm"
+							/>
 							<div class="flex gap-2">
 								<Button size="sm" class="h-7 px-3 text-xs" type="submit" disabled={pSaving}
 									>{pSaving ? 'Saving…' : 'Save'}</Button
@@ -2775,6 +2791,20 @@
 											+family
 										</label>
 									{/if}
+									<Button
+										size="sm"
+										variant="ghost"
+										title="Copy a link to this class for a friend"
+										onclick={async () => {
+											const url = `${window.location.origin}/j/${d.orgSlug}/schedule?session=${b.session.id}`;
+											try {
+												await navigator.clipboard.writeText(url);
+												toast.success('Link copied');
+											} catch {
+												window.prompt('Copy this link:', url);
+											}
+										}}>Share</Button
+									>
 									<Button
 										size="sm"
 										variant="outline"

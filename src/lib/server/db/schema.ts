@@ -148,6 +148,9 @@ export const gymMember = pgTable(
 		notes: text('notes'),
 		/** Short staff flag surfaced at the front desk — "owes $50", "injury: no jumping". */
 		deskNote: text('desk_note'),
+		/** Emergency contact — shown on the member page for staff. */
+		emergencyName: text('emergency_name'),
+		emergencyPhone: text('emergency_phone'),
 		/** "How did you hear about us?" — set from the public join form. */
 		referralSource: text('referral_source'),
 		/** Member who sent them the ?ref= join link; null = not referred. */

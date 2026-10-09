@@ -125,6 +125,14 @@ export const setBookingNote = command(
 		return r;
 	}
 );
+/** Flip a finished session's 'booked' rows to no_show now (fees + emails run
+ * via the same path as the nightly sweep) — staff don't wait for the cron. */
+export const markSessionNoShows = command(idSchema, async (sessionId) => {
+	const n = await svc.markPastNoShows((await requireOrg()).orgId, sessionId);
+	void getRoster(sessionId).refresh();
+	return { marked: n };
+});
+
 /** Email everyone booked or waitlisted on a session — "AC is out tonight" notes. */
 export const emailSessionRoster = command(
 	emailRosterInput,

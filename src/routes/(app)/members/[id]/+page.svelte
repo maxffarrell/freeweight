@@ -20,6 +20,7 @@
 	import { toast } from 'svelte-sonner';
 	import {
 		getMember,
+		extendPack,
 		updateMember,
 		getPortalInvite,
 		getCheckInCode,
@@ -463,6 +464,8 @@
 	let status = $state<'active' | 'inactive'>(m.member.status);
 	let birthday = $state(m.member.birthday ?? '');
 	let deskNote = $state(m.member.deskNote ?? '');
+	let emName = $state(m.member.emergencyName ?? '');
+	let emPhone = $state(m.member.emergencyPhone ?? '');
 	let guardianId = $state(m.member.guardianId ?? 'none');
 	let pending = $state(false);
 	async function saveMember(e: SubmitEvent) {
@@ -477,6 +480,8 @@
 				status,
 				birthday: birthday || null,
 				deskNote: deskNote || null,
+				emergencyName: emName || null,
+				emergencyPhone: emPhone || null,
 				guardianId: guardianId === 'none' ? null : guardianId
 			});
 			toast.success('Member updated');
@@ -926,6 +931,15 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Phone</span><span>{m.member.phone ?? '—'}</span>
 				</div>
+				{#if m.member.emergencyName || m.member.emergencyPhone}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Emergency</span><span class="truncate"
+							>{m.member.emergencyName ?? ''}{m.member.emergencyName && m.member.emergencyPhone
+								? ' · '
+								: ''}{m.member.emergencyPhone ?? ''}</span
+						>
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Location</span><span>{m.locationName ?? '—'}</span>
 				</div>
@@ -1211,6 +1225,31 @@
 										class="h-7 px-2 text-xs"
 										title="Move pack classes to another member"
 										onclick={() => void openTransfer(mm.membership.id)}>Gift</Button
+									>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Push this pack's expiry out — 'paid before it lapsed' fixes"
+										onclick={async () => {
+											const days = Number(
+												window.prompt(
+													`Extend the pack by how many days? (currently ${
+														mm.membership.endsAt
+															? formatDate(mm.membership.endsAt)
+															: 'no expiry'
+													})`,
+													'30'
+												)
+											);
+											if (!days || days <= 0) return;
+											try {
+												const r = await extendPack({ membershipId: mm.membership.id, days });
+												toast.success(`Pack extended to ${formatDate(r.endsAt)}`);
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not extend'));
+											}
+										}}>Extend</Button
 									>
 								{:else}
 									<Button
@@ -2012,6 +2051,22 @@
 					bind:value={phone}
 				/></Field.Field
 			>
+			<div class="grid grid-cols-2 gap-2">
+				<Field.Field
+					><Field.Label for="e-emname">Emergency contact</Field.Label><Input
+						id="e-emname"
+						placeholder="Name"
+						bind:value={emName}
+					/></Field.Field
+				>
+				<Field.Field
+					><Field.Label for="e-emphone">&nbsp;</Field.Label><Input
+						id="e-emphone"
+						placeholder="Phone"
+						bind:value={emPhone}
+					/></Field.Field
+				>
+			</div>
 			<Field.Field
 				><Field.Label for="e-birthday">Birthday (optional)</Field.Label><Input
 					id="e-birthday"
