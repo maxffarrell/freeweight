@@ -312,9 +312,10 @@ export const getAnnouncementAudience = query(
 		planId: v.optional(v.string()),
 		locationId: v.optional(v.string()),
 		atRisk: v.optional(v.boolean()),
-		inactive: v.optional(v.boolean())
+		inactive: v.optional(v.boolean()),
+		recent: v.optional(v.boolean())
 	}),
-	async ({ tag, planId, locationId, atRisk, inactive }) =>
+	async ({ tag, planId, locationId, atRisk, inactive, recent }) =>
 		atRisk
 			? (await atRiskMembers((await requireOrg()).orgId)).length
 			: countAnnouncementAudience(
@@ -322,7 +323,8 @@ export const getAnnouncementAudience = query(
 					tag || undefined,
 					planId || undefined,
 					locationId || undefined,
-					inactive
+					inactive,
+					recent
 				)
 );
 
@@ -345,7 +347,8 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 		input.tag,
 		input.planId,
 		input.locationId,
-		input.inactive
+		input.inactive,
+		input.recent
 	);
 	void getRecentAnnouncements().refresh();
 	return r;
@@ -362,7 +365,8 @@ export const scheduleEmail = command(scheduledAnnouncementInput, async (input) =
 		planId: input.planId,
 		locationId: input.locationId,
 		atRisk: input.atRisk,
-		inactive: input.inactive
+		inactive: input.inactive,
+		recent: input.recent
 	});
 	void getRecentAnnouncements().refresh();
 	return r;

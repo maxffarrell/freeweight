@@ -255,6 +255,7 @@
 	}
 
 	function exportCsv() {
+		const rows = selected.size ? members.filter((m) => selected.has(m.id)) : members;
 		const csv = toCsv([
 			[
 				'Name',
@@ -271,7 +272,7 @@
 				'Visits (30d)',
 				'Referral source'
 			],
-			...members.map((m) => [
+			...rows.map((m) => [
 				m.name,
 				m.email,
 				m.phone,
@@ -404,11 +405,13 @@
 					? 'All active members'
 					: emailAudience === '__inactive'
 						? 'Inactive members'
-						: audTag
-							? `Tag: ${audTag}`
-							: audLoc
-								? `Location: ${audLocName}`
-								: `Plan: ${audPlanName}`
+						: emailAudience === '__recent'
+							? 'New this week'
+							: audTag
+								? `Tag: ${audTag}`
+								: audLoc
+									? `Location: ${audLocName}`
+									: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -419,7 +422,8 @@
 						planId: audPlan,
 						locationId: audLoc,
 						atRisk: emailAudience === '__risk',
-						inactive: emailAudience === '__inactive'
+						inactive: emailAudience === '__inactive',
+						recent: emailAudience === '__recent'
 					})
 				: null
 	);
@@ -436,6 +440,7 @@
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
 					inactive: emailAudience === '__inactive',
+					recent: emailAudience === '__recent',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
 				toast.success('Scheduled — the daily job sends it');
@@ -448,6 +453,7 @@
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
 					inactive: emailAudience === '__inactive',
+					recent: emailAudience === '__recent',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -564,7 +570,9 @@
 				currency
 			)} open</span
 		>
-		<Button size="sm" variant="outline" onclick={exportCsv}><Download /> Export</Button>
+		<Button size="sm" variant="outline" onclick={exportCsv}
+			><Download /> Export{selected.size ? ` (${selected.size})` : ''}</Button
+		>
 		<Button
 			size="sm"
 			variant="outline"
@@ -1075,6 +1083,7 @@
 							<Select.Item value="__all">All active members</Select.Item>
 							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
 							<Select.Item value="__inactive">Inactive members</Select.Item>
+							<Select.Item value="__recent">New this week</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}
