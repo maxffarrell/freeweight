@@ -22,7 +22,10 @@ export const searchFranchiseMembers = query(v.pipe(v.string(), v.maxLength(100))
 
 /** Copies a member record into another gym the caller administers. */
 export const copyFranchiseMember = command(
-	v.object({ memberId: v.pipe(v.string(), v.minLength(1)), targetOrgId: v.pipe(v.string(), v.minLength(1)) }),
+	v.object({
+		memberId: v.pipe(v.string(), v.minLength(1)),
+		targetOrgId: v.pipe(v.string(), v.minLength(1))
+	}),
 	async ({ memberId, targetOrgId }) => {
 		const { user } = requireUser();
 		return copyFranchiseMemberSvc(user.id, memberId, targetOrgId);

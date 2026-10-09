@@ -134,7 +134,7 @@
 								<Table.Head>Email</Table.Head>
 								<Table.Head>Gym</Table.Head>
 								<Table.Head class="text-right">Active plans</Table.Head>
-							<Table.Head class="text-right">Copy to</Table.Head>
+								<Table.Head class="text-right">Copy to</Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>

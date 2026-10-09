@@ -962,8 +962,8 @@
 					<div
 						class="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-destructive"
 					>
-						Requested deletion of their personal data {formatDate(m.member.deletionRequestedAt)} —
-						use "Anonymize personal data" in the menu.
+						Requested deletion of their personal data {formatDate(m.member.deletionRequestedAt)} — use
+						"Anonymize personal data" in the menu.
 					</div>
 				{/if}
 				<div class="flex justify-between">
@@ -1329,9 +1329,7 @@
 											const days = Number(
 												window.prompt(
 													`Extend the pack by how many days? (currently ${
-														mm.membership.endsAt
-															? formatDate(mm.membership.endsAt)
-															: 'no expiry'
+														mm.membership.endsAt ? formatDate(mm.membership.endsAt) : 'no expiry'
 													})`,
 													'30'
 												)

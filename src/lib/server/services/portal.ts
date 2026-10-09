@@ -1,18 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import {
-	and,
-	asc,
-	desc,
-	eq,
-	gt,
-	gte,
-	inArray,
-	isNotNull,
-	isNull,
-	lt,
-	ne,
-	sql
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -161,7 +148,8 @@ export async function portalOverview(memberId: string) {
 			classTypeId: classSession.classTypeId,
 			className: classType.name,
 			locationName: location.name,
-			workout: classSession.workout
+			workout: classSession.workout,
+			streamUrl: classSession.streamUrl
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
@@ -252,7 +240,10 @@ export async function portalOverview(memberId: string) {
 			.where(
 				and(
 					eq(payment.organizationId, orgId),
-					inArray(payment.memberId, referralRows.map((r) => r.id)),
+					inArray(
+						payment.memberId,
+						referralRows.map((r) => r.id)
+					),
 					isNull(payment.refundedAt)
 				)
 			)
@@ -738,8 +729,7 @@ export async function giveSpot(
 				.where(eq(classSession.id, b.sessionId)),
 			db
 				.select({
-					spots:
-						sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+					spots: sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
 				})
 				.from(booking)
 				.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')))
@@ -747,7 +737,10 @@ export async function giveSpot(
 		const free = (cap?.capacity ?? 0) - (spots ?? 0);
 		await db
 			.update(booking)
-			.set({ status: free >= 1 + (gb?.guestCount ?? 0) ? 'booked' : 'waitlisted', cancelledAt: null })
+			.set({
+				status: free >= 1 + (gb?.guestCount ?? 0) ? 'booked' : 'waitlisted',
+				cancelledAt: null
+			})
 			.where(eq(booking.id, bookingId));
 		// A voided drop-in charge comes back open with the restored booking.
 		if (gb?.chargeId)
@@ -1723,7 +1716,12 @@ async function yearRecap(orgId: string, memberId: string) {
 			.orderBy(desc(sql`count(*)`))
 			.limit(1)
 	]);
-	return { visits: visits[0]?.n ?? 0, prs: prs[0]?.n ?? 0, topClass: top[0]?.name ?? null, topCount: top[0]?.n ?? 0 };
+	return {
+		visits: visits[0]?.n ?? 0,
+		prs: prs[0]?.n ?? 0,
+		topClass: top[0]?.name ?? null,
+		topCount: top[0]?.n ?? 0
+	};
 }
 
 /** Class-alert toggles: every member-bookable class type + whether this member watches it. */

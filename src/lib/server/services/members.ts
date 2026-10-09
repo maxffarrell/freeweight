@@ -154,7 +154,10 @@ export async function listMembers(
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
 					: undefined,
 				recent
-					? gte(gymMember.joinedAt, new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10))
+					? gte(
+							gymMember.joinedAt,
+							new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
+						)
 					: undefined,
 				// At-risk: active member with no check-in in the last 30 days (or ever).
 				risk
@@ -496,7 +499,9 @@ export async function getMember(orgId: string, id: string) {
 		d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
 		return d.toISOString().slice(0, 10);
 	};
-	const mweeks = new Set(streakVisits.map((v) => mweekOf(localDate(v.checkedAt, stz?.tz ?? 'UTC'))));
+	const mweeks = new Set(
+		streakVisits.map((v) => mweekOf(localDate(v.checkedAt, stz?.tz ?? 'UTC')))
+	);
 	let weekStreak = 0;
 	let mw = mweekOf(localDate(new Date(), stz?.tz ?? 'UTC'));
 	if (!mweeks.has(mw)) {
@@ -790,8 +795,7 @@ export async function extendPack(ctx: OrgContext, membershipId: string, days: nu
 		.from(membership)
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, membershipId)));
 	if (!ms) error(404, 'Membership not found');
-	const base =
-		ms.endsAt && ms.endsAt.getTime() > Date.now() ? ms.endsAt.getTime() : Date.now();
+	const base = ms.endsAt && ms.endsAt.getTime() > Date.now() ? ms.endsAt.getTime() : Date.now();
 	const endsAt = new Date(base + days * 86_400_000);
 	const [row] = await db
 		.update(membership)

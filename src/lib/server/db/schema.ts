@@ -353,6 +353,8 @@ export const classType = pgTable(
 		waitlistLimit: integer('waitlist_limit'),
 		/** Minutes before start that member booking closes; null = the gym-wide setting. */
 		bookCutoffMin: integer('book_cutoff_min'),
+		/** Default join link for virtual sessions (Zoom/Meet) — new sessions inherit it. */
+		defaultStreamUrl: text('default_stream_url'),
 		/** false = staff-only: members can't self-book in the portal (desk bookings still work). */
 		memberBookable: boolean('member_bookable').notNull().default(true),
 		/** Members must hold at least this progression level to book — null = open to all. */
@@ -462,6 +464,8 @@ export const classSession = pgTable(
 		note: text('note'),
 		/** Workout of the day — set by staff, shown to booked members in the portal. */
 		workout: text('workout'),
+		/** Virtual-class join link (Zoom/Meet); booked members see a Join button in the portal. */
+		streamUrl: text('stream_url'),
 		/** Short code the instructor announces at class; booked members self-check-in via the portal. */
 		checkinCode: text('checkin_code'),
 		...timestamps
@@ -1143,6 +1147,25 @@ export const recurringCharge = pgTable(
 		index('recurring_charge_org_due_idx').on(t.organizationId, t.nextDue),
 		index('recurring_charge_member_idx').on(t.memberId)
 	]
+);
+
+/** A repeating operating cost (rent, software, insurance) — cron posts an `expense` row per period. */
+export const recurringExpense = pgTable(
+	'recurring_expense',
+	{
+		id: id(),
+		organizationId: orgId(),
+		label: text('label').notNull(),
+		category: text('category').notNull().default('other'),
+		amountCents: integer('amount_cents').notNull(),
+		/** 'week' | 'month' | 'year'. */
+		interval: text('interval').notNull().default('month'),
+		/** Next gym-local posting date (YYYY-MM-DD). */
+		nextDue: date('next_due', { mode: 'string' }).notNull(),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('recurring_expense_org_due_idx').on(t.organizationId, t.nextDue)]
 );
 
 /** A front-desk retail item — water, wraps, shirts — sold into a charge or paid on the spot. */

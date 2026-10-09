@@ -588,7 +588,9 @@ export async function wrongPlan(orgId: string) {
 		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
 	// Cheapest class drop-in price and the cheapest unlimited-style plan.
 	const [di] = await db
-		.select({ min: sql<number | null>`min(${classType.dropInPrice})`.mapWith((v) => v ? Number(v) : null) })
+		.select({
+			min: sql<number | null>`min(${classType.dropInPrice})`.mapWith((v) => (v ? Number(v) : null))
+		})
 		.from(classType)
 		.where(
 			and(
@@ -600,14 +602,17 @@ export async function wrongPlan(orgId: string) {
 	const plans = await db
 		.select({ name: plan.name, amount: plan.amount, interval: plan.interval })
 		.from(plan)
-		.where(
-			and(eq(plan.organizationId, orgId), eq(plan.active, true), eq(plan.isPack, false))
-		)
+		.where(and(eq(plan.organizationId, orgId), eq(plan.active, true), eq(plan.isPack, false)))
 		.orderBy(plan.amount);
 	const dropIn = di?.min ?? 0;
 	const cheapest = plans.find((p) => p.amount > 0) ?? null;
-	const overpaying: { memberId: string; name: string; plan: string; monthly: number; alt: string }[] =
-		[];
+	const overpaying: {
+		memberId: string;
+		name: string;
+		plan: string;
+		monthly: number;
+		alt: string;
+	}[] = [];
 	const upgrading: typeof overpaying = [];
 	const monthlyOf = (amount: number, interval: string) =>
 		(interval === 'year' ? amount / 12 : interval === 'week' ? amount * 4.33 : amount) / 100;
@@ -623,7 +628,11 @@ export async function wrongPlan(orgId: string) {
 				alt: `~${vpm.toFixed(0)} visits/mo — drop-ins would cost ~$${Math.round(vpm * (dropIn / 100))}`
 			});
 		}
-		if (m.isPack && cheapest && vpm * (dropIn / 100) > monthlyOf(cheapest.amount, cheapest.interval)) {
+		if (
+			m.isPack &&
+			cheapest &&
+			vpm * (dropIn / 100) > monthlyOf(cheapest.amount, cheapest.interval)
+		) {
 			upgrading.push({
 				memberId: m.memberId,
 				name: m.memberName,
@@ -1803,7 +1812,11 @@ async function topSpenders(orgId: string) {
 		})
 		.from(payment)
 		.where(and(eq(payment.organizationId, orgId), isNull(payment.refundedAt)));
-	return { rows, payers: agg?.payers ?? 0, avg: agg?.payers ? Math.round(agg.total / agg.payers) : 0 };
+	return {
+		rows,
+		payers: agg?.payers ?? 0,
+		avg: agg?.payers ? Math.round(agg.total / agg.payers) : 0
+	};
 }
 
 /**
@@ -1850,7 +1863,11 @@ export async function waitlistConversion(orgId: string) {
 		byName.set(r.name, row);
 	}
 	return [...byName.entries()]
-		.map(([name, v]) => ({ name, ...v, pct: Math.round((100 * v.promoted) / (v.promoted + v.queued)) }))
+		.map(([name, v]) => ({
+			name,
+			...v,
+			pct: Math.round((100 * v.promoted) / (v.promoted + v.queued))
+		}))
 		.sort((a, b) => b.promoted + b.queued - (a.promoted + a.queued));
 }
 
@@ -1867,7 +1884,10 @@ export async function refundsByMonth(orgId: string) {
 		.where(and(eq(payment.organizationId, orgId), isNotNull(payment.refundedAt)))
 		.groupBy(sql`to_char(${payment.refundedAt}, 'YYYY-MM')`, payment.method)
 		.orderBy(desc(sql`to_char(${payment.refundedAt}, 'YYYY-MM')`));
-	const byMonth = new Map<string, { total: number; n: number; methods: { method: string; total: number }[] }>();
+	const byMonth = new Map<
+		string,
+		{ total: number; n: number; methods: { method: string; total: number }[] }
+	>();
 	for (const r of rows) {
 		const row = byMonth.get(r.month) ?? { total: 0, n: 0, methods: [] };
 		row.total += r.total;

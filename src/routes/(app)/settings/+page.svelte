@@ -243,7 +243,10 @@
 	/** Serializes the editor back to the {weekday: 'HH:MM-HH:MM'|''} record. */
 	const hoursOut = $derived(
 		Object.fromEntries(
-			hours.map((h, i) => [String(i), h.closed || !h.open || !h.close ? '' : `${h.open}-${h.close}`])
+			hours.map((h, i) => [
+				String(i),
+				h.closed || !h.open || !h.close ? '' : `${h.open}-${h.close}`
+			])
 		)
 	);
 
@@ -732,8 +735,8 @@
 								placeholder="Off"
 							/>
 							<Field.Description
-								>Comp classes banked on each member's birthday — sent with the birthday email.
-								Blank or 0 = off.</Field.Description
+								>Comp classes banked on each member's birthday — sent with the birthday email. Blank
+								or 0 = off.</Field.Description
 							>
 						</Field.Field>
 						<Field.Field>
@@ -747,9 +750,8 @@
 								placeholder="Off"
 							/>
 							<Field.Description
-								>Let members pause their own plan in the portal up to this many days per
-								calendar year (no freeze fee, no approval needed). Blank or 0 = staff
-								only.</Field.Description
+								>Let members pause their own plan in the portal up to this many days per calendar
+								year (no freeze fee, no approval needed). Blank or 0 = staff only.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
@@ -789,7 +791,9 @@
 			<Card.Root class="mt-4 max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Opening hours</Card.Title>
-					<Card.Description>Shown on the gym's public timetable. Saved with the General settings above.</Card.Description>
+					<Card.Description
+						>Shown on the gym's public timetable. Saved with the General settings above.</Card.Description
+					>
 				</Card.Header>
 				<Card.Content class="space-y-2">
 					{#each hourDays as d, i (d)}
@@ -843,8 +847,8 @@
 						</Field.Field>
 						<Button type="submit" variant="outline" disabled={fzPending}>Freeze all plans</Button>
 						<p class="w-full text-xs text-muted-foreground">
-							Pauses every active plan until that date (packs are untouched). Members auto-resume and
-							get their welcome-back email as usual.
+							Pauses every active plan until that date (packs are untouched). Members auto-resume
+							and get their welcome-back email as usual.
 						</p>
 					</form>
 					<ul class="divide-y">

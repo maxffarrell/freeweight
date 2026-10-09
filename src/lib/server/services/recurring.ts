@@ -2,7 +2,13 @@ import { error } from '@sveltejs/kit';
 import { and, asc, eq, lte } from 'drizzle-orm';
 import type * as v from 'valibot';
 import { db } from '#lib/server/db/index.ts';
-import { charge, gymMember, recurringCharge } from '#lib/server/db/schema.ts';
+import {
+	charge,
+	expense,
+	gymMember,
+	recurringCharge,
+	recurringExpense
+} from '#lib/server/db/schema.ts';
 import { emit } from '#lib/server/services/events.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { formatMoney } from '#lib/format.ts';
@@ -124,6 +130,104 @@ export async function postDueRecurring(orgId: string) {
 			.update(recurringCharge)
 			.set({ nextDue: due, updatedAt: new Date() })
 			.where(eq(recurringCharge.id, r.id));
+	}
+	return posted;
+}
+
+// ---------- Recurring expenses (rent, software, insurance) ----------
+
+export async function listRecurringExpenses(orgId: string) {
+	return db
+		.select()
+		.from(recurringExpense)
+		.where(eq(recurringExpense.organizationId, orgId))
+		.orderBy(asc(recurringExpense.nextDue))
+		.limit(200);
+}
+
+export async function addRecurringExpense(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.recurringExpenseInput>
+) {
+	const [row] = await db
+		.insert(recurringExpense)
+		.values({
+			organizationId: ctx.orgId,
+			label: input.label,
+			category: input.category,
+			amountCents: input.amountCents,
+			interval: input.interval,
+			nextDue: input.nextDue
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'recurring_expense',
+		entityId: row!.id,
+		action: 'created',
+		summary: `Recurring expense ${input.label} (${formatMoney(input.amountCents)}/${input.interval})`
+	});
+	return row;
+}
+
+export async function updateRecurringExpense(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.recurringExpenseUpdate>
+) {
+	const [row] = await db
+		.update(recurringExpense)
+		.set({
+			...(input.active !== undefined ? { active: input.active } : {}),
+			...(input.nextDue ? { nextDue: input.nextDue } : {}),
+			updatedAt: new Date()
+		})
+		.where(and(eq(recurringExpense.id, input.id), eq(recurringExpense.organizationId, ctx.orgId)))
+		.returning();
+	if (!row) error(404, 'Not found');
+	return row;
+}
+
+export async function removeRecurringExpense(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.delete(recurringExpense)
+		.where(and(eq(recurringExpense.id, id), eq(recurringExpense.organizationId, ctx.orgId)))
+		.returning();
+	if (!row) error(404, 'Not found');
+	return row;
+}
+
+/** Cron: posts an `expense` row for every due period of every active recurring expense. */
+export async function postDueRecurringExpenses(orgId: string) {
+	const today = localDate(new Date(), (await getSettings(orgId)).timezone);
+	const rows = await db
+		.select()
+		.from(recurringExpense)
+		.where(
+			and(
+				eq(recurringExpense.organizationId, orgId),
+				eq(recurringExpense.active, true),
+				lte(recurringExpense.nextDue, today)
+			)
+		);
+	let posted = 0;
+	for (const r of rows) {
+		let due = r.nextDue;
+		for (let i = 0; i < 6 && due <= today; i++) {
+			await db.insert(expense).values({
+				organizationId: orgId,
+				label: `${r.label} (recurring)`,
+				category: r.category,
+				amountCents: r.amountCents,
+				expenseOn: due
+			});
+			posted++;
+			due = advance(due, r.interval);
+		}
+		await db
+			.update(recurringExpense)
+			.set({ nextDue: due, updatedAt: new Date() })
+			.where(eq(recurringExpense.id, r.id));
 	}
 	return posted;
 }

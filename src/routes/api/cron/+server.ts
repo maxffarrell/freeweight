@@ -43,7 +43,7 @@ import {
 } from '#lib/server/services/schedule.ts';
 import { closeStaleCheckIns, sendReviewNudges } from '#lib/server/services/checkins.ts';
 import { closeStaleShifts } from '#lib/server/services/shifts.ts';
-import { postDueRecurring } from '#lib/server/services/recurring.ts';
+import { postDueRecurring, postDueRecurringExpenses } from '#lib/server/services/recurring.ts';
 import { materializeResourceRecurring } from '#lib/server/services/resources.ts';
 import type { RequestHandler } from './$types';
 
@@ -100,6 +100,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			await runBilling(o.id);
 			suspended += await suspendDelinquentMembers(o.id);
 			recurringPosted += await postDueRecurring(o.id);
+			recurringPosted += await postDueRecurringExpenses(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);

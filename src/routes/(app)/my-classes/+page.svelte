@@ -185,7 +185,13 @@
 								row.session.startsAt,
 								tz
 							)}{#if row.locationName}
-								· {row.locationName}{/if}
+								· {row.locationName}{/if}{#if row.session.streamUrl}
+								· <a
+									href={row.session.streamUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="text-primary hover:underline">stream</a
+								>{/if}
 						</div>
 					</div>
 					<div class="text-sm whitespace-nowrap text-muted-foreground">

@@ -233,11 +233,7 @@ export async function copyFranchiseMember(userId: string, memberId: string, targ
 		.from(member)
 		.where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])));
 	const admin = new Set(orgs.map((o) => o.id));
-	const [src] = await db
-		.select()
-		.from(gymMember)
-		.where(eq(gymMember.id, memberId))
-		.limit(1);
+	const [src] = await db.select().from(gymMember).where(eq(gymMember.id, memberId)).limit(1);
 	if (!src || !admin.has(src.organizationId)) error(404, 'Member not found');
 	if (!admin.has(targetOrgId)) error(403, 'Not an admin of that gym');
 	if (src.organizationId === targetOrgId) error(400, 'Already in that gym');

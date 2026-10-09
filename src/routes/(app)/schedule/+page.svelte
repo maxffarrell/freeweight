@@ -286,6 +286,7 @@
 	let editInstructorId = $state('');
 	let editNote = $state('');
 	let editWorkout = $state('');
+	let editStreamUrl = $state('');
 	let editNeedsCover = $state(false);
 	function openEdit() {
 		if (!focus) return;
@@ -299,6 +300,7 @@
 		editInstructorId = focus.session.instructorId ?? '';
 		editNote = focus.session.note ?? '';
 		editWorkout = focus.session.workout ?? '';
+		editStreamUrl = focus.session.streamUrl ?? '';
 		editNeedsCover = !!focus.session.coverRequestedAt;
 		editOpen = true;
 	}
@@ -315,6 +317,7 @@
 				instructorId: editInstructorId || null,
 				note: editNote.trim() || null,
 				workout: editWorkout.trim() || null,
+				streamUrl: editStreamUrl.trim() || null,
 				needsCover: editNeedsCover
 			});
 			toast.success('Session updated');
@@ -410,7 +413,15 @@
 	let sessDuration = $derived<number | null>(
 		classTypes.find((c) => c.id === sessTypeId)?.durationMin ?? null
 	);
+	// New sessions inherit the class's default stream link until staff edits it.
+	let sessStreamFor = $state('');
+	$effect(() => {
+		if (sessTypeId === sessStreamFor) return;
+		sessStreamFor = sessTypeId;
+		sessStreamUrl = classTypes.find((c) => c.id === sessTypeId)?.defaultStreamUrl ?? '';
+	});
 	let sessNote = $state('');
+	let sessStreamUrl = $state('');
 	let pending = $state(false);
 	const noConflicts: { id: string; startsAt: Date; endsAt: Date; className: string }[] = [];
 	/** Name of the picked instructor when the type has quals and they're not in the list. */
@@ -424,6 +435,7 @@
 		await (sessInstructorId && sessStart && sessStartTime
 			? getInstructorConflicts({
 					instructorId: sessInstructorId,
+					locationId: sessLocationId || null,
 					startsAt: `${sessStart}T${sessStartTime}`,
 					durationMin: sessDuration ?? 60,
 					repeatUntil: sessRepeatUntil || null
@@ -434,6 +446,7 @@
 		await (editOpen && editInstructorId && editDate && editTime
 			? getInstructorConflicts({
 					instructorId: editInstructorId,
+					locationId: editLocationId || null,
 					startsAt: `${editDate}T${editTime}`,
 					durationMin: editDuration ?? 60,
 					excludeSessionId: focusId
@@ -452,7 +465,8 @@
 				capacity: sessCapacity ?? undefined,
 				durationMin: sessDuration ?? undefined,
 				repeatUntil: sessRepeatUntil || undefined,
-				note: sessNote.trim() || undefined
+				note: sessNote.trim() || undefined,
+				streamUrl: sessStreamUrl.trim() || null
 			});
 			toast.success('Session scheduled');
 			sessOpen = false;
@@ -761,7 +775,7 @@
 	let eqNext = $state('');
 	let eqNotes = $state('');
 	const today = $derived(localDate(new Date(), tz));
-		async function duplicateEvent(ev: (typeof events)[number]) {
+	async function duplicateEvent(ev: (typeof events)[number]) {
 		const at = new Date(new Date(ev.event.startsAt).getTime() + 7 * 86_400_000);
 		try {
 			await createEvent({
@@ -771,8 +785,7 @@
 				durationMin: Math.max(
 					15,
 					Math.round(
-						(new Date(ev.event.endsAt).getTime() - new Date(ev.event.startsAt).getTime()) /
-							60_000
+						(new Date(ev.event.endsAt).getTime() - new Date(ev.event.startsAt).getTime()) / 60_000
 					)
 				),
 				capacity: ev.event.capacity,
@@ -917,6 +930,7 @@
 	let tMemberBookable = $state(true);
 	let tMinLevel = $state('');
 	let tQuals = new SvelteSet<string>();
+	let tStream = $state('');
 	const levels = $derived(await getLevels());
 	const classTypeQuals = $derived(await getClassTypeQuals());
 	const cQualsByType: Record<string, string[]> = $derived.by(() => {
@@ -938,6 +952,7 @@
 		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
 		tMemberBookable = c.memberBookable;
+		tStream = c.defaultStreamUrl ?? '';
 		tMinLevel = c.minLevelId ?? '';
 		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
@@ -985,6 +1000,7 @@
 		tBookCutoff = null;
 		tActive = true;
 		tMemberBookable = true;
+		tStream = '';
 	}
 	async function submitType(e: SubmitEvent) {
 		e.preventDefault();
@@ -1002,6 +1018,7 @@
 				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
 				memberBookable: tMemberBookable,
+				defaultStreamUrl: tStream.trim() || null,
 				minLevelId: tMinLevel || null,
 				active: tActive
 			};
@@ -1675,6 +1692,16 @@
 				/>
 				<Field.Description>Booked members see this in their portal.</Field.Description>
 			</Field.Field>
+			<Field.Field>
+				<Field.Label for="edit-stream">Stream link (optional)</Field.Label>
+				<Input
+					id="edit-stream"
+					type="url"
+					bind:value={editStreamUrl}
+					placeholder="https://…"
+					maxlength={500}
+				/>
+			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save changes'}</Button>
 			</Dialog.Footer>
@@ -1778,6 +1805,17 @@
 					placeholder="Shown on the roster"
 					maxlength={500}
 				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="sess-stream">Stream link (optional)</Field.Label>
+				<Input
+					id="sess-stream"
+					type="url"
+					bind:value={sessStreamUrl}
+					placeholder="https://zoom.us/j/… — booked members get a Join button"
+					maxlength={500}
+				/>
+				<Field.Description>Prefilled from the class type's default.</Field.Description>
 			</Field.Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={pending || !sessTypeId}
@@ -1924,6 +1962,21 @@
 				/>
 				<Field.Description>
 					How many members may queue when a session is full — 0 disables the waitlist.
+				</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-stream">
+					Default stream link <span class="text-muted-foreground">(optional)</span>
+				</Field.Label>
+				<Input
+					id="t-stream"
+					type="url"
+					bind:value={tStream}
+					placeholder="https://zoom.us/j/…"
+					maxlength={500}
+				/>
+				<Field.Description>
+					New sessions inherit this join link — booked members get a Join button in the portal.
 				</Field.Description>
 			</Field.Field>
 			<div class="flex items-center justify-between rounded-lg border px-3 py-2">

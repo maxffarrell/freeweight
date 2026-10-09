@@ -30,7 +30,9 @@ import {
 	saleInput,
 	shopItemInput,
 	shopItemUpdate,
-	expenseInput
+	expenseInput,
+	recurringExpenseInput,
+	recurringExpenseUpdate
 } from '#lib/schemas.ts';
 
 export const getPlans = query(async () => svc.listPlans((await requireOrg()).orgId));
@@ -158,6 +160,28 @@ export const markPickedUp = command(idSchema, async (saleId) => {
 // ------- recurring add-ons -------
 
 export const getRecurring = query(async () => recSvc.listRecurring((await requireOrg()).orgId));
+
+export const getRecurringExpenses = query(async () =>
+	recSvc.listRecurringExpenses((await requireOrg()).orgId)
+);
+
+export const addRecurringExpense = command(recurringExpenseInput, async (input) => {
+	const r = await recSvc.addRecurringExpense(await requireOrg(), input);
+	void getRecurringExpenses().refresh();
+	return r;
+});
+
+export const updateRecurringExpense = command(recurringExpenseUpdate, async (input) => {
+	const r = await recSvc.updateRecurringExpense(await requireOrg(), input);
+	void getRecurringExpenses().refresh();
+	return r;
+});
+
+export const removeRecurringExpense = command(idSchema, async (id) => {
+	const r = await recSvc.removeRecurringExpense(await requireOrg(), id);
+	void getRecurringExpenses().refresh();
+	return r;
+});
 
 export const addRecurring = command(recurringChargeInput, async (input) => {
 	const r = await recSvc.addRecurring(await requireOrg(), input);

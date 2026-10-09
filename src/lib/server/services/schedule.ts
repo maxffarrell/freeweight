@@ -64,8 +64,7 @@ import {
 	notifySessionCancelled,
 	notifySeriesBooked,
 	notifyWaitlistPromoted,
-	sendCoverRequests
-,
+	sendCoverRequests,
 	notifyClassWatchers
 } from './notifications.ts';
 import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
@@ -152,6 +151,7 @@ export async function createClassType(
 			minEnrollment: input.minEnrollment ?? null,
 			waitlistLimit: input.waitlistLimit ?? null,
 			bookCutoffMin: input.bookCutoffMin ?? null,
+			defaultStreamUrl: input.defaultStreamUrl ?? null,
 			memberBookable: input.memberBookable,
 			minLevelId: input.minLevelId ?? null,
 			active: input.active
@@ -545,6 +545,7 @@ export async function createSession(
 				endsAt: new Date(d.getTime() + (end.getTime() - start.getTime())),
 				capacity: input.capacity ?? ct.capacity,
 				note: input.note ?? null,
+				streamUrl: input.streamUrl ?? ct.defaultStreamUrl ?? null,
 				checkinCode: sessionCode()
 			}))
 		)
@@ -590,6 +591,7 @@ export async function updateSession(
 			instructorId: set.instructorId,
 			note: set.note,
 			workout: set.workout,
+			streamUrl: set.streamUrl,
 			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null,
 			// A new instructor means the cover is filled; otherwise honor the flag.
 			coverRequestedAt:
@@ -1498,7 +1500,9 @@ export async function bookSession(
 		const [fill] = await db
 			.select({
 				cap: classSession.capacity,
-				n: sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${input.sessionId} and b.status = 'booked')`.mapWith(Number)
+				n: sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${input.sessionId} and b.status = 'booked')`.mapWith(
+					Number
+				)
 			})
 			.from(classSession)
 			.where(eq(classSession.id, input.sessionId));
@@ -2358,6 +2362,40 @@ export async function instructorConflicts(
 		.limit(6);
 }
 
+/** Sessions already booked in a room overlapping the proposed times — warn, not block. */
+export async function locationConflicts(
+	orgId: string,
+	locationId: string,
+	intervals: { start: Date; end: Date }[],
+	excludeSessionId?: string
+) {
+	if (!intervals.length) return [];
+	return db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			endsAt: classSession.endsAt,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.locationId, locationId),
+				isNull(classSession.cancelledAt),
+				excludeSessionId ? ne(classSession.id, excludeSessionId) : undefined,
+				or(
+					...intervals.map((i) =>
+						and(lt(classSession.startsAt, i.end), gt(classSession.endsAt, i.start))
+					)
+				)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(6);
+}
+
 // ---------- Instructor time off ----------
 
 async function myMemberId(ctx: OrgContext) {
@@ -2867,7 +2905,8 @@ export async function daySheet(orgId: string, date: string) {
 			byId.set(r.sessionId, e);
 			sessions.push(e);
 		}
-		if (r.memberName) e.roster.push({ name: r.memberName, status: r.status!, guests: r.guests ?? 0 });
+		if (r.memberName)
+			e.roster.push({ name: r.memberName, status: r.status!, guests: r.guests ?? 0 });
 	}
 	return { tz, date, sessions };
 }
@@ -2891,8 +2930,7 @@ export async function moveBooking(ctx: OrgContext, bookingId: string, newSession
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, bookingId)));
 	if (!b) error(404, 'Booking not found');
-	if (b.status !== 'booked' && b.status !== 'waitlisted')
-		error(409, 'That booking already ended');
+	if (b.status !== 'booked' && b.status !== 'waitlisted') error(409, 'That booking already ended');
 	if (b.sessionId === newSessionId) error(400, 'Already in that session');
 	const [target] = await db
 		.select({

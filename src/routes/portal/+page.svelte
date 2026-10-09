@@ -10,7 +10,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 	import Bell from '@lucide/svelte/icons/bell';
-import Trophy from '@lucide/svelte/icons/trophy';
+	import Trophy from '@lucide/svelte/icons/trophy';
 	import Star from '@lucide/svelte/icons/star';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
@@ -426,7 +426,11 @@ import Trophy from '@lucide/svelte/icons/trophy';
 		return [...byType.values()].filter((r) => r.n >= 2);
 	});
 	async function cancelSeries(classTypeId: string, name: string, n: number) {
-		if (!confirm(`Cancel all ${n} upcoming ${name} bookings? Sessions inside the cancel cutoff are kept.`))
+		if (
+			!confirm(
+				`Cancel all ${n} upcoming ${name} bookings? Sessions inside the cancel cutoff are kept.`
+			)
+		)
 			return;
 		busy = 'cancelSeries';
 		try {
@@ -1292,8 +1296,7 @@ import Trophy from '@lucide/svelte/icons/trophy';
 							<button
 								class="text-muted-foreground underline"
 								disabled={delPending}
-								onclick={askDataDeletion}
-								>{delPending ? 'Sending…' : 'Delete my data'}</button
+								onclick={askDataDeletion}>{delPending ? 'Sending…' : 'Delete my data'}</button
 							>
 						{/if}
 					</p>
@@ -1414,8 +1417,7 @@ import Trophy from '@lucide/svelte/icons/trophy';
 											onclick={() => {
 												freezeDays = Math.min(7, freezeRemaining(mm.membership));
 												freezeId = freezeId === mm.membership.id ? '' : mm.membership.id;
-											}}
-											>Freeze</button
+											}}>Freeze</button
 										>
 										·
 									{/if}
@@ -2451,7 +2453,8 @@ import Trophy from '@lucide/svelte/icons/trophy';
 				</div>
 			</div>
 			<p class="text-xs text-muted-foreground">
-				In the gym right now: {d.insideNow} {d.insideNow === 1 ? 'person' : 'people'}
+				In the gym right now: {d.insideNow}
+				{d.insideNow === 1 ? 'person' : 'people'}
 			</p>
 			{#if d.attendance.nextMilestone}
 				<p class="text-xs text-muted-foreground">
@@ -2522,7 +2525,8 @@ import Trophy from '@lucide/svelte/icons/trophy';
 	{#if d.leaderboard.top.length}
 		<Card.Root>
 			<Card.Header class="pb-2">
-				<Card.Title class="flex items-center gap-2 text-base"><Trophy /> Visits leaderboard</Card.Title
+				<Card.Title class="flex items-center gap-2 text-base"
+					><Trophy /> Visits leaderboard</Card.Title
 				>
 				<Card.Description>
 					Most check-ins this month
@@ -2539,7 +2543,7 @@ import Trophy from '@lucide/svelte/icons/trophy';
 							<span class="min-w-0 flex-1 truncate"
 								>{row.memberId === d.member.id ? 'You' : row.name}</span
 							>
-							<span class="shrink-0 text-xs tabular-nums text-muted-foreground"
+							<span class="shrink-0 text-xs text-muted-foreground tabular-nums"
 								>{row.visits} visit{row.visits === 1 ? '' : 's'}</span
 							>
 						</li>
@@ -2547,7 +2551,8 @@ import Trophy from '@lucide/svelte/icons/trophy';
 				</ol>
 				{#if d.leaderboard.mine !== null && d.leaderboard.rank! > 10}
 					<p class="mt-2 border-t pt-2 text-xs text-muted-foreground">
-						#{d.leaderboard.rank} — you, {d.leaderboard.mine!.visits} visit{d.leaderboard.mine!.visits === 1
+						#{d.leaderboard.rank} — you, {d.leaderboard.mine!.visits} visit{d.leaderboard.mine!
+							.visits === 1
 							? ''
 							: 's'}
 					</p>
@@ -2791,6 +2796,15 @@ import Trophy from '@lucide/svelte/icons/trophy';
 						{/if}
 					</div>
 					<span class="flex items-center gap-1.5">
+						{#if u.streamUrl && u.booking.status === 'booked'}
+							<a
+								href={u.streamUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
+								>Join stream</a
+							>
+						{/if}
 						{#if u.booking.guestCount}
 							<Badge variant="outline"
 								>+{u.booking.guestCount} guest{u.booking.guestCount > 1 ? 's' : ''}</Badge
@@ -2849,7 +2863,8 @@ import Trophy from '@lucide/svelte/icons/trophy';
 					<button
 						class="text-xs text-muted-foreground underline underline-offset-2"
 						disabled={busy === 'cancelSeries'}
-						onclick={() => cancelSeries(ct.classTypeId, ct.name, ct.n)}>Cancel all {ct.n} upcoming {ct.name} bookings</button
+						onclick={() => cancelSeries(ct.classTypeId, ct.name, ct.n)}
+						>Cancel all {ct.n} upcoming {ct.name} bookings</button
 					>
 				{/each}
 			{/if}

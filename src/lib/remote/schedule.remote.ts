@@ -173,13 +173,19 @@ export const getInstructorConflicts = query(instructorConflictInput, async (inpu
 		start: d,
 		end: new Date(d.getTime() + input.durationMin * 60_000)
 	}));
-	const [sessions, offs, outside] = await Promise.all([
+	const [sessions, offs, outside, room] = await Promise.all([
 		svc.instructorConflicts(orgId, input.instructorId, intervals, input.excludeSessionId),
 		svc.instructorTimeOffConflicts(orgId, input.instructorId, intervals, tzName),
-		svc.instructorAvailabilityConflicts(orgId, input.instructorId, intervals, tzName)
+		svc.instructorAvailabilityConflicts(orgId, input.instructorId, intervals, tzName),
+		input.locationId
+			? svc.locationConflicts(orgId, input.locationId, intervals, input.excludeSessionId)
+			: Promise.resolve([])
 	]);
 	return [
 		...sessions.map((s) => ({ ...s, kind: 'session' as const })),
+		...room
+			.filter((r) => !sessions.some((s) => s.id === r.id))
+			.map((r) => ({ ...r, className: `${r.className} — room in use`, kind: 'room' as const })),
 		// Cap availability hints so they don't crowd out real session clashes on repeats.
 		...outside.slice(0, 3).map((i, n) => ({
 			id: `avail-${n}`,

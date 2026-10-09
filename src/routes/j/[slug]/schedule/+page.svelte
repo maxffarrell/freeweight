@@ -124,9 +124,14 @@
 
 		{#if Object.values(settings.openHours ?? {}).some(Boolean)}
 			{@const hours = settings.openHours ?? {}}
-			<div class="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border px-4 py-3 text-xs text-muted-foreground">
+			<div
+				class="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border px-4 py-3 text-xs text-muted-foreground"
+			>
 				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d, i (d)}
-					<span><span class="font-medium text-foreground">{d}</span> {hours[String(i)] || 'Closed'}</span>
+					<span
+						><span class="font-medium text-foreground">{d}</span>
+						{hours[String(i)] || 'Closed'}</span
+					>
 				{/each}
 			</div>
 		{/if}
@@ -143,7 +148,7 @@
 							id={`s-${s.session.id}`}
 							class="flex items-center justify-between gap-3 px-4 py-3 text-sm {s.session.id ===
 							focusId
-								? 'bg-primary/5 -m-px rounded-lg ring-2 ring-primary'
+								? '-m-px rounded-lg bg-primary/5 ring-2 ring-primary'
 								: ''}"
 						>
 							<div class="flex min-w-0 items-center gap-2.5">
