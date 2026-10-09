@@ -583,7 +583,10 @@
 							<span class="font-medium tabular-nums">{localTime(s.session.startsAt, tz)}</span>
 							<span>{s.className}</span>
 							<span class="text-muted-foreground">
-								{s.booked}/{s.session.capacity}{s.locationName ? ` · ${s.locationName}` : ''}
+								{s.booked}/{s.session.capacity}{#if s.waitlisted > 0}
+									<span class="text-amber-600"> +{s.waitlisted} wait</span>{/if}{s.locationName
+									? ` · ${s.locationName}`
+									: ''}
 							</span>
 						</button>
 					{/each}
