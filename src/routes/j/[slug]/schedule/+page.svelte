@@ -21,6 +21,8 @@
 	const tz = $derived(settings.timezone);
 	/** Deep link: /j/{slug}/schedule?session=<id> scrolls to + highlights one class. */
 	const focusId = $derived(page.url.searchParams.get('session'));
+	/** Deep link: /j/{slug}/schedule?class=<classTypeId> filters to one class. */
+	const classFilter = $derived(page.url.searchParams.get('class'));
 	$effect(() => {
 		if (!focusId) return;
 		void tick().then(() =>
@@ -77,8 +79,11 @@
 		}).format(d);
 
 	/** Sessions grouped by local day, in order. */
+	const visible = $derived(
+		classFilter ? sessions.filter((s) => s.session.classTypeId === classFilter) : sessions
+	);
 	const byDay = $derived(
-		[...sessions]
+		[...visible]
 			.reduce((acc, s) => {
 				const day = localDate(s.session.startsAt, tz);
 				(acc.get(day) ?? acc.set(day, []).get(day)!).push(s);
@@ -115,7 +120,10 @@
 		<div class="flex items-center justify-between gap-3">
 			<div class="space-y-1">
 				<h1 class="text-2xl font-semibold tracking-tight">Class schedule</h1>
-				<p class="text-sm text-muted-foreground">Next 7 days · {tz}</p>
+				<p class="text-sm text-muted-foreground">
+					Next 7 days · {tz}{#if classFilter && visible[0]}
+						· {visible[0].className} only{/if}
+				</p>
 			</div>
 			<Button variant="outline" size="sm" href="/j/{org.slug}">
 				<ArrowLeft /> Memberships

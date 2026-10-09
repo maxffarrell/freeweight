@@ -25,6 +25,7 @@
 		updateSession,
 		getRoster,
 		setBookingNote,
+		setCoachNote,
 		moveBooking,
 		bookSession,
 		forgiveNoShow,
@@ -74,7 +75,7 @@
 		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
-	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
+	import { getJoinInfo, getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -1251,6 +1252,24 @@
 										}
 									}}
 								/>
+								<input
+									class="ml-1 w-20 border-0 bg-transparent text-xs text-primary/70 outline-none placeholder:italic focus:text-primary sm:w-24"
+									placeholder="+ coach"
+									title="Coach note — the member sees this in their portal"
+									value={r.booking.coachNote ?? ''}
+									onchange={async (e) => {
+										const v2 = (e.target as HTMLInputElement).value;
+										try {
+											await setCoachNote({
+												bookingId: r.booking.id,
+												sessionId: focus!.session.id,
+												note: v2 || null
+											});
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not save note'));
+										}
+									}}
+								/>
 							</Table.Cell>
 							<Table.Cell>
 								<StatusBadge status={r.booking.status} />
@@ -1849,6 +1868,21 @@
 							{#if !c.active}<Badge variant="outline">inactive</Badge>{/if}
 							{#if editTypeId === c.id}<Badge variant="secondary">editing</Badge>{/if}
 						</div>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-7 shrink-0 px-2 text-xs"
+							title="Copy the public timetable link for this class"
+							onclick={async () => {
+								try {
+									const { url } = await getJoinInfo();
+									await navigator.clipboard.writeText(`${url}/schedule?class=${c.id}`);
+									toast.success(`${c.name} link copied`);
+								} catch (err) {
+									toast.error(errMsg(err, 'Could not copy'));
+								}
+							}}><Copy class="size-3.5" /></Button
+						>
 						<Button
 							variant="ghost"
 							size="sm"

@@ -50,7 +50,8 @@ import { creditUsage, creditsUsedIn } from './schedule.ts';
 import {
 	notifyCreditsGifted,
 	notifyDeletionRequested,
-	notifySignRequest
+	notifySignRequest,
+	notifyPersonalRecord
 } from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -951,6 +952,7 @@ export async function addPersonalRecord(
 		summary: `New PR: ${input.label} — ${input.value}`,
 		data: { prId: row!.id }
 	});
+	notifyPersonalRecord(orgId, row!.id).catch(() => {});
 	return row;
 }
 

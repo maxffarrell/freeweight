@@ -31,7 +31,8 @@ import {
 	sendWinBackNudges,
 	sendLeadNudges,
 	sendEquipmentServiceReminders,
-	sendOwnerInsights
+	sendOwnerInsights,
+	sendNewMemberDrip
 } from '#lib/server/services/notifications.ts';
 import {
 	autoCancelUnderEnrolled,
@@ -101,6 +102,11 @@ export const GET: RequestHandler = async ({ request }) => {
 			suspended += await suspendDelinquentMembers(o.id);
 			recurringPosted += await postDueRecurring(o.id);
 			recurringPosted += await postDueRecurringExpenses(o.id);
+			try {
+				await sendNewMemberDrip(o.id);
+			} catch (err) {
+				console.error(`member-drip cron failed for ${o.id}`, err);
+			}
 		} catch (err) {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);
