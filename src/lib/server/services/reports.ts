@@ -1630,7 +1630,8 @@ export async function getReports(orgId: string) {
 		lost,
 		streaks,
 		rel,
-		shopTop
+		shopTop,
+		statusBreakdown
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1703,7 +1704,8 @@ export async function getReports(orgId: string) {
 		lostMrr(orgId),
 		weekStreakLeaders(orgId, 8),
 		instructorReliability(orgId),
-		shopSales30d(orgId)
+		shopSales30d(orgId),
+		memberStatusBreakdown(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1788,7 +1790,8 @@ export async function getReports(orgId: string) {
 		lostMrr: lost,
 		streakLeaders: streaks,
 		instructorReliability: rel,
-		shopTop
+		shopTop,
+		statusBreakdown
 	};
 }
 
@@ -1817,6 +1820,19 @@ async function instructorReliability(orgId: string) {
 		.groupBy(user.name)
 		.orderBy(desc(sql`count(*) filter (where ${classSession.cancelledAt} is not null)`))
 		.limit(8);
+}
+
+/** Headcount per member status (active / inactive / suspended / …). */
+async function memberStatusBreakdown(orgId: string) {
+	return db
+		.select({
+			status: gymMember.status,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, orgId))
+		.groupBy(gymMember.status)
+		.orderBy(desc(sql`count(*)`));
 }
 
 /** Retail shop sales for the last 30 days — top items by units sold + revenue. */

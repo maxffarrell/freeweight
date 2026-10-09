@@ -647,7 +647,12 @@
 									<Table.Cell class="text-muted-foreground"
 										>{c.charge.description ?? c.charge.kind}</Table.Cell
 									>
-									<Table.Cell>{formatDate(c.charge.dueDate)}</Table.Cell>
+									<Table.Cell
+										>{formatDate(
+											c.charge.dueDate
+										)}{#if c.charge.status === 'open' && c.charge.dueDate < todayISO()}
+											<Badge variant="destructive" class="ml-1">overdue</Badge>{/if}</Table.Cell
+									>
 									<Table.Cell><StatusBadge status={c.charge.status} /></Table.Cell>
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(c.charge.amount, currency)}</Table.Cell
