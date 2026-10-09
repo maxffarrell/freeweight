@@ -1492,7 +1492,7 @@ export async function bookSession(
 		const [fill] = await db
 			.select({
 				cap: classSession.capacity,
-				n: sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`.mapWith(Number)
+				n: sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${input.sessionId} and b.status = 'booked')`.mapWith(Number)
 			})
 			.from(classSession)
 			.where(eq(classSession.id, input.sessionId));
