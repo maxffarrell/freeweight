@@ -29,7 +29,9 @@ import {
 	sendMemberDigest,
 	sendWeeklyDigest,
 	sendWinBackNudges,
-	sendLeadNudges
+	sendLeadNudges,
+	sendEquipmentServiceReminders,
+	sendOwnerInsights
 } from '#lib/server/services/notifications.ts';
 import {
 	autoCancelUnderEnrolled,
@@ -91,6 +93,8 @@ export const GET: RequestHandler = async ({ request }) => {
 	let recurringPosted = 0;
 	let riskTagged = 0;
 	let usualNudges = 0;
+	let serviceReminders = 0;
+	let ownerInsights = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -112,6 +116,13 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`usual-class nudge failed for ${o.id}`, err);
+		}
+		try {
+			serviceReminders += await sendEquipmentServiceReminders(o.id);
+			ownerInsights += await sendOwnerInsights(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`service/insights cron failed for ${o.id}`, err);
 		}
 		try {
 			reminders += await sendClassReminders(o.id);
@@ -291,6 +302,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		workspaces: orgs.length,
 		riskTagChanges: riskTagged,
 		usualNudges,
+		serviceReminders,
+		ownerInsights,
 		failed,
 		reminders,
 		eventReminders,

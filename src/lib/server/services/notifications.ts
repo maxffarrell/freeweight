@@ -17,8 +17,9 @@ import {
 	sql
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { atRiskMembers } from '#lib/server/services/reports.ts';
+import { wrongPlan,  atRiskMembers } from '#lib/server/services/reports.ts';
 import {
+	equipment,
 	activity,
 	booking,
 	challenge,
@@ -4049,4 +4050,106 @@ export async function notifyClassWatchers(orgId: string, sessionIds: string[]) {
 			await logOnce(orgId, 'class_watch', `${w.memberId}:${first.id}`, email);
 		}).catch(() => {});
 	}
+}
+
+/**
+ * Equipment service reminders — daily cron: emails owner/admin when a machine's
+ * nextServiceOn date passes. Deduped once per machine per service date.
+ */
+export async function sendEquipmentServiceReminders(orgId: string) {
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	const due = await db
+		.select({ id: equipment.id, name: equipment.name, kind: equipment.kind, nextServiceOn: equipment.nextServiceOn })
+		.from(equipment)
+		.where(and(eq(equipment.organizationId, orgId), lte(equipment.nextServiceOn, today)));
+	if (!due.length) return 0;
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	let sent = 0;
+	for (const s of staff) {
+		const lines = [];
+		for (const e of due) {
+			if (!(await logOnce(orgId, 'service_due', `${e.id}:${e.nextServiceOn}`, s.email))) continue;
+			lines.push(`${e.name}${e.kind ? ` (${e.kind})` : ''} — service due ${e.nextServiceOn}`);
+		}
+		if (!lines.length) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${due.length} machine${due.length === 1 ? '' : 's'} due for service — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: 'Equipment service due',
+				lines: [...lines, 'Update the service date or status from Settings → Locations once handled.']
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
+ * Monthly owner insights — on the 1st of the month (gym-local) emails owner/admin a
+ * compact digest: last month's joins/cancels plus the current at-risk and wrong-plan lists.
+ */
+export async function sendOwnerInsights(orgId: string) {
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const today = localDate(new Date(), tz);
+	if (!today.endsWith('-01')) return 0;
+	const lastMonth = today.slice(0, 5) + (Number(today.slice(5, 7)) - 1 || 12).toString().padStart(2, '0') + '-01';
+	const prevMonthStart = new Date(`${today.slice(0, 8)}01T00:00:00Z`);
+	prevMonthStart.setUTCMonth(prevMonthStart.getUTCMonth() - 1);
+	const [joins, cancels, atRisk, wp] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(gymMember)
+			.where(
+				and(
+					eq(gymMember.organizationId, orgId),
+					sql`to_char(${gymMember.createdAt} at time zone ${sql.raw(`'${tz}'`)}, 'YYYY-MM') = ${lastMonth.slice(0, 7)}`
+				)
+			),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.status, 'cancelled'),
+					gte(membership.endsAt, prevMonthStart),
+					lt(membership.endsAt, new Date(`${today.slice(0, 8)}01T00:00:00Z`))
+				)
+			),
+		atRiskMembers(orgId),
+		wrongPlan(orgId)
+	]);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	const misfitCount = wp.overpaying.length + wp.upgrading.length;
+	const lines = [
+		`Last month: ${joins[0]?.n ?? 0} new member${(joins[0]?.n ?? 0) === 1 ? '' : 's'} joined, ${cancels[0]?.n ?? 0} membership${(cancels[0]?.n ?? 0) === 1 ? '' : 's'} cancelled.`,
+		atRisk.length
+			? `${atRisk.length} member${atRisk.length === 1 ? ' is' : 's are'} at risk right now (no visit in 14+ days) — see Reports → At risk.`
+			: 'No members at risk right now.',
+		misfitCount
+			? `${misfitCount} member${misfitCount === 1 ? '' : 's'} look${misfitCount === 1 ? 's' : ''} like they're on the wrong plan — see Reports → Wrong plan.`
+			: 'Every member looks to be on the right plan.'
+	];
+	let sent = 0;
+	for (const s of staff) {
+		if (!(await logOnce(orgId, 'owner_insights', today, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `Your ${name.orgName} month in one email`,
+			...renderEmail({ ...name, heading: 'Monthly insights', lines })
+		});
+		sent++;
+	}
+	return sent;
 }

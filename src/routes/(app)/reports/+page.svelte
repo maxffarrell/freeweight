@@ -534,6 +534,25 @@
 	</Card.Root>
 
 	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Waitlist conversion</Card.Title>
+			<Card.Description>Last 90 days — promoted off the queue vs still waiting</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			{#each r.waitlist as w (w.name)}
+				<div class="flex items-center justify-between gap-2">
+					<span class="min-w-0 flex-1 truncate">{w.name}</span>
+					<span class="tabular-nums text-muted-foreground"
+						>{w.promoted} promoted · {w.queued} queued · {w.pct}%</span
+					>
+				</div>
+			{:else}
+				<p class="text-muted-foreground">No waitlist activity in the last 90 days.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
 			<Card.Description
