@@ -1006,6 +1006,7 @@ export async function membersLeaderboard(orgId: string, memberId: string, tz: st
 			and(
 				eq(checkIn.organizationId, orgId),
 				isNull(checkIn.guestName),
+				ne(gymMember.name, 'Former member'),
 				sql`to_char(${checkIn.checkedAt} at time zone ${sql.raw(`'${tz.replace(/'/g, '')}'`)}, 'YYYY-MM') = ${month}`
 			)
 		)
