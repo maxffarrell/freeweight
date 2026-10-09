@@ -46,6 +46,14 @@ export const updatePlan = command(planUpdate, async (input) => {
 	void getPlans().refresh();
 	return p;
 });
+export const migratePlanMembers = command(
+	v.object({ fromPlanId: idSchema, toPlanId: idSchema }),
+	async ({ fromPlanId, toPlanId }) => {
+		const r = await svc.migratePlan(await requireOrg('admin'), fromPlanId, toPlanId);
+		void getPlans().refresh();
+		return r;
+	}
+);
 
 export const getPromoCodes = query(async () => svc.listPromoCodes((await requireOrg()).orgId));
 export const createPromoCode = command(promoCodeInput, async (input) => {

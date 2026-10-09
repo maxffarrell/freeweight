@@ -16,6 +16,7 @@ import {
 	gymSettings,
 	location,
 	member,
+	memberIssue,
 	membership,
 	payment,
 	paymentProvider,
@@ -318,6 +319,20 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(signRequest.createdAt))
 		.limit(50);
 
+	// Problems members flagged in the portal, newest first.
+	const issueOpen = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			text: memberIssue.text,
+			requestedAt: memberIssue.createdAt
+		})
+		.from(memberIssue)
+		.innerJoin(gymMember, eq(memberIssue.memberId, gymMember.id))
+		.where(and(eq(memberIssue.organizationId, orgId), eq(memberIssue.status, 'open')))
+		.orderBy(desc(memberIssue.createdAt))
+		.limit(50);
+
 	// Members currently inside (checked in today, not yet checked out).
 	const insideNow = await db
 		.select({ name: gymMember.name })
@@ -578,6 +593,15 @@ export async function dashboard(orgId: string) {
 				planName: `sign: ${p.title}`,
 				kind: 'sign' as const,
 				requestedAt: p.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...issueOpen.map((i) => ({
+				memberId: i.memberId,
+				memberName: i.memberName,
+				planName: `issue: ${i.text.slice(0, 60)}${i.text.length > 60 ? '…' : ''}`,
+				kind: 'issue' as const,
+				requestedAt: i.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
 			})),

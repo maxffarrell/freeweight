@@ -931,6 +931,7 @@
 	let tMemberBookable = $state(true);
 	let tMinLevel = $state('');
 	let tMinAge = $state<number | null>(null);
+	let tBring = $state('');
 	let tQuals = new SvelteSet<string>();
 	let tStream = $state('');
 	const levels = $derived(await getLevels());
@@ -957,6 +958,7 @@
 		tStream = c.defaultStreamUrl ?? '';
 		tMinLevel = c.minLevelId ?? '';
 		tMinAge = c.minAge ?? null;
+		tBring = c.bringNote ?? '';
 		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
 	// ------- movement video library -------
@@ -1024,6 +1026,7 @@
 				defaultStreamUrl: tStream.trim() || null,
 				minLevelId: tMinLevel || null,
 				minAge: tMinAge,
+				bringNote: tBring,
 				active: tActive
 			};
 			let savedTypeId = editTypeId;
@@ -2031,6 +2034,10 @@
 					placeholder="All ages"
 				/>
 				<Field.Description>Under-age members can't book this class.</Field.Description>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-bring">What to bring (optional)</Field.Label>
+				<Input id="t-bring" bind:value={tBring} placeholder="Mat, gloves, towel" maxlength={120} />
 			</Field.Field>
 			{#if levels.length}
 				<Field.Field>

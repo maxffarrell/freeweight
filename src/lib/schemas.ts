@@ -149,6 +149,7 @@ export const classTypeInput = v.object({
 	minLevelId: v.optional(v.nullable(idSchema)),
 	/** Minimum member age in years to self-book; null = all ages. */
 	minAge: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(3), v.maxValue(99)))),
+	bringNote: v.optional(v.pipe(v.string(), v.maxLength(120))),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });

@@ -76,6 +76,23 @@
 		a.click();
 		URL.revokeObjectURL(a.href);
 	}
+	function exportPnl() {
+		const csv = toCsv([
+			['Month', 'Revenue', 'Expenses', 'Shop COGS', 'Net'],
+			...r.pnl.months.map((m) => [
+				m.month,
+				(m.revenue / 100).toFixed(2),
+				(m.expenses / 100).toFixed(2),
+				(m.cogs / 100).toFixed(2),
+				(m.net / 100).toFixed(2)
+			])
+		]);
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		a.download = `pnl-${new Date().toISOString().slice(0, 7)}.csv`;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
 
 	function monthLabel(ym: string) {
 		return new Date(`${ym}-02T00:00:00Z`).toLocaleString('en', { month: 'short', year: '2-digit' });
@@ -659,12 +676,15 @@
 
 	{#if r.pnl.months.length}
 		<Card.Root class="lg:col-span-2">
-			<Card.Header>
-				<Card.Title class="text-base">Profit &amp; loss</Card.Title>
-				<Card.Description>
-					Revenue vs logged expenses + shop cost-of-goods per month — costs on Billing → Expenses,
-					item cost on Billing → Shop
-				</Card.Description>
+			<Card.Header class="flex-row items-start justify-between">
+				<div>
+					<Card.Title class="text-base">Profit &amp; loss</Card.Title>
+					<Card.Description>
+						Revenue vs logged expenses + shop cost-of-goods per month — costs on Billing → Expenses,
+						item cost on Billing → Shop
+					</Card.Description>
+				</div>
+				<Button size="sm" variant="outline" onclick={exportPnl}><Download /> CSV</Button>
 			</Card.Header>
 			<Card.Content>
 				<div class="grid gap-6 md:grid-cols-[1fr_auto]">

@@ -38,6 +38,7 @@
 		mergeMembers,
 		logIncident,
 		updateIncidentEntry,
+		resolveMemberIssue,
 		sendSignRequest,
 		voidSignRequest,
 		getMemberWorkouts,
@@ -219,6 +220,14 @@
 			toast.error(errMsg(err, 'Could not log'));
 		}
 		incPending = false;
+	}
+	async function resolveIssue(issueId: string) {
+		try {
+			await resolveMemberIssue({ id: issueId, memberId: id });
+			toast.success('Issue resolved');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not resolve'));
+		}
 	}
 	async function closeIncident(incidentId: string) {
 		const followUp = prompt('Follow-up notes (what was done):') ?? '';
@@ -1544,6 +1553,37 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
+
+		{#if m.issues.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Member issues</Card.Title>
+					<Card.Description>Problems the member reported in the portal</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.issues as i (i.id)}
+						<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+							<span class="min-w-0 break-words">{i.text}</span>
+							<span class="flex shrink-0 items-center gap-2">
+								<span class="text-xs text-muted-foreground">
+									{formatRelative(i.createdAt)}
+								</span>
+								{#if i.status === 'open'}
+									<Button
+										size="sm"
+										variant="ghost"
+										class="h-7 px-1.5"
+										onclick={() => resolveIssue(i.id)}>Resolve</Button
+									>
+								{:else}
+									<Badge variant="secondary">resolved</Badge>
+								{/if}
+							</span>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
 
 		<Card.Root>
 			<Card.Header class="flex-row items-center justify-between">

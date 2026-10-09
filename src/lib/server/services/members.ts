@@ -40,6 +40,7 @@ import {
 	waiver,
 	plan,
 	outer,
+	memberIssue,
 	workoutLog,
 	workoutResult
 } from '#lib/server/db/schema.ts';
@@ -376,7 +377,8 @@ export async function getMember(orgId: string, id: string) {
 		prs,
 		incidents,
 		signRequests,
-		workoutLogs
+		workoutLogs,
+		issues
 	] = await Promise.all([
 		db
 			.select({
@@ -484,7 +486,13 @@ export async function getMember(orgId: string, id: string) {
 			.from(workoutLog)
 			.where(and(eq(workoutLog.organizationId, orgId), eq(workoutLog.memberId, id)))
 			.orderBy(desc(workoutLog.day), desc(workoutLog.createdAt))
-			.limit(10)
+			.limit(10),
+		db
+			.select()
+			.from(memberIssue)
+			.where(and(eq(memberIssue.organizationId, orgId), eq(memberIssue.memberId, id)))
+			.orderBy(desc(memberIssue.createdAt))
+			.limit(15)
 	]);
 	// Current week-streak for the member page (same rule as the portal card).
 	const yearAgo = new Date(Date.now() - 370 * 86400_000);
@@ -560,6 +568,7 @@ export async function getMember(orgId: string, id: string) {
 		incidents,
 		signRequests,
 		workoutLogs,
+		issues,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),
@@ -574,6 +583,25 @@ export async function getMember(orgId: string, id: string) {
 					: null
 		}
 	};
+}
+
+/** Staff resolves an issue a member reported in the portal. */
+export async function resolveIssue(ctx: OrgContext, id: string) {
+	const [row] = await db
+		.update(memberIssue)
+		.set({ status: 'resolved', resolvedAt: new Date(), updatedAt: new Date() })
+		.where(and(eq(memberIssue.organizationId, ctx.orgId), eq(memberIssue.id, id)))
+		.returning();
+	if (!row) error(404, 'Issue not found');
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'member_issue',
+		entityId: id,
+		action: 'resolved',
+		summary: 'Resolved a member-reported issue'
+	});
+	return row;
 }
 
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {

@@ -431,6 +431,15 @@ export const logIncident = command(incidentInput, async (input) => {
 	return r;
 });
 
+export const resolveMemberIssue = command(
+	v.object({ id: idSchema, memberId: idSchema }),
+	async ({ id, memberId }) => {
+		const r = await svc.resolveIssue(await requireOrg(), id);
+		void getMember(memberId).refresh();
+		return r;
+	}
+);
+
 export const updateIncidentEntry = command(
 	v.object({ ...incidentUpdate.entries, memberId: idSchema }),
 	async ({ memberId, ...input }) => {
