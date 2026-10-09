@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-demo-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  group: release-demo-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: false
 jobs:
   plan:
@@ -33,6 +33,9 @@ jobs:
       - id: plan
         run: node scripts/release/plan.mjs
   version:
+    concurrency:
+      group: changesets-version-${{ github.repository }}
+      cancel-in-progress: false
     needs: plan
     if: github.event_name == 'push' && needs.plan.outputs.deploy != 'true'
     runs-on: ubuntu-24.04
