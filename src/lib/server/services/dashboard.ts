@@ -89,6 +89,17 @@ export async function dashboard(orgId: string) {
 			)
 		);
 
+	const [lastWkDay] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, new Date(dayStart.getTime() - 7 * 86400_000)),
+				lt(checkIn.checkedAt, new Date(dayEnd.getTime() - 7 * 86400_000))
+			)
+		);
+
 	const mrr = await monthlyRecurring(orgId);
 
 	// Trailing-7d check-ins vs the week before — feeds the KPI card.
@@ -693,6 +704,7 @@ export async function dashboard(orgId: string) {
 		upcomingEvents,
 		inSessionNow,
 		checkInsToday: checkInStats?.today ?? 0,
+		checkInsLastWkDay: lastWkDay?.n ?? 0,
 		checkInsWeek: checkInsWk?.week ?? 0,
 		checkInsPrevWeek: checkInsWk?.prev ?? 0,
 		guestsWeek: checkInsWk?.guests ?? 0,
