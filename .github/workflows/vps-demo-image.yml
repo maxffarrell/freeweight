@@ -24,7 +24,7 @@ jobs:
           pnpm check
           pnpm lint
           # Seeded-database integration tests run separately from this unit suite.
-          pnpm test --exclude '**/*.it.test.ts'
+          pnpm test $(git ls-files '*.test.ts' '*.spec.ts' | sed '/\.it\.test\.ts$/d')
       - uses: docker/setup-buildx-action@v3
       - name: Build linux/amd64 image
         uses: docker/build-push-action@v6
