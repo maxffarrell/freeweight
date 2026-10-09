@@ -158,6 +158,7 @@
 	let freezeFee = $state<number | null>(settings.freezeFee);
 	let reviewUrl = $state(settings.reviewUrl ?? '');
 	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
+	let rewardCredits = $state<number | null>(settings.rewardCredits);
 	let revenueTarget = $state<number | null>(settings.revenueTarget);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
@@ -193,6 +194,7 @@
 				freezeFee,
 				reviewUrl: reviewUrl.trim() || null,
 				reviewAfterVisits,
+				rewardCredits,
 				revenueTarget,
 				publicPage,
 				staffBriefing,
@@ -590,6 +592,20 @@
 							<Field.Description
 								>Once a member's lifetime check-ins reach this, they get one review-request email
 								(never twice).</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-reward">Milestone reward — comp classes</Field.Label>
+							<Input
+								id="s-reward"
+								type="number"
+								min={0}
+								bind:value={rewardCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Comp classes granted when a member hits a check-in milestone (10, 25, 50, …) —
+								blank or 0 = off.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

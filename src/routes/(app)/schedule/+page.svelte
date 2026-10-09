@@ -1215,6 +1215,25 @@
 				>
 					{focus.session.cancelledAt ? 'Restore session' : 'Cancel session'}
 				</Button>
+				{#if !focus.session.cancelledAt}
+					<Button
+						variant="outline"
+						class="w-full"
+						title="Cancel this session and try booking its members into the next session of this class"
+						onclick={async () => {
+							try {
+								await updateSession({ id: focusId, cancelled: true, rebookNext: true });
+								toast.success('Session cancelled — members moved to the next class if one exists');
+								await reload();
+								rosterOpen = false;
+							} catch (err) {
+								toast.error(errMsg(err, 'Failed'));
+							}
+						}}
+					>
+						Cancel + rebook members
+					</Button>
+				{/if}
 			{/if}
 		</div>
 	</Sheet.Content>

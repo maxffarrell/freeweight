@@ -270,7 +270,11 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		.returning();
 	// A check-in marks that member's already-started bookings today as attended.
 	const [st] = await db
-		.select({ timezone: gymSettings.timezone, waiverText: gymSettings.waiver })
+		.select({
+			timezone: gymSettings.timezone,
+			waiverText: gymSettings.waiver,
+			rewardCredits: gymSettings.rewardCredits
+		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 	const tz = st?.timezone ?? 'UTC';
@@ -313,7 +317,28 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			)
 		);
 	if (n === 1) notifyFirstVisit(ctx.orgId, memberId).catch(() => {});
-	else if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+	else if (MILESTONES.includes(n)) {
+		notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+		// Milestone reward: comp classes on the member's active membership.
+		if (st?.rewardCredits) {
+			const [ms] = await db
+				.select({ id: membership.id })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.memberId, memberId),
+						eq(membership.status, 'active')
+					)
+				)
+				.limit(1);
+			if (ms)
+				await db
+					.update(membership)
+					.set({ bonusCredits: sql`${membership.bonusCredits} + ${st.rewardCredits}` })
+					.where(eq(membership.id, ms.id));
+		}
+	}
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);

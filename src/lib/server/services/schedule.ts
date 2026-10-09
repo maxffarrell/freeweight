@@ -588,6 +588,53 @@ export async function updateSession(
 	}
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
+	if (set.cancelled && set.rebookNext) {
+		// Next upcoming session of the same class — members get booked into it.
+		const [next] = await db
+			.select({ id: classSession.id, startsAt: classSession.startsAt })
+			.from(classSession)
+			.where(
+				and(
+					eq(classSession.organizationId, ctx.orgId),
+					eq(classSession.classTypeId, row.classTypeId),
+					isNull(classSession.cancelledAt),
+					gt(classSession.startsAt, row.startsAt)
+				)
+			)
+			.orderBy(asc(classSession.startsAt))
+			.limit(1);
+		if (next) {
+			const booked = await db
+				.select({ memberId: booking.memberId })
+				.from(booking)
+				.where(
+					and(
+						eq(booking.organizationId, ctx.orgId),
+						eq(booking.sessionId, id),
+						eq(booking.status, 'booked')
+					)
+				);
+			let moved = 0;
+			for (const b of booked) {
+				try {
+					await bookSession(ctx, { sessionId: next.id, memberId: b.memberId }, ctx.userId, {
+						skipDailyLimit: true
+					});
+					moved++;
+				} catch {
+					// Full, duplicate, or no entitlement — the cancel email already went out.
+				}
+			}
+			await emit({
+				orgId: ctx.orgId,
+				actorId: ctx.userId,
+				entityType: 'session',
+				entityId: id,
+				action: 'rebooked',
+				summary: `${moved}/${booked.length} booked members moved to the next session`
+			});
+		}
+	}
 	if (set.needsCover && !prev.coverRequestedAt) {
 		await emit({
 			orgId: ctx.orgId,

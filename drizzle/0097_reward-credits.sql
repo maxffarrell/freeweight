@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "reward_credits" integer;
