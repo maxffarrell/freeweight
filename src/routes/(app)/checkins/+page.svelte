@@ -28,6 +28,7 @@
 	let checkIns = $state(await getCheckIns({ date: viewDate }));
 	let insideOnly = $state(false);
 	let guestsOnly = $state(false);
+	let firstOnly = $state(false);
 	let method = $state<'' | 'qr' | 'manual'>('');
 	let filterLocation = $state('');
 	async function refilter() {
@@ -37,7 +38,8 @@
 			inside: insideOnly || undefined,
 			guests: guestsOnly || undefined,
 			method: method || undefined,
-			locationId: filterLocation === '__all' ? undefined : filterLocation || undefined
+			locationId: filterLocation === '__all' ? undefined : filterLocation || undefined,
+			firstVisit: firstOnly || undefined
 		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -233,6 +235,18 @@
 						if (guestsOnly) insideOnly = false;
 						void refilter();
 					}}>Guests</Button
+				>
+				<Button
+					size="sm"
+					variant={firstOnly ? 'default' : 'outline'}
+					onclick={() => {
+						firstOnly = !firstOnly;
+						if (firstOnly) {
+							guestsOnly = false;
+							insideOnly = false;
+						}
+						void refilter();
+					}}>First visit</Button
 				>
 				{#if locations.length > 1}
 					<Select.Root

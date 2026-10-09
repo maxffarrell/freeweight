@@ -446,7 +446,8 @@ export async function getMember(orgId: string, id: string) {
 					sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
 						Number
 					),
-				firstVisit: sql<Date | null>`min(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`
+				firstVisit: sql<Date | null>`min(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`,
+				lastVisit: sql<Date | null>`max(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`
 			})
 			.from(checkIn)
 			.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
@@ -646,6 +647,7 @@ export async function getMember(orgId: string, id: string) {
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,
 			firstVisit: att?.firstVisit ?? null,
+			lastVisit: att?.lastVisit ?? null,
 			noShows: bs?.noShows ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:

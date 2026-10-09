@@ -20,6 +20,14 @@
 
 	const f = await getFranchise();
 	const multiCurrency = new Set(f.gyms.map((g) => g.currency)).size > 1;
+	const totals = $derived({
+		members: f.gyms.reduce((a, g) => a + g.members, 0),
+		newMembers30: f.gyms.reduce((a, g) => a + g.newMembers30, 0),
+		mrr: f.gyms.reduce((a, g) => a + g.mrr, 0),
+		monthRevenue: f.gyms.reduce((a, g) => a + g.monthRevenue, 0),
+		monthCheckIns: f.gyms.reduce((a, g) => a + g.monthCheckIns, 0),
+		sessionsNext7: f.gyms.reduce((a, g) => a + g.sessionsNext7, 0)
+	});
 	let switching = $state<string | null>(null);
 	const expanded = new SvelteSet<string>();
 	let memberQ = $state('');
@@ -274,6 +282,27 @@
 								</Table.Row>
 							{/if}
 						{/each}
+						{#if f.gyms.length > 1}
+							<Table.Row class="border-t-2 font-medium">
+								<Table.Cell>Total</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{totals.members}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{totals.newMembers30}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{multiCurrency
+										? '—'
+										: formatMoney(totals.mrr, f.gyms[0].currency, true)}</Table.Cell
+								>
+								<Table.Cell class="text-right tabular-nums"
+									>{multiCurrency
+										? '—'
+										: formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}</Table.Cell
+								>
+								<Table.Cell class="text-right text-muted-foreground">—</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{totals.monthCheckIns}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{totals.sessionsNext7}</Table.Cell>
+								<Table.Cell></Table.Cell>
+							</Table.Row>
+						{/if}
 					</Table.Body>
 				</Table.Root>
 			</Card.Content>

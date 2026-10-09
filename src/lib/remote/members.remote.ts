@@ -257,9 +257,10 @@ export const getCheckIns = query(
 		inside: v.optional(v.boolean()),
 		guests: v.optional(v.boolean()),
 		method: v.optional(v.picklist(['qr', 'manual'])),
-		locationId: v.optional(idSchema)
+		locationId: v.optional(idSchema),
+		firstVisit: v.optional(v.boolean())
 	}),
-	async ({ date, q, inside, guests, method, locationId }) => {
+	async ({ date, q, inside, guests, method, locationId, firstVisit }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
@@ -271,7 +272,8 @@ export const getCheckIns = query(
 			inside,
 			guestsOnly: guests,
 			method,
-			locationId
+			locationId,
+			firstVisit
 		});
 	}
 );

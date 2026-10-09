@@ -539,6 +539,8 @@ export async function listCheckIns(
 		method?: 'qr' | 'manual';
 		/** Only check-ins at this location. */
 		locationId?: string;
+		/** Only a member's first-ever check-in (guest rows excluded). */
+		firstVisit?: boolean;
 	}
 ) {
 	const term = opts.q?.trim();
@@ -562,6 +564,12 @@ export async function listCheckIns(
 				opts.guestsOnly ? isNotNull(checkIn.guestName) : undefined,
 				opts.method ? eq(checkIn.method, opts.method) : undefined,
 				opts.locationId ? eq(checkIn.locationId, opts.locationId) : undefined,
+				opts.firstVisit
+					? and(
+							isNull(checkIn.guestName),
+							sql`${checkIn.checkedAt} = (select min(c2.checked_at) from check_in c2 where c2.member_id = ${checkIn.memberId} and c2.guest_name is null)`
+						)
+					: undefined,
 				term
 					? or(ilike(gymMember.name, `%${term}%`), ilike(checkIn.guestName, `%${term}%`))
 					: undefined

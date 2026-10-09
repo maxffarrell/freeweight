@@ -314,6 +314,16 @@
 						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
 								>{p.endingSoon} ending soon</Badge
 							>{/if}
+						{#if !p.isPack && p.activeMembers > 0}
+							{@const mrr = Math.round(
+								p.amount *
+									p.activeMembers *
+									(p.interval === 'week' ? 52 / 12 : p.interval === 'year' ? 1 / 12 : 1)
+							)}
+							<Badge variant="outline" class="text-muted-foreground"
+								>≈ {formatMoney(mrr, currency, true)}/mo</Badge
+							>
+						{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
 				</Card.Content>
