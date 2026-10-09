@@ -1,0 +1,1 @@
+ALTER TABLE "notification_log" ADD COLUMN "opened_at" timestamp with time zone;

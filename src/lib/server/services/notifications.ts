@@ -1839,6 +1839,21 @@ export async function sendDueRecurringAnnouncements(orgId: string) {
  * rows for their email. The portal shows these as a News feed so a member who
  * deleted the email can still read the notice.
  */
+/** Stamps openedAt on a member's unread announcement rows — called when the portal News card renders. */
+export async function markAnnouncementsRead(orgId: string, email: string) {
+	await db
+		.update(notificationLog)
+		.set({ openedAt: new Date() })
+		.where(
+			and(
+				eq(notificationLog.organizationId, orgId),
+				eq(notificationLog.kind, 'announcement'),
+				eq(notificationLog.recipient, email),
+				isNull(notificationLog.openedAt)
+			)
+		);
+}
+
 export async function memberAnnouncements(orgId: string, email: string, limit = 10) {
 	const rows = await db
 		.select({ entityId: notificationLog.entityId, sentAt: notificationLog.createdAt })
@@ -1877,7 +1892,10 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 			total: sql<number>`(${activity.data}->>'total')::int`,
 			sendAt: sql<string | null>`${activity.data}->>'sendAt'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
-			plan: sql<string | null>`${activity.data}->>'plan'`
+			plan: sql<string | null>`${activity.data}->>'plan'`,
+			read: sql<number>`(select count(*) from ${notificationLog} nl where nl.organization_id = ${orgId} and nl.kind = 'announcement' and nl.opened_at is not null and nl.entity_id = 'announcement:' || (${activity.data}->>'subject') || '::' || (${activity.data}->>'message'))`.mapWith(
+				Number
+			)
 		})
 		.from(activity)
 		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'announcement')))

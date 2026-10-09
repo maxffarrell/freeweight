@@ -521,6 +521,13 @@ export const getPortalChallenges = query(idSchema, async (memberId) => {
 });
 
 /** Announcements this member was actually sent — the portal's News feed. */
+/** Stamps openedAt on the member's announcement rows when the News card renders. */
+export const markNewsRead = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!m || !m.email) return;
+	await notif.markAnnouncementsRead(m.organizationId, m.email);
+});
+
 export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!m.email) return [];

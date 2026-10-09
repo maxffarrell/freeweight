@@ -63,6 +63,7 @@
 		joinChallenge,
 		leaveChallenge,
 		getPortalAnnouncements,
+		markNewsRead,
 		addDependent,
 		getPortalAi,
 		aiWorkoutPlan,
@@ -476,6 +477,13 @@
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
 	const news = $derived(await getPortalAnnouncements(memberId));
+	let newsMarked = $state('');
+	$effect(() => {
+		if (news.length && newsMarked !== memberId) {
+			newsMarked = memberId;
+			markNewsRead(memberId).catch(() => {});
+		}
+	});
 	let chalBusy = $state('');
 	async function joinChal(challengeId: string) {
 		chalBusy = challengeId;
