@@ -552,6 +552,25 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.lockers.total}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Lockers</Card.Title>
+				<Card.Description>{r.lockers.assigned} of {r.lockers.total} assigned</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				{#each r.lockers.rows as l (l.id)}
+					<div class="flex items-center justify-between">
+						<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{l.memberId}"
+							>{l.memberName}</a
+						>
+						<span class="text-muted-foreground">{l.label}</span>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>

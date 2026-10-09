@@ -734,6 +734,9 @@
 										>
 									{/if}
 									{m.name}
+									{#if m.guardianId}
+										<Badge variant="outline" class="px-1.5 py-0 text-[10px]">family</Badge>
+									{/if}
 								</span>
 								{#if m.tags.length}
 									<span class="ml-1.5 inline-flex gap-1">

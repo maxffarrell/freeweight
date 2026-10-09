@@ -235,6 +235,14 @@ export const recordCheckIn = command(checkInInput, async (input) => {
 	return r;
 });
 
+/** Kiosk end-of-day: checks out everyone still inside (same rule the cron uses). */
+export const checkOutAll = command(async () => {
+	const { orgId } = await requireOrg();
+	const n = await checkins.checkOutAll(orgId);
+	void getTodayCheckIns().refresh();
+	return n;
+});
+
 /** Staff marks a check-in row as over — the member left. */
 export const checkOut = command(idSchema, async (checkInId) => {
 	const ctx = await requireOrg();

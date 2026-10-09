@@ -632,6 +632,16 @@ export async function closeStaleCheckIns(orgId: string) {
 	return rows.length;
 }
 
+/** Kiosk "Out all": stamps every still-open check-in out right now. */
+export async function checkOutAll(orgId: string) {
+	const rows = await db
+		.update(checkIn)
+		.set({ checkedOutAt: new Date() })
+		.where(and(eq(checkIn.organizationId, orgId), isNull(checkIn.checkedOutAt)))
+		.returning({ id: checkIn.id });
+	return rows.length;
+}
+
 /**
  * Portal self check-in: the instructor announces the session's `checkinCode` at
  * class; a booked member types it into the portal to mark their booking
