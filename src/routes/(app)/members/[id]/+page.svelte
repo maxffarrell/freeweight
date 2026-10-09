@@ -1116,6 +1116,12 @@
 						<span class="tabular-nums">{formatDate(m.attendance.firstVisit)}</span>
 					</div>
 				{/if}
+				{#if m.attendance.lastVisit}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Last visit</span>
+						<span class="tabular-nums">{formatDate(m.attendance.lastVisit)}</span>
+					</div>
+				{/if}
 				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
 				{#if nextMile}
 					<div class="flex justify-between">
