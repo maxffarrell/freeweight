@@ -1576,6 +1576,24 @@
 					<Button
 						variant="outline"
 						class="w-full"
+						title="Stop members booking this session themselves — staff can still add from the roster"
+						onclick={async () => {
+							try {
+								await updateSession({ id: focusId, bookingClosed: !focus!.session.bookingClosed });
+								toast.success(
+									focus!.session.bookingClosed ? 'Bookings reopened' : 'Bookings closed to members'
+								);
+								await reload();
+							} catch (err) {
+								toast.error(errMsg(err, 'Failed'));
+							}
+						}}
+					>
+						{focus.session.bookingClosed ? 'Open bookings' : 'Close bookings'}
+					</Button>
+					<Button
+						variant="outline"
+						class="w-full"
 						title="Cancel this session and try booking its members into the next session of this class"
 						onclick={async () => {
 							if (

@@ -582,7 +582,7 @@
 			<Card.Description>How far ahead members book — last 30 days</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-1.5 text-sm">
-			{#each r.leadTimes as c (c.name)}
+			{#each r.leadTimes.byClass as c (c.name)}
 				<div class="flex items-center justify-between">
 					<span class="min-w-0 flex-1 truncate">{c.name}</span>
 					<span class="text-muted-foreground tabular-nums"
@@ -592,6 +592,13 @@
 			{:else}
 				<p class="text-muted-foreground">No bookings in the last 30 days.</p>
 			{/each}
+			{#if r.leadTimes.cancelAvgHours != null}
+				<p class="border-t pt-1.5 text-xs text-muted-foreground">
+					Cancels average {r.leadTimes.cancelAvgHours >= 24
+						? `${Math.round(r.leadTimes.cancelAvgHours / 24)}d`
+						: `${r.leadTimes.cancelAvgHours}h`} before class ({r.leadTimes.cancelN} cancels)
+				</p>
+			{/if}
 		</Card.Content>
 	</Card.Root>
 

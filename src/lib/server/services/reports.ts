@@ -709,7 +709,7 @@ async function walkInStats(orgId: string) {
 /** Average hours members book ahead of class, per class — last 30 days of bookings. */
 async function bookingLeadTimes(orgId: string) {
 	const cutoff = new Date(Date.now() - 30 * 24 * 3600_000);
-	return db
+	const rows = await db
 		.select({
 			name: classType.name,
 			avgHours:
@@ -732,6 +732,29 @@ async function bookingLeadTimes(orgId: string) {
 		.groupBy(classType.name)
 		.orderBy(desc(sql`count(*)`))
 		.limit(8);
+	const [cancelLead] = await db
+		.select({
+			avgHours:
+				sql<number>`round(avg(extract(epoch from (${classSession.startsAt} - ${booking.cancelledAt})) / 3600))`.mapWith(
+					Number
+				),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'cancelled'),
+				gte(booking.cancelledAt, cutoff),
+				gt(classSession.startsAt, booking.cancelledAt)
+			)
+		);
+	return {
+		byClass: rows,
+		cancelAvgHours: cancelLead?.avgHours ?? null,
+		cancelN: cancelLead?.n ?? 0
+	};
 }
 
 /** Sessions in the next 14 days with people still on the waitlist. */

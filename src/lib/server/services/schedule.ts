@@ -670,6 +670,7 @@ export async function updateSession(
 			note: set.note,
 			workout: set.workout,
 			streamUrl: set.streamUrl,
+			bookingClosed: set.bookingClosed,
 			cancelledAt: set.cancelled === undefined ? undefined : set.cancelled ? new Date() : null,
 			// A new instructor means the cover is filled; otherwise honor the flag.
 			coverRequestedAt:
