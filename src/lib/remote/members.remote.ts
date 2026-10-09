@@ -35,6 +35,7 @@ import {
 	workoutUpdate
 } from '#lib/schemas.ts';
 import {
+	resendAnnouncementToNonOpeners,
 	cancelScheduledAnnouncement,
 	countAnnouncementAudience,
 	createRecurringAnnouncement,
@@ -329,6 +330,13 @@ export const scheduleEmail = command(scheduledAnnouncementInput, async (input) =
 export const cancelScheduledEmail = command(idSchema, async (id) => {
 	await cancelScheduledAnnouncement((await requireOrg()).orgId, id);
 	void getRecentAnnouncements().refresh();
+});
+
+/** Re-sends a sent announcement to recipients who never opened it. */
+export const resendToNonOpeners = command(idSchema, async (id) => {
+	const r = await resendAnnouncementToNonOpeners((await requireOrg()).orgId, id);
+	void getRecentAnnouncements().refresh();
+	return r;
 });
 
 // ------- recurring announcements -------

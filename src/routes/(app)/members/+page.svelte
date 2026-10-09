@@ -37,7 +37,8 @@
 		removeLevel,
 		getAnnouncementTemplates,
 		saveAnnouncementTemplate,
-		deleteAnnouncementTemplate
+		deleteAnnouncementTemplate,
+		resendToNonOpeners
 	} from '#lib/remote/members.remote.ts';
 	import { getLocations } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
@@ -469,6 +470,15 @@
 			toast.success('Repeating email removed');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not remove'));
+		}
+	}
+	async function resendAnnouncement(id: string, n: number) {
+		if (!confirm(`Resend to the ${n} member${n === 1 ? '' : 's'} who haven't opened it?`)) return;
+		try {
+			const r = await resendToNonOpeners(id);
+			toast.success(r.resent ? `Resent to ${r.resent} member${r.resent === 1 ? '' : 's'}` : 'Nobody left to resend to');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not resend'));
 		}
 	}
 	async function cancelScheduled(id: string) {
@@ -936,6 +946,13 @@
 									{formatDate(a.createdAt)} · {a.sent} sent{a.read ? ` · ${a.read} read` : ''}{a.tag
 										? ` · tag: ${a.tag}`
 										: ''}{a.plan ? ` · plan: ${a.plan}` : ''}
+									{#if a.sent > (a.read ?? 0)}
+										<button
+											class="ml-1 underline"
+											onclick={() => resendAnnouncement(a.id, a.sent - (a.read ?? 0))}
+											>resend to {a.sent - (a.read ?? 0)} unopened</button
+										>
+									{/if}
 								{/if}
 							</span>
 						</li>
