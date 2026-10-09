@@ -22,7 +22,10 @@ import {
 	charge,
 	checkIn,
 	classSession,
+	classTemplate,
 	classType,
+	course,
+	courseEnrollment,
 	eventRegistration,
 	expense,
 	facilityResource,
@@ -1080,7 +1083,8 @@ export async function getReports(orgId: string) {
 		profitability,
 		memberValue,
 		planChurn,
-		funnel
+		funnel,
+		courses
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1121,7 +1125,8 @@ export async function getReports(orgId: string) {
 		classProfitability(orgId),
 		memberLifetimeValue(orgId),
 		churnByPlan(orgId),
-		memberFunnel(orgId)
+		memberFunnel(orgId),
+		courseStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1174,8 +1179,39 @@ export async function getReports(orgId: string) {
 		profitability,
 		memberValue,
 		planChurn,
-		funnel
+		funnel,
+		courses
 	};
+}
+
+/** Per-course stats: enrollees, sessions held, attendance rate, revenue posted. */
+async function courseStats(orgId: string) {
+	return db
+		.select({
+			id: course.id,
+			name: course.name,
+			startsOn: course.startsOn,
+			endsOn: course.endsOn,
+			enrollees:
+				sql<number>`(select count(*) from ${courseEnrollment} e where e.course_id = ${outer(course.id)})`.mapWith(
+					Number
+				),
+			sessions:
+				sql<number>`(select count(*) from ${classSession} s join ${classTemplate} t on t.id = s.template_id where t.course_id = ${outer(course.id)})`.mapWith(
+					Number
+				),
+			attendancePct: sql<
+				number | null
+			>`(select round(100.0 * count(*) filter (where b.status = 'attended') / nullif(count(*) filter (where b.status in ('attended','no_show')),0)) from ${booking} b join ${classSession} s2 on s2.id = b.session_id join ${classTemplate} t2 on t2.id = s2.template_id where t2.course_id = ${outer(course.id)})`,
+			revenue:
+				sql<number>`coalesce((select sum(c.amount) from ${charge} c join ${courseEnrollment} e2 on e2.charge_id = c.id where e2.course_id = ${outer(course.id)} and c.status <> 'void'), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(course)
+		.where(eq(course.organizationId, orgId))
+		.orderBy(desc(course.createdAt))
+		.limit(20);
 }
 
 /**

@@ -1219,6 +1219,45 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.courses.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Courses</Card.Title>
+				<Card.Description
+					>Enrollees, sessions held, attendance, and revenue per course</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Course</Table.Head>
+							<Table.Head class="text-right">Enrollees</Table.Head>
+							<Table.Head class="text-right">Sessions</Table.Head>
+							<Table.Head class="text-right">Attendance</Table.Head>
+							<Table.Head class="text-right">Revenue</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.courses as c (c.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{c.name}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.enrollees}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.sessions}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{c.attendancePct == null ? '—' : `${c.attendancePct}%`}</Table.Cell
+								>
+								<Table.Cell class="text-right tabular-nums"
+									>{formatMoney(c.revenue, currency, true)}</Table.Cell
+								>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Top referrers</Card.Title>

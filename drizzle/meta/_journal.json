@@ -687,6 +687,13 @@
       "when": 1791519781724,
       "tag": "0097_reward-credits",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1791521535541,
+      "tag": "0098_amenity-recurring",
+      "breakpoints": true
     }
   ]
 }

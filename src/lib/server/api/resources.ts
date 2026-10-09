@@ -1,5 +1,9 @@
 import * as v from 'valibot';
+import { randomBytes } from 'node:crypto';
 import { error } from '@sveltejs/kit';
+import { and, desc, eq } from 'drizzle-orm';
+import { db } from '#lib/server/db/index.ts';
+import { webhook } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import * as members from '#lib/server/services/members.ts';
 import * as billing from '#lib/server/services/billing.ts';
@@ -363,6 +367,31 @@ export const resources: Record<string, Resource> = {
 				return members.addPersonalRecord(ctx.orgId, memberId, rest as never);
 			}
 		}
+	},
+	webhooks: {
+		description:
+			'Outbound webhook subscriptions (signed POSTs). POST {url, events[]} creates with a generated secret; DELETE removes',
+		list: (ctx) =>
+			db
+				.select()
+				.from(webhook)
+				.where(eq(webhook.organizationId, ctx.orgId))
+				.orderBy(desc(webhook.createdAt)),
+		create: {
+			schema: s.webhookInput,
+			run: (ctx, input) =>
+				db
+					.insert(webhook)
+					.values({
+						organizationId: ctx.orgId,
+						url: (input as { url: string; events: string[] }).url,
+						events: (input as { url: string; events: string[] }).events,
+						secret: `whsec_${randomBytes(24).toString('base64url')}`
+					})
+					.returning()
+		},
+		delete: (ctx, id) =>
+			db.delete(webhook).where(and(eq(webhook.organizationId, ctx.orgId), eq(webhook.id, id)))
 	},
 	desk_tasks: {
 		description:

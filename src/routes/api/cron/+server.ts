@@ -38,6 +38,7 @@ import {
 import { closeStaleCheckIns, sendReviewNudges } from '#lib/server/services/checkins.ts';
 import { closeStaleShifts } from '#lib/server/services/shifts.ts';
 import { postDueRecurring } from '#lib/server/services/recurring.ts';
+import { materializeResourceRecurring } from '#lib/server/services/resources.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -63,6 +64,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let waitlistExpired = 0;
 	let suspended = 0;
 	let generated = 0;
+	let amenityBookings = 0;
 	let digests = 0;
 	let winbacks = 0;
 	let leadNudges = 0;
@@ -207,6 +209,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`template cron failed for ${o.id}`, err);
 		}
 		try {
+			amenityBookings += await materializeResourceRecurring(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`amenity-recurring cron failed for ${o.id}`, err);
+		}
+		try {
 			digests += await sendWeeklyDigest(o.id);
 		} catch (err) {
 			failed++;
@@ -272,6 +280,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		waitlistExpired,
 		suspended,
 		generated,
+		amenityBookings,
 		digests,
 		winbacks,
 		leadNudges,

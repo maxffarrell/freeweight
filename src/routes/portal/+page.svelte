@@ -44,6 +44,9 @@
 		bookResource,
 		cancelReservation,
 		getReservations,
+		getAmenityRules,
+		repeatAmenityWeekly,
+		cancelAmenityRule,
 		getPortalEvents,
 		registerEvent,
 		cancelEventReg,
@@ -299,6 +302,7 @@
 	// ------- amenity reservations -------
 	const amenities = $derived(await getPortalResources(memberId));
 	const reservations = $derived(await getReservations(memberId));
+	const amenityRules = $derived(await getAmenityRules(memberId));
 	let amenityId = $state('');
 	const amenity = $derived(
 		amenities.find((a) => a.resource.id === amenityId) ?? amenities[0] ?? null
@@ -1368,6 +1372,33 @@
 						<p class="text-sm text-muted-foreground">Pick a day to see open slots.</p>
 					{/if}
 				{/if}
+				{#if amenityRules.length}
+					<div class="mb-3 divide-y rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+						{#each amenityRules as rule (rule.rule.id)}
+							<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+								<div>
+									<span class="font-medium">{rule.resourceName}</span>
+									<span class="text-muted-foreground">
+										· every {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][rule.rule.weekday]} at
+										{rule.rule.startTime}
+									</span>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={async () => {
+										try {
+											await cancelAmenityRule({ memberId, ruleId: rule.rule.id });
+											toast.success('Weekly reservation ended');
+										} catch (err) {
+											toast.error(errMsg(err, 'Failed'));
+										}
+									}}>End weekly</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
 				{#if reservations.length}
 					<div class="divide-y rounded-lg border">
 						{#each reservations as r (r.booking.id)}
@@ -1378,9 +1409,24 @@
 										· {localDate(r.booking.startsAt, tz)} at {localTime(r.booking.startsAt, tz)}
 									</span>
 								</div>
-								<Button variant="ghost" size="sm" onclick={() => cancelRes(r.booking.id)}
-									>Cancel</Button
-								>
+								<div class="flex items-center gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										title="Reserve this slot every week"
+										onclick={async () => {
+											try {
+												await repeatAmenityWeekly({ memberId, bookingId: r.booking.id });
+												toast.success('Booked every week at this time');
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											}
+										}}>Weekly</Button
+									>
+									<Button variant="ghost" size="sm" onclick={() => cancelRes(r.booking.id)}
+										>Cancel</Button
+									>
+								</div>
 							</div>
 						{/each}
 					</div>

@@ -405,6 +405,34 @@ export const cancelReservation = command(
 	}
 );
 
+/** The member's weekly amenity rules. */
+export const getAmenityRules = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return resSvc.memberRecurringRules(m.organizationId, m.id);
+});
+
+/** Turn a reservation into a weekly rule at the same weekday+time. */
+export const repeatAmenityWeekly = command(
+	v.object({ memberId: idSchema, bookingId: idSchema }),
+	async ({ memberId, bookingId }) => {
+		const m = await myMember(memberId);
+		const st = await getSettings(m.organizationId);
+		const r = await resSvc.repeatResourceWeekly(m.organizationId, m.id, bookingId, st.timezone);
+		void getAmenityRules(memberId).refresh();
+		return r;
+	}
+);
+
+export const cancelAmenityRule = command(
+	v.object({ memberId: idSchema, ruleId: idSchema }),
+	async ({ memberId, ruleId }) => {
+		const m = await myMember(memberId);
+		const r = await resSvc.cancelResourceRecurring(m.organizationId, m.id, ruleId);
+		void getAmenityRules(memberId).refresh();
+		return r;
+	}
+);
+
 // ---------- Events (workshops, comps) ----------
 
 /** Upcoming member-bookable events with this member's registration status. */
