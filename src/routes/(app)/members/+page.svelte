@@ -82,7 +82,8 @@
 		joined: 'Newest',
 		lastVisit: 'Last visit',
 		balance: 'Balance due',
-		visits30: 'Most visits (30d)'
+		visits30: 'Most visits (30d)',
+		stale: 'Longest away'
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let owesFilter = $state(initOwes ? 'owes' : 'any');

@@ -72,7 +72,7 @@ export const getMembers = query(
 			tag: v.optional(v.string()),
 			status: v.optional(v.picklist(['active', 'inactive'])),
 			planId: v.optional(v.string()),
-			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance', 'visits30'])),
+			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'stale', 'balance', 'visits30'])),
 			owes: v.optional(v.boolean()),
 			suspended: v.optional(v.boolean()),
 			recent: v.optional(v.boolean()),
