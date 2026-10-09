@@ -1328,6 +1328,7 @@ export async function getReports(orgId: string) {
 		spenders,
 		packBurn,
 		waitlist,
+		refunds,
 		planMisfits,
 		guests,
 		payrollPaid
@@ -1383,6 +1384,7 @@ export async function getReports(orgId: string) {
 		topSpenders(orgId),
 		packBurnDown(orgId),
 		waitlistConversion(orgId),
+		refundsByMonth(orgId),
 		wrongPlan(orgId),
 		guestStats(orgId),
 		payrollPaidThrough(orgId)
@@ -1450,6 +1452,7 @@ export async function getReports(orgId: string) {
 		spenders,
 		packBurn,
 		waitlist,
+		refunds,
 		wrongPlan: planMisfits,
 		guestStats: guests,
 		payrollPaid
@@ -1849,4 +1852,28 @@ export async function waitlistConversion(orgId: string) {
 	return [...byName.entries()]
 		.map(([name, v]) => ({ name, ...v, pct: Math.round((100 * v.promoted) / (v.promoted + v.queued)) }))
 		.sort((a, b) => b.promoted + b.queued - (a.promoted + a.queued));
+}
+
+/** Refunded payments grouped by month + method — revenue nets them out, this shows what went back. */
+export async function refundsByMonth(orgId: string) {
+	const rows = await db
+		.select({
+			month: sql<string>`to_char(${payment.refundedAt}, 'YYYY-MM')`,
+			method: payment.method,
+			total: sql<number>`sum(${payment.amount})`.mapWith(Number),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(payment)
+		.where(and(eq(payment.organizationId, orgId), isNotNull(payment.refundedAt)))
+		.groupBy(sql`to_char(${payment.refundedAt}, 'YYYY-MM')`, payment.method)
+		.orderBy(desc(sql`to_char(${payment.refundedAt}, 'YYYY-MM')`));
+	const byMonth = new Map<string, { total: number; n: number; methods: { method: string; total: number }[] }>();
+	for (const r of rows) {
+		const row = byMonth.get(r.month) ?? { total: 0, n: 0, methods: [] };
+		row.total += r.total;
+		row.n += r.n;
+		row.methods.push({ method: r.method, total: r.total });
+		byMonth.set(r.month, row);
+	}
+	return [...byMonth.entries()].map(([month, v]) => ({ month, ...v }));
 }

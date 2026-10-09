@@ -162,6 +162,16 @@ export const memberCancel = command(
 );
 
 /** Drops one upcoming occurrence of an enrolled course without unenrolling. */
+/** Cancel every upcoming booking the member has for one class type. */
+export const memberCancelSeries = command(
+	v.object({ memberId: v.pipe(v.string(), v.uuid()), classTypeId: v.pipe(v.string(), v.uuid()) }),
+	async ({ memberId, classTypeId }) => {
+		const { user } = requireUser();
+		const m = await myMember(memberId);
+		return svc.memberCancelAllUpcoming(m.organizationId, user.id, m.id, classTypeId);
+	}
+);
+
 export const dropCourseSession = command(
 	v.object({ memberId: idSchema, bookingId: idSchema }),
 	async ({ memberId, bookingId }) => {

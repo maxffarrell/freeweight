@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	signRequest,
 	loanableItem,
 	equipmentLoan,
 	activity,
@@ -271,6 +272,20 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(gymMember.deletionRequestedAt))
 		.limit(50);
 
+	// Documents out for signature that members haven't signed yet.
+	const signPending = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			title: signRequest.title,
+			requestedAt: signRequest.createdAt
+		})
+		.from(signRequest)
+		.innerJoin(gymMember, eq(signRequest.memberId, gymMember.id))
+		.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.status, 'pending')))
+		.orderBy(asc(signRequest.createdAt))
+		.limit(50);
+
 	// Members currently inside (checked in today, not yet checked out).
 	const insideNow = await db
 		.select({ name: gymMember.name })
@@ -518,6 +533,15 @@ export async function dashboard(orgId: string) {
 				planName: `trial ${t.className} ${localDate(t.startsAt, tz)}`,
 				kind: 'trial' as const,
 				requestedAt: t.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...signPending.map((p) => ({
+				memberId: p.memberId,
+				memberName: p.memberName,
+				planName: `sign: ${p.title}`,
+				kind: 'sign' as const,
+				requestedAt: p.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
 			})),

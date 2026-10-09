@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
@@ -23,6 +24,7 @@ import Trophy from '@lucide/svelte/icons/trophy';
 		memberGiveSpot,
 		memberBookSeries,
 		memberCancel,
+		memberCancelSeries,
 		memberMove,
 		requestMembershipCancel,
 		requestMembershipPause,
@@ -411,6 +413,33 @@ import Trophy from '@lucide/svelte/icons/trophy';
 			toast.error(errMsg(err, 'Could not book'));
 		}
 		amenityBusy = 0;
+	}
+	const multiClassTypes = $derived.by(() => {
+		const byType = new SvelteMap<string, { classTypeId: string; name: string; n: number }>();
+		for (const u of d.upcoming) {
+			if (u.booking.status !== 'booked') continue;
+			const key = u.classTypeId;
+			const row = byType.get(key) ?? { classTypeId: key, name: u.className, n: 0 };
+			row.n++;
+			byType.set(key, row);
+		}
+		return [...byType.values()].filter((r) => r.n >= 2);
+	});
+	async function cancelSeries(classTypeId: string, name: string, n: number) {
+		if (!confirm(`Cancel all ${n} upcoming ${name} bookings? Sessions inside the cancel cutoff are kept.`))
+			return;
+		busy = 'cancelSeries';
+		try {
+			const r = await memberCancelSeries({ memberId, classTypeId });
+			toast.success(
+				r.cancelled
+					? `Cancelled ${r.cancelled} ${name} booking${r.cancelled === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} inside the cutoff kept)` : ''}`
+					: 'Nothing cancellable left'
+			);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not cancel'));
+		}
+		busy = null;
 	}
 	async function cancelRes(id: string) {
 		try {
@@ -2816,6 +2845,13 @@ import Trophy from '@lucide/svelte/icons/trophy';
 						rel="noreferrer">Add to Google Calendar</a
 					>
 				</div>
+				{#each multiClassTypes as ct (ct.classTypeId)}
+					<button
+						class="text-xs text-muted-foreground underline underline-offset-2"
+						disabled={busy === 'cancelSeries'}
+						onclick={() => cancelSeries(ct.classTypeId, ct.name, ct.n)}>Cancel all {ct.n} upcoming {ct.name} bookings</button
+					>
+				{/each}
 			{/if}
 		</Card.Content>
 	</Card.Root>

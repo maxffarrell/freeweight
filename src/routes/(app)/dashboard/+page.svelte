@@ -452,7 +452,9 @@
 														? `kit ${r.planName}`
 														: r.kind === 'trial'
 															? r.planName
-															: r.kind === 'deletion'
+															: r.kind === 'sign'
+																? r.planName
+																: r.kind === 'deletion'
 																? 'delete my data'
 																: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`

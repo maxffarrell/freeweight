@@ -553,6 +553,27 @@
 	</Card.Root>
 
 	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Refunds</Card.Title>
+			<Card.Description>Money returned to members, by month</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			{#each r.refunds.slice(0, 6) as m (m.month)}
+				<div class="flex items-center justify-between gap-2">
+					<span>{m.month}</span>
+					<span class="tabular-nums text-muted-foreground"
+						>{m.n} · {formatMoney(m.total, currency, true)}{m.methods.length
+							? ` (${m.methods.map((x) => x.method).join(', ')})`
+							: ''}</span
+					>
+				</div>
+			{:else}
+				<p class="text-muted-foreground">No refunds yet.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
 			<Card.Description

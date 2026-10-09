@@ -4153,3 +4153,61 @@ export async function sendOwnerInsights(orgId: string) {
 	}
 	return sent;
 }
+
+/**
+ * "Resend to non-openers" — re-sends an announcement to every recipient whose
+ * notification_log row never got an opened_at. Returns how many were re-sent.
+ */
+export async function resendAnnouncementToNonOpeners(orgId: string, announcementId: string) {
+	const [row] = await db
+		.select({ data: activity.data })
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.id, announcementId),
+				eq(activity.entityType, 'announcement')
+			)
+		)
+		.limit(1);
+	const subject = (row?.data as { subject?: string } | undefined)?.subject;
+	const message = (row?.data as { message?: string } | undefined)?.message;
+	if (!subject || !message) error(404, 'Announcement not found');
+	const key = `announcement:${subject}::${message}`;
+	const unopened = await db
+		.select({ recipient: notificationLog.recipient })
+		.from(notificationLog)
+		.where(
+			and(
+				eq(notificationLog.organizationId, orgId),
+				eq(notificationLog.kind, 'announcement'),
+				eq(notificationLog.entityId, key),
+				isNull(notificationLog.openedAt)
+			)
+		);
+	if (!unopened.length) return { resent: 0 };
+	const members = await db
+		.select({ id: gymMember.id, email: gymMember.email })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				inArray(
+					gymMember.email,
+					unopened.map((u) => u.recipient)
+				)
+			)
+		);
+	const name = await orgBrand(orgId);
+	let resent = 0;
+	for (const m of members) {
+		if (!m.email) continue;
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject,
+			...renderEmail({ ...name, heading: subject, lines: message.split('\n').filter(Boolean) })
+		});
+		resent++;
+	}
+	return { resent };
+}

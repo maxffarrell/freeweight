@@ -4,6 +4,7 @@ import {
 	asc,
 	desc,
 	eq,
+	gt,
 	gte,
 	inArray,
 	isNotNull,
@@ -157,6 +158,7 @@ export async function portalOverview(memberId: string) {
 			booking,
 			startsAt: classSession.startsAt,
 			endsAt: classSession.endsAt,
+			classTypeId: classSession.classTypeId,
 			className: classType.name,
 			locationName: location.name,
 			workout: classSession.workout
@@ -1745,4 +1747,40 @@ async function watchList(orgId: string, memberId: string) {
 	]);
 	const watching = new Set(watches.map((w) => w.classTypeId));
 	return types.map((t) => ({ ...t, watching: watching.has(t.id) }));
+}
+
+/**
+ * Portal "Cancel all upcoming {class}" — cancels every future booked session of one
+ * class type for the member in one tap (series undo). Skips anything inside the
+ * cancel cutoff since those are already locked; returns how many were cancelled.
+ */
+export async function memberCancelAllUpcoming(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	classTypeId: string
+) {
+	const { cancelCutoffMin } = await bookingRules(orgId);
+	const rows = await db
+		.select({ id: booking.id, startsAt: classSession.startsAt })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				eq(classSession.classTypeId, classTypeId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date())
+			)
+		);
+	let cancelled = 0;
+	for (const b of rows) {
+		if (cancelCutoffMin != null && b.startsAt.getTime() - Date.now() < cancelCutoffMin * 60_000)
+			continue;
+		await cancelBooking(memberCtx(orgId, userId), b.id, userId);
+		cancelled++;
+	}
+	return { cancelled, skipped: rows.length - cancelled };
 }
