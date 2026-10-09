@@ -6,22 +6,27 @@ import { db } from '#lib/server/db/index.ts';
 import { classType, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
+import * as progSvc from '#lib/server/services/programs.ts';
 import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
+import * as woSvc from '#lib/server/services/workouts.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
+import * as ptSvc from '#lib/server/services/pt.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
 import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
+import { zonedToUtc } from '#lib/tz.ts';
 import { emit } from '#lib/server/services/events.ts';
 import {
 	idSchema,
 	measurementInput,
 	prInput,
 	resourceBookInput,
-	sessionFeedbackInput
+	sessionFeedbackInput,
+	giftCreditsInput
 } from '#lib/schemas.ts';
 import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
@@ -53,6 +58,25 @@ export const getBookable = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return svc.bookableSessions(m.id);
 });
+
+/** The member hands an upcoming booking to another member by email. */
+export const memberGiveSpot = command(
+	v.object({
+		memberId: idSchema,
+		bookingId: idSchema,
+		email: v.pipe(v.string(), v.trim(), v.email())
+	}),
+	async ({ memberId, bookingId, email }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		try {
+			return await svc.giveSpot(m.organizationId, user.id, m.id, bookingId, email);
+		} finally {
+			void getPortalOverview(memberId).refresh();
+			void getBookable(memberId).refresh();
+		}
+	}
+);
 
 export const memberBook = command(
 	v.object({
@@ -403,6 +427,64 @@ export const cancelReservation = command(
 	}
 );
 
+/** The member's weekly amenity rules. */
+export const getAmenityRules = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return resSvc.memberRecurringRules(m.organizationId, m.id);
+});
+
+/** Turn a reservation into a weekly rule at the same weekday+time. */
+export const repeatAmenityWeekly = command(
+	v.object({ memberId: idSchema, bookingId: idSchema }),
+	async ({ memberId, bookingId }) => {
+		const m = await myMember(memberId);
+		const st = await getSettings(m.organizationId);
+		const r = await resSvc.repeatResourceWeekly(m.organizationId, m.id, bookingId, st.timezone);
+		void getAmenityRules(memberId).refresh();
+		return r;
+	}
+);
+
+export const cancelAmenityRule = command(
+	v.object({ memberId: idSchema, ruleId: idSchema }),
+	async ({ memberId, ruleId }) => {
+		const m = await myMember(memberId);
+		const r = await resSvc.cancelResourceRecurring(m.organizationId, m.id, ruleId);
+		void getAmenityRules(memberId).refresh();
+		return r;
+	}
+);
+
+// ---------- PT (1:1) session requests ----------
+
+/** Coaches the member can request a session with. */
+export const getPtCoaches = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return ptSvc.ptCoaches(m.organizationId);
+});
+
+export const getMyPtRequests = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return ptSvc.memberPtRequests(m.organizationId, m.id);
+});
+
+export const requestPt = command(
+	v.object({
+		memberId: idSchema,
+		instructorId: v.optional(v.nullable(idSchema)),
+		preferredAt: v.pipe(v.string(), v.nonEmpty('Pick a date and time')),
+		note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)))
+	}),
+	async ({ memberId, instructorId, preferredAt, note }) => {
+		const m = await myMember(memberId);
+		const st = await getSettings(m.organizationId);
+		const when = zonedToUtc(preferredAt, st.timezone ?? 'UTC');
+		const r = await ptSvc.requestPt(m.organizationId, m.id, instructorId, when, note);
+		void getMyPtRequests(memberId).refresh();
+		return r;
+	}
+);
+
 // ---------- Events (workshops, comps) ----------
 
 /** Upcoming member-bookable events with this member's registration status. */
@@ -458,6 +540,32 @@ export const getPortalChallenges = query(idSchema, async (memberId) => {
 });
 
 /** Announcements this member was actually sent — the portal's News feed. */
+/** Stamps openedAt on the member's announcement rows when the News card renders. */
+export const markNewsRead = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!m || !m.email) return;
+	await notif.markAnnouncementsRead(m.organizationId, m.email);
+});
+
+/** Makeup offers for bookings lost to gym-side class cancellations. */
+export const getMakeups = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!m) error(404);
+	return svc.memberMakeups(m.organizationId, memberId);
+});
+
+export const bookMakeup = command(
+	v.object({ memberId: idSchema, compFrom: idSchema, sessionId: idSchema }),
+	async ({ memberId, compFrom, sessionId }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const r = await svc.memberBookMakeup(m.organizationId, user.id, memberId, compFrom, sessionId);
+		await getPortalOverview(memberId).refresh();
+		await getMakeups(memberId).refresh();
+		return r.status;
+	}
+);
+
 export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!m.email) return [];
@@ -639,10 +747,16 @@ export const buyShopItem = command(
 		const m = await myMember(memberId);
 		const r = await svc.memberBuyItem(m.organizationId, user.id, memberId, itemId);
 		void getShopItems(memberId).refresh();
+		void getMyPurchases(memberId).refresh();
 		void getPortalOverview(memberId).refresh();
 		return r;
 	}
 );
+
+export const getMyPurchases = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.memberPurchases(m.organizationId, memberId);
+});
 
 export const getPersonalRecords = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
@@ -713,3 +827,48 @@ export const setPackAutoRenew = command(
 		await getPortalOverview(memberId).refresh();
 	}
 );
+
+/** Portal: the member's assigned workouts. */
+export const getMyWorkouts = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return woSvc.listMyWorkouts(m.organizationId, m.id);
+});
+
+/** Portal: gift classes off the member's own pack to another member by email. */
+export const giftPackCredits = command(giftCreditsInput, async ({ memberId, email, credits }) => {
+	const m = await myMember(memberId);
+	const { user } = requireUser();
+	const r = await memberSvc.giftPackCredits(m.organizationId, m.id, email, credits, user.id);
+	void getPortalOverview(memberId).refresh();
+	return r;
+});
+
+/** Portal: one-shot JSON export of everything we hold on the member. */
+export const getMyDataExport = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.exportMemberData(m.organizationId, m.id);
+});
+
+export const getNpsStatus = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.npsStatus(m.organizationId, m.id);
+});
+
+export const submitNps = command(
+	v.object({
+		memberId: idSchema,
+		score: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)),
+		comment: v.optional(v.pipe(v.string(), v.maxLength(500)))
+	}),
+	async (input) => {
+		const m = await myMember(input.memberId);
+		const r = await svc.submitNps(m.organizationId, m.id, null, input.score, input.comment);
+		void getNpsStatus(input.memberId).refresh();
+		return r;
+	}
+);
+
+export const getMyPrograms = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return progSvc.portalPrograms(m.organizationId, m.id);
+});

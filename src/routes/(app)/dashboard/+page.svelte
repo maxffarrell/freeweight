@@ -308,6 +308,9 @@
 									>
 									<Table.Cell class="w-28 text-right">
 										<Badge variant="secondary">{s.booked}/{s.capacity}</Badge>
+										{#if s.expected > 0 && new Date(s.startsAt).getTime() > Date.now()}
+											<Badge variant="outline" class="ml-1">{s.expected} due in</Badge>
+										{/if}
 										{#if s.waitlisted > 0}<Badge variant="outline" class="ml-1"
 												>+{s.waitlisted} wait</Badge
 											>{/if}
@@ -443,10 +446,36 @@
 											? `cancel ${r.planName}`
 											: r.kind === 'addon'
 												? `stop ${r.planName}`
-												: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+												: r.kind === 'pt'
+													? r.planName
+													: r.kind === 'loan'
+														? `kit ${r.planName}`
+														: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.fullSessions?.length}
+				<Card.Root class="border-amber-500/50">
+					<Card.Header><Card.Title class="text-base">Full with a waitlist</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.fullSessions as s (s.sessionId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/schedule?focus={s.sessionId}" class="truncate hover:underline"
+										>{s.className} {localDate(s.startsAt, d.timezone)} {localTime(
+											s.startsAt,
+											d.timezone
+										)}</a
+									>
+									<Badge variant="outline" class="shrink-0"
+										>{s.waiting} waiting</Badge
+									>
 								</li>
 							{/each}
 						</ul>
@@ -529,6 +558,17 @@
 								</li>
 							{/each}
 						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			{#if d.expectedRevenue30d > 0}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Expected revenue</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<p class="text-2xl font-bold">{formatMoney(d.expectedRevenue30d, d.currency, true)}</p>
+						<p class="text-xs text-muted-foreground">
+							Open charges + membership renewals due in the next 30 days.
+						</p>
 					</Card.Content>
 				</Card.Root>
 			{/if}

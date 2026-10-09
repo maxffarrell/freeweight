@@ -17,6 +17,7 @@ import {
 	sql
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
+import { atRiskMembers } from '#lib/server/services/reports.ts';
 import {
 	activity,
 	booking,
@@ -41,6 +42,8 @@ import {
 	organization,
 	payment,
 	plan,
+	recurringAnnouncement,
+	announcementTemplate,
 	resourceBooking,
 	rota,
 	sessionFeedback,
@@ -55,7 +58,7 @@ import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
-import { addDays, localDate, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { entryProgress } from './challenges.ts';
 
 async function orgBrand(orgId: string) {
@@ -144,15 +147,41 @@ async function sendMemberEmail(memberId: string | null | undefined, args: Email)
 	await sendEmail(args);
 }
 
-/** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops. */
+/** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops.
+ * Returns the new row's id, or null when the row already existed. */
 async function logOnce(orgId: string, kind: string, entityId: string, recipient: string) {
 	const [row] = await db
 		.insert(notificationLog)
 		.values({ organizationId: orgId, kind, entityId, recipient })
 		.onConflictDoNothing()
-		.returning();
-	return !!row;
+		.returning({ id: notificationLog.id });
+	return row?.id ?? null;
 }
+
+/** Signed token behind the 1x1 email-open pixel stamped onto a notification_log row. */
+export function openToken(logId: string) {
+	return createHmac('sha256', BETTER_AUTH_SECRET)
+		.update(`open:${logId}`)
+		.digest('hex')
+		.slice(0, 32);
+}
+
+export function validOpenToken(logId: string, token: string) {
+	const a = Buffer.from(openToken(logId));
+	const b = Buffer.from(token);
+	return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Stamps openedAt on a notification_log row — the email-open pixel endpoint. */
+export async function markEmailOpened(logId: string) {
+	await db
+		.update(notificationLog)
+		.set({ openedAt: new Date() })
+		.where(and(eq(notificationLog.id, logId), isNull(notificationLog.openedAt)));
+}
+
+const openPixel = (logId: string) =>
+	`<img src="${appOrigin()}/api/email-open?i=${logId}&t=${openToken(logId)}" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px" />`;
 
 /** "You're in" when a waitlisted member gets promoted into a booked spot. */
 export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
@@ -508,6 +537,50 @@ export async function notifyPaymentReceived(
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/** Staff "Resend receipt" on the billing page — same email as the original
+ * receipt, but always sends (the once-per-payment log key doesn't apply). */
+export async function resendPaymentReceipt(orgId: string, paymentId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			amount: payment.amount,
+			method: payment.method
+		})
+		.from(payment)
+		.innerJoin(gymMember, eq(payment.memberId, gymMember.id))
+		.where(and(eq(payment.organizationId, orgId), eq(payment.id, paymentId)));
+	if (!row) error(404, 'Payment not found');
+	if (!row.email) error(409, 'That member has no email');
+	if (!emailProvider()) error(409, 'No email provider configured');
+	const [name, st] = await Promise.all([
+		orgBrand(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const money = formatMoney(row.amount, st[0]?.currency ?? 'usd');
+	const logId = await logOnce(
+		orgId,
+		'payment_received',
+		`${paymentId}:resend:${Date.now()}`,
+		row.email
+	);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Payment received: ${money} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `Thanks, ${row.memberName} — ${money} received`,
+			lines: [
+				`${name.orgName} received your ${money} payment (${row.method}).`,
+				'Any remaining balance shows in your member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+	return { sent: logId ? 1 : 0 };
 }
 
 /** "Your payment was refunded" — one email per refundPayment call. */
@@ -1189,6 +1262,43 @@ export async function notifyPackLowCredit(
 }
 
 /**
+ * "X gave you N classes" to the recipient of a pack-credit transfer.
+ * `transferId` is unique per transfer, so re-sends on retries still log once.
+ */
+export async function notifyCreditsGifted(
+	orgId: string,
+	transferId: string,
+	toMemberId: string,
+	fromName: string,
+	credits: number
+) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, toMemberId)));
+	if (!m?.email || !(await logOnce(orgId, 'credits-gifted', transferId, m.email))) return;
+	const name = await orgBrand(orgId);
+	const first = m.name.split(' ')[0] ?? m.name;
+	const heading = `${fromName} gave you ${credits} class${credits === 1 ? '' : 'es'}`;
+	const { text, html } = renderEmail({
+		...name,
+		heading,
+		lines: [
+			`Hi ${first},`,
+			`${fromName} passed ${credits} of their class-pack credits to you at ${name.orgName}.`,
+			'Book your next class from the member portal.'
+		],
+		action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+	});
+	await sendMemberEmail(toMemberId, {
+		to: m.email,
+		subject: `${name.orgName}: ${heading}`,
+		text,
+		html
+	});
+}
+
+/**
  * Referral bounty: when a member referred via a ?ref= link records their first
  * non-refunded payment, the referrer earns `gymSettings.referralCredits` bonus
  * credits on their active membership. Called after every recordPayment; returns
@@ -1575,13 +1685,15 @@ export async function sendAnnouncement(
 	const shared = personalized ? null : render('');
 	let sent = 0;
 	for (const m of members) {
-		if (!m.email || !(await logOnce(orgId, 'announcement', entityId, m.email))) continue;
+		if (!m.email) continue;
+		const logId = await logOnce(orgId, 'announcement', entityId, m.email);
+		if (!logId) continue;
 		const { text, html } = personalized ? render(m.name) : shared!;
 		await sendMemberEmail(m.id, {
 			to: m.email,
 			subject: `${name.orgName}: ${mergeTags(subject, m.name)}`,
 			text,
-			html
+			html: html + openPixel(logId)
 		});
 		sent++;
 	}
@@ -1595,6 +1707,20 @@ export async function sendAnnouncement(
 		data: { subject, message, sent, total: members.length, tag: tag ?? null, plan: planName }
 	});
 	return { sent, total: members.length };
+}
+
+/** Renders the announcement email exactly as members see it — the compose
+ * dialog's live preview (merge tags resolved against a sample name). */
+export async function previewAnnouncement(orgId: string, subject: string, message: string) {
+	const name = await orgBrand(orgId);
+	return renderEmail({
+		...name,
+		heading: mergeTags(subject || '(no subject)', 'Casey Rivera'),
+		lines: mergeTags(message || '(empty message)', 'Casey Rivera')
+			.split(/\n+/)
+			.filter(Boolean),
+		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+	}).html;
 }
 
 /** EXISTS clause: the member holds an active membership on this plan. */
@@ -1625,10 +1751,17 @@ export async function countAnnouncementAudience(orgId: string, tag?: string, pla
 export async function scheduleAnnouncement(
 	orgId: string,
 	actorId: string | null | undefined,
-	opts: { subject: string; message: string; sendAt: Date; tag?: string; planId?: string }
+	opts: {
+		subject: string;
+		message: string;
+		sendAt: Date;
+		tag?: string;
+		planId?: string;
+		atRisk?: boolean;
+	}
 ) {
 	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
-	if (!opts.tag && !opts.planId && !(await countAnnouncementAudience(orgId)))
+	if (!opts.tag && !opts.planId && !opts.atRisk && !(await countAnnouncementAudience(orgId)))
 		error(409, 'No members to email');
 	const entityId = `scheduled:${crypto.randomUUID()}`;
 	await emit({
@@ -1643,7 +1776,8 @@ export async function scheduleAnnouncement(
 			message: opts.message,
 			sendAt: opts.sendAt.toISOString(),
 			tag: opts.tag ?? null,
-			planId: opts.planId ?? null
+			planId: opts.planId ?? null,
+			atRisk: opts.atRisk ?? null
 		}
 	});
 	return { scheduledFor: opts.sendAt };
@@ -1661,7 +1795,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			subject: sql<string>`${activity.data}->>'subject'`,
 			message: sql<string>`${activity.data}->>'message'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
-			planId: sql<string | null>`${activity.data}->>'planId'`
+			planId: sql<string | null>`${activity.data}->>'planId'`,
+			atRisk: sql<string | null>`${activity.data}->>'atRisk'`
 		})
 		.from(activity)
 		.where(
@@ -1674,15 +1809,124 @@ export async function sendDueAnnouncements(orgId: string) {
 		);
 	let sent = 0;
 	for (const a of due) {
+		const memberIds =
+			a.atRisk === 'true' ? (await atRiskMembers(orgId)).map((m) => m.memberId) : undefined;
 		await sendAnnouncement(
 			orgId,
 			a.subject,
 			a.message,
-			undefined,
+			memberIds,
 			a.tag ?? undefined,
 			a.planId ?? undefined
 		);
 		await db.delete(activity).where(eq(activity.id, a.id));
+		sent++;
+	}
+	return sent;
+}
+
+// ---------- Recurring announcements (weekly sends the cron delivers) ----------
+
+export async function listRecurringAnnouncements(orgId: string) {
+	return db
+		.select({ rule: recurringAnnouncement, planName: plan.name })
+		.from(recurringAnnouncement)
+		.leftJoin(plan, eq(plan.id, recurringAnnouncement.planId))
+		.where(eq(recurringAnnouncement.organizationId, orgId))
+		.orderBy(recurringAnnouncement.weekday, recurringAnnouncement.time);
+}
+
+export async function createRecurringAnnouncement(
+	orgId: string,
+	actorId: string | null | undefined,
+	input: {
+		subject: string;
+		message: string;
+		tag?: string;
+		planId?: string | null;
+		weekday: number;
+		time: string;
+	}
+) {
+	const [row] = await db
+		.insert(recurringAnnouncement)
+		.values({
+			organizationId: orgId,
+			subject: input.subject.trim().slice(0, 150),
+			message: input.message.trim().slice(0, 5000),
+			tag: input.tag || null,
+			planId: input.planId || null,
+			weekday: input.weekday,
+			time: input.time,
+			createdBy: actorId ?? null
+		})
+		.returning();
+	void emit({
+		orgId,
+		actorId: actorId ?? null,
+		entityType: 'announcement',
+		entityId: row.id,
+		action: 'recurring_created',
+		summary: `Weekly announcement scheduled (${input.time}): ${input.subject}`
+	});
+	return row;
+}
+
+export async function deleteRecurringAnnouncement(orgId: string, id: string) {
+	const [row] = await db
+		.delete(recurringAnnouncement)
+		.where(and(eq(recurringAnnouncement.organizationId, orgId), eq(recurringAnnouncement.id, id)))
+		.returning();
+	if (!row) error(404, 'Recurring announcement not found');
+	return { ok: true };
+}
+
+/**
+ * Sends each active recurring announcement whose weekday+time has arrived
+ * (org-local), once per day. Runs from the daily cron.
+ */
+export async function sendDueRecurringAnnouncements(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const now = new Date();
+	const todayISO = localDate(now, tz);
+	const nowMin = localMinutes(now, tz);
+	const weekday = localWeekday(now, tz);
+	const rules = await db
+		.select()
+		.from(recurringAnnouncement)
+		.where(
+			and(
+				eq(recurringAnnouncement.organizationId, orgId),
+				eq(recurringAnnouncement.active, true),
+				eq(recurringAnnouncement.weekday, weekday)
+			)
+		);
+	let sent = 0;
+	for (const r of rules) {
+		const [hh, mm] = r.time.split(':').map(Number);
+		if ((hh ?? 0) * 60 + (mm ?? 0) > nowMin) continue;
+		if (r.lastSentOn === todayISO) continue;
+		try {
+			await sendAnnouncement(
+				orgId,
+				r.subject,
+				r.message,
+				undefined,
+				r.tag ?? undefined,
+				r.planId ?? undefined
+			);
+		} catch (err) {
+			console.error(`recurring announcement ${r.id} failed`, err);
+			continue;
+		}
+		await db
+			.update(recurringAnnouncement)
+			.set({ lastSentOn: todayISO, updatedAt: new Date() })
+			.where(eq(recurringAnnouncement.id, r.id));
 		sent++;
 	}
 	return sent;
@@ -1693,6 +1937,21 @@ export async function sendDueAnnouncements(orgId: string) {
  * rows for their email. The portal shows these as a News feed so a member who
  * deleted the email can still read the notice.
  */
+/** Stamps openedAt on a member's unread announcement rows — called when the portal News card renders. */
+export async function markAnnouncementsRead(orgId: string, email: string) {
+	await db
+		.update(notificationLog)
+		.set({ openedAt: new Date() })
+		.where(
+			and(
+				eq(notificationLog.organizationId, orgId),
+				eq(notificationLog.kind, 'announcement'),
+				eq(notificationLog.recipient, email),
+				isNull(notificationLog.openedAt)
+			)
+		);
+}
+
 export async function memberAnnouncements(orgId: string, email: string, limit = 10) {
 	const rows = await db
 		.select({ entityId: notificationLog.entityId, sentAt: notificationLog.createdAt })
@@ -1731,7 +1990,10 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 			total: sql<number>`(${activity.data}->>'total')::int`,
 			sendAt: sql<string | null>`${activity.data}->>'sendAt'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
-			plan: sql<string | null>`${activity.data}->>'plan'`
+			plan: sql<string | null>`${activity.data}->>'plan'`,
+			read: sql<number>`(select count(*) from ${notificationLog} nl where nl.organization_id = ${orgId} and nl.kind = 'announcement' and nl.opened_at is not null and nl.entity_id = 'announcement:' || (${activity.data}->>'subject') || '::' || (${activity.data}->>'message'))`.mapWith(
+				Number
+			)
 		})
 		.from(activity)
 		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'announcement')))
@@ -2002,6 +2264,125 @@ export async function sendWeeklyDigest(orgId: string) {
 					`<strong>${formatMoney(collected!.n, currency)}</strong> collected · <strong>${formatMoney(openBalance!.n, currency)}</strong> still open.`
 				],
 				action: { label: 'Open reports', url: `${appOrigin()}/reports` }
+			})
+		});
+		sent++;
+	}
+	return sent;
+}
+
+/**
+ * Weekly member digest (Mondays, org tz): each active member gets their own
+ * week — check-ins last 7 days, their current week streak, and bookings they
+ * hold for the coming week. Skipped entirely when they'd get an empty email.
+ * Deduped per member per ISO week via the Monday date in the log key.
+ */
+export async function sendMemberDigest(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	if (localWeekday(new Date(), tz) !== 1) return 0; // Mondays only
+
+	const weekAgoTs = zonedToUtc(`${addDays(today, -7)}T00:00`, tz);
+	const weekEndTs = zonedToUtc(`${addDays(today, 7)}T00:00`, tz);
+	const name = await orgBrand(orgId);
+
+	const members = await db
+		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email),
+				isNull(gymMember.unsubscribedAt)
+			)
+		);
+	if (!members.length) return 0;
+
+	// One pass over a year of check-ins → visits last 7d + current week streak per member.
+	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
+	const visits = await db
+		.select({ memberId: checkIn.memberId, checkedAt: checkIn.checkedAt })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNotNull(checkIn.memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, since)
+			)
+		);
+	const weekOf = (d: Date) => {
+		const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+		x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+		return x.getTime();
+	};
+	const thisWeek = weekOf(new Date());
+	const stats = new Map<string, { last7d: number; streak: number }>();
+	const weeksByMember = new Map<string, Set<number>>();
+	for (const v of visits) {
+		weeksByMember.set(v.memberId!, (weeksByMember.get(v.memberId!) ?? new Set()).add(weekOf(v.checkedAt)));
+		if (v.checkedAt >= weekAgoTs) {
+			const e = stats.get(v.memberId!) ?? { last7d: 0, streak: 0 };
+			e.last7d++;
+			stats.set(v.memberId!, e);
+		}
+	}
+	for (const [id, weeks] of weeksByMember) {
+		let w = thisWeek;
+		if (!weeks.has(w)) w -= 7 * 86_400_000; // this week isn't over — count from last week
+		let streak = 0;
+		while (weeks.has(w)) {
+			streak++;
+			w -= 7 * 86_400_000;
+		}
+		const e = stats.get(id) ?? { last7d: 0, streak: 0 };
+		e.streak = streak;
+		stats.set(id, e);
+	}
+
+	// Upcoming bookings for the next 7 days, grouped by member.
+	const upcoming = await db
+		.select({ memberId: booking.memberId, n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, weekEndTs)
+			)
+		)
+		.groupBy(booking.memberId);
+	const upcomingByMember = new Map(upcoming.map((r) => [r.memberId, r.n]));
+
+	let sent = 0;
+	for (const m of members) {
+		if (!m.email) continue;
+		const st = stats.get(m.id) ?? { last7d: 0, streak: 0 };
+		const booked = upcomingByMember.get(m.id) ?? 0;
+		if (!st.last7d && !st.streak && !booked) continue; // nothing worth an email
+		if (!(await logOnce(orgId, 'member_digest', `${today}:${m.id}`, m.id))) continue;
+		const lines = [
+			st.last7d
+				? `You checked in <strong>${st.last7d}</strong> time${st.last7d > 1 ? 's' : ''} this past week${st.streak > 1 ? ` — that's a <strong>${st.streak}-week streak</strong>, keep it going` : ''}.`
+				: st.streak > 1
+					? `You're holding a <strong>${st.streak}-week streak</strong> — one visit keeps it alive.`
+					: `No visits last week — a fresh week starts today.`,
+			booked
+				? `You have <strong>${booked}</strong> class${booked > 1 ? 'es' : ''} booked this week.`
+				: `Nothing booked this week yet — grab a spot before classes fill.`
+		];
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject: `${name.orgName}: your week`,
+			...renderEmail({
+				...name,
+				heading: `Your week at ${name.orgName}`,
+				lines,
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 			})
 		});
 		sent++;
@@ -2540,6 +2921,40 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/**
+ * Streak-reward email at week-streak milestones. Returns true only when this
+ * check-in actually won the dedupe — callers grant the comp credits then, so a
+ * re-run can't double-pay. Also sends the congrats email (best-effort).
+ */
+export async function notifyStreakReward(
+	orgId: string,
+	memberId: string,
+	weeks: number,
+	credits: number
+) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email) return false;
+	if (!(await logOnce(orgId, 'streak_reward', `${memberId}:${weeks}`, m.email))) return false;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${weeks}-week streak at ${name.orgName} — ${credits} free class${credits === 1 ? '' : 'es'} on us`,
+		...renderEmail({
+			...name,
+			heading: `${weeks} weeks in a row. Impressive.`,
+			lines: [
+				`Hi ${m.name} — you've checked in every week for ${weeks} weeks straight.`,
+				`We've added ${credits} free class${credits === 1 ? '' : 'es'} to your membership. Keep the streak alive.`
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	}).catch(() => {});
+	return true;
 }
 
 /** Welcome note on a member's very first check-in. Deduped per member. */
@@ -3182,4 +3597,40 @@ export async function notifyReviewRequest(orgId: string, memberId: string, revie
 		html
 	});
 	return true;
+}
+
+export async function listAnnouncementTemplates(orgId: string) {
+	return db
+		.select()
+		.from(announcementTemplate)
+		.where(eq(announcementTemplate.organizationId, orgId))
+		.orderBy(asc(announcementTemplate.createdAt));
+}
+
+export async function createAnnouncementTemplate(
+	orgId: string,
+	userId: string,
+	input: { name: string; subject: string; message: string; tag?: string }
+) {
+	const [row] = await db
+		.insert(announcementTemplate)
+		.values({
+			organizationId: orgId,
+			name: input.name,
+			subject: input.subject,
+			message: input.message,
+			tag: input.tag || null,
+			createdBy: userId
+		})
+		.returning();
+	return row;
+}
+
+export async function deleteAnnouncementTemplate(orgId: string, id: string) {
+	const [row] = await db
+		.delete(announcementTemplate)
+		.where(and(eq(announcementTemplate.id, id), eq(announcementTemplate.organizationId, orgId)))
+		.returning({ id: announcementTemplate.id });
+	if (!row) error(404, 'Template not found');
+	return { ok: true };
 }

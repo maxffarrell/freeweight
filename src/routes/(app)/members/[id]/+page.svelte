@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -10,9 +11,11 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -35,7 +38,29 @@
 		logIncident,
 		updateIncidentEntry,
 		sendSignRequest,
-		voidSignRequest
+		voidSignRequest,
+		getMemberWorkouts,
+		getMemberPrograms,
+		getPrograms,
+		assignProgram,
+		setProgramStatus,
+		saveProgram,
+		removeProgram,
+		addMemberWorkout,
+		updateMemberWorkout,
+		deleteMemberWorkout,
+		getPackRemaining,
+		transferPackCredits,
+		getMemberLocker,
+		getLockers,
+		getLevels,
+		setMemberLevel,
+		getMemberLoans,
+		getLoanables,
+		loanItem,
+		returnLoan,
+		assignLocker,
+		releaseLocker
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -44,7 +69,8 @@
 		recordPayment,
 		refundPayment,
 		getCurrency,
-		grantCredits
+		grantCredits,
+		sellDayPass
 	} from '#lib/remote/billing.remote.ts';
 	import {
 		getClassTypes,
@@ -69,12 +95,46 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import FilePen from '@lucide/svelte/icons/file-pen';
 	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
+	const workouts = $derived(await getMemberWorkouts(id));
+	const memberPrograms = $derived(await getMemberPrograms(id));
+	const programs = $derived(await getPrograms());
+	let assignOpen = $state(false);
+	let assignProgramId = $state('');
+	let assignStart = $state(new Date().toISOString().slice(0, 10));
+	let libOpen = $state(false);
+	let libEditing = $state<null | {
+		id?: string;
+		name: string;
+		weeks: number;
+		note: string;
+		days: { dayNo: number; title: string; body: string }[];
+	}>(null);
+	function openProgram(p?: {
+		program: { id: string; name: string; weeks: number; note: string | null };
+		days: { dayNo: number; title: string; body: string }[];
+	}) {
+		libEditing = p
+			? {
+					id: p.program.id,
+					name: p.program.name,
+					weeks: p.program.weeks,
+					note: p.program.note ?? '',
+					days: p.days.map((d) => ({ dayNo: d.dayNo, title: d.title, body: d.body }))
+				}
+			: {
+					name: '',
+					weeks: 4,
+					note: '',
+					days: [{ dayNo: 1, title: '', body: '' }]
+				};
+	}
 	const mSignReqs = $derived(m.signRequests);
 	const mIncidents = $derived(m.incidents);
 	const memberNotes = $derived(await getMemberNotes(id));
@@ -194,6 +254,53 @@
 
 	// ------- tags -------
 	const allTags = $derived(await getTags());
+	const memberLocker = $derived(await getMemberLocker(id));
+	const memberLoans = $derived(await getMemberLoans(id));
+	const loanables = $derived(await getLoanables());
+	const freeKit = $derived(loanables.filter((k) => k.out < k.item.quantity));
+	let kitPick = $state('');
+	$effect(() => {
+		if (kitPick) {
+			const itemId = kitPick;
+			kitPick = '';
+			loanItem({ itemId, memberId: id })
+				.then(() => toast.success('Checked out'))
+				.catch((err) => toast.error(errMsg(err, 'Could not check out')));
+		}
+	});
+	const levels = $derived(await getLevels());
+	const levelName = $derived(levels.find((l) => l.id === m.member.skillLevelId)?.name ?? null);
+	let levelPick = $state('');
+	$effect(() => {
+		if (levelPick) {
+			const levelId = levelPick;
+			levelPick = '';
+			setMemberLevel({ memberId: id, levelId })
+				.then(() => toast.success('Level updated'))
+				.catch((err) => toast.error(errMsg(err, 'Could not set level')));
+		}
+	});
+	const allLockers = $derived(await getLockers());
+	const freeLockers = $derived(allLockers.filter((l) => !l.locker.memberId));
+	let lockerPick = $state('');
+	$effect(() => {
+		if (lockerPick) {
+			const lockerId = lockerPick;
+			lockerPick = '';
+			assignLocker({ lockerId, memberId: id })
+				.then(() => toast.success('Locker assigned'))
+				.catch((err) => toast.error(errMsg(err, 'Could not assign')));
+		}
+	});
+	async function releaseMemberLocker() {
+		if (!memberLocker) return;
+		try {
+			await releaseLocker({ id: memberLocker.id, memberId: id });
+			toast.success('Locker released');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not release'));
+		}
+	}
 	let newTag = $state('');
 	async function addTag() {
 		const t = newTag.trim();
@@ -434,6 +541,74 @@
 		pending = false;
 	}
 
+	// ------- assigned workouts -------
+	let woOpen = $state(false);
+	let woId = $state<string | null>(null);
+	let woTitle = $state('');
+	let woBody = $state('');
+	function openWorkout(w?: { id: string; title: string; body: string }) {
+		woId = w?.id ?? null;
+		woTitle = w?.title ?? '';
+		woBody = w?.body ?? '';
+		woOpen = true;
+	}
+	async function saveWorkout(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			if (woId) await updateMemberWorkout({ id: woId, title: woTitle.trim(), body: woBody.trim() });
+			else await addMemberWorkout({ memberId: id, title: woTitle.trim(), body: woBody.trim() });
+			toast.success(woId ? 'Workout updated' : 'Workout assigned');
+			woOpen = false;
+			await getMemberWorkouts(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save workout'));
+		}
+		pending = false;
+	}
+	async function removeWorkout(wid: string) {
+		try {
+			await deleteMemberWorkout(wid);
+			toast.success('Workout removed');
+			await getMemberWorkouts(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
+	}
+
+	// ------- pack credit transfer -------
+	let trOpen = $state(false);
+	let trMsId = $state('');
+	let trTo = $state('');
+	let trCredits = $state('1');
+	let trRemaining = $state(0);
+	async function openTransfer(membershipId: string) {
+		trMsId = membershipId;
+		trTo = '';
+		trCredits = '1';
+		trOpen = true;
+		const r = await getPackRemaining(membershipId);
+		trRemaining = r?.remaining ?? 0;
+	}
+	async function sendTransfer(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await transferPackCredits({
+				membershipId: trMsId,
+				toMemberId: trTo,
+				credits: parseInt(trCredits) || 0
+			});
+			const n = parseInt(trCredits) || 0;
+			toast.success(`${r.toName} got ${n} class${n === 1 ? '' : 'es'}`);
+			trOpen = false;
+			await getMember(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not transfer'));
+		}
+		pending = false;
+	}
+
 	async function setMembership(
 		membershipId: string,
 		status: 'paused' | 'cancelled' | 'suspended' | 'active',
@@ -525,6 +700,14 @@
 
 	// ------- payment -------
 	let payOpen = $state(false);
+	async function sellPass() {
+		try {
+			const r = await sellDayPass(id);
+			toast.success(`Day pass posted — ${formatMoney(r.charge.amount, currency)} on their balance`);
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not sell the pass'));
+		}
+	}
 	let payAmount = $state<number | null>(null);
 	let method = $state<'card' | 'cash' | 'bank' | 'other'>('cash');
 	let notes = $state('');
@@ -582,13 +765,25 @@
 		bookSessions = await getSessions();
 		bookOpen = true;
 	}
-	/** No active membership → the dialog sells paid drop-ins instead of booking. */
+	/** No active membership → the dialog sells paid drop-ins instead of booking.
+	 * Dependents may draw from a guardian's pack, so a no-membership member tries
+	 * a normal booking first and only falls back to drop-in on the 402. */
 	const hasActiveMembership = m.memberships.some((mm) => mm.membership.status === 'active');
 	async function bookInto(sessionId: string, dropInPrice?: number | null) {
 		bookPending = sessionId;
 		try {
-			const dropIn = !hasActiveMembership;
-			const b = await bookSession({ sessionId, memberId: id, dropIn, guests: bookGuests });
+			let b: Awaited<ReturnType<typeof bookSession>>;
+			let dropIn = false;
+			if (hasActiveMembership) {
+				b = await bookSession({ sessionId, memberId: id, guests: bookGuests });
+			} else {
+				try {
+					b = await bookSession({ sessionId, memberId: id, guests: bookGuests });
+				} catch {
+					dropIn = true;
+					b = await bookSession({ sessionId, memberId: id, dropIn: true, guests: bookGuests });
+				}
+			}
 			toast.success(
 				dropIn
 					? `Drop-in booked — ${formatMoney(dropInPrice ?? 0, currency)} charge posted`
@@ -651,19 +846,31 @@
 <PageHeader title={m.member.name} crumbs={[{ label: 'Members', href: '/members' }]}>
 	{#snippet actions()}
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
-		<Button variant="outline" size="sm" onclick={openCard}><Printer /> Card</Button>
-		<Button variant="outline" size="sm" href="/members/{m.member.id}/statement"
-			><FileText /> Statement</Button
-		>
-		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
 		{#if m.member.email}
 			<Button variant="outline" size="sm" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
 		{/if}
-		<Button variant="outline" size="sm" onclick={() => (guestOpen = true)}
-			><UserPlus /> Guest</Button
-		>
 		<Button size="sm" variant="outline" onclick={() => (editOpen = true)}>Edit</Button>
-		<Button size="sm" variant="ghost" onclick={openMerge}>Merge…</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" size="sm" {...props} aria-label="More actions">
+						<Ellipsis class="h-4 w-4" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-48">
+				<DropdownMenu.Item onclick={() => (guestOpen = true)}
+					><UserPlus /> Book a guest</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={openCard}><Printer /> Print member card</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => goto(`/members/${m.member.id}/statement`)}
+					><FileText /> Statement</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </PageHeader>
 
@@ -807,6 +1014,74 @@
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
 				</div>
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-muted-foreground">Level</span>
+					<span class="flex items-center gap-1.5">
+						{#if levels.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={levelPick}>
+								<option value="">{levelName ?? 'set…'}</option>
+								{#each levels as l (l.id)}
+									<option value={l.id}>{l.name}</option>
+								{/each}
+							</NativeSelect>
+						{:else}
+							<span class="text-muted-foreground">{levelName ?? '—'}</span>
+						{/if}
+					</span>
+				</div>
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-muted-foreground">Locker</span>
+					<span class="flex items-center gap-1.5">
+						{#if memberLocker}
+							<span class="font-medium">{memberLocker.label}</span>
+							<button
+								class="text-xs text-muted-foreground underline-offset-2 hover:underline"
+								onclick={releaseMemberLocker}>release</button
+							>
+						{:else if freeLockers.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={lockerPick}>
+								<option value="">assign…</option>
+								{#each freeLockers as l (l.locker.id)}
+									<option value={l.locker.id}>{l.locker.label}</option>
+								{/each}
+							</NativeSelect>
+						{:else}
+							<span class="text-muted-foreground">—</span>
+						{/if}
+					</span>
+				</div>
+				<div class="flex items-start justify-between gap-2">
+					<span class="pt-0.5 text-muted-foreground">Kit out</span>
+					<span class="flex max-w-56 flex-wrap justify-end gap-1">
+						{#each memberLoans.filter((l) => !l.loan.returnedAt) as l (l.loan.id)}
+							<Badge variant="secondary" class="gap-1">
+								{l.itemName}
+								<button
+									class="text-muted-foreground hover:text-foreground"
+									aria-label="Return {l.itemName}"
+									onclick={async () => {
+										try {
+											await returnLoan({ loanId: l.loan.id, memberId: id });
+											toast.success('Returned');
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not return'));
+										}
+									}}>×</button
+								>
+							</Badge>
+						{:else}
+							<span class="text-muted-foreground">—</span>
+						{/each}
+						{#if freeKit.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={kitPick}>
+								<option value="">lend…</option>
+								{#each freeKit as k (k.item.id)}
+									<option value={k.item.id}>{k.item.name}</option>
+								{/each}
+							</NativeSelect>
+						{/if}
+					</span>
+				</div>
 				<div class="flex items-start justify-between gap-2">
 					<span class="pt-0.5 text-muted-foreground">Tags</span>
 					<span class="flex max-w-56 flex-wrap justify-end gap-1">
@@ -837,6 +1112,11 @@
 					</span>
 				</div>
 			</Card.Content>
+			<Card.Footer>
+				<Button variant="outline" size="sm" class="w-full" onclick={() => void sellPass()}
+					>Sell day pass</Button
+				>
+			</Card.Footer>
 			{#if balance > 0}
 				<Card.Footer class="flex-col gap-2">
 					<Button class="w-full" onclick={() => ((payAmount = balance), (payOpen = true))}
@@ -863,7 +1143,7 @@
 				{#each m.memberships as mm (mm.membership.id)}
 					<div class="flex items-center justify-between gap-2 text-sm">
 						<div class="min-w-0">
-							<p class="truncate font-medium">{mm.planName}</p>
+							<p class="truncate font-medium" title={mm.planName}>{mm.planName}</p>
 							<p class="text-xs text-muted-foreground">
 								{formatMoney(mm.membership.price ?? mm.amount, currency)}{mm.isPack
 									? ' pack'
@@ -874,6 +1154,16 @@
 									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
 									: ''}
 							</p>
+							{#if mm.membership.noBill}
+								<p class="text-xs text-emerald-600 dark:text-emerald-400">Comp'd — never bills</p>
+							{/if}
+							{#if mm.membership.bonusCredits}
+								<p class="text-xs text-emerald-600 dark:text-emerald-400">
+									{mm.membership.bonusCredits} comp class{mm.membership.bonusCredits === 1
+										? ''
+										: 'es'} banked
+								</p>
+							{/if}
 							{#if mm.membership.cancelRequestedAt}
 								<p class="text-xs text-amber-600 dark:text-amber-400">
 									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}{mm.membership
@@ -893,7 +1183,7 @@
 								<p class="text-xs text-muted-foreground">“{mm.membership.endReason}”</p>
 							{/if}
 						</div>
-						<div class="flex items-center gap-2">
+						<div class="flex flex-wrap items-center justify-end gap-2">
 							<StatusBadge status={mm.membership.status} />
 							{#if mm.membership.status === 'active'}
 								{#if mm.isPack}
@@ -915,7 +1205,32 @@
 												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
 										>{mm.membership.autoRenew ? 'Auto-renew ✓' : 'Auto-renew'}</Button
 									>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Move pack classes to another member"
+										onclick={() => void openTransfer(mm.membership.id)}>Gift</Button
+									>
 								{:else}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Comp'd membership — the billing job never charges it"
+										onclick={() =>
+											updateMembership({
+												id: mm.membership.id,
+												noBill: !mm.membership.noBill
+											})
+												.then(() =>
+													toast.success(
+														mm.membership.noBill ? 'Will bill again' : "Comp'd — never bills"
+													)
+												)
+												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
+										>{mm.membership.noBill ? 'Comp’d ✓' : 'Comp'}</Button
+									>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -1245,6 +1560,107 @@
 		{/if}
 
 		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Assigned workouts</Card.Title>
+					<Card.Description>Routines the member sees in their portal</Card.Description>
+				</div>
+				<Button size="sm" variant="outline" onclick={() => openWorkout()}><Plus /> Assign</Button>
+			</Card.Header>
+			<Card.Content class="space-y-3 px-4">
+				{#each workouts as w (w.id)}
+					<div class="rounded-md border p-3 text-sm">
+						<div class="flex items-center justify-between gap-2">
+							<span class="font-medium">{w.title}</span>
+							<span class="flex shrink-0 gap-1">
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs"
+									onclick={() => openWorkout(w)}>Edit</Button
+								>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={() => void removeWorkout(w.id)}>Remove</Button
+								>
+							</span>
+						</div>
+						<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{w.body}</p>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No workouts assigned yet.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Workout program</Card.Title>
+					<Card.Description
+						>Reusable multi-week plans — the member's portal shows today's day</Card.Description
+					>
+				</div>
+				<span class="flex gap-1">
+					<Button size="sm" variant="ghost" onclick={() => (libOpen = true)}>Library</Button>
+					<Button size="sm" variant="outline" onclick={() => (assignOpen = true)}
+						><Plus /> Assign</Button
+					>
+				</span>
+			</Card.Header>
+			<Card.Content class="space-y-2 px-4">
+				{#each memberPrograms as mp (mp.assignment.id)}
+					<div class="flex items-center justify-between gap-2 rounded-md border p-3 text-sm">
+						<div class="min-w-0">
+							<p class="truncate font-medium">
+								{mp.program.name}
+								<span class="font-normal text-muted-foreground">
+									· {mp.program.weeks}w · starts {mp.assignment.startDate}</span
+								>
+							</p>
+						</div>
+						<span class="flex shrink-0 items-center gap-1">
+							<Badge variant={mp.assignment.status === 'active' ? 'default' : 'secondary'}
+								>{mp.assignment.status}</Badge
+							>
+							{#if mp.assignment.status === 'active'}
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs"
+									onclick={async () => {
+										await setProgramStatus({
+											assignmentId: mp.assignment.id,
+											memberId: id,
+											status: 'done'
+										});
+										toast.success('Marked done');
+									}}>Done</Button
+								>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={async () => {
+										await setProgramStatus({
+											assignmentId: mp.assignment.id,
+											memberId: id,
+											status: 'stopped'
+										});
+									}}>Stop</Button
+								>
+							{/if}
+						</span>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No program assigned.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Challenges</Card.Title>
 				<Card.Description>Check-in challenges this member is in</Card.Description>
@@ -1298,10 +1714,13 @@
 				<Card.Title class="text-base">Emails sent</Card.Title>
 			</Card.Header>
 			<Card.Content class="px-4">
-				{#each m.emails as e (e.createdAt + e.kind)}
+				{#each m.emails as e (e.id)}
 					<div class="flex items-center justify-between gap-2 py-1 text-sm">
 						<span class="capitalize">{e.kind.replaceAll('_', ' ')}</span>
-						<span class="shrink-0 text-xs text-muted-foreground">{formatRelative(e.createdAt)}</span
+						<span class="shrink-0 text-xs text-muted-foreground"
+							>{#if e.openedAt}
+								<Badge variant="secondary" class="mr-1">opened</Badge>
+							{/if}{formatRelative(e.createdAt)}</span
 						>
 					</div>
 				{:else}
@@ -1835,11 +2254,11 @@
 		</Dialog.Header>
 		<label class="flex items-center gap-2 pb-2 text-sm">
 			<span class="text-muted-foreground">Bringing guests</span>
-			<select bind:value={bookGuests} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			<NativeSelect bind:value={bookGuests}>
 				{#each [0, 1, 2, 3] as n (n)}
 					<option value={n}>{n === 0 ? 'None' : `+${n} guest${n > 1 ? 's' : ''}`}</option>
 				{/each}
-			</select>
+			</NativeSelect>
 			{#if bookGuests > 0}
 				<span class="text-xs text-muted-foreground">guest passes first, then drop-in price</span>
 			{/if}
@@ -1986,6 +2405,219 @@
 				</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+<Dialog.Root bind:open={woOpen}>
+	<Dialog.Content>
+		<Dialog.Header
+			><Dialog.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Dialog.Title></Dialog.Header
+		>
+		<form class="space-y-4" onsubmit={saveWorkout}>
+			<Field.Field>
+				<Field.Label for="wo-title">Title</Field.Label>
+				<Input id="wo-title" bind:value={woTitle} placeholder="Leg day" required />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="wo-body">Workout</Field.Label>
+				<Textarea
+					id="wo-body"
+					bind:value={woBody}
+					rows={8}
+					placeholder="3×10 back squats&#10;3×12 lunges&#10;10-min bike cooldown"
+					required
+				/>
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={pending}
+				>{pending ? 'Saving…' : woId ? 'Save' : 'Assign'}</Button
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={trOpen}>
+	<Dialog.Content>
+		<Dialog.Header
+			><Dialog.Title>Gift pack classes</Dialog.Title>
+			<Dialog.Description
+				>Move classes off this pack to another member. {trRemaining} left to give.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendTransfer}>
+			<Field.Field>
+				<Field.Label>To member</Field.Label>
+				<NativeSelect bind:value={trTo} required>
+					<option value="" disabled>Pick a member…</option>
+					{#each m.memberOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
+				</NativeSelect>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="tr-n">Classes</Field.Label>
+				<Input id="tr-n" type="number" min="1" max={trRemaining} bind:value={trCredits} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={pending || !trTo}
+				>{pending ? 'Moving…' : 'Gift classes'}</Button
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={assignOpen}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header><Dialog.Title>Assign a program</Dialog.Title></Dialog.Header>
+		<form
+			class="space-y-4"
+			onsubmit={async (e) => {
+				e.preventDefault();
+				try {
+					await assignProgram({ memberId: id, programId: assignProgramId, startDate: assignStart });
+					assignOpen = false;
+					toast.success('Program assigned');
+				} catch (err) {
+					toast.error(errMsg(err, 'Could not assign'));
+				}
+			}}
+		>
+			<Field.Field>
+				<Field.Label>Program</Field.Label>
+				<NativeSelect bind:value={assignProgramId} required>
+					<option value="" disabled>Pick a program…</option>
+					{#each programs as p (p.program.id)}
+						<option value={p.program.id}
+							>{p.program.name} — {p.program.weeks}w, {p.days.length} days</option
+						>
+					{/each}
+				</NativeSelect>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>Starts</Field.Label>
+				<Input type="date" bind:value={assignStart} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={!assignProgramId}>Assign</Button>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={libOpen}>
+	<Dialog.Content class="max-w-2xl">
+		<Dialog.Header><Dialog.Title>Program library</Dialog.Title></Dialog.Header>
+		{#if libEditing}
+			<form
+				class="space-y-3"
+				onsubmit={async (e) => {
+					e.preventDefault();
+					try {
+						await saveProgram({
+							id: libEditing!.id,
+							name: libEditing!.name,
+							weeks: libEditing!.weeks,
+							note: libEditing!.note || undefined,
+							days: libEditing!.days
+						});
+						libEditing = null;
+						toast.success('Program saved');
+					} catch (err) {
+						toast.error(errMsg(err, 'Could not save'));
+					}
+				}}
+			>
+				<div class="grid grid-cols-[1fr_5rem] gap-2">
+					<Field.Field>
+						<Field.Label>Name</Field.Label>
+						<Input bind:value={libEditing.name} required placeholder="Base strength" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Weeks</Field.Label>
+						<Input type="number" min={1} max={52} bind:value={libEditing.weeks} required />
+					</Field.Field>
+				</div>
+				<Input bind:value={libEditing.note} placeholder="Note (optional)" />
+				<div class="max-h-64 space-y-2 overflow-y-auto rounded-md border p-2">
+					{#each libEditing.days as day, i (day.dayNo)}
+						<div class="space-y-1 rounded border p-2">
+							<div class="flex items-center justify-between gap-2">
+								<Input
+									class="h-8 flex-1"
+									bind:value={day.title}
+									placeholder="Day {day.dayNo} — e.g. Heavy day"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={() => {
+										libEditing!.days.splice(i, 1);
+										libEditing!.days.forEach((d2, j) => (d2.dayNo = j + 1));
+									}}>Remove</Button
+								>
+							</div>
+							<Textarea
+								bind:value={day.body}
+								placeholder="Back squat 5×5 · RDL 3×8 · Plank 3×60s"
+								rows={2}
+								required
+							/>
+						</div>
+					{/each}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						class="w-full"
+						onclick={() =>
+							libEditing!.days.push({
+								dayNo: libEditing!.days.length + 1,
+								title: '',
+								body: ''
+							})}>Add day</Button
+					>
+				</div>
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={() => (libEditing = null)}>Back</Button>
+					<Button type="submit">Save program</Button>
+				</div>
+			</form>
+		{:else}
+			<div class="space-y-2">
+				{#each programs as p (p.program.id)}
+					<div class="flex items-center justify-between gap-2 rounded-md border p-3 text-sm">
+						<div class="min-w-0">
+							<p class="truncate font-medium">{p.program.name}</p>
+							<p class="text-xs text-muted-foreground">
+								{p.program.weeks} week{p.program.weeks === 1 ? '' : 's'} · {p.days.length} days{p
+									.program.note
+									? ` — ${p.program.note}`
+									: ''}
+							</p>
+						</div>
+						<span class="flex shrink-0 gap-1">
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-xs"
+								onclick={() => openProgram(p)}>Edit</Button
+							>
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-xs text-destructive"
+								onclick={async () => {
+									if (!confirm(`Delete "${p.program.name}"?`)) return;
+									await removeProgram(p.program.id);
+									toast.success('Deleted');
+								}}>Delete</Button
+							>
+						</span>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No programs yet.</p>
+				{/each}
+				<Button size="sm" variant="outline" class="w-full" onclick={() => openProgram()}
+					><Plus /> New program</Button
+				>
+			</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
 

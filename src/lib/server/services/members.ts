@@ -1,5 +1,18 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import {
+	isNull,
+	gte,
+	and,
+	asc,
+	desc,
+	eq,
+	ilike,
+	inArray,
+	isNotNull,
+	ne,
+	or,
+	sql
+} from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -30,8 +43,8 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
 import { emit } from './events.ts';
-import { creditUsage } from './schedule.ts';
-import { notifySignRequest } from './notifications.ts';
+import { creditUsage, creditsUsedIn } from './schedule.ts';
+import { notifyCreditsGifted, notifySignRequest } from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -67,7 +80,10 @@ export async function listMembers(
 	planId?: string,
 	sort: MemberSort = 'name',
 	owes?: boolean,
-	suspended?: boolean
+	suspended?: boolean,
+	recent?: boolean,
+	risk?: boolean,
+	family?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -91,6 +107,11 @@ export async function listMembers(
 			planName: sql<
 				string | null
 			>`(select p2.name from ${membership} m2 join ${plan} p2 on p2.id = m2.plan_id where m2.member_id = ${outer(gymMember.id)} and m2.status = 'active' order by m2.created_at desc limit 1)`,
+			/** Dependents can book from a guardian's membership — the picker's
+			 * eligibility gate needs to know without a second query. */
+			guardianPlanName: sql<
+				string | null
+			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
 			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`
 		})
 		.from(gymMember)
@@ -111,14 +132,29 @@ export async function listMembers(
 				status ? eq(gymMember.status, status) : undefined,
 				planId === 'none'
 					? sql`not exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active')`
-					: planId
-						? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
-						: undefined,
+					: planId === 'pack'
+						? sql`exists (select 1 from ${membership} m3 join ${plan} p4 on p4.id = m3.plan_id where m3.member_id = ${gymMember.id} and m3.status = 'active' and p4.is_pack)`
+						: planId === 'recurring'
+							? sql`exists (select 1 from ${membership} m3 join ${plan} p4 on p4.id = m3.plan_id where m3.member_id = ${gymMember.id} and m3.status = 'active' and not p4.is_pack)`
+							: planId
+								? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
+								: undefined,
 				owes
 					? sql`exists (select 1 from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open' and c.amount > coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0))`
 					: undefined,
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
+					: undefined,
+				recent
+					? gte(gymMember.joinedAt, new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10))
+					: undefined,
+				// At-risk: active member with no check-in in the last 30 days (or ever).
+				risk
+					? sql`${gymMember.status} = 'active' and not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`
+					: undefined,
+				// In a household: has a guardian payer, or is the guardian of someone.
+				family
+					? sql`(${gymMember.guardianId} is not null or exists (select 1 from ${gymMember} g2 where g2.guardian_id = ${outer(gymMember.id)}))`
 					: undefined
 			)
 		)
@@ -374,7 +410,12 @@ export async function getMember(orgId: string, id: string) {
 			.limit(500),
 		row.member.email
 			? db
-					.select({ kind: notificationLog.kind, createdAt: notificationLog.createdAt })
+					.select({
+						id: notificationLog.id,
+						kind: notificationLog.kind,
+						openedAt: notificationLog.openedAt,
+						createdAt: notificationLog.createdAt
+					})
 					.from(notificationLog)
 					.where(
 						and(
@@ -1037,4 +1078,263 @@ export async function voidSignRequest(ctx: OrgContext, id: string) {
 		.returning();
 	if (!row) error(404, 'Request not found or already handled');
 	return row;
+}
+
+/**
+ * Moves N class-pack credits from one member's active pack to another member.
+ * Effective pack credits are `plan.classCredits + membership.bonusCredits`, so
+ * the donor's bonusCredits drops by N and the recipient either gets +N on an
+ * existing pack on the same plan or a fresh pack membership whose bonusCredits
+ * nets out to exactly N. No money moves — the original charge stays with the
+ * donor. Returns the donor's remaining credits.
+ */
+export async function transferPackCredits(
+	ctx: { orgId: string; userId?: string | null },
+	fromMembershipId: string,
+	to: { memberId?: string; email?: string },
+	credits: number
+) {
+	if (!Number.isInteger(credits) || credits < 1) error(400, 'Give at least 1 class');
+	const [donor] = await db
+		.select({
+			ms: membership,
+			classCredits: plan.classCredits,
+			classTypeId: plan.classTypeId,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.id, fromMembershipId),
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	if (!donor) error(404, 'Active pack membership not found');
+	const [recipient] = to.memberId
+		? await db
+				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+				.from(gymMember)
+				.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, to.memberId)))
+		: await db
+				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+				.from(gymMember)
+				.where(
+					and(
+						eq(gymMember.organizationId, ctx.orgId),
+						eq(sql`lower(${gymMember.email})`, (to.email ?? '').trim().toLowerCase())
+					)
+				);
+	if (!recipient) error(404, 'No member with that email at this gym');
+	if (recipient.id === donor.ms.memberId) error(400, 'That is already their pack');
+	const window = {
+		start: donor.ms.startsAt.toISOString().slice(0, 10),
+		end: (donor.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+	};
+	const used = await creditsUsedIn(
+		ctx.orgId,
+		donor.ms.memberId,
+		donor.ms.id,
+		window,
+		donor.classTypeId
+	);
+	const remaining = donor.classCredits! + donor.ms.bonusCredits - used;
+	if (credits > remaining)
+		error(400, `Only ${remaining} class${remaining === 1 ? '' : 'es'} left on this pack`);
+	const [donorMember] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(eq(gymMember.id, donor.ms.memberId));
+	await db.transaction(async (tx) => {
+		await tx
+			.update(membership)
+			.set({ bonusCredits: sql`${membership.bonusCredits} - ${credits}` })
+			.where(eq(membership.id, donor.ms.id));
+		const [existing] = await tx
+			.select({ id: membership.id })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, ctx.orgId),
+					eq(membership.memberId, recipient.id),
+					eq(membership.planId, donor.ms.planId),
+					eq(membership.status, 'active')
+				)
+			)
+			.limit(1);
+		if (existing)
+			await tx
+				.update(membership)
+				.set({ bonusCredits: sql`${membership.bonusCredits} + ${credits}` })
+				.where(eq(membership.id, existing.id));
+		else
+			await tx.insert(membership).values({
+				organizationId: ctx.orgId,
+				memberId: recipient.id,
+				planId: donor.ms.planId,
+				startsAt: new Date(),
+				// The gifted classes live and die with the donor pack's window.
+				endsAt: donor.ms.endsAt,
+				// Effective credits = plan.classCredits + bonusCredits = exactly `credits`.
+				bonusCredits: credits - donor.classCredits!
+			});
+	});
+	const fromName = donorMember?.name ?? 'A member';
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: recipient.id,
+		action: 'credits.transferred',
+		summary: `${credits} pack class${credits === 1 ? '' : 'es'} from ${fromName}`
+	});
+	await notifyCreditsGifted(
+		ctx.orgId,
+		`${donor.ms.id}:${crypto.randomUUID()}`,
+		recipient.id,
+		fromName,
+		credits
+	);
+	return { remaining: remaining - credits, toName: recipient.name };
+}
+
+/** Remaining classes on one pack membership — for the transfer dialog. */
+export async function packRemaining(orgId: string, membershipId: string) {
+	const [row] = await db
+		.select({ ms: membership, classCredits: plan.classCredits, classTypeId: plan.classTypeId })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.id, membershipId),
+				eq(membership.organizationId, orgId),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	if (!row) return null;
+	const used = await creditsUsedIn(
+		orgId,
+		row.ms.memberId,
+		row.ms.id,
+		{
+			start: row.ms.startsAt.toISOString().slice(0, 10),
+			end: (row.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+		},
+		row.classTypeId
+	);
+	const limit = row.classCredits! + row.ms.bonusCredits;
+	return { used, limit, remaining: Math.max(0, limit - used) };
+}
+
+/**
+ * Portal-side gift: the member gives N credits off their own pack to another
+ * member by email. Picks their pack with the most remaining credits.
+ */
+export async function giftPackCredits(
+	orgId: string,
+	fromMemberId: string,
+	email: string,
+	credits: number,
+	userId?: string | null
+) {
+	const packs = await db
+		.select({ ms: membership, classCredits: plan.classCredits, classTypeId: plan.classTypeId })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, fromMemberId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	let best: { id: string; remaining: number } | null = null;
+	for (const p of packs) {
+		const used = await creditsUsedIn(
+			orgId,
+			fromMemberId,
+			p.ms.id,
+			{
+				start: p.ms.startsAt.toISOString().slice(0, 10),
+				end: (p.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+			},
+			p.classTypeId
+		);
+		const remaining = p.classCredits! + p.ms.bonusCredits - used;
+		if (!best || remaining > best.remaining) best = { id: p.ms.id, remaining };
+	}
+	if (!best) error(400, 'You have no active class pack');
+	if (credits > best!.remaining)
+		error(
+			400,
+			`Only ${best!.remaining} class${best!.remaining === 1 ? '' : 'es'} left on your pack`
+		);
+	return transferPackCredits({ orgId, userId }, best!.id, { email }, credits);
+}
+
+/** Latest personal records across the gym — the lobby PR wall. */
+export async function prWall(orgId: string) {
+	const records = await db
+		.select({
+			pr: personalRecord,
+			memberName: gymMember.name,
+			photoDocumentId: gymMember.photoDocumentId
+		})
+		.from(personalRecord)
+		.innerJoin(gymMember, eq(personalRecord.memberId, gymMember.id))
+		.where(eq(personalRecord.organizationId, orgId))
+		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+		.limit(40);
+
+	// Top current week-streaks — one year of check-ins, grouped by ISO week.
+	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
+	const visits = await db
+		.select({
+			memberId: checkIn.memberId,
+			checkedAt: checkIn.checkedAt,
+			memberName: gymMember.name
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, since),
+				isNull(checkIn.guestName)
+			)
+		);
+	const weekOf = (d: Date) => {
+		const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+		x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+		return x.getTime();
+	};
+	const byMember = new Map<string, { name: string; weeks: Set<number> }>();
+	for (const v of visits) {
+		const e = byMember.get(v.memberId) ?? { name: v.memberName, weeks: new Set<number>() };
+		e.weeks.add(weekOf(v.checkedAt));
+		byMember.set(v.memberId, e);
+	}
+	const thisWeek = weekOf(new Date());
+	const streaks = [...byMember.entries()]
+		.map(([memberId, e]) => {
+			let w = thisWeek;
+			if (!e.weeks.has(w)) w -= 7 * 86_400_000;
+			let streak = 0;
+			while (e.weeks.has(w)) {
+				streak++;
+				w -= 7 * 86_400_000;
+			}
+			return { memberId, memberName: e.name, streak };
+		})
+		.filter((r) => r.streak >= 2)
+		.sort((a, b) => b.streak - a.streak)
+		.slice(0, 5);
+
+	return { records, streaks };
 }

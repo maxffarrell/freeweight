@@ -101,7 +101,9 @@ export const membershipUpdate = v.object({
 	/** Staff: custom recurring price in minor units; null clears the override. */
 	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** Pack memberships: renew automatically when the pack runs out or expires. */
-	autoRenew: v.optional(v.boolean())
+	autoRenew: v.optional(v.boolean()),
+	/** Comp'd membership — billing cron never charges it. */
+	noBill: v.optional(v.boolean())
 });
 
 export const grantCreditsInput = v.object({
@@ -139,6 +141,7 @@ export const classTypeInput = v.object({
 	bookCutoffMin: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });
@@ -158,7 +161,9 @@ export const resourceInput = v.object({
 	/** 'open' | 'maintenance' | 'closed' — non-open blocks every new booking. */
 	status: v.optional(v.picklist(['open', 'maintenance', 'closed']), 'open'),
 	/** Short "why" shown to members while the amenity isn't open. */
-	statusNote: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
+	statusNote: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+	/** Minutes blocked after each booking for cleaning/reset (0 = back-to-back). */
+	bufferMin: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120)), 0)
 });
 export const resourceUpdate = v.object({ id: idSchema, ...v.partial(resourceInput).entries });
 
@@ -210,6 +215,7 @@ export const eventInput = v.object({
 	/** Signup price in cents; null/0 = free. */
 	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	active: v.optional(v.boolean(), true)
 });
 /** Times aren't editable — recreate the event (registrations keep the old row). */
@@ -271,6 +277,8 @@ export const sessionUpdate = v.object({
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
 	cancelled: v.optional(v.boolean()),
+	/** On cancel: try re-booking 'booked' members into the next session of this class. */
+	rebookNext: v.optional(v.boolean()),
 	/** Flag/unflag the session as needing a substitute instructor. */
 	needsCover: v.optional(v.boolean()),
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
@@ -378,7 +386,8 @@ export const chargeInput = v.object({
 	kind: v.optional(v.picklist(chargeKinds), 'other'),
 	description: optionalText,
 	amount: cents,
-	dueDate: isoDate
+	dueDate: isoDate,
+	cogsCents: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0))))
 });
 /** One manual charge posted to every member with an active membership. */
 export const bulkChargeInput = v.object({
@@ -431,7 +440,9 @@ export const shopItemInput = v.object({
 	/** Staff alert when stock drops to this level; null = never. */
 	lowStockAt: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
-	)
+	),
+	/** Unit cost in cents — feeds shop COGS/margin; null = untracked. */
+	cost: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999999))))
 });
 
 export const shopItemUpdate = v.object({
@@ -441,6 +452,9 @@ export const shopItemUpdate = v.object({
 	stock: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))),
 	lowStockAt: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
+	),
+	cost: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999999)))
 	),
 	active: v.optional(v.boolean())
 });
@@ -488,11 +502,23 @@ export const settingsInput = v.object({
 	/** Review link (Google/Yelp) sent to members after `reviewAfterVisits` visits; null = off. */
 	reviewUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.url(), v.maxLength(300)))),
 	/** Lifetime attended visits that triggers a once-per-member review request; null = off. */
+	/** Comp classes granted at each check-in milestone; null/0 = off. */
+	rewardCredits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
+	),
+	streakRewardCredits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
+	),
+	lateCancelFreebies: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)))
+	),
 	reviewAfterVisits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
 	),
 	/** Monthly revenue goal in minor units for the Reports progress bar; null = off. */
-	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Weekly opening hours {weekday: 'HH:MM-HH:MM'}; '' = closed that day. */
+	openHours: v.optional(v.record(v.string(), v.pipe(v.string(), v.trim(), v.maxLength(11))))
 });
 
 export const webhookInput = v.object({
@@ -580,6 +606,13 @@ export const emailRosterInput = v.object({
 	message: requiredText('Message')
 });
 
+/** Email everyone registered for an event — same treatment as a session roster. */
+export const emailEventRosterInput = v.object({
+	eventId: idSchema,
+	subject: requiredText('Subject'),
+	message: requiredText('Message')
+});
+
 export const announcementInput = v.object({
 	subject: requiredText('Subject'),
 	message: requiredText('Message'),
@@ -588,7 +621,9 @@ export const announcementInput = v.object({
 	/** Restrict the batch to members carrying this tag. */
 	tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50))),
 	/** Restrict the batch to members holding an active membership on this plan. */
-	planId: v.optional(idSchema)
+	planId: v.optional(idSchema),
+	/** Restrict the batch to the at-risk list (no visit in 30+ days). */
+	atRisk: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({
@@ -691,6 +726,7 @@ export const courseInput = v.object({
 	/** Program-wide enrollment cap; null = per-session capacities only. */
 	capacity: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
 	memberBookable: v.optional(v.boolean(), true),
+	minLevelId: v.optional(v.nullable(idSchema)),
 	/** Split the price into this many monthly installments (1 = pay up front). */
 	installments: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(12)))
@@ -717,4 +753,76 @@ export const slotGenInput = v.object({
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50))),
 		1
 	)
+});
+
+/** Staff-assigned workout routine on the member page / in the portal. */
+export const workoutInput = v.object({
+	memberId: idSchema,
+	title: v.pipe(requiredText('Title'), v.maxLength(80)),
+	body: v.pipe(requiredText('Workout'), v.maxLength(4000))
+});
+
+export const workoutUpdate = v.object({
+	id: idSchema,
+	title: v.pipe(requiredText('Title'), v.maxLength(80)),
+	body: v.pipe(requiredText('Workout'), v.maxLength(4000))
+});
+
+/** Staff: move pack credits from one member's pack membership to another member. */
+export const creditTransferInput = v.object({
+	membershipId: idSchema,
+	toMemberId: idSchema,
+	credits: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))
+});
+
+/** Portal: member gifts pack credits to another member by email. */
+export const giftCreditsInput = v.object({
+	memberId: idSchema,
+	email: v.pipe(requiredText('Email'), v.email('Must be an email')),
+	credits: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))
+});
+
+/** Member requesting a 1:1 session in the portal. */
+export const ptRequestInput = v.object({
+	instructorId: v.optional(v.nullable(idSchema)),
+	preferredAt: v.pipe(v.string(), v.nonEmpty('Pick a date and time')),
+	note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)))
+});
+
+/** Staff approving a PT request — session to create. */
+export const ptApproveInput = v.object({
+	id: idSchema,
+	classTypeId: idSchema,
+	startsAt: v.optional(v.pipe(v.string(), v.nonEmpty()))
+});
+
+/** Weekly recurring announcement (cron-delivered). */
+export const recurringEmailInput = v.object({
+	subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(150)),
+	message: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(5000)),
+	tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+	planId: v.optional(v.nullable(idSchema)),
+	weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
+	time: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)'))
+});
+
+export const levelInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(40)),
+	color: v.optional(v.pipe(v.string(), v.maxLength(30)))
+});
+
+export const setLevelInput = v.object({
+	memberId: idSchema,
+	levelId: v.nullable(idSchema)
+});
+
+export const announcementTemplateInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+	subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(150)),
+	message: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(5000)),
+	tag: v.optional(v.pipe(v.string(), v.maxLength(50)))
+});
+
+export const lockerInput = v.object({
+	label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(30))
 });

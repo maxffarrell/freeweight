@@ -1,9 +1,22 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	ne,
+	sql
+} from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
+	locker,
 	booking,
 	charge,
 	checkIn,
@@ -12,16 +25,21 @@ import {
 	document,
 	sessionFeedback,
 	shopItem,
+	shopSale,
 	signRequest,
 	classVideo,
 	workoutResult,
 	gymMember,
 	gymSettings,
 	location,
+	memberLevel,
+	memberNps,
+	memberMeasurement,
 	memberNote,
 	membership,
 	organization,
 	payment,
+	personalRecord,
 	plan,
 	recurringCharge,
 	waiver,
@@ -113,6 +131,24 @@ export async function portalOverview(memberId: string) {
 		.where(eq(membership.memberId, memberId))
 		.orderBy(desc(membership.createdAt));
 
+	// Family packs: a dependent books from the guardian's memberships — the
+	// portal's booking gate needs to know one exists.
+	const guardianHasMembership = m.guardianId
+		? !!(
+				await db
+					.select({ id: membership.id })
+					.from(membership)
+					.where(
+						and(
+							eq(membership.organizationId, orgId),
+							eq(membership.memberId, m.guardianId),
+							eq(membership.status, 'active')
+						)
+					)
+					.limit(1)
+			).length
+		: false;
+
 	const now = new Date();
 	const upcoming = await db
 		.select({
@@ -191,13 +227,35 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(recurringCharge.memberId, memberId), eq(recurringCharge.organizationId, orgId)))
 		.orderBy(asc(recurringCharge.nextDue));
 
-	const [[org], [referred]] = await Promise.all([
+	const [[org], [referred], referralRows] = await Promise.all([
 		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
 		db
 			.select({ n: sql<number>`count(*)`.mapWith(Number) })
 			.from(gymMember)
+			.where(eq(gymMember.referredByMemberId, memberId)),
+		db
+			.select({ id: gymMember.id, name: gymMember.name })
+			.from(gymMember)
 			.where(eq(gymMember.referredByMemberId, memberId))
+			.orderBy(desc(gymMember.createdAt))
+			.limit(20)
 	]);
+	let referrals: { name: string; paying: boolean }[] = [];
+	if (referralRows.length) {
+		const paid = await db
+			.select({ memberId: payment.memberId })
+			.from(payment)
+			.where(
+				and(
+					eq(payment.organizationId, orgId),
+					inArray(payment.memberId, referralRows.map((r) => r.id)),
+					isNull(payment.refundedAt)
+				)
+			)
+			.groupBy(payment.memberId);
+		const paidSet = new Set(paid.map((p) => p.memberId));
+		referrals = referralRows.map((r) => ({ name: r.name, paying: paidSet.has(r.id) }));
+	}
 
 	// Recent payments for the portal's billing history (most recent first).
 	const payments = await db
@@ -298,7 +356,7 @@ export async function portalOverview(memberId: string) {
 	> = {};
 	for (const r of wbRows) (whiteboard[r.sessionId] ??= []).push(r);
 
-	const [priorBooking, [avatarDoc], [firstVisit]] = await Promise.all([
+	const [priorBooking, [avatarDoc], [firstVisit], [level]] = await Promise.all([
 		hasPriorBooking(memberId),
 		db
 			.select({ id: document.id })
@@ -315,13 +373,29 @@ export async function portalOverview(memberId: string) {
 					isNull(checkIn.guestName)
 				)
 			)
-			.limit(1)
+			.limit(1),
+		m.skillLevelId
+			? db
+					.select({ name: memberLevel.name, color: memberLevel.color })
+					.from(memberLevel)
+					.where(eq(memberLevel.id, m.skillLevelId))
+					.limit(1)
+			: Promise.resolve([])
 	]);
+
+	const [lk] = await db
+		.select({ label: locker.label })
+		.from(locker)
+		.where(and(eq(locker.organizationId, orgId), eq(locker.memberId, memberId)))
+		.limit(1);
 
 	return {
 		member: m,
+		lockerLabel: lk?.label ?? null,
+		level: level ?? null,
 		settings,
 		memberships,
+		guardianHasMembership,
 		upcoming: upcomingWithPos,
 		balance,
 		openCharges,
@@ -336,6 +410,7 @@ export async function portalOverview(memberId: string) {
 		calendarToken: calendarToken(memberId),
 		orgSlug: org?.slug ?? '',
 		referralCount: referred?.n ?? 0,
+		referrals,
 		dropInFree: !!settings?.firstClassFree && !priorBooking,
 		onboarding: {
 			waiver: !settings?.waiver || !!signedWaiver,
@@ -401,7 +476,30 @@ async function attendanceStats(orgId: string, memberId: string, tz: string) {
 		prev.setUTCDate(prev.getUTCDate() - 7);
 		w = prev.toISOString().slice(0, 10);
 	}
-	return { visitsThisMonth, weekStreak, totalVisits: rows.length, recent: rows.slice(0, 10) };
+	// Longest run of consecutive visited weeks (for the streak card).
+	const sortedWeeks = [...weeks].sort();
+	let longestStreak = 0;
+	let run = 0;
+	let prevW = '';
+	for (const wk of sortedWeeks) {
+		const expect = prevW
+			? new Date(new Date(`${prevW}T12:00:00Z`).getTime() + 7 * 86400_000)
+					.toISOString()
+					.slice(0, 10)
+			: '';
+		run = wk === expect ? run + 1 : 1;
+		if (run > longestStreak) longestStreak = run;
+		prevW = wk;
+	}
+	const nextMilestone = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > rows.length) ?? null;
+	return {
+		visitsThisMonth,
+		weekStreak,
+		longestStreak,
+		nextMilestone,
+		totalVisits: rows.length,
+		recent: rows.slice(0, 10)
+	};
 }
 
 /**
@@ -535,7 +633,15 @@ export async function memberBook(
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
 	// Members without an active plan buy the visit as a drop-in — the class's
 	// drop-in charge lands on their balance to pay online or at the desk.
-	const ms = await activeMembership(orgId, memberId);
+	let ms = await activeMembership(orgId, memberId);
+	// Dependents ride on the guardian's plan/pack — check before marking drop-in.
+	if (!ms) {
+		const [me] = await db
+			.select({ guardianId: gymMember.guardianId })
+			.from(gymMember)
+			.where(eq(gymMember.id, memberId));
+		if (me?.guardianId) ms = (await activeMembership(orgId, me.guardianId)) ?? null;
+	}
 	// A plan's own book-ahead window takes precedence over the gym-wide one.
 	const windowDays = ms?.bookAheadDays ?? bookingWindowDays;
 	if (windowDays != null && s.startsAt.getTime() > Date.now() + windowDays * 86400_000)
@@ -552,6 +658,179 @@ export async function memberBook(
 		userId,
 		opts
 	);
+}
+
+/**
+ * "Give my spot" — the member hands an upcoming booking to another member by
+ * email. Their seat is released (credits returned as with any cancel) and the
+ * recipient books it on their own entitlement — an active membership (their own
+ * or a guardian's shared pack) is required so no surprise charge lands. If the
+ * recipient's book fails after the seat freed, the giver's booking is restored.
+ */
+export async function giveSpot(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	bookingId: string,
+	recipientEmail: string
+) {
+	const [b] = await db
+		.select({
+			memberId: booking.memberId,
+			status: booking.status,
+			sessionId: booking.sessionId,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
+	if (!b || b.memberId !== memberId) error(404, 'Booking not found');
+	if (b.status !== 'booked') error(409, 'Only a booked spot can be given');
+	if (b.startsAt.getTime() <= Date.now()) error(409, 'That class already started');
+	const email = recipientEmail.trim().toLowerCase();
+	const [r] = await db
+		.select({ id: gymMember.id, name: gymMember.name, guardianId: gymMember.guardianId })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`lower(${gymMember.email}) = ${email}`
+			)
+		)
+		.limit(1);
+	if (!r) error(404, 'No member with that email');
+	if (r.id === memberId) error(400, 'That is your own email');
+	// Recipient must hold an active membership — their own or a guardian's.
+	let rms = await activeMembership(orgId, r.id);
+	if (!rms && r.guardianId) rms = await activeMembership(orgId, r.guardianId);
+	if (!rms) error(409, `${r.name} has no active membership — they can't take the spot`);
+	await cancelBooking(memberCtx(orgId, userId), bookingId, userId, { notify: false });
+	try {
+		await memberBook(orgId, userId, b.sessionId, r.id, { skipDailyLimit: true });
+	} catch (err) {
+		// Put the giver's seat back rather than lose it — un-cancel the original
+		// row directly. Rebooking via memberBook would re-run level/credit checks
+		// the original booking may predate and silently drop the seat. If the
+		// freed seat already went to a waitlister, the giver rejoins the queue at
+		// the front (createdAt unchanged) instead of vanishing entirely.
+		const [[gb], [cap], [{ spots }]] = await Promise.all([
+			db
+				.select({ guestCount: booking.guestCount, chargeId: booking.chargeId })
+				.from(booking)
+				.where(eq(booking.id, bookingId)),
+			db
+				.select({ capacity: classSession.capacity })
+				.from(classSession)
+				.where(eq(classSession.id, b.sessionId)),
+			db
+				.select({
+					spots:
+						sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+				})
+				.from(booking)
+				.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')))
+		]);
+		const free = (cap?.capacity ?? 0) - (spots ?? 0);
+		await db
+			.update(booking)
+			.set({ status: free >= 1 + (gb?.guestCount ?? 0) ? 'booked' : 'waitlisted', cancelledAt: null })
+			.where(eq(booking.id, bookingId));
+		// A voided drop-in charge comes back open with the restored booking.
+		if (gb?.chargeId)
+			await db
+				.update(charge)
+				.set({ status: 'open', updatedAt: new Date() })
+				.where(and(eq(charge.id, gb.chargeId), eq(charge.status, 'void')));
+		throw err;
+	}
+	await emit({
+		orgId,
+		actorId: userId,
+		entityType: 'booking',
+		entityId: bookingId,
+		action: 'spot_given',
+		summary: `Spot given to ${r.name}`
+	});
+	return { recipient: r.name };
+}
+
+/**
+ * Makeup offers: bookings the member lost to a gym-side session cancellation
+ * and hasn't replaced yet, each with the free candidate sessions of the same
+ * class coming up in the next 14 days.
+ */
+export async function memberMakeups(orgId: string, memberId: string) {
+	const lost = await db
+		.select({
+			bookingId: booking.id,
+			className: classType.name,
+			classTypeId: classSession.classTypeId,
+			wasAt: classSession.startsAt,
+			replacedBy: sql<
+				string | null
+			>`(select b2.id from ${booking} b2 where b2.comp_booking_id = ${booking.id} and b2.status != 'cancelled' limit 1)`
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				eq(booking.status, 'booked'),
+				isNotNull(classSession.cancelledAt)
+			)
+		)
+		.orderBy(desc(classSession.startsAt))
+		.limit(10);
+
+	const now = new Date();
+	const horizon = new Date(Date.now() + 14 * 86_400_000);
+	const out = [];
+	for (const l of lost) {
+		if (l.replacedBy) continue;
+		const candidates = await db
+			.select({
+				sessionId: classSession.id,
+				startsAt: classSession.startsAt,
+				locationName: location.name,
+				free: sql<number>`${classSession.capacity} - (select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+					Number
+				)
+			})
+			.from(classSession)
+			.leftJoin(location, eq(classSession.locationId, location.id))
+			.where(
+				and(
+					eq(classSession.organizationId, orgId),
+					eq(classSession.classTypeId, l.classTypeId),
+					isNull(classSession.cancelledAt),
+					gte(classSession.startsAt, now),
+					lt(classSession.startsAt, horizon),
+					sql`not exists (select 1 from ${booking} b3 where b3.session_id = ${outer(classSession.id)} and b3.member_id = ${memberId} and b3.status in ('booked','waitlisted'))`
+				)
+			)
+			.orderBy(asc(classSession.startsAt))
+			.limit(6);
+		if (candidates.length) out.push({ ...l, candidates });
+	}
+	return out;
+}
+
+/**
+ * Books the member into a makeup session for a booking they lost to a
+ * gym-side cancellation — free, no credit drain, same class only.
+ * `compFrom` is validated inside bookSession's row lock.
+ */
+export async function memberBookMakeup(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	compFrom: string,
+	sessionId: string
+) {
+	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, { compFrom });
 }
 
 /**
@@ -1152,6 +1431,24 @@ export async function memberShopItems(orgId: string) {
 		.orderBy(asc(shopItem.name));
 }
 
+/** The member's recent shop purchases with pickup status. */
+export async function memberPurchases(orgId: string, memberId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			createdAt: shopSale.createdAt,
+			pickedUpAt: shopSale.pickedUpAt,
+			itemName: shopItem.name,
+			price: shopItem.price
+		})
+		.from(shopSale)
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(and(eq(shopSale.organizationId, orgId), eq(shopSale.memberId, memberId)))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(15);
+}
+
 /**
  * Buys one of an item — posts an 'other' charge on the member's tab and
  * decrements stock. Pick-up is at the desk; no member-facing inventory.
@@ -1239,6 +1536,111 @@ export async function memberSetPackAutoRenew(
 		entityId: membershipId,
 		action: 'updated',
 		summary: `Auto-renew ${on ? 'on' : 'off'}`
+	});
+	return row;
+}
+
+/** Everything we hold on one member — portal "download my data" export. */
+export async function exportMemberData(orgId: string, memberId: string) {
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const [
+		memberships,
+		charges,
+		payments,
+		checkIns,
+		bookings,
+		prs,
+		measurements,
+		documents,
+		signRequests,
+		waivers
+	] = await Promise.all([
+		db
+			.select({ membership, planName: plan.name })
+			.from(membership)
+			.leftJoin(plan, eq(membership.planId, plan.id))
+			.where(eq(membership.memberId, memberId)),
+		db.select().from(charge).where(eq(charge.memberId, memberId)),
+		db.select().from(payment).where(eq(payment.memberId, memberId)),
+		db.select().from(checkIn).where(eq(checkIn.memberId, memberId)),
+		db.select().from(booking).where(eq(booking.memberId, memberId)),
+		db.select().from(personalRecord).where(eq(personalRecord.memberId, memberId)),
+		db.select().from(memberMeasurement).where(eq(memberMeasurement.memberId, memberId)),
+		db
+			.select({
+				id: document.id,
+				name: document.name,
+				contentType: document.contentType,
+				size: document.size,
+				createdAt: document.createdAt
+			})
+			.from(document)
+			.where(
+				and(
+					eq(document.organizationId, orgId),
+					eq(document.entityType, 'member'),
+					eq(document.entityId, memberId)
+				)
+			),
+		db.select().from(signRequest).where(eq(signRequest.memberId, memberId)),
+		db.select().from(waiver).where(eq(waiver.memberId, memberId))
+	]);
+	return {
+		exportedAt: new Date().toISOString(),
+		member: m,
+		memberships,
+		charges,
+		payments,
+		checkIns,
+		bookings,
+		personalRecords: prs,
+		measurements,
+		documents,
+		signRequests,
+		waivers
+	};
+}
+
+/** Latest satisfaction score — the portal asks once every 90 days. */
+export async function npsStatus(orgId: string, memberId: string) {
+	const cutoff = new Date(Date.now() - 90 * 86400_000);
+	const [row] = await db
+		.select({ id: memberNps.id })
+		.from(memberNps)
+		.where(
+			and(
+				eq(memberNps.organizationId, orgId),
+				eq(memberNps.memberId, memberId),
+				gte(memberNps.createdAt, cutoff)
+			)
+		)
+		.limit(1);
+	return { due: !row };
+}
+
+export async function submitNps(
+	orgId: string,
+	memberId: string,
+	userId: string | null,
+	score: number,
+	comment?: string
+) {
+	if (score < 0 || score > 10) error(400, 'Score must be 0–10');
+	const [row] = await db
+		.insert(memberNps)
+		.values({ organizationId: orgId, memberId, score, comment: comment || null })
+		.returning();
+	emit({
+		orgId,
+		actorId: null,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'updated',
+		summary: `Left feedback — ${score}/10`
 	});
 	return row;
 }

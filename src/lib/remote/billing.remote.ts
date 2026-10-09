@@ -7,7 +7,10 @@ import * as recSvc from '#lib/server/services/recurring.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
-import { requestAllPaymentNotices } from '#lib/server/services/notifications.ts';
+import {
+	requestAllPaymentNotices,
+	resendPaymentReceipt
+} from '#lib/server/services/notifications.ts';
 import {
 	bulkChargeInput,
 	chargeInput,
@@ -86,8 +89,8 @@ export const grantCredits = command(grantCreditsInput, async ({ membershipId, co
 });
 
 export const getCharges = query(
-	v.optional(v.object({ status: v.optional(v.string()) })),
-	async (opts) => svc.listCharges((await requireOrg()).orgId, opts?.status)
+	v.optional(v.object({ status: v.optional(v.string()), kind: v.optional(v.string()) })),
+	async (opts) => svc.listCharges((await requireOrg()).orgId, opts?.status, opts?.kind)
 );
 export const addCharge = command(chargeInput, async (input) => {
 	const c = await svc.addCharge(await requireOrg(), input);
@@ -130,6 +133,25 @@ export const sellItem = command(saleInput, async (input) => {
 	void getCharges().refresh();
 	void getPayments().refresh();
 	void getMember(input.memberId).refresh();
+	void getPendingPickups().refresh();
+	void getShopItems().refresh();
+	return r;
+});
+
+export const getPendingPickups = query(async () => svc.pendingPickups((await requireOrg()).orgId));
+
+/** Desk day-pass sale — posts the day's dropin charge for the member. */
+export const sellDayPass = command(idSchema, async (memberId) => {
+	const ctx = await requireOrg();
+	const r = await svc.sellDayPass(ctx, memberId);
+	void getCharges().refresh();
+	void getMember(memberId).refresh();
+	return r;
+});
+
+export const markPickedUp = command(idSchema, async (saleId) => {
+	const r = await svc.markPickedUp(await requireOrg(), saleId);
+	void getPendingPickups().refresh();
 	return r;
 });
 
@@ -181,6 +203,11 @@ export const recordPayment = command(paymentInput, async (input) => {
 /** "Email all" on the aging card — balance-due emails to every member with an unpaid charge. */
 export const requestAllPayments = command(async () =>
 	requestAllPaymentNotices((await requireOrg()).orgId)
+);
+
+/** Re-emails the payment receipt — the desk's "member lost the receipt" fix. */
+export const resendReceipt = command(idSchema, async (id) =>
+	resendPaymentReceipt((await requireOrg()).orgId, id)
 );
 
 export const refundPayment = command(idSchema, async (id) => {

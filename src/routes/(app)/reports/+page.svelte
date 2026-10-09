@@ -142,6 +142,42 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">Traffic heatmap — last 90 days</Card.Title>
+			<Card.Description>Check-ins by day × hour, gym timezone</Card.Description>
+		</Card.Header>
+		<Card.Content class="overflow-x-auto">
+			{@const maxCell = Math.max(1, ...r.heatmap.map((c) => c.n))}
+			{@const hrs = [...new Set(r.heatmap.map((c) => c.hour))].sort((a, b) => a - b)}
+			<table class="w-full min-w-150 border-collapse text-[10px] tabular-nums">
+				<thead>
+					<tr>
+						<th class="p-1 text-left font-medium text-muted-foreground"></th>
+						{#each hrs as h (h)}
+							<th class="p-1 font-medium text-muted-foreground">{hourLabel(h)}</th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d, dow (d)}
+						<tr>
+							<td class="p-1 pr-2 font-medium text-muted-foreground">{d}</td>
+							{#each hrs as h (h)}
+								{@const c = r.heatmap.find((x) => x.dow === dow && x.hour === h)}
+								<td
+									class="p-1 text-center {c?.n ? 'font-medium' : 'text-muted-foreground'}"
+									style="background: {c?.n ? `rgb(37 99 235 / ${Math.round(15 + 85 * (c.n / maxCell))}%)` : 'transparent'}"
+									title="{d} {hourLabel(h)} — {c?.n ?? 0} check-ins">{c?.n || ''}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Member growth</Card.Title>
@@ -229,6 +265,66 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Cover claims</Card.Title>
+			<Card.Description>Who flags sessions for cover vs who picks them up</Card.Description>
+		</Card.Header>
+		<Card.Content class="p-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Staff</Table.Head>
+						<Table.Head class="text-right">Flagged</Table.Head>
+						<Table.Head class="text-right">Covered</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.covers as c (c.name)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{c.name}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.requested}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.claimed}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground"
+								>No cover activity yet.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	{#if r.tags?.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Member tags</Card.Title>
+				<Card.Description>Active members per tag — how your labels distribute</Card.Description>
+			</Card.Header>
+			<Card.Content class="p-0">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Tag</Table.Head>
+							<Table.Head class="text-right">Members</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.tags as t (t.tag)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{t.tag}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{t.n}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<Card.Root>
 		<Card.Header>
@@ -406,7 +502,8 @@
 			<Card.Header>
 				<Card.Title class="text-base">Profit &amp; loss</Card.Title>
 				<Card.Description>
-					Revenue vs logged expenses per month — record costs on Billing → Expenses
+					Revenue vs logged expenses + shop cost-of-goods per month — costs on Billing → Expenses,
+					item cost on Billing → Shop
 				</Card.Description>
 			</Card.Header>
 			<Card.Content>
@@ -417,6 +514,7 @@
 								<Table.Head>Month</Table.Head>
 								<Table.Head class="text-right">Revenue</Table.Head>
 								<Table.Head class="text-right">Expenses</Table.Head>
+								<Table.Head class="text-right">Shop COGS</Table.Head>
 								<Table.Head class="text-right">Net</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -429,6 +527,9 @@
 									>
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(m.expenses, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-right tabular-nums"
+										>{m.cogs ? formatMoney(m.cogs, currency) : '—'}</Table.Cell
 									>
 									<Table.Cell
 										class="text-right font-medium tabular-nums {m.net < 0
@@ -1064,6 +1165,41 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.never?.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Never visited</Card.Title>
+				<Card.Description>
+					{r.never.length} active member{r.never.length === 1 ? '' : 's'} with zero check-ins —
+					signed up but never showed
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="p-0">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Member</Table.Head>
+							<Table.Head class="text-right">Joined</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.never as m (m.memberId)}
+							<Table.Row>
+								<Table.Cell>
+									<a
+										class="font-medium underline-offset-2 hover:underline"
+										href="/members/{m.memberId}">{m.name}</a
+									>
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{m.joinedAt ?? '—'}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
@@ -1194,6 +1330,152 @@
 			{/each}
 		</Card.Content>
 	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">On pause</Card.Title>
+			<Card.Description>Paused memberships and when they come back</Card.Description>
+		</Card.Header>
+		<Card.Content class="divide-y px-6">
+			{#each r.paused as p (p.memberName + p.planName)}
+				<div class="flex items-center justify-between gap-2 py-2 text-sm">
+					<span class="truncate font-medium">{p.memberName}</span>
+					<span class="shrink-0 text-xs text-muted-foreground">
+						{p.planName}
+						{#if p.frozenUntil}
+							· resumes {p.frozenUntil}
+						{:else if p.pauseUntil}
+							· out until {p.pauseUntil}
+						{:else}
+							· manual resume
+						{/if}
+					</span>
+				</div>
+			{:else}
+				<p class="py-2 text-sm text-muted-foreground">No paused memberships.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Renewals</Card.Title>
+			<Card.Description>Expected membership billing, next 3 months</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Month</Table.Head>
+						<Table.Head class="text-right">Renewals</Table.Head>
+						<Table.Head class="text-right">Expected</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.renewals as m (m.month)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{m.month}</Table.Cell>
+							<Table.Cell class="text-right">{m.n}</Table.Cell>
+							<Table.Cell class="text-right">{formatMoney(m.total, currency, true)}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row><Table.Cell colspan={3} class="text-muted-foreground">No renewals due in the next 90 days.</Table.Cell></Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Member funnel</Card.Title>
+			<Card.Description>Leads → members → trialed → paying → retained 90+ days</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5">
+			{#each [{ label: 'Leads captured', n: r.funnel.leads }, { label: 'Members on file', n: r.funnel.members }, { label: 'Trialed a plan', n: r.funnel.trialed }, { label: 'Paying now', n: r.funnel.paying }, { label: 'Active 90+ days', n: r.funnel.retained }] as step (step.label)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-28 shrink-0">{step.label}</span>
+					<div
+						class="h-4 rounded bg-sky-500/70"
+						style="width: {r.funnel.members ? (step.n / r.funnel.members) * 70 : 0}%"
+					></div>
+					<span class="tabular-nums">{step.n}</span>
+				</div>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	{#if r.courses.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Member feedback</Card.Title>
+				<Card.Description
+					>One-tap scores members leave in the portal — promoters minus detractors is the NPS.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				{#if r.nps.n}
+					<div class="flex items-baseline gap-2">
+						<span class="text-2xl font-bold tabular-nums">{r.nps.score ?? '—'}</span>
+						<span class="text-sm text-muted-foreground"
+							>NPS · {r.nps.avg}/10 avg across {r.nps.n} response{r.nps.n === 1 ? '' : 's'}</span
+						>
+					</div>
+					{#if r.nps.recent.length}
+						<ul class="mt-3 divide-y text-sm">
+							{#each r.nps.recent as nr (nr.createdAt)}
+								<li class="flex items-baseline justify-between gap-2 py-1.5">
+									<span class="font-medium">{nr.memberName}</span>
+									<span class="text-muted-foreground"
+										>{nr.score}/10{nr.comment ? ` — ${nr.comment}` : ''}</span
+									>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				{:else}
+					<p class="text-sm text-muted-foreground">No feedback yet.</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Courses</Card.Title>
+				<Card.Description
+					>Enrollees, sessions held, attendance, and revenue per course</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Course</Table.Head>
+							<Table.Head class="text-right">Enrollees</Table.Head>
+							<Table.Head class="text-right">Sessions</Table.Head>
+							<Table.Head class="text-right">Attendance</Table.Head>
+							<Table.Head class="text-right">Revenue</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.courses as c (c.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{c.name}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.enrollees}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.sessions}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{c.attendancePct == null ? '—' : `${c.attendancePct}%`}</Table.Cell
+								>
+								<Table.Cell class="text-right tabular-nums"
+									>{formatMoney(c.revenue, currency, true)}</Table.Cell
+								>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<Card.Root>
 		<Card.Header>

@@ -10,6 +10,7 @@ import { dashboard } from '#lib/server/services/dashboard.ts';
 import * as dashboardSvc from '#lib/server/services/dashboard.ts';
 import { search } from '#lib/server/services/search.ts';
 import { loadDemoData } from '#lib/server/services/demo.ts';
+import { signPayload } from '#lib/server/services/events.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import {
 	idSchema,
@@ -152,6 +153,48 @@ export const deleteWebhook = command(idSchema, async (id) => {
 	void getWebhooks().refresh();
 });
 
+/** Fires a signed `test.ping` at the hook — verifies URL + signature end to end. */
+export const testWebhook = command(idSchema, async (id) => {
+	assertNotDemo();
+	const { orgId } = await requireOrg('admin');
+	const [w] = await db
+		.select()
+		.from(webhook)
+		.where(and(eq(webhook.organizationId, orgId), eq(webhook.id, id)));
+	if (!w) error(404, 'Webhook not found');
+	const body = JSON.stringify({
+		id: `test_${Date.now()}`,
+		type: 'test.ping',
+		organizationId: orgId,
+		entity: { type: 'webhook', id },
+		summary: 'Test delivery',
+		data: {},
+		createdAt: new Date().toISOString()
+	});
+	let status: number;
+	try {
+		const res = await fetch(w.url, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'x-freeweight-event': 'test.ping',
+				'x-freeweight-signature': signPayload(w.secret, body)
+			},
+			body,
+			signal: AbortSignal.timeout(10_000)
+		});
+		status = res.status;
+	} catch {
+		status = 0;
+	}
+	await db
+		.update(webhook)
+		.set({ lastDeliveryAt: new Date(), lastDeliveryStatus: status })
+		.where(eq(webhook.id, id));
+	void getWebhooks().refresh();
+	return { status };
+});
+
 // ------- onboarding tour -------
 const TOUR_KEY = 'app_tour';
 
@@ -190,4 +233,11 @@ export const seedDemo = command(async () => {
 	const result = await loadDemoData(ctx);
 	void getDashboard().refresh();
 	return result;
+});
+
+/** Staff notification bell — actionable items for the active org. */
+export const getNotifications = query(async () => {
+	const ctx = await requireOrg();
+	const st = await settingsSvc.getSettings(ctx.orgId);
+	return dashboardSvc.notifications(ctx.orgId, st.timezone ?? 'UTC');
 });

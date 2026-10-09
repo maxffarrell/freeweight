@@ -1,16 +1,34 @@
 import { db } from '#lib/server/db/index.ts';
+import { eq } from 'drizzle-orm';
 import {
 	booking,
+	challenge,
+	challengeEntry,
 	charge,
 	checkIn,
 	classSession,
 	classType,
+	course,
+	courseEnrollment,
+	deskTask,
+	equipment,
+	eventRegistration,
+	expense,
+	facilityResource,
+	giftCard,
+	gymEvent,
 	gymMember,
 	gymSettings,
 	location,
+	memberTag,
 	membership,
 	payment,
-	plan
+	plan,
+	promoCode,
+	recurringCharge,
+	resourceBooking,
+	shopItem,
+	waiver
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { zonedToUtc } from '#lib/tz.ts';
@@ -65,6 +83,7 @@ export async function loadDemoData(ctx: OrgContext) {
 				amount: 22000,
 				interval: 'year',
 				classCredits: 10,
+				isPack: true,
 				listed: true
 			}
 		])
@@ -205,6 +224,190 @@ export async function loadDemoData(ctx: OrgContext) {
 			checkedAt: new Date(now.getTime() - Math.floor(Math.random() * 8) * 3600_000)
 		});
 	}
+
+	// ------- newer surfaces: waiver, tags, shop, expenses, promo, gift card -------
+	const gymName = ctx.org.name;
+	const waiverText =
+		`I understand that training at ${gymName} involves physical exertion and I ` +
+		`assume all risks. I release ${gymName} and its staff from liability for ` +
+		'injuries sustained on the premises or during classes.';
+	await db
+		.update(gymSettings)
+		.set({ waiver: waiverText })
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	for (const m of members.slice(0, 6)) {
+		await db.insert(waiver).values({
+			organizationId: ctx.orgId,
+			memberId: m.id,
+			text: waiverText
+		});
+	}
+
+	await db.insert(memberTag).values([
+		{ organizationId: ctx.orgId, memberId: members[0]!.id, tag: 'vip' },
+		{ organizationId: ctx.orgId, memberId: members[6]!.id, tag: 'lead' }
+	]);
+
+	await db.insert(shopItem).values([
+		{ organizationId: ctx.orgId, name: 'Water bottle', price: 250, stock: 40, lowStockAt: 10 },
+		{ organizationId: ctx.orgId, name: 'Wrist wraps', price: 1800, stock: 4, lowStockAt: 5 },
+		{ organizationId: ctx.orgId, name: 'Chalk block', price: 400, stock: 25 }
+	]);
+
+	await db.insert(expense).values([
+		{
+			organizationId: ctx.orgId,
+			label: 'Rent — Mission HQ',
+			category: 'rent',
+			amountCents: 420000,
+			expenseOn: `${today.slice(0, 8)}01`
+		},
+		{
+			organizationId: ctx.orgId,
+			label: 'Coach payroll',
+			category: 'payroll',
+			amountCents: 310000,
+			expenseOn: `${today.slice(0, 8)}15`
+		}
+	]);
+
+	await db.insert(promoCode).values({
+		organizationId: ctx.orgId,
+		code: 'FALL20',
+		percentOff: 20,
+		maxUses: 50,
+		timesUsed: 7
+	});
+
+	await db.insert(giftCard).values({
+		organizationId: ctx.orgId,
+		code: 'GC-DEMO-2026',
+		amount: 10000,
+		balance: 7500,
+		purchaserMemberId: members[1]!.id,
+		note: 'Birthday gift for Alex'
+	});
+
+	await db.insert(recurringCharge).values({
+		organizationId: ctx.orgId,
+		memberId: members[0]!.id,
+		description: 'Towel service',
+		amount: 1000,
+		interval: 'month',
+		nextDue: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+			.toISOString()
+			.slice(0, 10)
+	});
+
+	// ------- amenities, equipment, events, challenges, courses -------
+	const [sauna] = await db
+		.insert(facilityResource)
+		.values({
+			organizationId: ctx.orgId,
+			name: 'Sauna',
+			kind: 'Recovery',
+			description: 'Book a 30-minute sauna slot.',
+			slotMin: 30,
+			capacity: 2,
+			openFrom: '07:00',
+			openTo: '21:00',
+			locationId: loc!.id
+		})
+		.returning();
+	await db.insert(resourceBooking).values({
+		organizationId: ctx.orgId,
+		resourceId: sauna!.id,
+		memberId: members[2]!.id,
+		startsAt: zonedToUtc(`${today}T18:00`, tz),
+		endsAt: zonedToUtc(`${today}T18:30`, tz)
+	});
+
+	await db.insert(equipment).values([
+		{
+			organizationId: ctx.orgId,
+			name: 'Treadmill 1',
+			kind: 'Cardio',
+			locationId: loc!.id,
+			status: 'maintenance',
+			notes: 'Belt slipping — service scheduled',
+			nextServiceOn: today
+		},
+		{ organizationId: ctx.orgId, name: 'Treadmill 2', kind: 'Cardio', locationId: loc!.id },
+		{ organizationId: ctx.orgId, name: 'Rowing machine', kind: 'Cardio', locationId: loc!.id }
+	]);
+
+	const compDay = new Date(now.getTime() + 9 * 86400_000).toISOString().slice(0, 10);
+	const [comp] = await db
+		.insert(gymEvent)
+		.values({
+			organizationId: ctx.orgId,
+			name: 'Fall Throwdown',
+			description: 'In-house lifting comp — all levels welcome.',
+			locationId: loc!.id,
+			startsAt: zonedToUtc(`${compDay}T10:00`, tz),
+			endsAt: zonedToUtc(`${compDay}T13:00`, tz),
+			capacity: 30,
+			price: 2500
+		})
+		.returning();
+	for (const m of members.slice(0, 3)) {
+		await db.insert(eventRegistration).values({
+			organizationId: ctx.orgId,
+			eventId: comp!.id,
+			memberId: m.id
+		});
+	}
+
+	const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
+		.toISOString()
+		.slice(0, 10);
+	const [chal] = await db
+		.insert(challenge)
+		.values({
+			organizationId: ctx.orgId,
+			name: 'Consistency Challenge',
+			description: 'Check in 12 times this month — finishers get a gym tee.',
+			prize: 'Iron Works tee',
+			goal: 12,
+			startDate: `${today.slice(0, 8)}01`,
+			endDate: monthEnd
+		})
+		.returning();
+	for (const m of members.slice(0, 4)) {
+		await db.insert(challengeEntry).values({
+			organizationId: ctx.orgId,
+			challengeId: chal!.id,
+			memberId: m.id
+		});
+	}
+
+	const courseEnd = new Date(now.getTime() + 42 * 86400_000).toISOString().slice(0, 10);
+	const [sixWeek] = await db
+		.insert(course)
+		.values({
+			organizationId: ctx.orgId,
+			name: '6-Week Foundations',
+			description: 'Learn the core lifts with a coach — beginners welcome.',
+			classTypeId: strength!.id,
+			startsOn: today,
+			endsOn: courseEnd,
+			priceCents: 18000,
+			capacity: 16
+		})
+		.returning();
+	for (const m of members.slice(4, 6)) {
+		await db.insert(courseEnrollment).values({
+			organizationId: ctx.orgId,
+			courseId: sixWeek!.id,
+			memberId: m.id
+		});
+	}
+
+	await db.insert(deskTask).values([
+		{ organizationId: ctx.orgId, label: 'Wipe down cardio deck', sortOrder: 1 },
+		{ organizationId: ctx.orgId, label: 'Restock towels', sortOrder: 2 },
+		{ organizationId: ctx.orgId, label: 'Count the till', sortOrder: 3 }
+	]);
 
 	return { members: members.length, sessions: created.length };
 }

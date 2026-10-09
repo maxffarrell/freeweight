@@ -9,6 +9,7 @@ import {
 	isNotNull,
 	isNull,
 	lt,
+	lte,
 	ne,
 	notInArray,
 	sql
@@ -17,12 +18,16 @@ import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
 import {
+	memberNps,
 	activity,
 	booking,
 	charge,
 	checkIn,
 	classSession,
+	classTemplate,
 	classType,
+	course,
+	courseEnrollment,
 	eventRegistration,
 	expense,
 	facilityResource,
@@ -31,6 +36,7 @@ import {
 	gymSettings,
 	location,
 	member,
+	memberTag,
 	membership,
 	payment,
 	plan,
@@ -967,6 +973,28 @@ async function expensesByMonth(orgId: string) {
 		.orderBy(asc(sql`to_char(${expense.expenseOn}::date, 'YYYY-MM')`));
 }
 
+/** Shop cost-of-goods by month (YYYY-MM) — cogsCents snapshotted on sales. */
+async function cogsByMonth(orgId: string) {
+	const since = new Date();
+	since.setUTCMonth(since.getUTCMonth() - 12);
+	return db
+		.select({
+			month: sql<string>`to_char(${charge.dueDate}::date, 'YYYY-MM')`,
+			total: sql<number>`sum(${charge.cogsCents})`.mapWith(Number)
+		})
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				gte(charge.dueDate, since.toISOString().slice(0, 10)),
+				sql`${charge.cogsCents} is not null`,
+				sql`${charge.status} != 'void'`
+			)
+		)
+		.groupBy(sql`to_char(${charge.dueDate}::date, 'YYYY-MM')`)
+		.orderBy(asc(sql`to_char(${charge.dueDate}::date, 'YYYY-MM')`));
+}
+
 /** All-time expense totals by category. */
 async function expensesByCategory(orgId: string) {
 	return db
@@ -1052,11 +1080,21 @@ export async function getReports(orgId: string) {
 		ratings,
 		expenseMonths,
 		expenseCategories,
+		cogsMonths,
 		mrr,
 		giftCards,
 		profitability,
 		memberValue,
-		planChurn
+		planChurn,
+		funnel,
+		courses,
+		nps,
+		paused,
+		covers,
+		tags,
+		never,
+		renewals,
+		heatmap
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1091,19 +1129,35 @@ export async function getReports(orgId: string) {
 		classRatings(orgId),
 		expensesByMonth(orgId),
 		expensesByCategory(orgId),
+		cogsByMonth(orgId),
 		monthlyRecurring(orgId),
 		giftCardStats(orgId),
 		classProfitability(orgId),
 		memberLifetimeValue(orgId),
-		churnByPlan(orgId)
+		churnByPlan(orgId),
+		memberFunnel(orgId),
+		courseStats(orgId),
+		npsStats(orgId),
+		pausedMemberships(orgId),
+		coverScorecard(orgId),
+		tagBreakdown(orgId),
+		neverVisited(orgId),
+		renewalForecast(orgId),
+		checkinHeatmap(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
-	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
+	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
+	const months = new Set([
+		...revenue.map((r) => r.month),
+		...expenseMonths.map((e) => e.month),
+		...cogsMonths.map((e) => e.month)
+	]);
 	const pnl = {
 		months: [...months].sort().map((m) => {
 			const rev = revenue.find((r) => r.month === m)?.total ?? 0;
 			const exp = expByMonth[m] ?? 0;
-			return { month: m, revenue: rev, expenses: exp, net: rev - exp };
+			const cogs = cogsByMonthMap[m] ?? 0;
+			return { month: m, revenue: rev, expenses: exp, cogs, net: rev - exp - cogs };
 		}),
 		byCategory: expenseCategories
 	};
@@ -1141,8 +1195,155 @@ export async function getReports(orgId: string) {
 		giftCards,
 		profitability,
 		memberValue,
-		planChurn
+		planChurn,
+		funnel,
+		courses,
+		nps,
+		paused,
+		covers,
+		tags,
+		never,
+		renewals,
+		heatmap
 	};
+}
+
+async function npsStats(orgId: string) {
+	const [[agg], recent] = await Promise.all([
+		db
+			.select({
+				n: sql<number>`count(*)`.mapWith(Number),
+				avg: sql<number>`coalesce(avg(${memberNps.score}), 0)`.mapWith(Number),
+				promoters: sql<number>`count(*) filter (where ${memberNps.score} >= 9)`.mapWith(Number),
+				detractors: sql<number>`count(*) filter (where ${memberNps.score} <= 6)`.mapWith(Number)
+			})
+			.from(memberNps)
+			.where(eq(memberNps.organizationId, orgId)),
+		db
+			.select({
+				score: memberNps.score,
+				comment: memberNps.comment,
+				createdAt: memberNps.createdAt,
+				memberName: gymMember.name
+			})
+			.from(memberNps)
+			.innerJoin(gymMember, eq(memberNps.memberId, gymMember.id))
+			.where(eq(memberNps.organizationId, orgId))
+			.orderBy(desc(memberNps.createdAt))
+			.limit(10)
+	]);
+	const n = agg?.n ?? 0;
+	return {
+		n,
+		avg: Math.round((agg?.avg ?? 0) * 10) / 10,
+		score: n > 0 ? Math.round(((agg!.promoters - agg!.detractors) / n) * 100) : null,
+		recent
+	};
+}
+
+/** Cover-claim scorecard: per staff member, sessions they flagged for cover
+ * vs sessions they picked up — who's reliable when the roster needs help. */
+async function coverScorecard(orgId: string) {
+	const rows = await db
+		.select({
+			userId: activity.actorId,
+			name: user.name,
+			requested:
+				sql<number>`count(*) filter (where ${activity.action} = 'cover_requested')`.mapWith(Number),
+			claimed: sql<number>`count(*) filter (where ${activity.action} = 'cover_claimed')`.mapWith(
+				Number
+			)
+		})
+		.from(activity)
+		.innerJoin(user, eq(activity.actorId, user.id))
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'session'),
+				inArray(activity.action, ['cover_requested', 'cover_claimed'])
+			)
+		)
+		.groupBy(activity.actorId, user.name)
+		.orderBy(desc(sql`count(*) filter (where ${activity.action} = 'cover_claimed')`));
+	return rows.map((r) => ({ name: r.name ?? 'Staff', requested: r.requested, claimed: r.claimed }));
+}
+
+/** Per-course stats: enrollees, sessions held, attendance rate, revenue posted. */
+async function courseStats(orgId: string) {
+	return db
+		.select({
+			id: course.id,
+			name: course.name,
+			startsOn: course.startsOn,
+			endsOn: course.endsOn,
+			enrollees:
+				sql<number>`(select count(*) from ${courseEnrollment} e where e.course_id = ${outer(course.id)})`.mapWith(
+					Number
+				),
+			sessions:
+				sql<number>`(select count(*) from ${classSession} s join ${classTemplate} t on t.id = s.template_id where t.course_id = ${outer(course.id)})`.mapWith(
+					Number
+				),
+			attendancePct: sql<
+				number | null
+			>`(select round(100.0 * count(*) filter (where b.status = 'attended') / nullif(count(*) filter (where b.status in ('attended','no_show')),0)) from ${booking} b join ${classSession} s2 on s2.id = b.session_id join ${classTemplate} t2 on t2.id = s2.template_id where t2.course_id = ${outer(course.id)})`,
+			revenue:
+				sql<number>`coalesce((select sum(c.amount) from ${charge} c join ${courseEnrollment} e2 on e2.charge_id = c.id where e2.course_id = ${outer(course.id)} and c.status <> 'void'), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(course)
+		.where(eq(course.organizationId, orgId))
+		.orderBy(desc(course.createdAt))
+		.limit(20);
+}
+
+/**
+ * Acquisition funnel: leads captured -> members on file -> members who trialed
+ * -> active paying members -> members still active 90+ days after joining.
+ */
+async function memberFunnel(orgId: string) {
+	const [{ n: leads }] = await db
+		.select({ n: sql<number>`count(distinct ${activity.entityId})`.mapWith(Number) })
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'member'),
+				eq(activity.action, 'lead')
+			)
+		);
+	const [{ n: members }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, orgId));
+	const [{ n: trialed }] = await db
+		.select({ n: sql<number>`count(distinct ${membership.memberId})`.mapWith(Number) })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), gt(plan.trialDays, 0)));
+	const [{ n: paying }] = await db
+		.select({ n: sql<number>`count(distinct ${membership.memberId})`.mapWith(Number) })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		);
+	const [{ n: retained }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				lt(gymMember.createdAt, new Date(Date.now() - 90 * 86400_000))
+			)
+		);
+	return { leads, members, trialed, paying, retained };
 }
 
 /**
@@ -1205,4 +1406,124 @@ async function churnByPlan(orgId: string) {
 			)
 		);
 	return rows.filter((r) => r.active + r.cancelled > 0);
+}
+
+/**
+ * Currently paused memberships — who's on ice, which plan, and when they
+ * auto-resume (frozenUntil) or asked to stay out until (pauseUntil).
+ */
+async function pausedMemberships(orgId: string) {
+	return db
+		.select({
+			memberName: gymMember.name,
+			planName: plan.name,
+			frozenUntil: membership.frozenUntil,
+			pauseUntil: membership.pauseUntil,
+			pausedAt: membership.updatedAt
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'paused')))
+		.orderBy(asc(membership.frozenUntil), asc(gymMember.name))
+		.limit(50);
+}
+
+/**
+ * Member counts per tag (active members) — how the desk's labels distribute.
+ */
+async function tagBreakdown(orgId: string) {
+	return db
+		.select({
+			tag: memberTag.tag,
+			n: sql<number>`count(distinct ${memberTag.memberId})`.mapWith(Number)
+		})
+		.from(memberTag)
+		.innerJoin(gymMember, eq(memberTag.memberId, gymMember.id))
+		.where(and(eq(memberTag.organizationId, orgId), eq(gymMember.status, 'active')))
+		.groupBy(memberTag.tag)
+		.orderBy(desc(sql`count(distinct ${memberTag.memberId})`))
+		.limit(20);
+}
+
+/**
+ * Active members who have never checked in, newest joiners first — the "signed
+ * up but never showed" list the desk should call before they churn quietly.
+ */
+async function neverVisited(orgId: string) {
+	return db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			joinedAt: gymMember.joinedAt,
+			email: gymMember.email
+		})
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id})`
+			)
+		)
+		.orderBy(desc(gymMember.createdAt))
+		.limit(25);
+}
+
+/**
+ * Expected renewals over the next 90 days, bucketed by month — active, billed
+ * memberships grouped on their next charge date at the plan price (or the
+ * member's price override).
+ */
+async function renewalForecast(orgId: string) {
+	return db
+		.select({
+			month: sql<string>`to_char(${membership.nextChargeAt}, 'YYYY-MM')`,
+			n: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`coalesce(sum(coalesce(${membership.price}, ${plan.amount})), 0)`.mapWith(
+				Number
+			)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(membership.noBill, false),
+				isNotNull(membership.nextChargeAt),
+				gte(membership.nextChargeAt, new Date()),
+				lte(membership.nextChargeAt, new Date(Date.now() + 90 * 86_400_000))
+			)
+		)
+		.groupBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`)
+		.orderBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`);
+}
+
+/**
+ * Check-ins over the last 90 days bucketed by weekday × hour in the org's
+ * timezone — the gym's traffic heatmap.
+ */
+async function checkinHeatmap(orgId: string) {
+	const [s] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const tz = s?.timezone ?? 'UTC';
+	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
+	const since = new Date(Date.now() - 90 * 86_400_000);
+	return db
+		.select({
+			dow: sql<number>`extract(dow from ${checkIn.checkedAt} at time zone ${tzLit})::int`.mapWith(
+				Number
+			),
+			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})::int`.mapWith(
+				Number
+			),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(and(eq(checkIn.organizationId, orgId), gte(checkIn.checkedAt, since)))
+		.groupBy(sql`1, 2`);
 }

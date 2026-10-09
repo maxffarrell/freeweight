@@ -1,12 +1,19 @@
+import { error } from '@sveltejs/kit';
 import { and, asc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
+import { emit } from './events.ts';
 import {
+	booking,
+	charge,
 	checkIn,
 	classSession,
+	membership,
+	plan,
 	gymMember,
 	gymSettings,
 	member,
 	organization,
+	outer,
 	payment
 } from '#lib/server/db/schema.ts';
 import { monthlyRecurring } from '#lib/server/services/reports.ts';
@@ -34,12 +41,24 @@ export async function franchiseOverview(userId: string) {
 	const monthStart = new Date();
 	monthStart.setUTCDate(1);
 	monthStart.setUTCHours(0, 0, 0, 0);
+	const prevMonthStart = new Date(monthStart);
+	prevMonthStart.setUTCMonth(prevMonthStart.getUTCMonth() - 1);
+	const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
 	const weekEnd = new Date(Date.now() + 7 * 86_400_000);
 	const now = new Date();
 
 	const gyms = await Promise.all(
 		orgs.map(async (o) => {
-			const [[members], [revenue], [checkIns], [sessions], [settings], mrr] = await Promise.all([
+			const [
+				[members],
+				[revenue],
+				[prevRevenue],
+				[newMembers],
+				[checkIns],
+				[sessions],
+				[settings],
+				mrr
+			] = await Promise.all([
 				db
 					.select({ n: sql<number>`count(*)`.mapWith(Number) })
 					.from(gymMember)
@@ -53,6 +72,27 @@ export async function franchiseOverview(userId: string) {
 							isNull(payment.refundedAt),
 							notInArray(payment.method, ['gift_card', 'credit']),
 							gte(payment.paidAt, monthStart)
+						)
+					),
+				db
+					.select({ total: sql<number>`sum(${payment.amount})`.mapWith(Number) })
+					.from(payment)
+					.where(
+						and(
+							eq(payment.organizationId, o.id),
+							isNull(payment.refundedAt),
+							notInArray(payment.method, ['gift_card', 'credit']),
+							gte(payment.paidAt, prevMonthStart),
+							lt(payment.paidAt, monthStart)
+						)
+					),
+				db
+					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.from(gymMember)
+					.where(
+						and(
+							eq(gymMember.organizationId, o.id),
+							gte(gymMember.joinedAt, thirtyDaysAgo.toISOString().slice(0, 10))
 						)
 					),
 				db
@@ -76,14 +116,59 @@ export async function franchiseOverview(userId: string) {
 					.where(eq(gymSettings.organizationId, o.id)),
 				monthlyRecurring(o.id)
 			]);
+
+			// Drill-down detail: seats booked for next-7d sessions, members
+			// holding open (unpaid) charges, and the plan mix by membership.
+			const [seats] = await db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(classSession.organizationId, o.id),
+						isNull(classSession.cancelledAt),
+						eq(booking.status, 'booked'),
+						gte(classSession.startsAt, now),
+						lt(classSession.startsAt, weekEnd)
+					)
+				);
+			const [debtors] = await db
+				.select({
+					n: sql<number>`count(distinct ${charge.memberId})`.mapWith(Number)
+				})
+				.from(charge)
+				.where(and(eq(charge.organizationId, o.id), eq(charge.status, 'open')));
+			const planMix = await db
+				.select({
+					name: plan.name,
+					members: sql<number>`count(*)`.mapWith(Number)
+				})
+				.from(membership)
+				.innerJoin(plan, eq(membership.planId, plan.id))
+				.where(
+					and(
+						eq(membership.organizationId, o.id),
+						eq(membership.status, 'active'),
+						eq(plan.isPack, false)
+					)
+				)
+				.groupBy(plan.id, plan.name)
+				.orderBy(sql`count(*) desc`, asc(plan.name))
+				.limit(5);
+
 			return {
 				...o,
 				currency: settings?.currency ?? 'usd',
 				members: members?.n ?? 0,
 				mrr: mrr.total,
 				monthRevenue: revenue?.total ?? 0,
+				prevMonthRevenue: prevRevenue?.total ?? 0,
+				newMembers30: newMembers?.n ?? 0,
 				monthCheckIns: checkIns?.n ?? 0,
-				sessionsNext7: sessions?.n ?? 0
+				sessionsNext7: sessions?.n ?? 0,
+				seatsBooked7: seats?.n ?? 0,
+				debtors: debtors?.n ?? 0,
+				planMix
 			};
 		})
 	);
@@ -96,4 +181,91 @@ export async function franchiseOverview(userId: string) {
 			sessionsNext7: gyms.reduce((s, g) => s + g.sessionsNext7, 0)
 		}
 	};
+}
+
+/**
+ * Find a member by email/name across every org the caller owns or administers —
+ * "which of my gyms is this person a member of".
+ */
+export async function franchiseMemberSearch(userId: string, q: string) {
+	const orgs = await db
+		.select({ id: organization.id, name: organization.name })
+		.from(member)
+		.innerJoin(organization, eq(member.organizationId, organization.id))
+		.where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])));
+	if (!orgs.length || q.trim().length < 2) return [];
+	const orgIds = orgs.map((o) => o.id);
+	const pattern = `%${q.trim().toLowerCase().replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+	const rows = await db
+		.select({
+			orgId: gymMember.organizationId,
+			memberId: gymMember.id,
+			name: gymMember.name,
+			email: gymMember.email,
+			status: gymMember.status,
+			memberships:
+				sql<number>`(select count(*) from ${membership} ms where ms.member_id = ${outer(gymMember.id)} and ms.status = 'active')`.mapWith(
+					Number
+				)
+		})
+		.from(gymMember)
+		.where(
+			and(
+				inArray(gymMember.organizationId, orgIds),
+				sql`(lower(${gymMember.email}) like ${pattern} escape '\\' or lower(${gymMember.name}) like ${pattern} escape '\\')`
+			)
+		)
+		.orderBy(asc(gymMember.name))
+		.limit(20);
+	const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+	return rows.map((r) => ({ ...r, orgName: orgName.get(r.orgId) ?? '' }));
+}
+
+/**
+ * Copies a member's record into another gym the caller owns/administers —
+ * franchise ops moving a member between locations. Both orgs must be admin'd
+ * by the caller; the member is created active in the target with the same
+ * name/email/phone/birthday. Memberships don't travel — billing stays per-gym.
+ */
+export async function copyFranchiseMember(userId: string, memberId: string, targetOrgId: string) {
+	const orgs = await db
+		.select({ id: member.organizationId })
+		.from(member)
+		.where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])));
+	const admin = new Set(orgs.map((o) => o.id));
+	const [src] = await db
+		.select()
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId))
+		.limit(1);
+	if (!src || !admin.has(src.organizationId)) error(404, 'Member not found');
+	if (!admin.has(targetOrgId)) error(403, 'Not an admin of that gym');
+	if (src.organizationId === targetOrgId) error(400, 'Already in that gym');
+	if (src.email) {
+		const [dup] = await db
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, targetOrgId), eq(gymMember.email, src.email)))
+			.limit(1);
+		if (dup) error(409, 'A member with that email already exists at that gym');
+	}
+	const [row] = await db
+		.insert(gymMember)
+		.values({
+			organizationId: targetOrgId,
+			name: src.name,
+			email: src.email,
+			phone: src.phone,
+			birthday: src.birthday
+		})
+		.returning();
+	await emit({
+		orgId: targetOrgId,
+		actorId: userId,
+		entityType: 'member',
+		entityId: row!.id,
+		action: 'created',
+		summary: `${src.name} copied from another location`
+	});
+	return { memberId: row!.id };
 }

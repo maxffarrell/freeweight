@@ -4,15 +4,58 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
+	import { errMsg } from '#lib/format.ts';
 	import { authClient } from '#lib/auth-client.ts';
-	import { getFranchise } from '#lib/remote/franchise.remote.ts';
+	import {
+		copyFranchiseMember,
+		getFranchise,
+		searchFranchiseMembers
+	} from '#lib/remote/franchise.remote.ts';
 	import { formatMoney } from '#lib/format.ts';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const f = await getFranchise();
 	const multiCurrency = new Set(f.gyms.map((g) => g.currency)).size > 1;
 	let switching = $state<string | null>(null);
+	const expanded = new SvelteSet<string>();
+	let memberQ = $state('');
+	let memberHits = $state<
+		{
+			orgId: string;
+			orgName: string;
+			memberId: string;
+			name: string;
+			email: string | null;
+			status: string;
+			memberships: number;
+		}[]
+	>([]);
+	let searchPending = $state(false);
+
+	async function runSearch() {
+		if (memberQ.trim().length < 2) {
+			memberHits = [];
+			return;
+		}
+		searchPending = true;
+		try {
+			memberHits = await searchFranchiseMembers(memberQ);
+		} finally {
+			searchPending = false;
+		}
+	}
+
+	function toggle(g: { id: string }) {
+		if (expanded.has(g.id)) {
+			expanded.delete(g.id);
+		} else {
+			expanded.add(g.id);
+		}
+	}
 
 	async function switchTo(orgId: string, name: string) {
 		switching = orgId;
@@ -65,6 +108,80 @@
 
 		<Card.Root>
 			<Card.Header>
+				<Card.Title class="text-base">Find a member across gyms</Card.Title>
+				<Card.Description
+					>Name or email — searches every gym you own or administer.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<form
+					class="flex gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						runSearch();
+					}}
+				>
+					<Input class="max-w-xs" placeholder="member@email.com or a name" bind:value={memberQ} />
+					<Button type="submit" variant="outline" disabled={searchPending}
+						>{searchPending ? 'Searching…' : 'Search'}</Button
+					>
+				</form>
+				{#if memberHits.length}
+					<Table.Root class="mt-4">
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Member</Table.Head>
+								<Table.Head>Email</Table.Head>
+								<Table.Head>Gym</Table.Head>
+								<Table.Head class="text-right">Active plans</Table.Head>
+							<Table.Head class="text-right">Copy to</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each memberHits as h (h.orgId + h.memberId)}
+								<Table.Row>
+									<Table.Cell class="font-medium">{h.name}</Table.Cell>
+									<Table.Cell class="text-muted-foreground">{h.email ?? '—'}</Table.Cell>
+									<Table.Cell>{h.orgName}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{h.memberships}</Table.Cell>
+									<Table.Cell class="text-right">
+										<NativeSelect
+											size="sm"
+											class="ml-auto w-28"
+											value=""
+											onchange={async (e) => {
+												const target = (e.target as HTMLSelectElement).value;
+												if (!target) return;
+												try {
+													await copyFranchiseMember({
+														memberId: h.memberId,
+														targetOrgId: target
+													});
+													toast.success(`${h.name} copied`);
+												} catch (err) {
+													toast.error(errMsg(err, 'Could not copy'));
+												}
+												(e.target as HTMLSelectElement).value = '';
+											}}
+										>
+											<option value="">Copy to…</option>
+											{#each f.gyms.filter((g) => g.id !== h.orgId) as g (g.id)}
+												<option value={g.id}>{g.name}</option>
+											{/each}
+										</NativeSelect>
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				{:else if memberQ.trim().length >= 2 && !searchPending}
+					<p class="mt-3 text-sm text-muted-foreground">No members match across your gyms.</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
 				<Card.Title class="text-base">All locations</Card.Title>
 				<Card.Description>
 					Headline numbers per gym. {#if multiCurrency}Amounts are in each gym's own currency.{/if}
@@ -76,8 +193,10 @@
 						<Table.Row>
 							<Table.Head>Gym</Table.Head>
 							<Table.Head class="text-right">Members</Table.Head>
+							<Table.Head class="text-right">New (30d)</Table.Head>
 							<Table.Head class="text-right">MRR</Table.Head>
 							<Table.Head class="text-right">Revenue (mo)</Table.Head>
+							<Table.Head class="text-right">vs last mo</Table.Head>
 							<Table.Head class="text-right">Check-ins (mo)</Table.Head>
 							<Table.Head class="text-right">Sessions (7d)</Table.Head>
 							<Table.Head class="w-0"></Table.Head>
@@ -85,18 +204,36 @@
 					</Table.Header>
 					<Table.Body>
 						{#each f.gyms as g (g.id)}
-							<Table.Row>
+							<Table.Row class="cursor-pointer" onclick={() => toggle(g)}>
 								<Table.Cell class="font-medium">
+									<span class="mr-1 inline-block w-3 text-muted-foreground"
+										>{expanded.has(g.id) ? '▾' : '▸'}</span
+									>
 									{g.name}
 									<span class="ml-1 text-xs font-normal text-muted-foreground">{g.role}</span>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.members}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{g.newMembers30}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums"
 									>{formatMoney(g.mrr, g.currency, true)}</Table.Cell
 								>
 								<Table.Cell class="text-right tabular-nums"
 									>{formatMoney(g.monthRevenue, g.currency, true)}</Table.Cell
 								>
+								<Table.Cell class="text-right tabular-nums">
+									{#if g.prevMonthRevenue > 0}
+										<span
+											class={g.monthRevenue >= g.prevMonthRevenue
+												? 'text-emerald-600'
+												: 'text-destructive'}
+											>{g.monthRevenue >= g.prevMonthRevenue ? '+' : ''}{Math.round(
+												((g.monthRevenue - g.prevMonthRevenue) / g.prevMonthRevenue) * 100
+											)}%</span
+										>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.monthCheckIns}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.sessionsNext7}</Table.Cell>
 								<Table.Cell class="text-right">
@@ -112,6 +249,30 @@
 									{/if}
 								</Table.Cell>
 							</Table.Row>
+							{#if expanded.has(g.id)}
+								<Table.Row class="bg-muted/40 hover:bg-muted/40">
+									<Table.Cell colspan={9} class="py-3">
+										<div class="flex flex-wrap gap-x-8 gap-y-1 text-sm">
+											<span
+												><span class="text-muted-foreground">Seats booked (7d):</span>
+												{g.seatsBooked7}</span
+											>
+											<span
+												><span class="text-muted-foreground">Members owing:</span>
+												{g.debtors}</span
+											>
+											<span>
+												<span class="text-muted-foreground">Plans:</span>
+												{#if g.planMix.length}
+													{g.planMix.map((p) => `${p.name} (${p.members})`).join(' · ')}
+												{:else}
+													none
+												{/if}
+											</span>
+										</div>
+									</Table.Cell>
+								</Table.Row>
+							{/if}
 						{/each}
 					</Table.Body>
 				</Table.Root>

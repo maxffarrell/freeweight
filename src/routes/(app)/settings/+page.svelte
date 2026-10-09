@@ -27,6 +27,7 @@
 		createWebhook,
 		toggleWebhook,
 		deleteWebhook,
+		testWebhook,
 		getStaff,
 		getJoinInfo,
 		seedDemo,
@@ -40,6 +41,15 @@
 	} from '#lib/remote/payments.remote.ts';
 	import { getApiKeys, createApiKey, deleteApiKey } from '#lib/remote/api-keys.remote.ts';
 	import { getClosures, addClosure, removeClosure } from '#lib/remote/schedule.remote.ts';
+	import {
+		getLockers,
+		addLocker,
+		removeLocker,
+		releaseLocker,
+		getLoanables,
+		addLoanable,
+		removeLoanable
+	} from '#lib/remote/members.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -53,6 +63,32 @@
 
 	let settings = $state(await getSettings());
 	let locations = $state(await getLocations());
+	const lockers = $derived(await getLockers());
+	const loanables = $derived(await getLoanables());
+	let newKit = $state('');
+	let newKitQty = $state<number>(1);
+	async function addKitSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLoanable({ name: newKit, quantity: newKitQty || 1 });
+			newKit = '';
+			newKitQty = 1;
+			toast.success('Item added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+	}
+	let newLocker = $state('');
+	async function addLockerSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLocker({ label: newLocker });
+			newLocker = '';
+			toast.success('Locker added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+	}
 	let webhooks = $state(await getWebhooks());
 	let apiKeys = $state(await getApiKeys());
 	let providerList = $state(await getPaymentProviders());
@@ -150,6 +186,7 @@
 	let occupancyCap = $state<number | null>(settings.occupancyCap);
 	let noShowFee = $state<number | null>(settings.noShowFee);
 	let lateCancelFee = $state<number | null>(settings.lateCancelFee);
+	let lateCancelFreebies = $state<number | null>(settings.lateCancelFreebies);
 	let dayPassPrice = $state<number | null>(settings.dayPassPrice);
 	let suspendAfterDays = $state<number | null>(settings.suspendAfterDays);
 	let referralCredits = $state<number | null>(settings.referralCredits);
@@ -158,6 +195,8 @@
 	let freezeFee = $state<number | null>(settings.freezeFee);
 	let reviewUrl = $state(settings.reviewUrl ?? '');
 	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
+	let rewardCredits = $state<number | null>(settings.rewardCredits);
+	let streakRewardCredits = $state<number | null>(settings.streakRewardCredits);
 	let revenueTarget = $state<number | null>(settings.revenueTarget);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
@@ -165,6 +204,22 @@
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
+	type DayHours = { open: string; close: string; closed: boolean };
+	const hourDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	let hours = $state<DayHours[]>(
+		hourDays.map((_, i) => {
+			const v2 = (settings.openHours ?? {})[String(i)] ?? '';
+			const [open = '', close = ''] = v2.split('-');
+			return { open, close, closed: v2 === '' };
+		})
+	);
+	/** Serializes the editor back to the {weekday: 'HH:MM-HH:MM'|''} record. */
+	const hoursOut = $derived(
+		Object.fromEntries(
+			hours.map((h, i) => [String(i), h.closed || !h.open || !h.close ? '' : `${h.open}-${h.close}`])
+		)
+	);
+
 	async function saveSettings(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -186,6 +241,7 @@
 				occupancyCap,
 				noShowFee,
 				lateCancelFee,
+				lateCancelFreebies,
 				dayPassPrice,
 				suspendAfterDays,
 				referralCredits,
@@ -193,10 +249,13 @@
 				freezeFee,
 				reviewUrl: reviewUrl.trim() || null,
 				reviewAfterVisits,
+				rewardCredits,
+				streakRewardCredits,
 				revenueTarget,
 				publicPage,
 				staffBriefing,
-				firstClassFree
+				firstClassFree,
+				openHours: hoursOut
 			});
 			toast.success('Settings saved');
 		} catch (err) {
@@ -501,6 +560,20 @@
 							>
 						</Field.Field>
 						<Field.Field>
+							<Field.Label for="s-late-free">Free late cancels / month</Field.Label>
+							<Input
+								id="s-late-free"
+								type="number"
+								min={0}
+								bind:value={lateCancelFreebies}
+								placeholder="0"
+							/>
+							<Field.Description
+								>Each member's first N late cancels a month skip the fee — a goodwill budget, not a
+								loophole.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
 							<Field.Label>Day pass price</Field.Label>
 							<MoneyInput bind:value={dayPassPrice} />
 							<Field.Description
@@ -592,6 +665,34 @@
 								(never twice).</Field.Description
 							>
 						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-reward">Milestone reward — comp classes</Field.Label>
+							<Input
+								id="s-reward"
+								type="number"
+								min={0}
+								bind:value={rewardCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Comp classes granted when a member hits a check-in milestone (10, 25, 50, …) —
+								blank or 0 = off.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-streak-reward">Streak reward — comp classes</Field.Label>
+							<Input
+								id="s-streak-reward"
+								type="number"
+								min={0}
+								bind:value={streakRewardCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Comp classes granted at week-streak milestones (4, 8, 13, 26, 52) — each streak
+								pays once.</Field.Description
+							>
+						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
 								<p class="font-medium">Public join page</p>
@@ -623,6 +724,36 @@
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Opening hours</Card.Title>
+					<Card.Description>Shown on the gym's public timetable. Saved with the General settings above.</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-2">
+					{#each hourDays as d, i (d)}
+						<div class="flex items-center gap-3 text-sm">
+							<span class="w-10 font-medium">{d}</span>
+							<Input
+								type="time"
+								class="h-8 w-28"
+								disabled={hours[i].closed}
+								bind:value={hours[i].open}
+							/>
+							<span class="text-muted-foreground">–</span>
+							<Input
+								type="time"
+								class="h-8 w-28"
+								disabled={hours[i].closed}
+								bind:value={hours[i].close}
+							/>
+							<label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<input type="checkbox" class="size-3.5" bind:checked={hours[i].closed} /> Closed
+							</label>
+						</div>
+					{/each}
 				</Card.Content>
 			</Card.Root>
 
@@ -736,6 +867,94 @@
 							<li class="py-6 text-sm text-muted-foreground">
 								No locations — add your gym's site.
 							</li>
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="max-w-2xl">
+				<Card.Header class="flex-row items-center justify-between">
+					<div>
+						<Card.Title class="text-base">Lockers</Card.Title>
+						<Card.Description>Locker bank — assign them to members on their page.</Card.Description>
+					</div>
+					<form class="flex items-center gap-2" onsubmit={addLockerSubmit}>
+						<Input placeholder="#42" class="h-8 w-28" bind:value={newLocker} required />
+						<Button size="sm" variant="outline" type="submit">Add</Button>
+					</form>
+				</Card.Header>
+				<Card.Content class="px-6">
+					<ul class="divide-y">
+						{#each lockers as l (l.locker.id)}
+							<li class="flex items-center justify-between py-2.5 text-sm">
+								<span class="font-medium">{l.locker.label}</span>
+								<span class="flex items-center gap-2">
+									{#if l.memberName}
+										<span class="text-muted-foreground">{l.memberName}</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											onclick={async () => {
+												await releaseLocker({ id: l.locker.id, memberId: l.locker.memberId! });
+												toast.success('Released');
+											}}>Release</Button
+										>
+									{:else}
+										<span class="text-muted-foreground">free</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs text-destructive"
+											onclick={async () => {
+												await removeLocker(l.locker.id);
+												toast.success('Removed');
+											}}>Remove</Button
+										>
+									{/if}
+								</span>
+							</li>
+						{:else}
+							<li class="py-6 text-sm text-muted-foreground">No lockers — add your bank above.</li>
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="max-w-2xl">
+				<Card.Header class="flex-row items-center justify-between">
+					<div>
+						<Card.Title class="text-base">Loanable kit</Card.Title>
+						<Card.Description
+							>Ropes, bands, mats members can borrow — lent out on their page.</Card.Description
+						>
+					</div>
+					<form class="flex items-center gap-2" onsubmit={addKitSubmit}>
+						<Input placeholder="Skipping rope" class="h-8 w-36" bind:value={newKit} required />
+						<Input type="number" min={1} class="h-8 w-16" bind:value={newKitQty} required />
+						<Button size="sm" variant="outline" type="submit">Add</Button>
+					</form>
+				</Card.Header>
+				<Card.Content class="px-6">
+					<ul class="divide-y">
+						{#each loanables as k (k.item.id)}
+							<li class="flex items-center justify-between py-2.5 text-sm">
+								<span class="font-medium">{k.item.name} ×{k.item.quantity}</span>
+								<span class="flex items-center gap-2">
+									<span class="text-muted-foreground">{k.out > 0 ? `${k.out} out` : 'all in'}</span>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs text-destructive"
+										onclick={async () => {
+											await removeLoanable(k.item.id);
+											toast.success('Removed');
+										}}>Remove</Button
+									>
+								</span>
+							</li>
+						{:else}
+							<li class="py-6 text-sm text-muted-foreground">No loanable items yet.</li>
 						{/each}
 					</ul>
 				</Card.Content>
@@ -954,9 +1173,11 @@
 								{#each webhooks as w (w.id)}
 									<Table.Row>
 										<Table.Cell class="min-w-0 truncate font-mono text-xs">{w.url}</Table.Cell>
-										<Table.Cell class="text-xs text-muted-foreground"
-											>{w.events.length} events</Table.Cell
-										>
+										<Table.Cell class="text-xs text-muted-foreground">
+											{w.events.length} events{w.lastDeliveryStatus != null
+												? ` · last ${w.lastDeliveryStatus || '✕'}`
+												: ''}
+										</Table.Cell>
 										<Table.Cell
 											><Switch
 												checked={w.enabled}
@@ -967,15 +1188,35 @@
 											/></Table.Cell
 										>
 										<Table.Cell class="text-right">
-											<Button
-												variant="ghost"
-												size="icon"
-												class="size-7"
-												onclick={async () => {
-													await deleteWebhook(w.id);
-													webhooks = await getWebhooks();
-												}}><Trash class="size-4" /></Button
-											>
+											<div class="flex items-center justify-end gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													class="h-7 px-2 text-xs"
+													onclick={async () => {
+														try {
+															const r = await testWebhook(w.id);
+															toast.success(
+																r.status
+																	? `Delivered — HTTP ${r.status}`
+																	: 'Could not reach the endpoint'
+															);
+															webhooks = await getWebhooks();
+														} catch (err) {
+															toast.error(errMsg(err, 'Test failed'));
+														}
+													}}>Test</Button
+												>
+												<Button
+													variant="ghost"
+													size="icon"
+													class="size-7"
+													onclick={async () => {
+														await deleteWebhook(w.id);
+														webhooks = await getWebhooks();
+													}}><Trash class="size-4" /></Button
+												>
+											</div>
 										</Table.Cell>
 									</Table.Row>
 								{:else}

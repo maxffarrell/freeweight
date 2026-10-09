@@ -127,9 +127,18 @@
 			});
 			showFlash(
 				true,
-				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : '') + visitNote(r.visits),
+				`${memberName} checked in` +
+					(r.birthday ? ' — happy birthday!' : '') +
+					visitNote(r.visits) +
+					(r.creditsLeft != null ? ` — ${r.creditsLeft} ${r.creditsClass ?? 'class'} left` : ''),
 				r.member.photoDocumentId,
-				[r.waiverMissing ? 'waiver unsigned' : '', r.suspended ? 'membership suspended' : '']
+				[
+					r.waiverMissing ? 'waiver unsigned' : '',
+					r.suspended ? 'membership suspended' : '',
+					r.creditsLeft === 0 ? 'pack empty' : '',
+					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
+					r.nextClass ? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}` : ''
+				]
 					.filter(Boolean)
 					.join(' · ') || null
 			);
@@ -244,11 +253,21 @@
 					: `${r.member.name} checked in` +
 							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '') +
 							(r.birthday ? ' — happy birthday!' : '') +
-							visitNote(r.visits),
+							visitNote(r.visits) +
+							(r.creditsLeft != null && r.creditsLeft > 0
+								? ` — ${r.creditsLeft} ${r.creditsClass ?? 'class'} left`
+								: ''),
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.suspended ? 'membership suspended' : '',
+					r.creditsLeft === 0 ? 'pack empty' : '',
+					!r.checkedOut && r.guestPassesLeft != null
+						? `${r.guestPassesLeft} guest passes left this month`
+						: '',
+					!r.checkedOut && r.nextClass
+						? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}`
+						: '',
 					r.member.deskNote
 				]
 					.filter(Boolean)
@@ -316,6 +335,7 @@
 					/ {settings.occupancyCap}{/if}{#if settings.occupancyCap != null && inside >= settings.occupancyCap}
 					— at capacity{/if}
 			</Badge>
+			<Button variant="ghost" size="sm" href="/wall">PR board</Button>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
 	</header>
@@ -560,6 +580,13 @@
 					{/each}
 				</div>
 			</div>
+		{/if}
+		{#if settings.portalNotice}
+			<p
+				class="mx-auto mt-6 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100"
+			>
+				{settings.portalNotice}
+			</p>
 		{/if}
 	</main>
 </div>

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import {
 	and,
+	asc,
 	desc,
 	eq,
 	gte,
@@ -32,13 +33,19 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyCheckInMilestone, notifyFirstVisit, notifyReviewRequest } from './notifications.ts';
-import { getRoster, getSession } from './schedule.ts';
+import {
+	notifyCheckInMilestone,
+	notifyFirstVisit,
+	notifyReviewRequest,
+	notifyStreakReward
+} from './notifications.ts';
+import { creditUsage, getRoster, getSession } from './schedule.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
 const MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+const STREAK_MILESTONES = [4, 8, 13, 26, 52];
 
 function sign(payload: string) {
 	return createHmac('sha256', BETTER_AUTH_SECRET).update(`checkin:${payload}`).digest('base64url');
@@ -270,7 +277,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		.returning();
 	// A check-in marks that member's already-started bookings today as attended.
 	const [st] = await db
-		.select({ timezone: gymSettings.timezone, waiverText: gymSettings.waiver })
+		.select({
+			timezone: gymSettings.timezone,
+			waiverText: gymSettings.waiver,
+			rewardCredits: gymSettings.rewardCredits,
+			streakRewardCredits: gymSettings.streakRewardCredits
+		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
 	const tz = st?.timezone ?? 'UTC';
@@ -313,7 +325,79 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			)
 		);
 	if (n === 1) notifyFirstVisit(ctx.orgId, memberId).catch(() => {});
-	else if (MILESTONES.includes(n)) notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+	else if (MILESTONES.includes(n)) {
+		notifyCheckInMilestone(ctx.orgId, memberId, n).catch(() => {});
+		// Milestone reward: comp classes on the member's active membership.
+		if (st?.rewardCredits) {
+			const [ms] = await db
+				.select({ id: membership.id })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.memberId, memberId),
+						eq(membership.status, 'active')
+					)
+				)
+				.limit(1);
+			if (ms)
+				await db
+					.update(membership)
+					.set({ bonusCredits: sql`${membership.bonusCredits} + ${st.rewardCredits}` })
+					.where(eq(membership.id, ms.id));
+		}
+	}
+
+	// Streak reward: comp classes at week-streak milestones, deduped per streak.
+	if (st?.streakRewardCredits) {
+		const visits = await db
+			.select({ checkedAt: checkIn.checkedAt })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.memberId, memberId),
+					eq(checkIn.organizationId, ctx.orgId),
+					isNull(checkIn.guestName)
+				)
+			);
+		const weekOf = (iso: string) => {
+			const d = new Date(`${iso}T12:00:00Z`);
+			d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+			return d.toISOString().slice(0, 10);
+		};
+		const weeks = new Set(visits.map((v) => weekOf(localDate(v.checkedAt, tz))));
+		let w = weekOf(today);
+		if (!weeks.has(w)) {
+			const prev = new Date(`${w}T12:00:00Z`);
+			prev.setUTCDate(prev.getUTCDate() - 7);
+			w = prev.toISOString().slice(0, 10);
+		}
+		let streak = 0;
+		while (weeks.has(w)) {
+			streak++;
+			const prev = new Date(`${w}T12:00:00Z`);
+			prev.setUTCDate(prev.getUTCDate() - 7);
+			w = prev.toISOString().slice(0, 10);
+		}
+		if (STREAK_MILESTONES.includes(streak)) {
+			const [ms] = await db
+				.select({ id: membership.id })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.memberId, memberId),
+						eq(membership.status, 'active')
+					)
+				)
+				.limit(1);
+			if (ms && (await notifyStreakReward(ctx.orgId, memberId, streak, st.streakRewardCredits)))
+				await db
+					.update(membership)
+					.set({ bonusCredits: sql`${membership.bonusCredits} + ${st.streakRewardCredits}` })
+					.where(eq(membership.id, ms.id));
+		}
+	}
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
@@ -336,6 +420,56 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			.where(and(eq(membership.memberId, memberId), eq(membership.status, 'suspended')))
 			.limit(1)
 	).length;
+	// Desk heads-up: remaining classes on a capped plan/pack (null = unlimited or none).
+	const credits = await creditUsage(ctx.orgId, memberId);
+	// Desk heads-up: guest passes left this month (null = the plan has none).
+	const [gp] = await db
+		.select({ guestPasses: plan.guestPasses })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.memberId, memberId),
+				eq(membership.status, 'active'),
+				or(isNull(membership.endsAt), gt(membership.endsAt, new Date()))
+			)
+		)
+		.orderBy(desc(membership.createdAt))
+		.limit(1);
+	let guestPassesLeft: number | null = null;
+	if (gp?.guestPasses) {
+		const [used] = await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.organizationId, ctx.orgId),
+					eq(checkIn.memberId, memberId),
+					isNotNull(checkIn.guestName),
+					gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
+				)
+			);
+		guestPassesLeft = Math.max(0, gp.guestPasses - used!.n);
+	}
+	// Desk heads-up: their next class today (booked or waitlisted).
+	const [nb] = await db
+		.select({ className: classType.name, startsAt: classSession.startsAt })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.memberId, memberId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(today, 1)}T00:00`, tz))
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(1);
 	return {
 		checkIn: row!,
 		member: m,
@@ -343,7 +477,11 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		birthday,
 		visits: n,
 		waiverMissing,
-		suspended
+		suspended,
+		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
+		creditsClass: credits?.className ?? null,
+		guestPassesLeft,
+		nextClass: nb ?? null
 	};
 }
 

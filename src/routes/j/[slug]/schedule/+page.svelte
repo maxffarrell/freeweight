@@ -67,6 +67,15 @@
 			</Button>
 		</div>
 
+		{#if Object.values(settings.openHours ?? {}).some(Boolean)}
+			{@const hours = settings.openHours ?? {}}
+			<div class="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border px-4 py-3 text-xs text-muted-foreground">
+				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d, i (d)}
+					<span><span class="font-medium text-foreground">{d}</span> {hours[String(i)] || 'Closed'}</span>
+				{/each}
+			</div>
+		{/if}
+
 		{#each byDay as [day, rows] (day)}
 			<section class="space-y-2">
 				<h2 class="text-sm font-semibold tracking-wide text-muted-foreground uppercase">

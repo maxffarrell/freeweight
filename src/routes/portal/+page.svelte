@@ -19,6 +19,7 @@
 		getPortalOverview,
 		getBookable,
 		memberBook,
+		memberGiveSpot,
 		memberBookSeries,
 		memberCancel,
 		memberMove,
@@ -44,6 +45,12 @@
 		bookResource,
 		cancelReservation,
 		getReservations,
+		getPtCoaches,
+		getMyPtRequests,
+		requestPt,
+		getAmenityRules,
+		repeatAmenityWeekly,
+		cancelAmenityRule,
 		getPortalEvents,
 		registerEvent,
 		cancelEventReg,
@@ -56,7 +63,10 @@
 		getPortalChallenges,
 		joinChallenge,
 		leaveChallenge,
+		getMakeups,
 		getPortalAnnouncements,
+		markNewsRead,
+		bookMakeup,
 		addDependent,
 		getPortalAi,
 		aiWorkoutPlan,
@@ -67,6 +77,7 @@
 		acceptSaveOffer,
 		requestAddonRemoval,
 		getShopItems,
+		getMyPurchases,
 		buyShopItem,
 		getPersonalRecords,
 		addPersonalRecord,
@@ -75,7 +86,13 @@
 		getSignRequests,
 		signDocument,
 		getMovementVideos,
-		setPackAutoRenew
+		setPackAutoRenew,
+		getMyWorkouts,
+		getMyPrograms,
+		giftPackCredits,
+		getMyDataExport,
+		getNpsStatus,
+		submitNps
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -85,16 +102,59 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
 	import TrendingUp from '@lucide/svelte/icons/trending-up';
+	import Dumbbell from '@lucide/svelte/icons/dumbbell';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
+
+	// ------- data export -------
+	let exportPending = $state(false);
+	async function downloadMyData() {
+		exportPending = true;
+		try {
+			const data = await getMyDataExport(memberId);
+			const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = `freeweight-data-${new Date().toISOString().slice(0, 10)}.json`;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not export'));
+		}
+		exportPending = false;
+	}
+
+	// ------- gift pack classes -------
+	let giftOpen = $state(false);
+	let giftEmail = $state('');
+	let giftCredits = $state('1');
+	let giftPending = $state(false);
+	async function sendGift(e: SubmitEvent) {
+		e.preventDefault();
+		giftPending = true;
+		try {
+			const r = await giftPackCredits({
+				memberId,
+				email: giftEmail.trim(),
+				credits: parseInt(giftCredits) || 0
+			});
+			const n = parseInt(giftCredits) || 0;
+			toast.success(`${n} class${n === 1 ? '' : 'es'} sent to ${r.toName}`);
+			giftOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not gift classes'));
+		}
+		giftPending = false;
+	}
 
 	let rateFor = $state<{ sessionId: string; className: string } | null>(null);
 	let rateValue = $state(0);
@@ -155,6 +215,32 @@
 		rateBusy = false;
 	}
 	const d = $derived(await getPortalOverview(memberId));
+	const npsStatus = $derived(await getNpsStatus(memberId));
+	const npsDue = $derived(npsStatus.due);
+	let npsScore = $state<number | null>(null);
+	let npsComment = $state('');
+	let npsPending = $state(false);
+	let npsSent = $state(false);
+	let npsFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== npsFor) {
+			npsFor = memberId;
+			npsSent = false;
+			npsScore = null;
+			npsComment = '';
+		}
+	});
+	async function sendNps() {
+		if (npsScore == null) return;
+		npsPending = true;
+		try {
+			await submitNps({ memberId, score: npsScore, comment: npsComment || undefined });
+			npsSent = true;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		npsPending = false;
+	}
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
 
@@ -253,6 +339,31 @@
 	// ------- amenity reservations -------
 	const amenities = $derived(await getPortalResources(memberId));
 	const reservations = $derived(await getReservations(memberId));
+	const amenityRules = $derived(await getAmenityRules(memberId));
+	const ptCoaches = $derived(await getPtCoaches(memberId));
+	const myPt = $derived(await getMyPtRequests(memberId));
+	let ptCoach = $state('');
+	let ptAt = $state('');
+	let ptNote = $state('');
+	let ptBusy = $state(false);
+	async function sendPtRequest() {
+		if (!ptAt) return toast.error('Pick a date and time');
+		ptBusy = true;
+		try {
+			await requestPt({
+				memberId,
+				instructorId: ptCoach || undefined,
+				preferredAt: ptAt,
+				note: ptNote || undefined
+			});
+			toast.success('Request sent — the gym will confirm your slot');
+			ptAt = '';
+			ptNote = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send the request'));
+		}
+		ptBusy = false;
+	}
 	let amenityId = $state('');
 	const amenity = $derived(
 		amenities.find((a) => a.resource.id === amenityId) ?? amenities[0] ?? null
@@ -370,6 +481,25 @@
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
 	const news = $derived(await getPortalAnnouncements(memberId));
+	const makeups = $derived(await getMakeups(memberId));
+	let mkBusy = $state('');
+	async function bookMk(compFrom: string, sessionId: string) {
+		mkBusy = sessionId;
+		try {
+			const status = await bookMakeup({ memberId, compFrom, sessionId });
+			toast.success(status === 'waitlisted' ? "You're on the waitlist" : 'Makeup class booked');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book the makeup'));
+		}
+		mkBusy = '';
+	}
+	let newsMarked = $state('');
+	$effect(() => {
+		if (news.length && newsMarked !== memberId) {
+			newsMarked = memberId;
+			markNewsRead(memberId).catch(() => {});
+		}
+	});
 	let chalBusy = $state('');
 	async function joinChal(challengeId: string) {
 		chalBusy = challengeId;
@@ -394,6 +524,8 @@
 
 	// ------- shop -------
 	const shopItems = $derived(await getShopItems(memberId));
+	const purchases = $derived(await getMyPurchases(memberId));
+	const awaitingPickup = $derived(purchases.filter((p) => !p.pickedUpAt));
 	let shopBusy = $state('');
 	async function buyItem(itemId: string) {
 		shopBusy = itemId;
@@ -457,6 +589,7 @@
 				...(prDate ? { recordedOn: prDate } : {})
 			});
 			prLabel = prValue = prDate = '';
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 			toast.success('PR logged');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not save'));
@@ -466,6 +599,7 @@
 	async function delPr(prId: string) {
 		try {
 			await deletePersonalRecord({ memberId, prId });
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete'));
 		}
@@ -539,7 +673,12 @@
 		}
 	}
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
-	const hasPlan = $derived(d.memberships.some((mm) => mm.membership.status === 'active'));
+	const hasPlan = $derived(
+		d.memberships.some((mm) => mm.membership.status === 'active') || d.guardianHasMembership
+	);
+	const myWorkouts = $derived(await getMyWorkouts(memberId));
+	const myPrograms = $derived(await getMyPrograms(memberId));
+
 	const buyablePacks = $derived(
 		joinablePlans.filter(
 			(p) =>
@@ -700,12 +839,33 @@
 	let busy = $state<string | null>(null);
 	// Guests the member wants to bring to each session (guest passes / drop-in priced).
 	let guestPick = $state<Record<string, string>>({});
+	/** Dependents the current member manages (from the family switcher options). */
+	// Dependents the current member manages — empty while switched INTO a
+	// dependent (a child can't re-book the family).
+	const dependents = $derived(
+		data.options.find((o) => o.memberId === memberId)?.dependent
+			? []
+			: data.options.filter((o) => o.dependent && o.memberId !== memberId)
+	);
+	let familyPick = $state<Record<string, boolean>>({});
 	async function book(sessionId: string) {
 		busy = sessionId;
 		try {
 			const guests = Number(guestPick[sessionId] ?? 0) || 0;
 			const b = await memberBook({ memberId, sessionId, guests });
 			toast.success(b.status === 'waitlisted' ? 'Class full — you are on the waitlist' : 'Booked!');
+			if (familyPick[sessionId]) {
+				let added = 0;
+				for (const o of dependents) {
+					try {
+						await memberBook({ memberId: o.memberId, sessionId });
+						added++;
+					} catch {
+						/* a dependent who can't book (cutoff/already in) is skipped */
+					}
+				}
+				if (added) toast.success(`${added} family member${added === 1 ? '' : 's'} booked too`);
+			}
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
 		}
@@ -752,7 +912,11 @@
 		try {
 			const b = await memberCancel({ memberId, bookingId });
 			toast.success(
-				b.lateFeeApplied ? 'Cancelled — a late-cancel fee was charged' : 'Booking cancelled'
+				b.lateFeeApplied
+					? 'Cancelled — a late-cancel fee was charged'
+					: b.lateFeeForgiven
+						? 'Cancelled late — free late cancel used, no fee'
+						: 'Booking cancelled'
 			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
@@ -911,14 +1075,13 @@
 
 <div class="mb-4 flex items-center gap-3">
 	{#if data.options.length > 1}
-		<select
-			class="h-9 rounded-md border bg-background px-3 text-sm"
+		<NativeSelect
 			onchange={(e) => goto(`/portal?m=${e.currentTarget.value}`, { invalidateAll: true })}
 		>
 			{#each data.options as o (o.memberId)}
 				<option value={o.memberId} selected={o.memberId === memberId}>{o.label}</option>
 			{/each}
-		</select>
+		</NativeSelect>
 	{/if}
 	{#if !data.options.find((o) => o.memberId === memberId)?.dependent}
 		<button
@@ -978,12 +1141,23 @@
 					<h1 class="text-xl font-semibold">Hi {d.member.name.split(' ')[0]}</h1>
 					<p class="text-sm text-muted-foreground">Show this code at the front desk to check in.</p>
 					<div class="mt-3 flex flex-wrap gap-1.5">
+						{#if d.level}
+							<Badge variant="secondary" class="gap-1.5">
+								{#if d.level.color}<span
+										class="size-2 rounded-full"
+										style:background={d.level.color}
+									></span>{/if}
+								{d.level.name}
+							</Badge>
+						{/if}
 						{#each d.memberships as mm (mm.membership.id)}
 							{#if mm.membership.status === 'active'}
 								<Badge
 									>{mm.plan.name}{mm.plan.isPack
 										? ''
-										: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
+										: mm.membership.noBill
+											? ' · complimentary'
+											: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
 								>
 							{/if}
 						{/each}
@@ -996,11 +1170,27 @@
 									? ` ${d.credits.className}`
 									: ''} classes used</Badge
 							>
+							{#if d.credits.limit - d.credits.used > 0}
+								<button
+									class="text-xs text-muted-foreground underline"
+									onclick={() => ((giftEmail = ''), (giftCredits = '1'), (giftOpen = true))}
+									>Gift classes</button
+								>
+							{/if}
 						{/if}
 					</div>
 					<p class="mt-1 text-xs">
 						<button class="text-muted-foreground underline" onclick={openProfile}
 							>Edit profile</button
+						>
+						{#if d.lockerLabel}
+							· <span class="text-muted-foreground">Locker {d.lockerLabel}</span>
+						{/if}
+						·
+						<button
+							class="text-muted-foreground underline"
+							disabled={exportPending}
+							onclick={downloadMyData}>{exportPending ? 'Exporting…' : 'Download my data'}</button
 						>
 						·
 						<button
@@ -1140,13 +1330,10 @@
 										class="h-7 w-auto text-xs"
 										bind:value={pauseResumeOn}
 									/>
-									<select
-										bind:value={requestReason}
-										class="h-7 rounded-md border bg-transparent px-1 text-xs"
-									>
+									<NativeSelect bind:value={requestReason} size="sm">
 										<option value="">Reason (optional)</option>
 										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-									</select>
+									</NativeSelect>
 									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 										>Request pause</Button
 									>
@@ -1160,13 +1347,10 @@
 										void requestCancel(mm.membership.id);
 									}}
 								>
-									<select
-										bind:value={requestReason}
-										class="h-7 rounded-md border bg-transparent px-1 text-xs"
-									>
+									<NativeSelect bind:value={requestReason} size="sm">
 										<option value="">Reason (optional)</option>
 										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-									</select>
+									</NativeSelect>
 									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 										>Confirm cancellation request</Button
 									>
@@ -1254,11 +1438,7 @@
 									{amenity!.resource.name}
 								</p>
 							{:else}
-								<select
-									id="am-res"
-									bind:value={amenityId}
-									class="h-9 rounded-md border bg-transparent px-2 text-sm"
-								>
+								<NativeSelect id="am-res" bind:value={amenityId}>
 									{#each amenities as a (a.resource.id)}
 										<option value={a.resource.id}
 											>{a.resource.name}{a.resource.status !== 'open'
@@ -1266,7 +1446,7 @@
 												: ''}</option
 										>
 									{/each}
-								</select>
+								</NativeSelect>
 							{/if}
 						</div>
 						<div class="space-y-1">
@@ -1314,6 +1494,33 @@
 						<p class="text-sm text-muted-foreground">Pick a day to see open slots.</p>
 					{/if}
 				{/if}
+				{#if amenityRules.length}
+					<div class="mb-3 divide-y rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+						{#each amenityRules as rule (rule.rule.id)}
+							<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+								<div>
+									<span class="font-medium">{rule.resourceName}</span>
+									<span class="text-muted-foreground">
+										· every {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][rule.rule.weekday]} at
+										{rule.rule.startTime}
+									</span>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={async () => {
+										try {
+											await cancelAmenityRule({ memberId, ruleId: rule.rule.id });
+											toast.success('Weekly reservation ended');
+										} catch (err) {
+											toast.error(errMsg(err, 'Failed'));
+										}
+									}}>End weekly</Button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
 				{#if reservations.length}
 					<div class="divide-y rounded-lg border">
 						{#each reservations as r (r.booking.id)}
@@ -1324,9 +1531,24 @@
 										· {localDate(r.booking.startsAt, tz)} at {localTime(r.booking.startsAt, tz)}
 									</span>
 								</div>
-								<Button variant="ghost" size="sm" onclick={() => cancelRes(r.booking.id)}
-									>Cancel</Button
-								>
+								<div class="flex items-center gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										title="Reserve this slot every week"
+										onclick={async () => {
+											try {
+												await repeatAmenityWeekly({ memberId, bookingId: r.booking.id });
+												toast.success('Booked every week at this time');
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											}
+										}}>Weekly</Button
+									>
+									<Button variant="ghost" size="sm" onclick={() => cancelRes(r.booking.id)}
+										>Cancel</Button
+									>
+								</div>
 							</div>
 						{/each}
 					</div>
@@ -1557,7 +1779,91 @@
 		</Card.Root>
 	{/if}
 
+	{#if makeups.length}
+		<Card.Root class="md:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Make up a cancelled class</Card.Title>
+				<Card.Description
+					>Your spot was cancelled — rebook free into a later session.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content class="divide-y px-6">
+				{#each makeups as mk (mk.bookingId)}
+					<div class="py-3 first:pt-0 last:pb-0">
+						<p class="text-sm font-medium">
+							{mk.className}
+							<span class="font-normal text-muted-foreground">
+								— was {formatDate(localDate(mk.wasAt, d.settings?.timezone ?? 'UTC'))}</span
+							>
+						</p>
+						<div class="mt-2 flex flex-wrap gap-2">
+							{#each mk.candidates as c (c.sessionId)}
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={mkBusy === c.sessionId}
+									onclick={() => bookMk(mk.bookingId, c.sessionId)}
+								>
+									{formatDate(localDate(c.startsAt, d.settings?.timezone ?? 'UTC'))}
+									{localTime(c.startsAt, d.settings?.timezone ?? 'UTC')}
+									{#if c.locationName}
+										<span class="text-muted-foreground">· {c.locationName}</span>
+									{/if}
+									{#if c.free <= 0}
+										<span class="text-muted-foreground">· waitlist</span>
+									{/if}
+								</Button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if news.length}
+		<Card.Root class="md:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">How are we doing?</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				{#if npsDue === null}
+					<p class="text-sm text-muted-foreground">Loading…</p>
+				{:else if !npsDue}
+					<p class="text-sm text-muted-foreground">
+						Thanks for the feedback — we'll ask again soon.
+					</p>
+				{:else if npsSent}
+					<p class="text-sm text-muted-foreground">Thanks — noted!</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						How likely are you to recommend us to a friend?
+					</p>
+					<div class="mt-2 flex flex-wrap gap-1">
+						{#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as n (n)}
+							<button
+								type="button"
+								class="size-8 rounded-md border text-sm transition-colors {npsScore === n
+									? 'border-primary bg-primary text-primary-foreground'
+									: 'text-muted-foreground hover:border-primary'}"
+								onclick={() => (npsScore = n)}>{n}</button
+							>
+						{/each}
+					</div>
+					{#if npsScore !== null}
+						<Input
+							class="mt-3"
+							placeholder="Anything we could do better? (optional)"
+							bind:value={npsComment}
+						/>
+						<Button class="mt-2" size="sm" onclick={sendNps} disabled={npsPending}
+							>{npsPending ? 'Sending…' : 'Send feedback'}</Button
+						>
+					{/if}
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
 		<Card.Root class="sm:col-span-2">
 			<Card.Header class="pb-2">
 				<Card.Title class="text-base">News</Card.Title>
@@ -1595,11 +1901,24 @@
 							: 's'} for each one that pays.{/if}
 				</Card.Description>
 			</Card.Header>
-			<Card.Content class="flex items-center gap-2 px-6">
-				<code class="flex-1 truncate rounded-md border bg-muted/40 px-3 py-2 text-xs"
-					>{refLink}</code
-				>
-				<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
+			<Card.Content class="px-6">
+				<div class="flex items-center gap-2">
+					<code class="flex-1 truncate rounded-md border bg-muted/40 px-3 py-2 text-xs"
+						>{refLink}</code
+					>
+					<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
+				</div>
+				{#if d.referrals?.length}
+					<div class="mt-3 space-y-1">
+						{#each d.referrals as r (r.name)}
+							<p class="flex items-center justify-between text-xs">
+								<span>{r.name}</span>
+								{#if r.paying}<Badge variant="secondary" class="text-[10px]">paying</Badge
+									>{:else}<span class="text-muted-foreground">joined</span>{/if}
+							</p>
+						{/each}
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}
@@ -1633,6 +1952,23 @@
 						</div>
 					{/each}
 				</div>
+				{#if awaitingPickup.length}
+					<div class="mt-4 rounded-lg border bg-muted/30 p-3">
+						<p class="mb-2 text-xs font-medium text-muted-foreground uppercase">
+							Awaiting pickup at the desk
+						</p>
+						<ul class="space-y-1">
+							{#each awaitingPickup as p (p.id)}
+								<li class="flex items-center justify-between text-sm">
+									<span>{p.itemName}{p.qty > 1 ? ` ×${p.qty}` : ''}</span>
+									<Badge variant="outline" class="text-amber-600 dark:text-amber-400"
+										>awaiting pickup</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}
@@ -1958,14 +2294,32 @@
 				</div>
 				<div>
 					<p class="text-3xl font-semibold tabular-nums">{d.attendance.weekStreak}</p>
-					<p class="text-xs text-muted-foreground">week streak</p>
+					<p class="text-xs text-muted-foreground">
+						week streak{d.attendance.longestStreak > d.attendance.weekStreak
+							? ` · best ${d.attendance.longestStreak}`
+							: ''}
+					</p>
 				</div>
 			</div>
+			{#if d.attendance.nextMilestone}
+				<p class="text-xs text-muted-foreground">
+					{d.attendance.nextMilestone - d.attendance.totalVisits} visits to your
+					{d.attendance.nextMilestone}-visit milestone
+				</p>
+			{/if}
 			{#if d.member.goalVisitsPerMonth}
 				{@const goalPct = Math.min(
 					100,
 					Math.round((d.attendance.visitsThisMonth / d.member.goalVisitsPerMonth) * 100)
 				)}
+				{@const dayOfMonth = new Date().getDate()}
+				{@const daysInMonth = new Date(
+					new Date().getFullYear(),
+					new Date().getMonth() + 1,
+					0
+				).getDate()}
+				{@const expected = (d.member.goalVisitsPerMonth * dayOfMonth) / daysInMonth}
+				{@const pace = d.attendance.visitsThisMonth - expected}
 				<div class="space-y-1">
 					<div class="flex items-center justify-between text-xs">
 						<span class="text-muted-foreground"
@@ -1977,6 +2331,17 @@
 						>
 					</div>
 					<Progress max={d.member.goalVisitsPerMonth} value={d.attendance.visitsThisMonth} />
+					{#if goalPct < 100 && dayOfMonth > 3}
+						<p
+							class="text-xs {pace >= -0.5
+								? 'text-emerald-600 dark:text-emerald-400'
+								: 'text-amber-600 dark:text-amber-400'}"
+						>
+							{pace >= -0.5
+								? 'On track'
+								: `${Math.ceil(-pace)} visit${Math.ceil(-pace) === 1 ? '' : 's'} behind pace`}
+						</p>
+					{/if}
 				</div>
 			{:else}
 				<button
@@ -2002,17 +2367,117 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if myPrograms.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Your program</Card.Title>
+				<Card.Description>Day-by-day plan from your coach</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				{#each myPrograms as mp (mp.assignment.id)}
+					<div class="space-y-2">
+						<div class="flex items-baseline justify-between">
+							<p class="font-medium">{mp.program.name}</p>
+							<span class="text-xs text-muted-foreground">
+								{mp.finished ? 'Finished — well done!' : `Day ${mp.dayNo} of ${mp.days.length}`}
+							</span>
+						</div>
+						<div class="h-1.5 overflow-hidden rounded bg-muted">
+							<div
+								class="h-full bg-primary transition-all"
+								style="width: {Math.min(
+									100,
+									Math.round((mp.dayNo / Math.max(1, mp.days.length)) * 100)
+								)}%"
+							></div>
+						</div>
+						{#each mp.days.slice(Math.max(0, mp.dayNo - 1), mp.dayNo + 2) as day (day.id)}
+							<div
+								class="rounded-md border p-3 text-sm {day.dayNo === mp.dayNo
+									? 'border-primary'
+									: 'opacity-75'}"
+							>
+								<p class="font-medium">
+									Day {day.dayNo} — {day.title}{day.dayNo === mp.dayNo ? ' · today' : ''}
+								</p>
+								<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{day.body}</p>
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if myWorkouts.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"><Dumbbell /> Your workouts</Card.Title
+				>
+				<Card.Description>From your coach</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-3">
+				{#each myWorkouts as w (w.id)}
+					<div class="rounded-md border p-3 text-sm">
+						<p class="font-medium">{w.title}</p>
+						<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{w.body}</p>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Personal training</Card.Title>
+			<Card.Description>Request a 1:1 session — the gym confirms your slot</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			{#each myPt as r (r.request.id)}
+				<div class="flex items-center justify-between gap-2 text-sm">
+					<span>
+						{localDate(r.request.preferredAt, tz)} at {localTime(r.request.preferredAt, tz)}
+						{#if r.instructorName}
+							· {r.instructorName}{/if}
+					</span>
+					<span
+						class="text-xs {r.request.status === 'approved'
+							? 'text-emerald-600 dark:text-emerald-400'
+							: r.request.status === 'declined'
+								? 'text-muted-foreground line-through'
+								: 'text-amber-600 dark:text-amber-400'}">{r.request.status}</span
+					>
+				</div>
+			{/each}
+			<div class="flex flex-wrap items-center gap-2 border-t pt-3">
+				<NativeSelect bind:value={ptCoach} size="sm" class="min-w-36">
+					<option value="">Any coach</option>
+					{#each ptCoaches as c (c.id)}
+						<option value={c.id}>{c.name}</option>
+					{/each}
+				</NativeSelect>
+				<Input type="datetime-local" class="h-8 w-auto" bind:value={ptAt} />
+				<Input
+					placeholder="What do you want to work on?"
+					class="h-8 min-w-44 flex-1"
+					bind:value={ptNote}
+				/>
+				<Button size="sm" disabled={ptBusy} onclick={sendPtRequest}>Request</Button>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex items-center gap-2 text-base"><TrendingUp /> Progress</Card.Title>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<form class="flex flex-wrap items-center gap-2" onsubmit={logStat}>
-				<select bind:value={msKind} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+				<NativeSelect bind:value={msKind} size="sm">
 					{#each Object.entries(KIND_LABELS) as [k, label] (k)}
 						<option value={k}>{label}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 				<Input
 					type="number"
 					step="0.1"
@@ -2022,10 +2487,10 @@
 					placeholder="Value"
 					class="h-8 w-24"
 				/>
-				<select bind:value={msUnit} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+				<NativeSelect bind:value={msUnit} size="sm">
 					{#each UNITS as u (u)}<option value={u}>{u}</option>{/each}
-				</select>
-				<Input type="date" bind:value={msDate} class="h-8 w-auto text-xs" aria-label="Date" />
+				</NativeSelect>
+				<Input type="date" bind:value={msDate} class="h-7" aria-label="Date" />
 				<Button size="sm" class="h-8" type="submit" disabled={msPending}>Log</Button>
 			</form>
 			{#if measurements.length}
@@ -2095,17 +2560,52 @@
 						{#if u.waitlistPos}<span class="text-xs text-muted-foreground">#{u.waitlistPos}</span
 							>{/if}
 						<StatusBadge status={u.booking.status} />
+						{#if u.booking.status === 'booked'}
+							<button
+								class="text-xs text-muted-foreground underline-offset-4 hover:underline"
+								title="Give this spot to another member"
+								disabled={busy === `give:${u.booking.id}`}
+								onclick={async () => {
+									const email = window.prompt(
+										`Give your ${u.className} spot to which member? (their email)`
+									);
+									if (!email?.trim()) return;
+									busy = `give:${u.booking.id}`;
+									try {
+										const r = await memberGiveSpot({
+											memberId,
+											bookingId: u.booking.id,
+											email: email.trim()
+										});
+										toast.success(`Spot given to ${r.recipient}`);
+									} catch (err) {
+										toast.error(errMsg(err, 'Could not give the spot'));
+									}
+									busy = null;
+								}}>Give</button
+							>
+						{/if}
 					</span>
 				</div>
 			{:else}
 				<p class="py-2 text-sm text-muted-foreground">Nothing booked — grab a spot below.</p>
 			{/each}
 			{#if d.upcoming.length}
-				<a
-					class="block pb-2 text-xs text-muted-foreground underline underline-offset-2"
-					href="/portal/feed.ics?m={memberId}&t={d.calendarToken}"
-					>Sync bookings to your calendar app</a
-				>
+				<div class="flex items-center justify-between pb-2">
+					<a
+						class="text-xs text-muted-foreground underline underline-offset-2"
+						href="/portal/feed.ics?m={memberId}&t={d.calendarToken}"
+						>Sync bookings to your calendar app</a
+					>
+					<a
+						class="text-xs text-muted-foreground underline underline-offset-2"
+						href="https://calendar.google.com/calendar/r?cid={encodeURIComponent(
+							`${page.url.origin}/portal/feed.ics?m=${memberId}&t=${d.calendarToken}`
+						)}"
+						target="_blank"
+						rel="noreferrer">Add to Google Calendar</a
+					>
+				</div>
 			{/if}
 		</Card.Content>
 	</Card.Root>
@@ -2252,8 +2752,8 @@
 											>Series</Button
 										>
 									{/if}
-									<select
-										class="h-8 rounded-md border bg-transparent px-1 text-xs"
+									<NativeSelect
+										size="sm"
 										title="Bring guests — uses guest passes first, then drop-in price"
 										bind:value={guestPick[b.session.id]}
 									>
@@ -2261,7 +2761,20 @@
 										{#each [1, 2, 3] as n (n)}
 											<option value={String(n)}>+{n} guest{n > 1 ? 's' : ''}</option>
 										{/each}
-									</select>
+									</NativeSelect>
+									{#if dependents.length}
+										<label
+											class="flex items-center gap-1 text-xs whitespace-nowrap text-muted-foreground"
+											title={`Also book: ${dependents.map((o) => o.label).join(', ')}`}
+										>
+											<input
+												type="checkbox"
+												class="size-3"
+												bind:checked={familyPick[b.session.id]}
+											/>
+											+family
+										</label>
+									{/if}
 									<Button
 										size="sm"
 										variant="outline"
@@ -2490,5 +3003,35 @@
 				{signBusy ? 'Signing…' : 'Sign document'}
 			</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={giftOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Gift classes to a friend</Dialog.Title>
+			<Dialog.Description>
+				Move classes off your pack to another member. They need an account at your gym already.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendGift}>
+			<Field.Field>
+				<Field.Label for="gift-email">Their email</Field.Label>
+				<Input
+					id="gift-email"
+					type="email"
+					placeholder="friend@email.com"
+					bind:value={giftEmail}
+					required
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="gift-n">Classes</Field.Label>
+				<Input id="gift-n" type="number" min="1" bind:value={giftCredits} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={giftPending}>
+				{giftPending ? 'Sending…' : 'Gift classes'}
+			</Button>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

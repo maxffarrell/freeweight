@@ -18,6 +18,8 @@
 	import Sun from '@lucide/svelte/icons/sun';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import Map from '@lucide/svelte/icons/map';
+	import Bell from '@lucide/svelte/icons/bell';
+	import { getNotifications } from '#lib/remote/workspace.remote.ts';
 
 	type Props = {
 		user: { name: string; email: string; image: string | null };
@@ -39,6 +41,15 @@
 				(page.url.pathname.startsWith('/settings/') &&
 					!page.url.pathname.startsWith('/settings/integrations'))
 			: page.url.pathname === href || page.url.pathname.startsWith(href + '/');
+
+	const notifications = $derived(await getNotifications());
+	const unread = $derived(notifications.length);
+
+	// Keep the bell fresh while staff sit on a page — poll every 30s.
+	$effect(() => {
+		const t = setInterval(() => getNotifications().refresh(), 30_000);
+		return () => clearInterval(t);
+	});
 
 	async function signOut() {
 		await authClient.signOut();
@@ -63,16 +74,52 @@
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton
-					variant="outline"
-					onclick={onsearch}
-					tooltipContent="Search (⌘K)"
-					class="text-muted-foreground"
-				>
-					<Search />
-					<span>Search or jump to…</span>
-					<Kbd class="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
-				</Sidebar.MenuButton>
+				<div class="flex gap-1">
+					<Sidebar.MenuButton
+						variant="outline"
+						onclick={onsearch}
+						tooltipContent="Search (⌘K)"
+						class="flex-1 text-muted-foreground"
+					>
+						<Search />
+						<span>Search or jump to…</span>
+						<Kbd class="ml-auto group-data-[collapsible=icon]:hidden">⌘K</Kbd>
+					</Sidebar.MenuButton>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Sidebar.MenuButton
+									{...props}
+									variant="outline"
+									tooltipContent="Notifications"
+									class="relative aspect-square !w-auto shrink-0 px-2 text-muted-foreground"
+								>
+									<Bell />
+									{#if unread}
+										<span
+											class="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
+											>{unread > 9 ? '9+' : unread}</span
+										>
+									{/if}
+								</Sidebar.MenuButton>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content class="w-72" align="start">
+							<DropdownMenu.Label>Needs attention</DropdownMenu.Label>
+							<DropdownMenu.Separator />
+							{#each notifications as n (n.label + n.detail)}
+								<DropdownMenu.Item onclick={() => goto(n.href)} class="flex-col items-start gap-0">
+									<span class="text-sm">{n.label}</span>
+									<span class="text-xs text-muted-foreground">{n.detail}</span>
+								</DropdownMenu.Item>
+							{:else}
+								<DropdownMenu.Item disabled class="text-muted-foreground">
+									All clear — nothing needs attention
+								</DropdownMenu.Item>
+							{/each}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Header>

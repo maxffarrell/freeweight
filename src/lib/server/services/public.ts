@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq, getTableColumns, gte, isNull, ne, sql, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	closure,
 	booking,
 	charge,
 	classSession,
@@ -90,7 +91,15 @@ export async function getPublicGym(slug: string) {
 		.orderBy(asc(classSession.startsAt))
 		.limit(60);
 
-	return { org, settings, plans, sessions };
+	const todayIso = now.toISOString().slice(0, 10);
+	const closures = await db
+		.select()
+		.from(closure)
+		.where(and(eq(closure.organizationId, org.id), gte(closure.date, todayIso)))
+		.orderBy(asc(closure.date))
+		.limit(20);
+
+	return { org, settings, plans, sessions, closures };
 }
 
 /** First name of the member behind a ?ref= link, for the "Invited by X" line. Public-safe. */

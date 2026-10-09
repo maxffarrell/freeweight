@@ -14,6 +14,7 @@ import {
 	sendClassReminders,
 	sendCourseCompletions,
 	sendDueAnnouncements,
+	sendDueRecurringAnnouncements,
 	sendEventReminders,
 	sendResourceReminders,
 	sendInstructorFeedbackDigests,
@@ -23,6 +24,7 @@ import {
 	sendStaffBriefing,
 	sendTrialEndingNotices,
 	sendWaiverReminders,
+	sendMemberDigest,
 	sendWeeklyDigest,
 	sendWinBackNudges,
 	sendLeadNudges
@@ -38,6 +40,7 @@ import {
 import { closeStaleCheckIns, sendReviewNudges } from '#lib/server/services/checkins.ts';
 import { closeStaleShifts } from '#lib/server/services/shifts.ts';
 import { postDueRecurring } from '#lib/server/services/recurring.ts';
+import { materializeResourceRecurring } from '#lib/server/services/resources.ts';
 import type { RequestHandler } from './$types';
 
 const authorized = (header: string | null) => {
@@ -63,7 +66,9 @@ export const GET: RequestHandler = async ({ request }) => {
 	let waitlistExpired = 0;
 	let suspended = 0;
 	let generated = 0;
+	let amenityBookings = 0;
 	let digests = 0;
+	let memberDigests = 0;
 	let winbacks = 0;
 	let leadNudges = 0;
 	let rosters = 0;
@@ -72,6 +77,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let briefings = 0;
 	let billingReminders = 0;
 	let announcements = 0;
+	let recurringAnnouncements = 0;
 	let packNudges = 0;
 	let waiverNudges = 0;
 	let ratingNudgeCount = 0;
@@ -148,6 +154,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 		try {
 			announcements += await sendDueAnnouncements(o.id);
+			recurringAnnouncements += await sendDueRecurringAnnouncements(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`scheduled-announcement cron failed for ${o.id}`, err);
@@ -207,7 +214,14 @@ export const GET: RequestHandler = async ({ request }) => {
 			console.error(`template cron failed for ${o.id}`, err);
 		}
 		try {
+			amenityBookings += await materializeResourceRecurring(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`amenity-recurring cron failed for ${o.id}`, err);
+		}
+		try {
 			digests += await sendWeeklyDigest(o.id);
+			memberDigests += await sendMemberDigest(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`digest cron failed for ${o.id}`, err);
@@ -272,7 +286,9 @@ export const GET: RequestHandler = async ({ request }) => {
 		waitlistExpired,
 		suspended,
 		generated,
+		amenityBookings,
 		digests,
+		memberDigests,
 		winbacks,
 		leadNudges,
 		rosters,
@@ -281,6 +297,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		briefings,
 		billingReminders,
 		announcements,
+		recurringAnnouncements,
 		packNudges,
 		waiverNudges,
 		ratingNudges: ratingNudgeCount,

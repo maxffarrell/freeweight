@@ -19,6 +19,8 @@ import {
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
+	memberLevel,
+	instructorQual,
 	booking,
 	charge,
 	checkIn,
@@ -148,6 +150,7 @@ export async function createClassType(
 			waitlistLimit: input.waitlistLimit ?? null,
 			bookCutoffMin: input.bookCutoffMin ?? null,
 			memberBookable: input.memberBookable,
+			minLevelId: input.minLevelId ?? null,
 			active: input.active
 		})
 		.returning();
@@ -364,7 +367,7 @@ export async function sessionsNeedingCover(ctx: OrgContext) {
 				isNotNull(classSession.coverRequestedAt),
 				isNull(classSession.cancelledAt),
 				gt(classSession.startsAt, new Date()),
-				me ? ne(classSession.instructorId, me.id) : undefined
+				me ? or(ne(classSession.instructorId, me.id), isNull(classSession.instructorId)) : undefined
 			)
 		)
 		.orderBy(asc(classSession.startsAt))
@@ -396,6 +399,14 @@ export async function claimCover(ctx: OrgContext, tz: string, sessionId: string)
 	if (!s.coverRequestedAt) error(409, 'Already covered');
 	if (s.instructorId === me.id) error(409, 'You already teach it');
 	const row = await updateSession(ctx, tz, { id: sessionId, instructorId: me.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'session',
+		entityId: sessionId,
+		action: 'cover_claimed',
+		summary: `Cover claimed — ${s.className}`
+	});
 	return { session: row, className: s.className };
 }
 
@@ -428,7 +439,12 @@ export async function getRoster(orgId: string, sessionId: string) {
 			memberName: gymMember.name,
 			memberEmail: gymMember.email,
 			resultScore: workoutResult.score,
-			resultRx: workoutResult.asRx
+			resultRx: workoutResult.asRx,
+			// First-timer: no prior check-in or attended booking at this org.
+			firstTimer:
+				sql<boolean>`not exists (select 1 from ${checkIn} ci where ci.member_id = ${gymMember.id} and ci.organization_id = ${orgId}) and not exists (select 1 from ${booking} b2 where b2.member_id = ${gymMember.id} and b2.organization_id = ${orgId} and b2.status = 'attended')`.mapWith(
+					Boolean
+				)
 		})
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
@@ -441,6 +457,17 @@ export async function getRoster(orgId: string, sessionId: string) {
 		)
 		.where(and(eq(booking.organizationId, orgId), eq(booking.sessionId, sessionId)))
 		.orderBy(asc(booking.createdAt));
+}
+
+/** Staff note on a roster row — saved on blur in the roster dialog. */
+export async function setBookingNote(ctx: OrgContext, bookingId: string, note: string | null) {
+	const [row] = await db
+		.update(booking)
+		.set({ note })
+		.where(and(eq(booking.id, bookingId), eq(booking.organizationId, ctx.orgId)))
+		.returning({ sessionId: booking.sessionId });
+	if (!row) error(404, 'Booking not found');
+	return { ok: true };
 }
 
 /** REST API listing: bookings across sessions, newest session first. */
@@ -588,6 +615,53 @@ export async function updateSession(
 	}
 	if (set.instructorId !== undefined && set.instructorId !== prev.instructorId)
 		notifyInstructorChanged(ctx.orgId, id).catch(() => {});
+	if (set.cancelled && set.rebookNext) {
+		// Next upcoming session of the same class — members get booked into it.
+		const [next] = await db
+			.select({ id: classSession.id, startsAt: classSession.startsAt })
+			.from(classSession)
+			.where(
+				and(
+					eq(classSession.organizationId, ctx.orgId),
+					eq(classSession.classTypeId, row.classTypeId),
+					isNull(classSession.cancelledAt),
+					gt(classSession.startsAt, row.startsAt)
+				)
+			)
+			.orderBy(asc(classSession.startsAt))
+			.limit(1);
+		if (next) {
+			const booked = await db
+				.select({ memberId: booking.memberId })
+				.from(booking)
+				.where(
+					and(
+						eq(booking.organizationId, ctx.orgId),
+						eq(booking.sessionId, id),
+						eq(booking.status, 'booked')
+					)
+				);
+			let moved = 0;
+			for (const b of booked) {
+				try {
+					await bookSession(ctx, { sessionId: next.id, memberId: b.memberId }, ctx.userId, {
+						skipDailyLimit: true
+					});
+					moved++;
+				} catch {
+					// Full, duplicate, or no entitlement — the cancel email already went out.
+				}
+			}
+			await emit({
+				orgId: ctx.orgId,
+				actorId: ctx.userId,
+				entityType: 'session',
+				entityId: id,
+				action: 'rebooked',
+				summary: `${moved}/${booked.length} booked members moved to the next session`
+			});
+		}
+	}
 	if (set.needsCover && !prev.coverRequestedAt) {
 		await emit({
 			orgId: ctx.orgId,
@@ -878,7 +952,7 @@ function creditWindow(ms: ActiveMembership) {
 
 export async function creditsUsedIn(
 	orgId: string,
-	memberId: string,
+	memberId: string | null,
 	membershipId: string,
 	window: { start: string; end: string },
 	classTypeId?: string | null,
@@ -891,7 +965,9 @@ export async function creditsUsedIn(
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
-				eq(booking.memberId, memberId),
+				// null counts every booking charged to this membership — shared
+				// family packs let dependents drain a guardian's pack.
+				memberId ? eq(booking.memberId, memberId) : undefined,
 				inArray(booking.status, [...CREDIT_STATUSES]),
 				// A cancelled class gives the credit back.
 				isNull(classSession.cancelledAt),
@@ -1061,7 +1137,7 @@ export async function renewExpiredPacks(orgId: string) {
 async function pickEntitlement(
 	q: Pick<typeof db, 'select'>,
 	orgId: string,
-	memberId: string,
+	memberId: string | null,
 	mss: ActiveMembership[],
 	classTypeId: string,
 	className: string
@@ -1107,17 +1183,28 @@ export async function bookSession(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.bookingInput>,
 	actorId?: string | null,
-	opts?: { notify?: boolean; skipDailyLimit?: boolean }
+	opts?: { notify?: boolean; skipDailyLimit?: boolean; compFrom?: string }
 ) {
 	const [m] = await db
 		.select()
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
-	const mss = await activeMemberships(ctx.orgId, input.memberId);
+	let mss = await activeMemberships(ctx.orgId, input.memberId);
+	// Family packs: a dependent with no own membership may book from the
+	// guardian's — credits then count across the whole household.
+	let sharedPack = false;
+	if (!mss.length && m.guardianId && !input.dropIn) {
+		const gm = await activeMemberships(ctx.orgId, m.guardianId);
+		if (gm.length) {
+			mss = gm;
+			sharedPack = true;
+		}
+	}
 	// Staff-side drop-in: no membership required, the class's drop-in
 	// charge posts to the member's balance instead.
-	if (!mss.length && !input.dropIn) error(402, 'An active membership is required to book');
+	if (!mss.length && !input.dropIn && !opts?.compFrom)
+		error(402, 'An active membership is required to book');
 
 	const [st] = await db
 		.select({
@@ -1137,6 +1224,7 @@ export async function bookSession(
 				classTypeId: classSession.classTypeId,
 				dropInPrice: classType.dropInPrice,
 				waitlistLimit: classType.waitlistLimit,
+				minLevelId: classType.minLevelId,
 				className: classType.name
 			})
 			.from(classSession)
@@ -1145,11 +1233,63 @@ export async function bookSession(
 			.for('update');
 		if (!s) error(404, 'Session not found');
 		if (s.cancelledAt) error(409, 'This session is cancelled');
+		// Level gate: gated classes need the member to hold at least the
+		// required progression level (compare rank order).
+		if (s.minLevelId) {
+			const [gate] = await tx
+				.select({ sort: memberLevel.sortOrder, name: memberLevel.name })
+				.from(memberLevel)
+				.where(eq(memberLevel.id, s.minLevelId));
+			const [held] = m.skillLevelId
+				? await tx
+						.select({ sort: memberLevel.sortOrder })
+						.from(memberLevel)
+						.where(eq(memberLevel.id, m.skillLevelId))
+				: [undefined];
+			if (!gate || !held || held.sort < gate.sort)
+				error(409, `${s.className} requires ${gate?.name ?? 'a higher level'}`);
+		}
+		// Makeup booking: compFrom marks a free replacement for a booking the
+		// member lost to a gym-side cancellation (same class, no credit drain).
+		let compFrom: string | null = null;
+		if (opts?.compFrom) {
+			if (input.dropIn) error(400, 'A makeup booking cannot be a drop-in');
+			const [src] = await tx
+				.select({
+					status: booking.status,
+					sessionCancelled: classSession.cancelledAt,
+					srcClassTypeId: classSession.classTypeId
+				})
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(booking.id, opts.compFrom),
+						eq(booking.memberId, input.memberId),
+						eq(booking.organizationId, ctx.orgId)
+					)
+				)
+				.for('update');
+			if (!src || src.status !== 'booked' || !src.sessionCancelled)
+				error(409, 'Only a booking lost to a class cancellation earns a makeup');
+			if (src.srcClassTypeId !== s.classTypeId)
+				error(409, 'Makeup bookings must be for the same class');
+			compFrom = opts.compFrom;
+		}
 		// Which membership pays for this booking — restricted pack for its own
-		// class first, then a plan, then an open pack. Drop-ins never drain credits.
-		const ms = input.dropIn
-			? null
-			: await pickEntitlement(tx, ctx.orgId, input.memberId, mss, s.classTypeId, s.className);
+		// class first, then a plan, then an open pack. Drop-ins and makeups
+		// never drain credits.
+		const ms =
+			input.dropIn || compFrom
+				? null
+				: await pickEntitlement(
+						tx,
+						ctx.orgId,
+						sharedPack ? null : input.memberId,
+						mss,
+						s.classTypeId,
+						s.className
+					);
 		if (input.dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 			error(409, `No drop-in price set on ${s.className}`);
 		// "First class free": a member's first-ever booking skips the drop-in charge.
@@ -1274,7 +1414,8 @@ export async function bookSession(
 					cancelledAt: null,
 					createdAt: new Date(),
 					membershipId: ms?.membership.id ?? null,
-					guestCount: guests
+					guestCount: guests,
+					compBookingId: compFrom
 				})
 				.where(eq(booking.id, existing.id))
 				.returning();
@@ -1288,6 +1429,7 @@ export async function bookSession(
 				memberId: input.memberId,
 				membershipId: ms?.membership.id ?? null,
 				guestCount: guests,
+				compBookingId: compFrom,
 				status
 			})
 			.returning();
@@ -1417,7 +1559,7 @@ export async function cancelBooking(
 	actorId?: string | null,
 	opts?: { notify?: boolean; lateFee?: boolean }
 ) {
-	const { promoted, lateCancel } = await db.transaction(async (tx) => {
+	const { promoted, lateCancel, lateFeeForgiven } = await db.transaction(async (tx) => {
 		// Read status before updating — the returning row is always 'cancelled'.
 		const [prev] = await tx
 			.select({
@@ -1441,7 +1583,8 @@ export async function cancelBooking(
 				.update(charge)
 				.set({ status: 'void', updatedAt: new Date() })
 				.where(and(eq(charge.id, prev.chargeId), eq(charge.status, 'open')));
-		if (prev.status !== 'booked') return { promoted: null, lateCancel: null };
+		if (prev.status !== 'booked')
+			return { promoted: null, lateCancel: null, lateFeeForgiven: false };
 
 		const [[sess], [st]] = await Promise.all([
 			tx
@@ -1459,12 +1602,13 @@ export async function cancelBooking(
 					cutoff: gymSettings.waitlistCutoffMin,
 					cancelCutoffMin: gymSettings.cancelCutoffMin,
 					lateCancelFee: gymSettings.lateCancelFee,
+					lateCancelFreebies: gymSettings.lateCancelFreebies,
 					timezone: gymSettings.timezone
 				})
 				.from(gymSettings)
 				.where(eq(gymSettings.organizationId, ctx.orgId))
 		]);
-		const lateCancel =
+		let lateCancel =
 			sess &&
 			!sess.cancelledAt &&
 			st?.cancelCutoffMin != null &&
@@ -1479,10 +1623,44 @@ export async function cancelBooking(
 					}
 				: null;
 
+		// Forgiveness budget: the first N late cancels a member makes each
+		// calendar month skip the fee entirely.
+		let lateFeeForgiven = false;
+		if (lateCancel && st?.lateCancelFreebies && st.lateCancelFreebies > 0) {
+			const tz = st.timezone ?? 'UTC';
+			const monthStart = zonedToUtc(`${localDate(new Date(), tz).slice(0, 7)}-01T00:00`, tz);
+			const [{ used }] = await tx
+				.select({ used: sql<number>`count(*)`.mapWith(Number) })
+				.from(charge)
+				.where(
+					and(
+						eq(charge.memberId, b.memberId),
+						eq(charge.kind, 'other'),
+						sql`${charge.description} like 'Late-cancel fee%'`,
+						gte(charge.createdAt, monthStart)
+					)
+				);
+			if ((used ?? 0) < st.lateCancelFreebies) {
+				// $0 void marker keeps the forgiven cancel countable for the
+				// budget without touching the member's balance or revenue sums.
+				await tx.insert(charge).values({
+					organizationId: ctx.orgId,
+					memberId: b.memberId,
+					kind: 'other',
+					description: `Late-cancel fee — forgiven — ${sess.className} ${localDate(sess.startsAt, st.timezone ?? 'UTC')}`,
+					amount: 0,
+					status: 'void',
+					dueDate: todayISO()
+				});
+				lateCancel = null;
+				lateFeeForgiven = true;
+			}
+		}
+
 		// Don't promote when the class is about to start — the member can't
 		// realistically make it. The spot just opens for walk-in booking.
 		if (st?.cutoff && sess && sess.startsAt.getTime() - Date.now() < st.cutoff * 60_000)
-			return { promoted: null, lateCancel };
+			return { promoted: null, lateCancel, lateFeeForgiven };
 
 		// First waitlisted party that fits the freed seats — a bigger party is
 		// skipped rather than blocking the queue behind it.
@@ -1494,7 +1672,7 @@ export async function cancelBooking(
 			.from(booking)
 			.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')));
 		const free = (sess?.capacity ?? 0) - spots;
-		if (free <= 0) return { promoted: null, lateCancel };
+		if (free <= 0) return { promoted: null, lateCancel, lateFeeForgiven };
 		const waiters = await tx
 			.select()
 			.from(booking)
@@ -1502,9 +1680,9 @@ export async function cancelBooking(
 			.orderBy(asc(booking.createdAt))
 			.limit(freed + 2);
 		const next = waiters.find((w) => 1 + w.guestCount <= free);
-		if (!next) return { promoted: null, lateCancel };
+		if (!next) return { promoted: null, lateCancel, lateFeeForgiven };
 		await tx.update(booking).set({ status: 'booked' }).where(eq(booking.id, next.id));
-		return { promoted: next, lateCancel };
+		return { promoted: next, lateCancel, lateFeeForgiven };
 	});
 	const [b] = await db.select().from(booking).where(eq(booking.id, id));
 	await emit({
@@ -1532,7 +1710,7 @@ export async function cancelBooking(
 			.returning({ id: charge.id });
 		if (c) notifyChargePosted(ctx.orgId, c.id).catch(() => {});
 	}
-	return { ...b, lateFeeApplied: lateCancel != null };
+	return { ...b, lateFeeApplied: lateCancel != null, lateFeeForgiven };
 }
 
 /**
@@ -2502,4 +2680,237 @@ export async function generateSlots(ctx: OrgContext, input: v.InferOutput<typeof
 		summary: `${rows.length} open ${ct.name} slot${rows.length === 1 ? '' : 's'} generated${skipped ? ` (${skipped} skipped)` : ''}`
 	});
 	return { created: rows.length, skipped };
+}
+
+/**
+ * Desk undo for a no-show: flips the booking to 'cancelled' (which frees the
+ * credit it consumed — no_show counts toward creditsUsedIn, cancelled doesn't)
+ * and voids the matching open "No-show fee — <class> <date>" charge.
+ */
+export async function forgiveNoShow(ctx: OrgContext, bookingId: string, actorId?: string | null) {
+	const [b] = await db
+		.select({
+			id: booking.id,
+			status: booking.status,
+			memberId: booking.memberId,
+			startsAt: classSession.startsAt,
+			className: classType.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(classSession.id, booking.sessionId))
+		.innerJoin(classType, eq(classType.id, classSession.classTypeId))
+		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, bookingId)));
+	if (!b || b.status !== 'no_show') error(404, 'No-show booking not found');
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	const tz = st?.timezone ?? 'UTC';
+	await db.transaction(async (tx) => {
+		await tx
+			.update(booking)
+			.set({ status: 'cancelled', cancelledAt: new Date() })
+			.where(eq(booking.id, b.id));
+		await tx
+			.update(charge)
+			.set({ status: 'void', updatedAt: new Date() })
+			.where(
+				and(
+					eq(charge.organizationId, ctx.orgId),
+					eq(charge.memberId, b.memberId),
+					eq(charge.status, 'open'),
+					eq(charge.description, `No-show fee — ${b.className} ${localDate(b.startsAt, tz)}`)
+				)
+			);
+	});
+	await emit({
+		orgId: ctx.orgId,
+		actorId: actorId ?? null,
+		entityType: 'booking',
+		entityId: b.id,
+		action: 'forgiven',
+		summary: `Forgave a no-show — ${b.className}`
+	});
+	return { ok: true };
+}
+
+/** Staff qualified per class type — flat rows the dialog groups by type. */
+export async function listClassTypeQuals(orgId: string) {
+	return db
+		.select({ classTypeId: instructorQual.classTypeId, memberId: instructorQual.memberId })
+		.from(instructorQual)
+		.where(eq(instructorQual.organizationId, orgId));
+}
+
+export async function setClassTypeQuals(ctx: OrgContext, classTypeId: string, memberIds: string[]) {
+	const [ct] = await db
+		.select({ id: classType.id })
+		.from(classType)
+		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, classTypeId)));
+	if (!ct) error(404, 'Class not found');
+	await db.transaction(async (tx) => {
+		await tx
+			.delete(instructorQual)
+			.where(
+				and(
+					eq(instructorQual.organizationId, ctx.orgId),
+					eq(instructorQual.classTypeId, classTypeId)
+				)
+			);
+		if (memberIds.length)
+			await tx.insert(instructorQual).values(
+				memberIds.map((mid) => ({
+					organizationId: ctx.orgId,
+					classTypeId,
+					memberId: mid
+				}))
+			);
+	});
+	return { ok: true };
+}
+
+/**
+ * Printable front-desk day sheet: every session on one local day (org tz) with
+ * its booked/attended/waitlisted roster in one grouped read.
+ */
+export async function daySheet(orgId: string, date: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const tz = st?.timezone ?? 'UTC';
+	const rows = await db
+		.select({
+			sessionId: classSession.id,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			endsAt: classSession.endsAt,
+			instructor: user.name,
+			location: location.name,
+			cancelled: classSession.cancelledAt,
+			note: classSession.note,
+			cover: classSession.coverRequestedAt,
+			memberName: gymMember.name,
+			status: booking.status,
+			guests: booking.guestCount
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.leftJoin(
+			booking,
+			and(
+				eq(booking.sessionId, classSession.id),
+				inArray(booking.status, ['booked', 'attended', 'waitlisted', 'no_show'])
+			)
+		)
+		.leftJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, zonedToUtc(`${date}T00:00`, tz)),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(date, 1)}T00:00`, tz))
+			)
+		)
+		.orderBy(asc(classSession.startsAt), asc(gymMember.name));
+
+	const sessions: {
+		id: string;
+		className: string;
+		startsAt: Date;
+		endsAt: Date;
+		instructor: string | null;
+		location: string | null;
+		cancelled: boolean;
+		note: string | null;
+		cover: boolean;
+		roster: { name: string; status: string; guests: number }[];
+	}[] = [];
+	const byId = new Map<string, (typeof sessions)[number]>();
+	for (const r of rows) {
+		let e = byId.get(r.sessionId);
+		if (!e) {
+			e = {
+				id: r.sessionId,
+				className: r.className,
+				startsAt: r.startsAt,
+				endsAt: r.endsAt,
+				instructor: r.instructor,
+				location: r.location,
+				cancelled: !!r.cancelled,
+				note: r.note,
+				cover: !!r.cover,
+				roster: []
+			};
+			byId.set(r.sessionId, e);
+			sessions.push(e);
+		}
+		if (r.memberName) e.roster.push({ name: r.memberName, status: r.status!, guests: r.guests ?? 0 });
+	}
+	return { tz, date, sessions };
+}
+
+/**
+ * Staff-side move: re-seat a booking into another session of the same class.
+ * The desk overrides member-facing rules (cutoffs, booking windows); capacity
+ * still applies — a full target puts them on its waitlist. The member gets the
+ * new booking confirmation, never a cancellation.
+ */
+export async function moveBooking(ctx: OrgContext, bookingId: string, newSessionId: string) {
+	const [b] = await db
+		.select({
+			status: booking.status,
+			sessionId: booking.sessionId,
+			classTypeId: classSession.classTypeId,
+			memberName: gymMember.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, bookingId)));
+	if (!b) error(404, 'Booking not found');
+	if (b.status !== 'booked' && b.status !== 'waitlisted')
+		error(409, 'That booking already ended');
+	if (b.sessionId === newSessionId) error(400, 'Already in that session');
+	const [target] = await db
+		.select({
+			id: classSession.id,
+			classTypeId: classSession.classTypeId,
+			capacity: classSession.capacity,
+			startsAt: classSession.startsAt,
+			cancelledAt: classSession.cancelledAt
+		})
+		.from(classSession)
+		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, newSessionId)));
+	if (!target) error(404, 'Session not found');
+	if (target.cancelledAt) error(409, 'That session is cancelled');
+	if (target.classTypeId !== b.classTypeId) error(400, 'Pick a session of the same class');
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.sessionId, newSessionId),
+				inArray(booking.status, ['booked', 'attended'])
+			)
+		);
+	const status = n < target.capacity ? 'booked' : 'waitlisted';
+	await db
+		.update(booking)
+		.set({ sessionId: newSessionId, status })
+		.where(eq(booking.id, bookingId));
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'booking',
+		entityId: bookingId,
+		action: 'moved',
+		summary: `${b.memberName} moved to another session`
+	});
+	if (status === 'booked') notifyBookingConfirmed(ctx.orgId, bookingId).catch(() => {});
+	return { status };
 }

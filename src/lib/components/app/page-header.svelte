@@ -15,7 +15,7 @@
 <svelte:head><title>{title} · Freeweight</title></svelte:head>
 
 <header
-	class="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur"
+	class="sticky top-0 z-10 flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b bg-background/80 px-4 py-1.5 backdrop-blur"
 >
 	<Sidebar.Trigger class="-ml-1" />
 	<Separator orientation="vertical" class="mr-1 data-[orientation=vertical]:h-4" />
@@ -32,5 +32,9 @@
 			>
 		</Breadcrumb.List>
 	</Breadcrumb.Root>
-	{#if actions}<div class="ml-auto flex items-center gap-2">{@render actions()}</div>{/if}
+	{#if actions}
+		<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+			{@render actions()}
+		</div>
+	{/if}
 </header>

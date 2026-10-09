@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "open_hours" jsonb DEFAULT '{}'::jsonb NOT NULL;

@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/schedule.ts';
+import * as pt from '#lib/server/services/pt.ts';
 import * as res from '#lib/server/services/resources.ts';
 import * as evt from '#lib/server/services/gym-events.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
@@ -14,6 +15,7 @@ import {
 	classTypeUpdate,
 	classVideoInput,
 	closureInput,
+	emailEventRosterInput,
 	emailRosterInput,
 	equipmentInput,
 	equipmentUpdate,
@@ -29,7 +31,8 @@ import {
 	templateInput,
 	templateUpdate,
 	timeOffInput,
-	availabilityInput
+	availabilityInput,
+	ptApproveInput
 } from '#lib/schemas.ts';
 import { sendAnnouncement } from '#lib/server/services/notifications.ts';
 import { addDays, zonedToUtc } from '#lib/tz.ts';
@@ -86,11 +89,41 @@ export const getSessions = query(
 		return svc.listSessions(orgId, from, to);
 	}
 );
+/** Everything on one local day for the printable day sheet. */
+export const getDaySheet = query(v.string(), async (date) =>
+	svc.daySheet((await requireOrg()).orgId, date)
+);
+
 export const getSession = query(idSchema, async (id) =>
 	svc.getSession((await requireOrg()).orgId, id)
 );
 export const getRoster = query(idSchema, async (id) =>
 	svc.getRoster((await requireOrg()).orgId, id)
+);
+
+/** Staff re-seats a booking into another session of the same class. */
+export const moveBooking = command(
+	v.object({ bookingId: idSchema, sessionId: idSchema }),
+	async ({ bookingId, sessionId }) => {
+		const r = await svc.moveBooking(await requireOrg(), bookingId, sessionId);
+		void getSessions().refresh();
+		void getRoster(sessionId).refresh();
+		return r;
+	}
+);
+
+export const setBookingNote = command(
+	v.object({
+		bookingId: idSchema,
+		sessionId: idSchema,
+		note: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await svc.setBookingNote(ctx, input.bookingId, input.note);
+		void getRoster(input.sessionId).refresh();
+		return r;
+	}
 );
 /** Email everyone booked or waitlisted on a session — "AC is out tonight" notes. */
 export const emailSessionRoster = command(
@@ -101,6 +134,17 @@ export const emailSessionRoster = command(
 		const ids = roster
 			.filter((r) => r.booking.status === 'booked' || r.booking.status === 'waitlisted')
 			.map((r) => r.booking.memberId);
+		if (!ids.length) return { sent: 0, total: 0 };
+		return sendAnnouncement(orgId, subject, message, ids);
+	}
+);
+/** Email everyone registered or waitlisted for an event — "venue moved" notes. */
+export const emailEventRoster = command(
+	emailEventRosterInput,
+	async ({ eventId, subject, message }) => {
+		const { orgId } = await requireOrg();
+		const { rows } = await evt.eventRoster(orgId, eventId);
+		const ids = rows.map((r) => r.registration.memberId);
 		if (!ids.length) return { sent: 0, total: 0 };
 		return sendAnnouncement(orgId, subject, message, ids);
 	}
@@ -283,6 +327,32 @@ export const claimCover = command(idSchema, async (sessionId) => {
 	return r;
 });
 
+// ---------- PT (1:1) requests ----------
+
+/** Pending PT requests across the org — for the My classes card. */
+export const getPtRequests = query(async () => pt.myPtRequests(await requireOrg()));
+export const approvePtRequest = command(ptApproveInput, async (input) => {
+	const r = await pt.approvePtRequest(await requireOrg(), input.id, input.classTypeId, await tz(), {
+		startsAt: input.startsAt
+	});
+	void getPtRequests().refresh();
+	void getSessions().refresh();
+	return r;
+});
+export const declinePtRequest = command(idSchema, async (id) => {
+	const r = await pt.declinePtRequest(await requireOrg(), id);
+	void getPtRequests().refresh();
+	return r;
+});
+
+/** Desk undo for a no-show — frees the credit and voids the fee charge. */
+export const forgiveNoShow = command(idSchema, async (id) => {
+	const ctx = await requireOrg();
+	const r = await svc.forgiveNoShow(ctx, id, ctx.userId);
+	void getRoster('').refresh();
+	return r;
+});
+
 // ---------- Bookable resources (sauna, court, child care) ----------
 
 export const getResources = query(async () => res.listResources((await requireOrg()).orgId));
@@ -430,3 +500,16 @@ export const deleteClassVideo = command(idSchema, async (id) => {
 	void getClassVideos().refresh();
 	return r;
 });
+
+export const getClassTypeQuals = query(async () =>
+	svc.listClassTypeQuals((await requireOrg()).orgId)
+);
+
+export const setClassTypeQuals = command(
+	v.object({ classTypeId: idSchema, memberIds: v.array(idSchema) }),
+	async (input) => {
+		const r = await svc.setClassTypeQuals(await requireOrg(), input.classTypeId, input.memberIds);
+		void getClassTypeQuals().refresh();
+		return r;
+	}
+);

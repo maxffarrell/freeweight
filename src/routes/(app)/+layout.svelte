@@ -4,16 +4,11 @@
 	import AppSidebar from '#lib/components/app/app-sidebar.svelte';
 	import CommandPalette from '#lib/components/app/command-palette.svelte';
 	import OnboardingTour from '#lib/components/app/onboarding-tour.svelte';
-	import { getTourSeen } from '#lib/remote/workspace.remote.ts';
 	import { tour } from '#lib/tour.svelte.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
 	let searchOpen = $state(false);
-
-	const tourSeen = await getTourSeen();
-	// svelte-ignore state_referenced_locally
-	tour.open = !tourSeen;
 </script>
 
 <Sidebar.Provider>

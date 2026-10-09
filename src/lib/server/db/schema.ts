@@ -65,6 +65,8 @@ export const gymSettings = pgTable('gym_settings', {
 	waiver: text('waiver').notNull().default(''),
 	/** Persistent notice shown at the top of every member's portal; empty = hidden. */
 	portalNotice: text('portal_notice').notNull().default(''),
+	/** Weekly opening hours, {weekday(0=Sun): 'HH:MM-HH:MM'}; ''/missing = closed. Shown on the public timetable. */
+	openHours: jsonb('open_hours').$type<Record<string, string>>().notNull().default({}),
 	/** Daily morning briefing email to owner/admin staff; off skips the cron send. */
 	staffBriefing: boolean('staff_briefing').notNull().default(true),
 	/** Owner dismissed the launch checklist on the dashboard. */
@@ -101,6 +103,12 @@ export const gymSettings = pgTable('gym_settings', {
 	reviewUrl: text('review_url'),
 	/** Lifetime visits that triggers the once-per-member review-request email; null = off. */
 	reviewAfterVisits: integer('review_after_visits'),
+	/** Comp classes granted when a member hits a check-in milestone; null/0 = off. */
+	rewardCredits: integer('reward_credits'),
+	/** Comp classes granted at week-streak milestones (4/8/13/26/52); null = off. */
+	streakRewardCredits: integer('streak_reward_credits'),
+	/** Late cancels forgiven per member per calendar month before the fee applies. Null/0 = no freebies. */
+	lateCancelFreebies: integer('late_cancel_freebies'),
 	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
 	revenueTarget: integer('revenue_target'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -159,6 +167,8 @@ export const gymMember = pgTable(
 		unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
 		/** Member's own monthly visit target, set in the portal; drives the progress bar. */
 		goalVisitsPerMonth: integer('goal_visits_per_month'),
+		/** Progression rank (belt/level) the member currently holds — see member_level. */
+		skillLevelId: text('skill_level_id'),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		birthday: date('birthday', { mode: 'string' }),
 		...timestamps
@@ -296,6 +306,8 @@ export const membership = pgTable(
 		saveOfferAt: timestamp('save_offer_at', { withTimezone: true }),
 		/** Pack memberships: buy the same pack again when it runs out or expires. */
 		autoRenew: boolean('auto_renew').notNull().default(false),
+		/** Comp'd membership — the billing cron never posts a charge for it. */
+		noBill: boolean('no_bill').notNull().default(false),
 		...timestamps
 	},
 	(t) => [
@@ -331,6 +343,8 @@ export const classType = pgTable(
 		bookCutoffMin: integer('book_cutoff_min'),
 		/** false = staff-only: members can't self-book in the portal (desk bookings still work). */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
@@ -476,6 +490,10 @@ export const booking = pgTable(
 		/** Drop-in charge this booking created — voided when the booking/session is cancelled. */
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+		/** Staff note on this booking ("first visit", "spot near fan") — roster + sign-in sheet. */
+		note: text('note'),
+		/** Cancelled booking this one replaces (member makeup for a gym-cancelled class). */
+		compBookingId: text('comp_booking_id'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
@@ -483,7 +501,10 @@ export const booking = pgTable(
 		index('booking_member_idx').on(t.memberId),
 		uniqueIndex('booking_open_idx')
 			.on(t.sessionId, t.memberId)
-			.where(sql`${t.status} != 'cancelled'`)
+			.where(sql`${t.status} != 'cancelled'`),
+		uniqueIndex('booking_comp_idx')
+			.on(t.compBookingId)
+			.where(sql`${t.compBookingId} is not null and ${t.status} != 'cancelled'`)
 	]
 );
 
@@ -656,6 +677,8 @@ export const facilityResource = pgTable(
 		status: text('status').notNull().default('open'),
 		/** Short "why" shown to members when status isn't open ("leak — back Friday"). */
 		statusNote: text('status_note').notNull().default(''),
+		/** Minutes blocked after each booking for cleaning/reset. */
+		bufferMin: integer('buffer_min').notNull().default(0),
 		...timestamps
 	},
 	(t) => [index('facility_resource_org_idx').on(t.organizationId)]
@@ -779,6 +802,29 @@ export const resourceBooking = pgTable(
 	]
 );
 
+/** Member holds a weekly amenity slot — cron materializes bookings ~2 weeks out. */
+export const resourceRecurring = pgTable(
+	'resource_recurring',
+	{
+		id: id(),
+		organizationId: orgId(),
+		resourceId: text('resource_id')
+			.notNull()
+			.references(() => facilityResource.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** 0=Sun..6=Sat in the org's timezone. */
+		weekday: integer('weekday').notNull(),
+		/** Slot start, `HH:MM` org-local. */
+		startTime: text('start_time').notNull(),
+		runsUntil: date('runs_until', { mode: 'string' }),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('resource_recurring_org_idx').on(t.organizationId)]
+);
+
 /** A one-off paid/free event — seminar, comp, bring-a-friend day. */
 export const gymEvent = pgTable(
 	'gym_event',
@@ -795,6 +841,8 @@ export const gymEvent = pgTable(
 		price: integer('price'),
 		/** Members can self-register in the portal. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		active: boolean('active').notNull().default(true),
 		...timestamps
@@ -854,6 +902,8 @@ export const course = pgTable(
 		capacity: integer('capacity'),
 		/** false = staff enroll members; members can't self-register. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		/** Split the course price across this many monthly charges (1 = pay up front). */
 		installments: integer('installments').notNull().default(1),
 		...timestamps
@@ -931,6 +981,9 @@ export const charge = pgTable(
 		dueDate: date('due_date', { mode: 'string' }).notNull(),
 		amount: integer('amount').notNull(),
 		status: chargeStatus('status').notNull().default('open'),
+		/** Cost-of-goods snapshot (cents) for retail sales — feeds the P&L; null for
+		 * non-merch charges. */
+		cogsCents: integer('cogs_cents'),
 		...timestamps
 	},
 	(t) => [
@@ -1058,10 +1111,35 @@ export const shopItem = pgTable(
 		stock: integer('stock'),
 		/** Alert staff when stock falls to or below this; null = never alert. */
 		lowStockAt: integer('low_stock_at'),
+		/** Unit cost (cents) — feeds shop COGS/margin on the P&L; null = untracked. */
+		cost: integer('cost'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
 	(t) => [index('shop_item_org_idx').on(t.organizationId)]
+);
+
+/** One retail sale — links the charge to item+member and tracks desk pickup. */
+export const shopSale = pgTable(
+	'shop_sale',
+	{
+		id: id(),
+		organizationId: orgId(),
+		itemId: text('item_id')
+			.notNull()
+			.references(() => shopItem.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
+		qty: integer('qty').notNull().default(1),
+		pickedUpAt: timestamp('picked_up_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [
+		index('shop_sale_org_idx').on(t.organizationId),
+		index('shop_sale_member_idx').on(t.memberId)
+	]
 );
 
 /** A workspace's settings for one online payment provider (`stripe`, …). */
@@ -1115,6 +1193,7 @@ export const notificationLog = pgTable(
 		kind: text('kind').notNull(),
 		entityId: text('entity_id').notNull(),
 		recipient: text('recipient').notNull(),
+		openedAt: timestamp('opened_at', { withTimezone: true }),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [uniqueIndex('notification_log_once_idx').on(t.kind, t.entityId, t.recipient)]
@@ -1289,4 +1368,246 @@ export const expense = pgTable(
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [index('expense_org_date_idx').on(t.organizationId, t.expenseOn)]
+);
+
+/** A workout routine a coach assigns to a member — shown in the member's portal. */
+export const memberWorkout = pgTable(
+	'member_workout',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		/** The routine as the coach wrote it — freeform text. */
+		body: text('body').notNull(),
+		/** Staff user who wrote it. */
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [
+		index('member_workout_member_idx').on(t.memberId),
+		index('member_workout_org_idx').on(t.organizationId)
+	]
+);
+
+/** A member's request for a 1:1 training slot — staff approve into a session + booking. */
+export const ptRequest = pgTable(
+	'pt_request',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Preferred coach; null = any. */
+		instructorId: text('instructor_id').references(() => member.id, { onDelete: 'set null' }),
+		preferredAt: timestamp('preferred_at', { withTimezone: true }).notNull(),
+		note: text('note').notNull().default(''),
+		/** 'pending' | 'approved' | 'declined' */
+		status: text('status').notNull().default('pending'),
+		/** Session created on approval. */
+		sessionId: text('session_id').references(() => classSession.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('pt_request_org_idx').on(t.organizationId, t.status)]
+);
+
+/** A gym locker optionally assigned to a member. */
+export const locker = pgTable(
+	'locker',
+	{
+		id: id(),
+		organizationId: orgId(),
+		label: text('label').notNull(),
+		memberId: text('member_id').references(() => gymMember.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [uniqueIndex('locker_org_label_idx').on(t.organizationId, t.label)]
+);
+
+/** A weekly bulk email that the cron resends to an audience on a set weekday+time. */
+export const recurringAnnouncement = pgTable(
+	'recurring_announcement',
+	{
+		id: id(),
+		organizationId: orgId(),
+		subject: text('subject').notNull(),
+		message: text('message').notNull(),
+		/** Member tag to target; null = all active members. */
+		tag: text('tag'),
+		planId: text('plan_id').references(() => plan.id, { onDelete: 'set null' }),
+		/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+		weekday: integer('weekday').notNull(),
+		/** Org-local `HH:MM` 24h send time. */
+		time: text('time').notNull(),
+		active: boolean('active').notNull().default(true),
+		lastSentOn: date('last_sent_on', { mode: 'string' }),
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [index('recurring_announcement_org_idx').on(t.organizationId)]
+);
+
+/** Configurable progression ranks — belts/levels staff define, ordered. */
+export const memberLevel = pgTable(
+	'member_level',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		sortOrder: integer('sort_order').notNull().default(0),
+		color: text('color'),
+		...timestamps
+	},
+	(t) => [index('member_level_org_idx').on(t.organizationId)]
+);
+
+/** Saved bulk-email drafts reusable from the Email dialog. */
+export const announcementTemplate = pgTable(
+	'announcement_template',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		subject: text('subject').notNull(),
+		message: text('message').notNull(),
+		tag: text('tag'),
+		createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('announcement_template_org_idx').on(t.organizationId)]
+);
+
+/** Which staff may teach which class type — empty per class = anyone. */
+export const instructorQual = pgTable(
+	'instructor_qual',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		...timestamps
+	},
+	(t) => [index('instructor_qual_org_idx').on(t.organizationId)]
+);
+
+/** One-tap member satisfaction scores gathered in the portal. */
+export const memberNps = pgTable(
+	'member_nps',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		score: integer('score').notNull(),
+		comment: text('comment'),
+		...timestamps
+	},
+	(t) => [index('member_nps_org_idx').on(t.organizationId)]
+);
+
+/** Loanable kit (ropes, bands, mats) — stock + per-member loans. */
+export const loanableItem = pgTable(
+	'loanable_item',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		quantity: integer('quantity').notNull().default(1),
+		...timestamps
+	},
+	(t) => [index('loanable_item_org_idx').on(t.organizationId)]
+);
+
+export const equipmentLoan = pgTable(
+	'equipment_loan',
+	{
+		id: id(),
+		organizationId: orgId(),
+		itemId: text('item_id')
+			.notNull()
+			.references(() => loanableItem.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		outAt: timestamp('out_at', { withTimezone: true }).notNull().defaultNow(),
+		returnedAt: timestamp('returned_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [index('equipment_loan_org_idx').on(t.organizationId)]
+);
+
+/** A reusable workout program template — name + a library of numbered days. */
+export const workoutProgram = pgTable(
+	'workout_program',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		weeks: integer('weeks').notNull().default(1),
+		note: text('note'),
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [index('workout_program_org_idx').on(t.organizationId)]
+);
+
+/** One day inside a program — dayNo counts across the whole program (1..weeks*days). */
+export const programDay = pgTable(
+	'program_day',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		programId: text('program_id')
+			.notNull()
+			.references(() => workoutProgram.id, { onDelete: 'cascade' }),
+		dayNo: integer('day_no').notNull(),
+		title: text('title').notNull(),
+		/** Freeform: exercises, sets/reps, notes. */
+		body: text('body').notNull(),
+		...timestamps
+	},
+	(t) => [index('program_day_program_idx').on(t.programId)]
+);
+
+/** A member assigned to a program — start date anchors "day N" on their portal. */
+export const memberProgram = pgTable(
+	'member_program',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		programId: text('program_id')
+			.notNull()
+			.references(() => workoutProgram.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		startDate: text('start_date').notNull(),
+		status: text('status').notNull().default('active'), // active | done | stopped
+		...timestamps
+	},
+	(t) => [index('member_program_member_idx').on(t.memberId)]
 );

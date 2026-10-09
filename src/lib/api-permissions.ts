@@ -25,6 +25,7 @@ export const API_RESOURCES = [
 	'shifts',
 	'session_feedback',
 	'shop_items',
+	'shop_sales',
 	'promo_codes',
 	'gift_cards',
 	'recurring_charges',
@@ -34,7 +35,8 @@ export const API_RESOURCES = [
 	'personal_records',
 	'incidents',
 	'sign_requests',
-	'class_videos'
+	'class_videos',
+	'webhooks'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -68,6 +70,7 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	shifts: 'Staff shifts',
 	session_feedback: 'Class ratings',
 	shop_items: 'Shop items',
+	shop_sales: 'Shop sales',
 	promo_codes: 'Promo codes',
 	gift_cards: 'Gift cards',
 	recurring_charges: 'Recurring add-ons',
@@ -77,7 +80,8 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	personal_records: 'Personal records',
 	incidents: 'Incident reports',
 	sign_requests: 'Signature requests',
-	class_videos: 'Movement videos'
+	class_videos: 'Movement videos',
+	webhooks: 'Webhooks'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

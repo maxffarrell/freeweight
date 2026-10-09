@@ -11,7 +11,8 @@ import {
 	isNull,
 	lt,
 	lte,
-	sql
+	sql,
+	ne
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -26,6 +27,7 @@ import {
 	plan,
 	promoCode,
 	shopItem,
+	shopSale,
 	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -43,7 +45,7 @@ import {
 	notifyReferralReward
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
-import { addDays } from '#lib/tz.ts';
+import { addDays, localDate } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -479,6 +481,7 @@ export async function updateMembership(
 				? (current.requestReason ?? null)
 				: null;
 	}
+	if (input.noBill !== undefined) set.noBill = input.noBill;
 	if (input.status === 'cancelled' || input.clearCancelRequest) set.cancelRequestedAt = null;
 	if (input.clearPauseRequest) {
 		set.pauseRequestedAt = null;
@@ -610,7 +613,7 @@ export async function runBilling(orgId: string) {
 		let period = m.nextChargeAt.toISOString().slice(0, 10);
 		// Catch up on any missed periods (install was offline).
 		while (new Date(`${period}T00:00:00Z`) < now) {
-			if (p.amount > 0) await postMembershipCharge(orgId, m.id, period, p);
+			if (p.amount > 0 && !m.noBill) await postMembershipCharge(orgId, m.id, period, p);
 			posted++;
 			period = nextPeriod(period, p.interval);
 		}
@@ -727,7 +730,7 @@ async function resumeFrozenMemberships(orgId: string) {
 
 // ---------- Charges & payments ----------
 
-export async function listCharges(orgId: string, status?: string) {
+export async function listCharges(orgId: string, status?: string, kind?: string) {
 	return db
 		.select({
 			charge,
@@ -739,7 +742,11 @@ export async function listCharges(orgId: string, status?: string) {
 		.from(charge)
 		.innerJoin(gymMember, eq(charge.memberId, gymMember.id))
 		.where(
-			and(eq(charge.organizationId, orgId), status ? eq(charge.status, status as never) : undefined)
+			and(
+				eq(charge.organizationId, orgId),
+				status ? eq(charge.status, status as never) : undefined,
+				kind ? eq(charge.kind, kind as never) : undefined
+			)
 		)
 		.orderBy(desc(charge.dueDate));
 }
@@ -756,7 +763,8 @@ export async function addCharge(
 			kind: input.kind,
 			description: input.description ?? null,
 			amount: input.amount,
-			dueDate: input.dueDate
+			dueDate: input.dueDate,
+			cogsCents: input.cogsCents ?? null
 		})
 		.returning();
 	await emit({
@@ -827,7 +835,8 @@ export async function createShopItem(
 			name: input.name,
 			price: input.price,
 			stock: input.stock ?? null,
-			lowStockAt: input.lowStockAt ?? null
+			lowStockAt: input.lowStockAt ?? null,
+			cost: input.cost ?? null
 		})
 		.returning();
 	return row;
@@ -877,6 +886,7 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 		kind: 'other',
 		description: `${item.name}${input.qty > 1 ? ` ×${input.qty}` : ''}`,
 		amount,
+		cogsCents: item.cost !== null ? item.cost * input.qty : null,
 		dueDate: todayISO()
 	});
 	if (input.payNow)
@@ -888,6 +898,13 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 			reference: null,
 			notes: `Shop sale: ${item.name}`
 		});
+	await db.insert(shopSale).values({
+		organizationId: ctx.orgId,
+		itemId: item.id,
+		memberId: input.memberId,
+		chargeId: c!.id,
+		qty: input.qty
+	});
 	if (item.stock !== null) {
 		await db
 			.update(shopItem)
@@ -1249,4 +1266,115 @@ export async function removeExpense(ctx: OrgContext, id: string) {
 		summary: `Expense removed: ${row.label}`
 	});
 	return row;
+}
+
+/** Sales waiting on the member to collect the goods at the desk. */
+/**
+ * Desk day-pass sale — posts the same "Day pass — <today>" dropin charge the
+ * join page sells online, minus the checkout (staff collect at the desk).
+ */
+export async function sellDayPass(ctx: OrgContext, memberId: string) {
+	const [st] = await db
+		.select({ dayPassPrice: gymSettings.dayPassPrice, timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	if (!st?.dayPassPrice) error(409, 'Set a day pass price in Settings first');
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const today = localDate(new Date(), st.timezone);
+	const [dup] = await db
+		.select({ id: charge.id })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, ctx.orgId),
+				eq(charge.memberId, memberId),
+				eq(charge.kind, 'dropin'),
+				eq(charge.dueDate, today),
+				ne(charge.status, 'void')
+			)
+		)
+		.limit(1);
+	if (dup) error(409, 'Already has a pass for today');
+	const [c] = await db
+		.insert(charge)
+		.values({
+			organizationId: ctx.orgId,
+			memberId,
+			kind: 'dropin',
+			description: `Day pass — ${today}`,
+			dueDate: today,
+			amount: st.dayPassPrice
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'charge',
+		entityId: c.id,
+		action: 'day_pass',
+		summary: `Day pass sold to ${m.name}`
+	});
+	return { charge: c };
+}
+
+export async function pendingPickups(orgId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			createdAt: shopSale.createdAt,
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: shopItem.name
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(and(eq(shopSale.organizationId, orgId), isNull(shopSale.pickedUpAt)))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(25);
+}
+
+export async function markPickedUp(ctx: OrgContext, saleId: string) {
+	const [row] = await db
+		.update(shopSale)
+		.set({ pickedUpAt: new Date() })
+		.where(and(eq(shopSale.organizationId, ctx.orgId), eq(shopSale.id, saleId)))
+		.returning();
+	if (!row) error(404, 'Sale not found');
+	void emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'shop_sale',
+		entityId: row.id,
+		action: 'picked_up',
+		summary: 'Marked a shop purchase as picked up'
+	}).catch(() => {});
+	return row;
+}
+
+/** All retail sales, newest first — REST `shop_sales` list. */
+export async function listShopSales(orgId: string) {
+	return db
+		.select({
+			id: shopSale.id,
+			qty: shopSale.qty,
+			pickedUpAt: shopSale.pickedUpAt,
+			createdAt: shopSale.createdAt,
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemId: shopItem.id,
+			itemName: shopItem.name,
+			chargeId: shopSale.chargeId
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(eq(shopSale.organizationId, orgId))
+		.orderBy(desc(shopSale.createdAt))
+		.limit(200);
 }

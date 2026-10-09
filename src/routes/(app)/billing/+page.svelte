@@ -12,6 +12,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -22,6 +23,7 @@
 		getMemberships,
 		updateMembership,
 		getPayments,
+		resendReceipt,
 		recordPayment,
 		refundPayment,
 		requestAllPayments,
@@ -30,6 +32,8 @@
 		createShopItem,
 		updateShopItem,
 		sellItem,
+		getPendingPickups,
+		markPickedUp,
 		getGiftCards,
 		sellGiftCard,
 		getRecurring,
@@ -96,6 +100,7 @@
 	}
 	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
+	let kindFilter = $state('');
 
 	const aging = $derived.by(() => {
 		const today = todayISO();
@@ -119,11 +124,17 @@
 	});
 
 	async function filterCharges() {
-		charges = await getCharges({ status: chargeFilter || undefined });
+		charges = await getCharges({
+			status: chargeFilter || undefined,
+			kind: kindFilter || undefined
+		});
 	}
 
 	async function refreshCharges() {
-		charges = await getCharges({ status: chargeFilter || undefined });
+		charges = await getCharges({
+			status: chargeFilter || undefined,
+			kind: kindFilter || undefined
+		});
 		openCharges = await getCharges({ status: 'open' });
 	}
 
@@ -358,10 +369,21 @@
 
 	// ------- shop -------
 	let shopItems = $state(await getShopItems());
+	let pickups = $state(await getPendingPickups());
+	async function pickup(id: string) {
+		try {
+			await markPickedUp(id);
+			toast.success('Marked as picked up');
+			pickups = await getPendingPickups();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not update'));
+		}
+	}
 	let itemName = $state('');
 	let itemPrice = $state<number | null>(null);
 	let itemStock = $state<number | null>(null);
 	let itemLowStock = $state<number | null>(null);
+	let itemCost = $state<number | null>(null);
 	async function addItem(e: SubmitEvent) {
 		e.preventDefault();
 		if (itemPrice == null) return;
@@ -371,24 +393,27 @@
 				name: itemName,
 				price: itemPrice,
 				stock: itemStock,
-				lowStockAt: itemLowStock
+				lowStockAt: itemLowStock,
+				cost: itemCost
 			});
 			itemName = '';
 			itemPrice = null;
 			itemStock = null;
 			itemLowStock = null;
+			itemCost = null;
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add item'));
 		}
 		pending = false;
 	}
-	/** Prompts for a new count and alert level; blank stock = untracked. */
+	/** Prompts for a new count, alert level and unit cost; blank = untracked. */
 	async function setStock(item: {
 		id: string;
 		name: string;
 		stock: number | null;
 		lowStockAt: number | null;
+		cost: number | null;
 	}) {
 		const raw = prompt(
 			`${item.name} — units on hand (blank = unlimited)`,
@@ -404,8 +429,15 @@
 		if (rawLow === null) return;
 		const low = rawLow.trim() === '' ? null : Math.max(0, Math.floor(Number(rawLow)));
 		if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
+		const rawCost = prompt(
+			`${item.name} — unit cost in cents (blank = untracked)`,
+			String(item.cost ?? '')
+		);
+		if (rawCost === null) return;
+		const cost = rawCost.trim() === '' ? null : Math.max(0, Math.floor(Number(rawCost)));
+		if (cost !== null && !Number.isFinite(cost)) return toast.error('Not a number');
 		try {
-			await updateShopItem({ id: item.id, stock: n, lowStockAt: low });
+			await updateShopItem({ id: item.id, stock: n, lowStockAt: low, cost });
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update stock'));
@@ -444,6 +476,7 @@
 			sellQty = 1;
 			await refreshCharges();
 			payments = await getPayments();
+			pickups = await getPendingPickups();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not record sale'));
 		}
@@ -516,16 +549,18 @@
 				</Card.Root>
 			{/if}
 			<div class="mb-3 flex items-center gap-2">
-				<select
-					bind:value={chargeFilter}
-					onchange={filterCharges}
-					class="h-8 rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect bind:value={chargeFilter} onchange={filterCharges}>
 					<option value="">All</option>
 					<option value="open">Open</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
-				</select>
+				</NativeSelect>
+				<NativeSelect bind:value={kindFilter} onchange={filterCharges}>
+					<option value="">All kinds</option>
+					{#each chargeKinds as k (k)}
+						<option value={k} class="capitalize">{k}</option>
+					{/each}
+				</NativeSelect>
 				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>
 			<Card.Root class="py-0">
@@ -694,6 +729,19 @@
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
+												onclick={async () => {
+													try {
+														await resendReceipt(p.payment.id);
+														toast.success('Receipt sent');
+													} catch (err) {
+														toast.error(errMsg(err, 'Could not resend'));
+													}
+												}}>Receipt</Button
+											>
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
 												onclick={() => refund(p.payment.id, p.payment.amount)}>Refund</Button
 											>
 										{/if}
@@ -730,7 +778,13 @@
 									<Table.Row class={i.active ? '' : 'opacity-50'}>
 										<Table.Cell class="font-medium">{i.name}</Table.Cell>
 										<Table.Cell class="text-right tabular-nums"
-											>{formatMoney(i.price, currency)}</Table.Cell
+											>{formatMoney(i.price, currency)}{#if i.cost !== null}<div
+													class="text-xs {i.cost >= i.price
+														? 'text-destructive'
+														: 'text-muted-foreground'}"
+												>
+													margin {formatMoney(i.price - i.cost, currency)}
+												</div>{/if}</Table.Cell
 										>
 										<Table.Cell class="text-right tabular-nums">
 											{#if i.stock === null}—{:else}<span
@@ -813,6 +867,11 @@
 								/>
 							</Field.Field>
 							<Field.Field>
+								<Field.Label>Unit cost — optional</Field.Label>
+								<MoneyInput bind:value={itemCost} />
+								<Field.Description>Feeds COGS and margin on the P&amp;L report.</Field.Description>
+							</Field.Field>
+							<Field.Field>
 								<Field.Label for="i-low">Low-stock alert — optional</Field.Label>
 								<Input
 									id="i-low"
@@ -829,6 +888,38 @@
 					</Card.Content>
 				</Card.Root>
 			</div>
+
+			{#if pickups.length}
+				<Card.Root class="mt-4">
+					<Card.Header>
+						<Card.Title class="text-base">Awaiting pickup</Card.Title>
+						<Card.Description>Members who bought items — mark when they collect</Card.Description>
+					</Card.Header>
+					<Card.Content class="px-0">
+						<Table.Root>
+							<Table.Body>
+								{#each pickups as p (p.id)}
+									<Table.Row>
+										<Table.Cell class="font-medium">{p.memberName}</Table.Cell>
+										<Table.Cell>{p.itemName}{p.qty > 1 ? ` ×${p.qty}` : ''}</Table.Cell>
+										<Table.Cell class="text-muted-foreground"
+											>{formatDate(p.createdAt)}</Table.Cell
+										>
+										<Table.Cell class="text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={() => pickup(p.id)}>Picked up</Button
+											>
+										</Table.Cell>
+									</Table.Row>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 
 			<Card.Root class="mt-4">
 				<Card.Header class="flex flex-row items-center justify-between space-y-0">
@@ -981,7 +1072,7 @@
 								<Field.Label for="rc-desc">Item</Field.Label>
 								<Input id="rc-desc" required bind:value={rcDesc} placeholder="Towel service" />
 							</Field.Field>
-							<div class="grid grid-cols-3 gap-3">
+							<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Field.Field>
 									<Field.Label>Amount</Field.Label>
 									<MoneyInput bind:value={rcAmount} />
@@ -1070,7 +1161,7 @@
 								<Field.Label for="exp-label">Item</Field.Label>
 								<Input id="exp-label" required bind:value={expLabel} placeholder="Monthly rent" />
 							</Field.Field>
-							<div class="grid grid-cols-3 gap-3">
+							<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Field.Field>
 									<Field.Label>Category</Field.Label>
 									<Select.Root type="single" bind:value={expCategory}>

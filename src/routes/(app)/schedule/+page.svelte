@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
@@ -9,9 +10,11 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getSessions,
@@ -21,7 +24,10 @@
 		createSession,
 		updateSession,
 		getRoster,
+		setBookingNote,
+		moveBooking,
 		bookSession,
+		forgiveNoShow,
 		updateBooking,
 		getInstructors,
 		getTemplates,
@@ -29,6 +35,7 @@
 		updateTemplate,
 		deleteTemplate,
 		emailSessionRoster,
+		emailEventRoster,
 		copyWeek,
 		getInstructorUpcoming,
 		handoffInstructor,
@@ -60,10 +67,13 @@
 		removeEquipment,
 		getClassVideos,
 		addClassVideo,
-		deleteClassVideo
+		deleteClassVideo,
+		getClassTypeQuals,
+		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
-	import { getMembers } from '#lib/remote/members.remote.ts';
+	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
@@ -77,6 +87,7 @@
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import Flame from '@lucide/svelte/icons/flame';
 	import Wrench from '@lucide/svelte/icons/wrench';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -127,6 +138,42 @@
 		})
 	);
 
+	// ------- bulk cancel -------
+	let bulkOpen = $state(false);
+	let bulkChecked = new SvelteSet<string>();
+	let bulkPending = $state(false);
+	const bulkSessions = $derived(sessions.filter((s) => !s.session.cancelledAt));
+	function toggleBulk(id: string) {
+		if (bulkChecked.has(id)) bulkChecked.delete(id);
+		else bulkChecked.add(id);
+	}
+	async function runBulkCancel() {
+		if (!bulkChecked.size) return;
+		if (
+			!confirm(
+				`Cancel ${bulkChecked.size} session${bulkChecked.size === 1 ? '' : 's'}? Booked members get the usual cancellation emails and credits back.`
+			)
+		)
+			return;
+		bulkPending = true;
+		let done = 0;
+		for (const id of bulkChecked) {
+			try {
+				await updateSession({ id, cancelled: true });
+				done++;
+			} catch {
+				// keep going — one failing session shouldn't block the rest
+			}
+		}
+		toast.success(
+			`Cancelled ${done} session${done === 1 ? '' : 's'}${done < bulkChecked.size ? ` — ${bulkChecked.size - done} failed` : ''}`
+		);
+		bulkPending = false;
+		bulkChecked.clear();
+		bulkOpen = false;
+		await reload();
+	}
+
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
@@ -136,6 +183,18 @@
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
 	);
 	const printWaitlist = $derived(roster.filter((r) => r.booking.status === 'waitlisted'));
+	let moveFor = $state<string | null>(null);
+	const moveTargets = $derived(
+		moveFor && focus
+			? sessions.filter(
+					(s) =>
+						s.session.classTypeId === focus.session.classTypeId &&
+						s.session.id !== focus.session.id &&
+						!s.session.cancelledAt &&
+						new Date(s.session.startsAt).getTime() > Date.now()
+				)
+			: []
+	);
 	const waitlistPos = $derived(
 		new Map(
 			roster
@@ -167,7 +226,7 @@
 		if (!bookMemberId) return;
 		try {
 			const m = memberList.find((mm) => mm.id === bookMemberId);
-			const dropIn = m ? !m.planName : false;
+			const dropIn = m ? !m.planName && !m.guardianPlanName : false;
 			const b = await bookSession({
 				sessionId: focusId,
 				memberId: bookMemberId,
@@ -187,6 +246,21 @@
 			await reload();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
+		}
+	}
+	async function doMove(sessionId: string) {
+		const bid = moveFor;
+		moveFor = null;
+		if (!bid) return;
+		try {
+			const r = await moveBooking({ bookingId: bid, sessionId });
+			toast.success(
+				r.status === 'booked' ? 'Moved' : 'Moved to the waitlist — that session is full'
+			);
+			await getRoster(focusId).refresh();
+			await reload();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not move'));
 		}
 	}
 	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show' | 'booked') {
@@ -254,21 +328,26 @@
 	let msgOpen = $state(false);
 	let msgSubject = $state('');
 	let msgBody = $state('');
+	/** Non-empty when the mail dialog targets an event roster instead of the focused session. */
+	let msgEventId = $state('');
 	async function submitMsg(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
 		try {
-			const r = await emailSessionRoster({
-				sessionId: focusId,
-				subject: msgSubject,
-				message: msgBody
-			});
+			const r = msgEventId
+				? await emailEventRoster({ eventId: msgEventId, subject: msgSubject, message: msgBody })
+				: await emailSessionRoster({
+						sessionId: focusId,
+						subject: msgSubject,
+						message: msgBody
+					});
 			toast.success(
 				r.sent ? `Sent to ${r.sent} member${r.sent === 1 ? '' : 's'}` : 'Nobody to email'
 			);
 			msgOpen = false;
 			msgSubject = '';
 			msgBody = '';
+			msgEventId = '';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send'));
 		}
@@ -332,6 +411,13 @@
 	let sessNote = $state('');
 	let pending = $state(false);
 	const noConflicts: { id: string; startsAt: Date; endsAt: Date; className: string }[] = [];
+	/** Name of the picked instructor when the type has quals and they're not in the list. */
+	function unqualWarn(typeId: string | null | undefined, instructorId: string | null | undefined) {
+		if (!typeId || !instructorId) return null;
+		const quals = cQualsByType[typeId];
+		if (!quals?.length || quals.includes(instructorId)) return null;
+		return instructors.find((i) => i.id === instructorId)?.name ?? 'Instructor';
+	}
 	let sessConflicts = $derived(
 		await (sessInstructorId && sessStart && sessStartTime
 			? getInstructorConflicts({
@@ -702,6 +788,7 @@
 	let rName = $state('');
 	let rKind = $state('');
 	let rSlot = $state(30);
+	let rBuffer = $state(0);
 	let rCap = $state(1);
 	let rFrom = $state('06:00');
 	let rTo = $state('22:00');
@@ -718,6 +805,7 @@
 				capacity: rCap,
 				openFrom: rFrom,
 				openTo: rTo,
+				bufferMin: rBuffer,
 				locationId: rLoc || undefined
 			});
 			toast.success('Amenity added — members can book it in the portal');
@@ -786,6 +874,15 @@
 	let tDescription = $state('');
 	let tActive = $state(true);
 	let tMemberBookable = $state(true);
+	let tMinLevel = $state('');
+	let tQuals = new SvelteSet<string>();
+	const levels = $derived(await getLevels());
+	const classTypeQuals = $derived(await getClassTypeQuals());
+	const cQualsByType: Record<string, string[]> = $derived.by(() => {
+		const map: Record<string, string[]> = {};
+		for (const q of classTypeQuals) (map[q.classTypeId] ??= []).push(q.memberId);
+		return map;
+	});
 	function editType(c: (typeof classTypes)[number]) {
 		editTypeId = c.id;
 		tName = c.name;
@@ -800,6 +897,8 @@
 		tBookCutoff = c.bookCutoffMin;
 		tActive = c.active;
 		tMemberBookable = c.memberBookable;
+		tMinLevel = c.minLevelId ?? '';
+		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
 	// ------- movement video library -------
 	const classVideos = $derived(await getClassVideos());
@@ -862,10 +961,14 @@
 				bookCutoffMin: tBookCutoff,
 				description: tDescription || undefined,
 				memberBookable: tMemberBookable,
+				minLevelId: tMinLevel || null,
 				active: tActive
 			};
+			let savedTypeId = editTypeId;
 			if (editTypeId) await updateClassType({ id: editTypeId, ...body });
-			else await createClassType(body);
+			else savedTypeId = (await createClassType(body)).id;
+			if (savedTypeId)
+				await setClassTypeQuals({ classTypeId: savedTypeId, memberIds: [...tQuals] });
 			await getClassTypes().refresh();
 			toast.success(editTypeId ? 'Class updated' : 'Class type created');
 			resetTypeForm();
@@ -878,28 +981,42 @@
 
 <PageHeader title="Schedule">
 	{#snippet actions()}
-		<Button variant="outline" size="sm" onclick={() => (hoOpen = true)}
-			><ArrowRightLeft /> Handoff</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (tplOpen = true)}
-			><Repeat /> Recurring</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (typeOpen = true)}
-			><Plus /> Class type</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
-		<Button variant="outline" size="sm" onclick={() => (eqOpen = true)}><Wrench /> Equipment</Button
-		>
 		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}
 			><Flame /> Demand{#if hints.length}
 				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
 					>{hints.length}</span
 				>{/if}</Button
 		>
-		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
-		<Button variant="outline" size="sm" onclick={() => (coursesOpen = true)}>Courses</Button>
-		<Button variant="outline" size="sm" onclick={() => (slotsOpen = true)}>Slots</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" size="sm" {...props} aria-label="More actions">
+						<Ellipsis class="h-4 w-4" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-48">
+				<DropdownMenu.Item onclick={() => (tplOpen = true)}
+					><Repeat /> Recurring templates</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={() => (typeOpen = true)}><Plus /> Class type</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (hoOpen = true)}
+					><ArrowRightLeft /> Instructor handoff</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={() => (slotsOpen = true)}>Open slots</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={() => (resOpen = true)}>Amenities</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (eqOpen = true)}><Wrench /> Equipment</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (evOpen = true)}>Events</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (coursesOpen = true)}>Courses</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={() => (bulkOpen = true)}>Bulk cancel…</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => goto('/schedule/day-sheet')}
+					><Printer /> Day sheet</DropdownMenu.Item
+				>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </PageHeader>
 
@@ -946,21 +1063,21 @@
 			}}><Copy /> Copy week</Button
 		>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
-			<select bind:value={fType} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			<NativeSelect bind:value={fType}>
 				<option value="">All classes</option>
 				{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-			</select>
-			<select bind:value={fInstructor} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			</NativeSelect>
+			<NativeSelect bind:value={fInstructor}>
 				<option value="">All instructors</option>
 				{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-			</select>
+			</NativeSelect>
 			{#if locations.filter((l) => !l.archivedAt).length > 1}
-				<select bind:value={fLocation} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+				<NativeSelect bind:value={fLocation}>
 					<option value="">All locations</option>
 					{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 						<option value={l.id}>{l.name}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 			{/if}
 		</div>
 	</div>
@@ -1048,6 +1165,9 @@
 						<Table.Row>
 							<Table.Cell class="font-medium">
 								{r.memberName}
+								{#if r.firstTimer}
+									<Badge variant="secondary" class="ml-1">1st visit</Badge>
+								{/if}
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
 								{/if}
@@ -1056,6 +1176,23 @@
 										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span
 									>
 								{/if}
+								<input
+									class="ml-1 w-20 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground sm:w-28"
+									placeholder="+ note"
+									value={r.booking.note ?? ''}
+									onchange={async (e) => {
+										const v2 = (e.target as HTMLInputElement).value;
+										try {
+											await setBookingNote({
+												bookingId: r.booking.id,
+												sessionId: focus!.session.id,
+												note: v2 || null
+											});
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not save note'));
+										}
+									}}
+								/>
 							</Table.Cell>
 							<Table.Cell>
 								<StatusBadge status={r.booking.status} />
@@ -1080,12 +1217,37 @@
 										onclick={() => setBooking(r.booking.id, 'no_show')}>No-show</Button
 									>
 								{/if}
+								{#if r.booking.status === 'booked' || r.booking.status === 'waitlisted'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() => (moveFor = r.booking.id)}>Move</Button
+									>
+								{/if}
 								{#if r.booking.status === 'waitlisted'}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
 										onclick={() => setBooking(r.booking.id, 'booked')}>Promote</Button
+									>
+								{/if}
+								{#if r.booking.status === 'no_show'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={async () => {
+											try {
+												await forgiveNoShow(r.booking.id);
+												toast.success('No-show forgiven');
+												await getRoster(focusId).refresh();
+												await reload();
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not forgive'));
+											}
+										}}>Forgive</Button
 									>
 								{/if}
 								<Button
@@ -1104,8 +1266,14 @@
 				</Table.Body>
 			</Table.Root>
 			<div class="flex justify-end gap-1">
-				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => (msgOpen = true)}
-					><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-7 px-2 text-xs"
+					onclick={() => {
+						msgEventId = '';
+						msgOpen = true;
+					}}><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
 				>
 				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
 					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
@@ -1120,7 +1288,7 @@
 						{#each memberList.filter((mm) => mm.status === 'active') as mm (mm.id)}
 							<Select.Item value={mm.id}
 								>{mm.name}{#if !mm.planName}
-									(drop-in){/if}</Select.Item
+									({mm.guardianPlanName ? 'family' : 'drop-in'}){/if}</Select.Item
 							>
 						{/each}
 					</Select.Content>
@@ -1144,13 +1312,17 @@
 				<Button
 					onclick={book}
 					disabled={!bookMemberId ||
-						(!memberList.find((mm) => mm.id === bookMemberId)?.planName && !focus?.dropInPrice)}
-					>Book</Button
+						(!memberList.find((mm) => mm.id === bookMemberId)?.planName &&
+							!memberList.find((mm) => mm.id === bookMemberId)?.guardianPlanName &&
+							!focus?.dropInPrice)}>Book</Button
 				>
 			</div>
 			{#if bookMemberId && !memberList.find((mm) => mm.id === bookMemberId)?.planName}
+				{@const bk = memberList.find((mm) => mm.id === bookMemberId)}
 				<p class="text-xs text-amber-600 dark:text-amber-400">
-					{#if focus?.dropInPrice}
+					{#if bk?.guardianPlanName}
+						No own membership — books from the guardian's {bk.guardianPlanName}.
+					{:else if focus?.dropInPrice}
 						No active membership — booking posts a {formatMoney(focus.dropInPrice, currency)}
 						drop-in charge.
 					{:else}
@@ -1189,12 +1361,65 @@
 				>
 					{focus.session.cancelledAt ? 'Restore session' : 'Cancel session'}
 				</Button>
+				{#if !focus.session.cancelledAt}
+					<Button
+						variant="outline"
+						class="w-full"
+						title="Cancel this session and try booking its members into the next session of this class"
+						onclick={async () => {
+							if (
+								!confirm(
+									'Cancel this session and try booking its members into the next session of this class?'
+								)
+							)
+								return;
+							try {
+								await updateSession({ id: focusId, cancelled: true, rebookNext: true });
+								toast.success('Session cancelled — members moved to the next class if one exists');
+								await reload();
+								rosterOpen = false;
+							} catch (err) {
+								toast.error(errMsg(err, 'Failed'));
+							}
+						}}
+					>
+						Cancel + rebook members
+					</Button>
+				{/if}
 			{/if}
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
 
 {#if focus}
+	<Dialog.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
+		<Dialog.Content class="sm:max-w-sm">
+			<Dialog.Header>
+				<Dialog.Title>Move to another session</Dialog.Title>
+				<Dialog.Description
+					>Same class ({focus?.className}) — pick the new session in view.</Dialog.Description
+				>
+			</Dialog.Header>
+			<div class="max-h-64 divide-y overflow-auto">
+				{#each moveTargets as t (t.session.id)}
+					<button
+						class="flex w-full items-center justify-between gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted/60"
+						onclick={() => doMove(t.session.id)}
+					>
+						<span class="font-medium">{localTime(t.session.startsAt, tz)}</span>
+						<span class="text-xs text-muted-foreground"
+							>{localDate(t.session.startsAt, tz)} · {t.booked}/{t.session.capacity}</span
+						>
+					</button>
+				{:else}
+					<p class="py-3 text-sm text-muted-foreground">
+						No other upcoming sessions of this class in view — try another week.
+					</p>
+				{/each}
+			</div>
+		</Dialog.Content>
+	</Dialog.Root>
+
 	<div id="roster-print" class="hidden print:block">
 		<h1 class="text-2xl font-bold">{focus.className}</h1>
 		<p class="mt-1 text-sm">
@@ -1315,6 +1540,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if focus && unqualWarn(focus.session.classTypeId, editInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(focus.session.classTypeId, editInstructorId)} isn't marked qualified for
+						{classTypes.find((c) => c.id === focus.session.classTypeId)?.name ?? 'this class'}.
+					</p>
+				{/if}
 				{#if editConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{editConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
@@ -1419,6 +1650,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if unqualWarn(sessTypeId, sessInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(sessTypeId, sessInstructorId)} isn't marked qualified for
+						{classTypes.find((c) => c.id === sessTypeId)?.name ?? 'this class'}.
+					</p>
+				{/if}
 				{#if sessConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{sessConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
@@ -1511,7 +1748,7 @@
 					bind:value={tDescription}
 				/></Field.Field
 			>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="t-color">Color</Field.Label>
 					<Input id="t-color" type="color" bind:value={tColor} class="h-9 p-1" />
@@ -1604,6 +1841,39 @@
 				<span class="text-sm">Members can book online — off for front-desk-only classes</span>
 				<Switch bind:checked={tMemberBookable} />
 			</div>
+			{#if levels.length}
+				<Field.Field>
+					<Field.Label for="t-min-level">Required level</Field.Label>
+					<NativeSelect id="t-min-level" bind:value={tMinLevel}>
+						<option value="">Open to all levels</option>
+						{#each levels as l (l.id)}
+							<option value={l.id}>{l.name}</option>
+						{/each}
+					</NativeSelect>
+					<Field.Description>
+						Members must hold at least this progression level to book (portal or desk).
+					</Field.Description>
+				</Field.Field>
+			{/if}
+			{#if instructors.length}
+				<Field.Field>
+					<Field.Label>Qualified to teach (blank = anyone)</Field.Label>
+					<div class="flex flex-wrap gap-1.5">
+						{#each instructors as st (st.id)}
+							<button
+								type="button"
+								class="rounded-full border px-2.5 py-1 text-xs transition-colors {tQuals.has(st.id)
+									? 'border-primary bg-primary/10 font-medium'
+									: 'text-muted-foreground'}"
+								onclick={() => {
+									if (tQuals.has(st.id)) tQuals.delete(st.id);
+									else tQuals.add(st.id);
+								}}>{st.name}</button
+							>
+						{/each}
+					</div>
+				</Field.Field>
+			{/if}
 			{#if editTypeId}
 				<div class="flex items-center justify-between rounded-lg border px-3 py-2">
 					<span class="text-sm">Active — shows in booking picks</span>
@@ -1767,10 +2037,11 @@
 <Dialog.Root bind:open={msgOpen}>
 	<Dialog.Content>
 		<Dialog.Header>
-			<Dialog.Title>Message attendees</Dialog.Title>
+			<Dialog.Title>{msgEventId ? 'Message registrants' : 'Message attendees'}</Dialog.Title>
 			<Dialog.Description
-				>Emails everyone booked or waitlisted on {focus?.className ??
-					'this session'}.</Dialog.Description
+				>Emails {msgEventId
+					? `everyone registered for ${events.find((e) => e.event.id === msgEventId)?.event.name ?? 'this event'}`
+					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.</Dialog.Description
 			>
 		</Dialog.Header>
 		<form class="space-y-4" onsubmit={submitMsg}>
@@ -1804,52 +2075,34 @@
 		<form class="space-y-4" onsubmit={submitHandoff}>
 			<Field.Field>
 				<Field.Label for="ho-from">Instructor</Field.Label>
-				<select
-					id="ho-from"
-					required
-					bind:value={hoFrom}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-from" required bind:value={hoFrom}>
 					<option value="" disabled>Pick an instructor</option>
 					{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="ho-type">Only this class (optional)</Field.Label>
-				<select
-					id="ho-type"
-					bind:value={hoType}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-type" bind:value={hoType}>
 					<option value="">All classes</option>
 					{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="ho-action">Do what with them</Field.Label>
-				<select
-					id="ho-action"
-					bind:value={hoAction}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-action" bind:value={hoAction}>
 					<option value="reassign">Reassign to another instructor</option>
 					<option value="cancel">Cancel them all</option>
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			{#if hoAction === 'reassign'}
 				<Field.Field>
 					<Field.Label for="ho-to">Taken over by</Field.Label>
-					<select
-						id="ho-to"
-						required
-						bind:value={hoTo}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="ho-to" required bind:value={hoTo}>
 						<option value="" disabled>Pick the new instructor</option>
 						{#each instructors.filter((i) => i.id !== hoFrom) as i (i.id)}<option value={i.id}
 								>{i.name}</option
 							>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			{#if hoCounts && (hoCounts.sessions || hoCounts.templates)}
@@ -1910,8 +2163,8 @@
 							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-2">
-							<select
-								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+							<NativeSelect
+								size="sm"
 								value={r.resource.status}
 								onchange={(e) =>
 									setResourceStatus(
@@ -1922,7 +2175,7 @@
 								<option value="open">Open</option>
 								<option value="maintenance">Maintenance</option>
 								<option value="closed">Closed</option>
-							</select>
+							</NativeSelect>
 							<Switch
 								checked={r.resource.active}
 								onCheckedChange={(v) => toggleResource(r.resource.id, v)}
@@ -1935,26 +2188,18 @@
 		{#if resources.some((r) => r.resource.active && r.resource.status === 'open')}
 			<p class="mb-1 text-xs font-medium text-muted-foreground">Book for a member</p>
 			<form class="mb-4 grid grid-cols-2 items-end gap-2" onsubmit={submitAmenityBooking}>
-				<select
-					bind:value={abMember}
-					required
-					class="h-9 rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect bind:value={abMember} required>
 					<option value="" disabled>Member…</option>
 					{#each memberList.filter((m) => m.status === 'active') as m (m.id)}
 						<option value={m.id}>{m.name}</option>
 					{/each}
-				</select>
-				<select
-					bind:value={abResource}
-					required
-					class="h-9 rounded-md border bg-transparent px-2 text-sm"
-				>
+				</NativeSelect>
+				<NativeSelect bind:value={abResource} required>
 					<option value="" disabled>Amenity…</option>
 					{#each resources.filter((r) => r.resource.active && r.resource.status === 'open') as r (r.resource.id)}
 						<option value={r.resource.id}>{r.resource.name}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 				<Input type="date" required bind:value={abDay} />
 				<Input type="time" required bind:value={abTime} />
 				<Button type="submit" class="col-span-2" disabled={pending}>Book slot</Button>
@@ -2020,18 +2265,27 @@
 					<Input id="r-to" type="time" required bind:value={rTo} />
 				</Field.Field>
 			</div>
+			<Field.Field>
+				<Field.Label for="r-buffer">Buffer after each booking (min) — optional</Field.Label>
+				<Input
+					id="r-buffer"
+					type="number"
+					min={0}
+					max={120}
+					bind:value={rBuffer}
+					placeholder="0 = back-to-back"
+				/>
+				<Field.Description>Blocks the slot for cleaning/reset between bookings.</Field.Description>
+			</Field.Field>
 			{#if locations.filter((l) => !l.archivedAt).length}
 				<Field.Field>
 					<Field.Label>Location (optional)</Field.Label>
-					<select
-						bind:value={rLoc}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect bind:value={rLoc}>
 						<option value="">Any location</option>
 						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 							<option value={l.id}>{l.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			<Dialog.Footer>
@@ -2079,7 +2333,16 @@
 						</button>
 						{#if evRosterId === ev.event.id && evRoster}
 							{#if !ev.event.cancelledAt}
-								<div class="mb-1 flex justify-end">
+								<div class="mb-1 flex justify-end gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 px-2 text-xs"
+										onclick={() => {
+											msgEventId = ev.event.id;
+											msgOpen = true;
+										}}><Mail class="mr-1 h-3 w-3" /> Message</Button
+									>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -2157,7 +2420,7 @@
 				<Field.Label for="e-desc">Description (optional)</Field.Label>
 				<Input id="e-desc" bind:value={eDesc} maxlength={500} />
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="e-date">Date</Field.Label>
 					<Input id="e-date" type="date" required bind:value={eDate} />
@@ -2171,7 +2434,7 @@
 					<Input id="e-dur" type="number" min={15} bind:value={eDur} />
 				</Field.Field>
 			</div>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="e-cap">Capacity</Field.Label>
 					<Input id="e-cap" type="number" min={1} bind:value={eCap} />
@@ -2183,15 +2446,12 @@
 				{#if locations.filter((l) => !l.archivedAt).length}
 					<Field.Field>
 						<Field.Label>Location</Field.Label>
-						<select
-							bind:value={eLoc}
-							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-						>
+						<NativeSelect bind:value={eLoc}>
 							<option value="">—</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
 							{/each}
-						</select>
+						</NativeSelect>
 					</Field.Field>
 				{/if}
 			</div>
@@ -2215,30 +2475,20 @@
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label for="s-type">Class type</Field.Label>
-					<select
-						id="s-type"
-						required
-						bind:value={sType}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="s-type" required bind:value={sType}>
 						<option value="" disabled>Pick…</option>
 						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="s-instr">Instructor</Field.Label>
-					<select
-						id="s-instr"
-						required
-						bind:value={sInstr}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="s-instr" required bind:value={sInstr}>
 						<option value="" disabled>Pick…</option>
 						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			</div>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="s-from">From</Field.Label>
 					<Input id="s-from" type="date" required bind:value={sFrom} />
@@ -2362,22 +2612,17 @@
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="c-type">Class type</Field.Label>
-					<select
-						id="c-type"
-						required
-						bind:value={cType}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="c-type" required bind:value={cType}>
 						<option value="" disabled>Pick…</option>
 						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			</div>
 			<Field.Field>
 				<Field.Label for="c-desc">Description (optional)</Field.Label>
 				<Input id="c-desc" bind:value={cDesc} maxlength={500} />
 			</Field.Field>
-			<div class="grid grid-cols-4 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
 				<Field.Field>
 					<Field.Label for="c-start">Starts</Field.Label>
 					<Input id="c-start" type="date" required bind:value={cStart} />
@@ -2430,35 +2675,27 @@
 					{/each}
 				</div>
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-time">Start time</Field.Label>
 					<Input id="c-time" type="time" required bind:value={cTime} />
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="c-instr">Instructor</Field.Label>
-					<select
-						id="c-instr"
-						bind:value={cInstr}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="c-instr" bind:value={cInstr}>
 						<option value="">Class default</option>
 						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 				{#if locations.filter((l) => !l.archivedAt).length}
 					<Field.Field>
 						<Field.Label for="c-loc">Location</Field.Label>
-						<select
-							id="c-loc"
-							bind:value={cLoc}
-							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-						>
+						<NativeSelect id="c-loc" bind:value={cLoc}>
 							<option value="">Class default</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
 							{/each}
-						</select>
+						</NativeSelect>
 					</Field.Field>
 				{/if}
 			</div>
@@ -2558,8 +2795,8 @@
 									>service due</span
 								>
 							{/if}
-							<select
-								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+							<NativeSelect
+								size="sm"
 								value={eq.status}
 								onchange={(e) =>
 									setEquipment(eq.id, {
@@ -2569,7 +2806,7 @@
 								<option value="operational">Operational</option>
 								<option value="maintenance">Maintenance</option>
 								<option value="out_of_order">Out of order</option>
-							</select>
+							</NativeSelect>
 							<Button
 								size="xs"
 								variant="ghost"
@@ -2622,15 +2859,12 @@
 			{#if locations.filter((l) => !l.archivedAt).length}
 				<Field.Field>
 					<Field.Label>Location</Field.Label>
-					<select
-						bind:value={eqLoc}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect bind:value={eqLoc}>
 						<option value="">—</option>
 						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 							<option value={l.id}>{l.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			<Field.Field>
@@ -2643,5 +2877,48 @@
 			</Field.Field>
 			<Button type="submit" class="col-span-2" disabled={pending}>Add equipment</Button>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={bulkOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Bulk cancel sessions</Dialog.Title>
+			<Dialog.Description
+				>Cancel several sessions this week at once — booked members get the usual email, credits and
+				drop-in voids.</Dialog.Description
+			>
+		</Dialog.Header>
+		<ul class="max-h-80 divide-y overflow-y-auto">
+			{#each bulkSessions as s (s.session.id)}
+				<li class="flex items-center gap-3 py-2.5 text-sm">
+					<input
+						type="checkbox"
+						class="size-4 accent-primary"
+						checked={bulkChecked.has(s.session.id)}
+						onchange={() => toggleBulk(s.session.id)}
+					/>
+					<div class="flex-1">
+						<p class="font-medium">{s.className}</p>
+						<p class="text-xs text-muted-foreground">
+							{dayFmt.format(s.session.startsAt)}
+							{localTime(s.session.startsAt, tz)} ·
+							{s.booked}/{s.session.capacity} booked
+						</p>
+					</div>
+				</li>
+			{:else}
+				<li class="py-6 text-sm text-muted-foreground">No live sessions this week.</li>
+			{/each}
+		</ul>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (bulkOpen = false)}>Close</Button>
+			<Button
+				variant="destructive"
+				disabled={bulkPending || !bulkChecked.size}
+				onclick={runBulkCancel}
+				>{bulkPending ? 'Cancelling…' : `Cancel ${bulkChecked.size || ''} selected`}</Button
+			>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

@@ -12,21 +12,32 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getMembers,
 		createMember,
 		emailAllMembers,
+	previewAnnouncement,
 		emailMeTest,
 		scheduleEmail,
 		cancelScheduledEmail,
+		getRecurringEmails,
+		createRecurringEmail,
+		deleteRecurringEmail,
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
 		getDuplicates,
 		importMembers,
-		tagMembers
+		tagMembers,
+		getLevels,
+		addLevel,
+		removeLevel,
+		getAnnouncementTemplates,
+		saveAnnouncementTemplate,
+		deleteAnnouncementTemplate
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import {
@@ -36,6 +47,7 @@
 	} from '#lib/remote/challenges.remote.ts';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import Trophy from '@lucide/svelte/icons/trophy';
+	import Medal from '@lucide/svelte/icons/medal';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
 	import { getCurrency, getPlans } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -115,10 +127,20 @@
 			q,
 			tag: tag === '__all' ? undefined : tag,
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
-			planId: planFilter === '__all' ? undefined : planFilter === '__none' ? 'none' : planFilter,
+			planId:
+				planFilter === '__all'
+					? undefined
+					: planFilter === '__none'
+						? 'none'
+						: planFilter === 'pack' || planFilter === 'recurring'
+							? planFilter
+							: planFilter,
 			sort,
 			owes: owesFilter === 'owes' || undefined,
-			suspended: owesFilter === 'suspended' || undefined
+			suspended: owesFilter === 'suspended' || undefined,
+			recent: owesFilter === '__new' || undefined,
+			risk: owesFilter === '__risk' || undefined,
+			family: owesFilter === '__family' || undefined
 		});
 	}
 	function search() {
@@ -269,6 +291,70 @@
 	}
 	// ------- email all -------
 	let emailOpen = $state(false);
+	const emailTemplates = $derived(await getAnnouncementTemplates());
+	let templatePick = $state('');
+	const templateApplied = $derived(emailTemplates.find((t) => t.id === templatePick) ?? null);
+	$effect(() => {
+		if (templatePick) {
+			const t = emailTemplates.find((x) => x.id === templatePick);
+			if (t) {
+				emailSubject = t.subject;
+				emailBody = t.message;
+				if (t.tag) emailAudience = `tag:${t.tag}`;
+			}
+		}
+	});
+	async function saveTemplate() {
+		const name = window.prompt('Template name', emailSubject.slice(0, 40));
+		if (!name?.trim()) return;
+		try {
+			await saveAnnouncementTemplate({
+				name: name.trim(),
+				subject: emailSubject,
+				message: emailBody,
+				tag: emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined
+			});
+			toast.success('Template saved');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save template'));
+		}
+	}
+	async function removeTemplate() {
+		if (!templateApplied) return;
+		try {
+			await deleteAnnouncementTemplate(templateApplied.id);
+			templatePick = '';
+			toast.success('Template deleted');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
+	let levelsOpen = $state(false);
+	let newLevelName = $state('');
+	let newLevelColor = $state('');
+	const levels = $derived(await getLevels());
+	async function addLevelSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLevel({ name: newLevelName, color: newLevelColor || undefined });
+			newLevelName = '';
+			newLevelColor = '';
+			toast.success('Level added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add level'));
+		}
+	}
+	let emailPreview = $state<string | null>(null);
+	async function togglePreview() {
+		if (emailPreview != null) return (emailPreview = null);
+		if (!emailSubject.trim() && !emailBody.trim())
+			return toast.error('Write the subject and message first');
+		try {
+			emailPreview = await previewAnnouncement({ subject: emailSubject, message: emailBody });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not preview'));
+		}
+	}
 	let emailSubject = $state('');
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
@@ -282,17 +368,23 @@
 	const audLabel = $derived(
 		emailAudience === '__sel'
 			? `Selected members (${selected.size})`
-			: emailAudience === '__all'
-				? 'All active members'
-				: audTag
-					? `Tag: ${audTag}`
-					: `Plan: ${audPlanName}`
+			: emailAudience === '__risk'
+				? 'At-risk members (no visit in 30+ days)'
+				: emailAudience === '__all'
+					? 'All active members'
+					: audTag
+						? `Tag: ${audTag}`
+						: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
 			? selected.size
 			: emailOpen
-				? await getAnnouncementAudience({ tag: audTag, planId: audPlan })
+				? await getAnnouncementAudience({
+						tag: audTag,
+						planId: audPlan,
+						atRisk: emailAudience === '__risk'
+					})
 				: null
 	);
 	async function submitAnnouncement(e: SubmitEvent) {
@@ -305,6 +397,7 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					atRisk: emailAudience === '__risk',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
 				toast.success('Scheduled — the daily job sends it');
@@ -314,17 +407,53 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					atRisk: emailAudience === '__risk',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
 			}
 			emailOpen = false;
 			emailSubject = emailBody = emailSendAt = '';
+			emailPreview = null;
 			emailAudience = '__all';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send — try again'));
 		}
 		emailPending = false;
+	}
+	const recurringEmails = $derived(await getRecurringEmails());
+	let recurWeekday = $state('1');
+	let recurTime = $state('09:00');
+	async function saveRecurringEmail() {
+		if (!emailSubject.trim() || !emailBody.trim())
+			return toast.error('Write the subject and message first');
+		emailPending = true;
+		try {
+			await createRecurringEmail({
+				subject: emailSubject,
+				message: emailBody,
+				tag: audTag || undefined,
+				planId: audPlan || undefined,
+				weekday: Number(recurWeekday),
+				time: recurTime
+			});
+			toast.success('Repeats weekly — the cron sends it');
+			emailOpen = false;
+			emailSubject = emailBody = emailSendAt = '';
+			emailPreview = null;
+			emailAudience = '__all';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save'));
+		}
+		emailPending = false;
+	}
+	async function dropRecurring(id: string) {
+		try {
+			await deleteRecurringEmail(id);
+			toast.success('Repeating email removed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
 	}
 	async function cancelScheduled(id: string) {
 		try {
@@ -384,12 +513,14 @@
 		<Button size="sm" variant="outline" onclick={() => (chalOpen = true)}
 			><Trophy /> Challenges</Button
 		>
+		<Button size="sm" variant="outline" onclick={() => (levelsOpen = true)}><Medal /> Levels</Button
+		>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-6">
-	<div class="flex max-w-xl gap-2">
+	<div class="flex max-w-xl flex-wrap gap-2">
 		<div class="relative flex-1">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
@@ -431,11 +562,18 @@
 						? 'All plans'
 						: planFilter === '__none'
 							? 'No plan'
-							: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}</Select.Trigger
+							: planFilter === 'pack'
+								? 'Has pack'
+								: planFilter === 'recurring'
+									? 'On a plan'
+									: (audiencePlans.find((p) => p.id === planFilter)?.name ??
+										'Plan')}</Select.Trigger
 				>
 				<Select.Content>
 					<Select.Item value="__all">All plans</Select.Item>
 					<Select.Item value="__none">No plan</Select.Item>
+					<Select.Item value="pack">Has pack</Select.Item>
+					<Select.Item value="recurring">On a plan</Select.Item>
 					{#each audiencePlans as p (p.id)}
 						<Select.Item value={p.id}>{p.name}</Select.Item>
 					{/each}
@@ -448,12 +586,21 @@
 					? 'Owes money'
 					: owesFilter === 'suspended'
 						? 'Suspended'
-						: 'Any balance'}</Select.Trigger
+						: owesFilter === '__new'
+							? 'New this week'
+							: owesFilter === '__risk'
+								? 'At-risk 30d+'
+								: owesFilter === '__family'
+									? 'Has family'
+									: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
 				<Select.Item value="owes">Owes money</Select.Item>
 				<Select.Item value="suspended">Suspended</Select.Item>
+				<Select.Item value="__new">New this week</Select.Item>
+				<Select.Item value="__risk">At-risk 30d+</Select.Item>
+				<Select.Item value="__family">Has family</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
@@ -701,6 +848,23 @@
 				Goes to active members with an email on file — closures, schedule changes, news.
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if emailTemplates.length}
+			<div class="flex items-center gap-2">
+				<NativeSelect size="sm" class="w-auto" bind:value={templatePick}>
+					<option value="">Load template…</option>
+					{#each emailTemplates as t (t.id)}
+						<option value={t.id}>{t.name}</option>
+					{/each}
+				</NativeSelect>
+				{#if templateApplied}
+					<button
+						type="button"
+						class="text-xs text-muted-foreground hover:underline"
+						onclick={removeTemplate}>Delete "{templateApplied.name}"</button
+					>
+				{/if}
+			</div>
+		{/if}
 		{#if ai.licensed}
 			<div class="rounded-md border bg-muted/40 p-3">
 				{#if ai.configured}
@@ -750,10 +914,31 @@
 										>cancel</button
 									>
 								{:else}
-									{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}{a.plan
-										? ` · plan: ${a.plan}`
-										: ''}
+									{formatDate(a.createdAt)} · {a.sent} sent{a.read ? ` · ${a.read} read` : ''}{a.tag
+										? ` · tag: ${a.tag}`
+										: ''}{a.plan ? ` · plan: ${a.plan}` : ''}
 								{/if}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+		{#if recurringEmails.length}
+			<div class="rounded-md border bg-muted/40 p-3 text-sm">
+				<p class="mb-2 font-medium text-muted-foreground">Repeats weekly</p>
+				<ul class="space-y-1.5">
+					{#each recurringEmails as r (r.rule.id)}
+						<li class="flex items-baseline justify-between gap-3">
+							<span class="truncate">{r.rule.subject}</span>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][r.rule.weekday]}
+								{r.rule.time}{r.rule.tag ? ` · tag: ${r.rule.tag}` : ''}{r.planName
+									? ` · plan: ${r.planName}`
+									: ''}
+								<button class="ml-1 underline" onclick={() => dropRecurring(r.rule.id)}
+									>remove</button
+								>
 							</span>
 						</li>
 					{/each}
@@ -773,6 +958,7 @@
 								<Select.Item value="__sel">Selected members ({selected.size})</Select.Item>
 							{/if}
 							<Select.Item value="__all">All active members</Select.Item>
+							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}
@@ -793,6 +979,23 @@
 					<Input id="a-sendat" type="datetime-local" bind:value={emailSendAt} />
 					<Field.Description>Leave blank to send right away.</Field.Description>
 				</Field.Field>
+				<div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2 text-sm">
+					<span class="text-muted-foreground">Or repeat</span>
+					<NativeSelect bind:value={recurWeekday} size="sm">
+						{#each ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as d, i (d)}
+							<option value={String(i)}>{d}</option>
+						{/each}
+					</NativeSelect>
+					<span class="text-muted-foreground">at</span>
+					<Input type="time" class="h-8 w-auto" bind:value={recurTime} />
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						disabled={emailPending}
+						onclick={saveRecurringEmail}>Repeat weekly</Button
+					>
+				</div>
 			{/if}
 			<Field.Field>
 				<Field.Label for="a-body">Message</Field.Label>
@@ -807,6 +1010,13 @@
 					Personalize with {'{name}'} or {'{first_name}'}.
 				</Field.Description>
 			</Field.Field>
+			{#if emailPreview != null}
+				<iframe
+					title="Email preview"
+					srcdoc={emailPreview}
+					class="h-64 w-full rounded-md border bg-white"
+				></iframe>
+			{/if}
 			<Dialog.Footer class="items-center justify-between sm:justify-between">
 				<span class="text-xs text-muted-foreground">
 					{audienceCount == null
@@ -821,6 +1031,19 @@
 						onclick={sendTest}
 						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
 						>{testPending ? 'Sending…' : 'Send me a test'}</Button
+					>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={togglePreview}>{emailPreview != null ? 'Hide preview' : 'Preview'}</Button
+					>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={saveTemplate}
+						disabled={!emailSubject.trim() || !emailBody.trim()}>Save template</Button
 					>
 					<Button type="submit" disabled={emailPending || audienceCount === 0}>
 						{emailPending
@@ -898,7 +1121,7 @@
 				<Field.Label for="c-prize">Prize (optional)</Field.Label>
 				<Input id="c-prize" bind:value={cPrize} placeholder="A free month, gym hoodie…" />
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-goal">Goal (check-ins)</Field.Label>
 					<Input id="c-goal" type="number" min={1} max={1000} required bind:value={cGoal} />
@@ -918,5 +1141,47 @@
 				>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={levelsOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Progression levels</Dialog.Title>
+			<Dialog.Description
+				>Belts, ranks, skill tiers — whatever your gym calls them. Set a member's level on their
+				page.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="flex items-center gap-2" onsubmit={addLevelSubmit}>
+			<Input placeholder="Blue belt" bind:value={newLevelName} required />
+			<Input placeholder="#3b82f6" class="w-24" bind:value={newLevelColor} />
+			<Button type="submit" size="sm">Add</Button>
+		</form>
+		<ul class="divide-y">
+			{#each levels as l (l.id)}
+				<li class="flex items-center justify-between py-2.5 text-sm">
+					<span class="flex items-center gap-2">
+						{#if l.color}
+							<span class="size-3 rounded-full" style:background={l.color}></span>
+						{/if}
+						<span class="font-medium">{l.name}</span>
+					</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-7 px-2 text-xs text-destructive"
+						onclick={async () => {
+							await removeLevel(l.id);
+							toast.success('Removed');
+						}}>Remove</Button
+					>
+				</li>
+			{:else}
+				<li class="py-6 text-sm text-muted-foreground">
+					No levels yet — add your first rank above.
+				</li>
+			{/each}
+		</ul>
 	</Dialog.Content>
 </Dialog.Root>

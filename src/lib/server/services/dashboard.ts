@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	loanableItem,
+	equipmentLoan,
 	activity,
 	booking,
 	challenge,
@@ -16,8 +18,12 @@ import {
 	membership,
 	payment,
 	paymentProvider,
+	deskTask,
+	deskTaskDone,
 	plan,
+	ptRequest,
 	recurringCharge,
+	shopItem,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -91,6 +97,10 @@ export async function dashboard(orgId: string) {
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended'))`.mapWith(
 					Number
 				),
+			expected:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+					Number
+				),
 			waitlisted:
 				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted')`.mapWith(
 					Number
@@ -148,6 +158,33 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
 
+	// Sessions in the next 3 days that are full AND have a waitlist — the desk
+	// might add capacity, a second slot, or clear the queue before they run.
+	const fullSessions = await db
+		.select({
+			sessionId: classSession.id,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			waiting:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, new Date(Date.now() + 3 * 86_400_000)),
+				sql`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted') > 0`,
+				sql`(select count(*) + coalesce(sum(b2.guest_count), 0) from ${booking} b2 where b2.session_id = ${outer(classSession.id)} and b2.status = 'booked') >= ${outer(classSession.capacity)}`
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(10);
+
 	// Members who asked staff to stop a recurring add-on — folded into the same
 	// Needs-attention list with kind 'addon'.
 	const addonRequests = await db
@@ -167,6 +204,41 @@ export async function dashboard(orgId: string) {
 			)
 		)
 		.orderBy(asc(recurringCharge.removalRequestedAt))
+		.limit(50);
+
+	// Pending PT session requests — instructors approve on My classes.
+	const ptPending = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			preferredAt: ptRequest.preferredAt,
+			requestedAt: ptRequest.createdAt
+		})
+		.from(ptRequest)
+		.innerJoin(gymMember, eq(ptRequest.memberId, gymMember.id))
+		.where(and(eq(ptRequest.organizationId, orgId), eq(ptRequest.status, 'pending')))
+		.orderBy(asc(ptRequest.preferredAt))
+		.limit(50);
+
+	// Kit out longer than a week — chase returns at the desk.
+	const overdueLoans = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: loanableItem.name,
+			outAt: equipmentLoan.outAt
+		})
+		.from(equipmentLoan)
+		.innerJoin(gymMember, eq(equipmentLoan.memberId, gymMember.id))
+		.innerJoin(loanableItem, eq(equipmentLoan.itemId, loanableItem.id))
+		.where(
+			and(
+				eq(equipmentLoan.organizationId, orgId),
+				isNull(equipmentLoan.returnedAt),
+				lte(equipmentLoan.outAt, new Date(Date.now() - 7 * 86_400_000))
+			)
+		)
+		.orderBy(asc(equipmentLoan.outAt))
 		.limit(50);
 
 	// Upcoming sessions flagged as needing a substitute instructor.
@@ -244,6 +316,37 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(membership.endsAt))
 		.limit(10);
+
+	// Cash expected over the next 30 days: open charges coming due plus
+	// membership renewals scheduled to bill in that window.
+	const in30d = new Date(Date.now() + 30 * 86400_000);
+	const [{ n: openDue30d }] = await db
+		.select({ n: sql<string>`coalesce(sum(${charge.amount}), 0)`.mapWith(Number) })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.status, 'open'),
+				lte(charge.dueDate, in30d.toISOString().slice(0, 10))
+			)
+		);
+	const [{ n: renewals30d }] = await db
+		.select({
+			n: sql<string>`coalesce(sum(coalesce(${membership.price}, ${plan.amount})), 0)`.mapWith(
+				Number
+			)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				isNotNull(membership.nextChargeAt),
+				gt(membership.nextChargeAt, new Date()),
+				lte(membership.nextChargeAt, in30d)
+			)
+		);
 
 	// Class packs expiring within 7 days — same window as the pack-expiry
 	// email. Staff can nudge a last visit or sell a top-up pack.
@@ -343,11 +446,31 @@ export async function dashboard(orgId: string) {
 				requestedAt: a.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
+			})),
+			...ptPending.map((p) => ({
+				memberId: p.memberId,
+				memberName: p.memberName,
+				planName: `PT ${p.preferredAt.toISOString().slice(0, 10)}`,
+				kind: 'pt' as const,
+				requestedAt: p.preferredAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...overdueLoans.map((l) => ({
+				memberId: l.memberId,
+				memberName: l.memberName,
+				planName: `${l.itemName} out ${Math.floor((Date.now() - l.outAt.getTime()) / 86400000)}d`,
+				kind: 'loan' as const,
+				requestedAt: l.outAt as Date,
+				pauseUntil: null,
+				requestReason: null
 			}))
 		],
+		fullSessions,
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,
+		expectedRevenue30d: openDue30d + renewals30d,
 		trialsEnding,
 		packsExpiring,
 		liveChallenges
@@ -515,4 +638,137 @@ export async function dismissChecklist(orgId: string) {
 		.update(gymSettings)
 		.set({ setupDismissed: true })
 		.where(eq(gymSettings.organizationId, orgId));
+}
+
+/** Actionable items for the staff notification bell — requests, cover gaps, low
+ * stock, undone desk tasks. Each item links to the page that resolves it. */
+export async function notifications(orgId: string, tz: string) {
+	const items: {
+		kind: 'request' | 'cover' | 'stock' | 'task';
+		label: string;
+		detail: string;
+		href: string;
+	}[] = [];
+	const today = localDate(new Date(), tz);
+
+	const requests = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			kind: sql<
+				'cancel' | 'pause' | 'addon'
+			>`case when ${membership.cancelRequestedAt} is not null then 'cancel' when ${membership.pauseRequestedAt} is not null then 'pause' else 'cancel' end`
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				or(isNotNull(membership.cancelRequestedAt), isNotNull(membership.pauseRequestedAt))
+			)
+		)
+		.limit(20);
+	for (const r of requests)
+		items.push({
+			kind: 'request',
+			label: `${r.memberName} asked to ${r.kind === 'cancel' ? 'cancel' : 'pause'}`,
+			detail: 'membership request',
+			href: `/members/${r.memberId}`
+		});
+
+	const addons = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			desc: recurringCharge.description
+		})
+		.from(recurringCharge)
+		.innerJoin(gymMember, eq(recurringCharge.memberId, gymMember.id))
+		.where(
+			and(
+				eq(recurringCharge.organizationId, orgId),
+				eq(recurringCharge.active, true),
+				isNotNull(recurringCharge.removalRequestedAt)
+			)
+		)
+		.limit(20);
+	for (const a of addons)
+		items.push({
+			kind: 'request',
+			label: `${a.memberName} wants to stop "${a.desc}"`,
+			detail: 'add-on removal',
+			href: `/members/${a.memberId}`
+		});
+
+	const in7d = new Date(Date.now() + 7 * 86_400_000);
+	const covers = await db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNotNull(classSession.coverRequestedAt),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lte(classSession.startsAt, in7d)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(20);
+	for (const c of covers)
+		items.push({
+			kind: 'cover',
+			label: `${c.className} needs cover`,
+			detail: localDate(c.startsAt, tz),
+			href: '/schedule'
+		});
+
+	const lowStock = await db
+		.select({ name: shopItem.name, stock: shopItem.stock })
+		.from(shopItem)
+		.where(
+			and(
+				eq(shopItem.organizationId, orgId),
+				eq(shopItem.active, true),
+				isNotNull(shopItem.lowStockAt),
+				sql`${shopItem.stock} <= ${shopItem.lowStockAt}`
+			)
+		)
+		.limit(20);
+	for (const i of lowStock)
+		items.push({
+			kind: 'stock',
+			label: `${i.name} is ${i.stock === 0 ? 'out of stock' : `low (${i.stock} left)`}`,
+			detail: 'shop stock',
+			href: '/billing'
+		});
+
+	const tasks = await db
+		.select({ id: deskTask.id, label: deskTask.label })
+		.from(deskTask)
+		.where(and(eq(deskTask.organizationId, orgId), eq(deskTask.active, true)));
+	const done = await db
+		.select({ taskId: deskTaskDone.taskId })
+		.from(deskTaskDone)
+		.where(and(eq(deskTaskDone.organizationId, orgId), eq(deskTaskDone.doneOn, today)));
+	const doneSet = new Set(done.map((d) => d.taskId));
+	const undone = tasks.filter((t) => !doneSet.has(t.id));
+	if (undone.length)
+		items.push({
+			kind: 'task',
+			label: `${undone.length} desk task${undone.length === 1 ? '' : 's'} still open today`,
+			detail:
+				undone
+					.slice(0, 3)
+					.map((t) => t.label)
+					.join(', ') + (undone.length > 3 ? '…' : ''),
+			href: '/dashboard'
+		});
+
+	return items;
 }
