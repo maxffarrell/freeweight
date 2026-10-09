@@ -70,6 +70,10 @@ export async function dashboard(orgId: string) {
 			overdueTotal:
 				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} < ${today}), 0)`.mapWith(
 					Number
+				),
+			dueWeekTotal:
+				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} >= ${today} and ${outer(charge.dueDate)} <= ${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}), 0)`.mapWith(
+					Number
 				)
 		})
 		.from(charge)
@@ -697,6 +701,7 @@ export async function dashboard(orgId: string) {
 		newThisMonth: memberStats?.newThisMonth ?? 0,
 		openTotal: openStats?.openTotal ?? 0,
 		overdueTotal: openStats?.overdueTotal ?? 0,
+		dueWeekTotal: openStats?.dueWeekTotal ?? 0,
 		collectedToday: collectedToday.today,
 		collectedYesterday: collectedToday.yesterday,
 		collectedWeek: collectedToday.week,
