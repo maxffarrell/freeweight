@@ -581,6 +581,13 @@
 				</div>
 			</div>
 		{/if}
+		{#if settings.portalNotice}
+			<p
+				class="mx-auto mt-6 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100"
+			>
+				{settings.portalNotice}
+			</p>
+		{/if}
 	</main>
 </div>
 

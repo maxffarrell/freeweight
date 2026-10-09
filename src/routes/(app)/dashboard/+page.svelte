@@ -460,6 +460,28 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.fullSessions?.length}
+				<Card.Root class="border-amber-500/50">
+					<Card.Header><Card.Title class="text-base">Full with a waitlist</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.fullSessions as s (s.sessionId)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<a href="/schedule?focus={s.sessionId}" class="truncate hover:underline"
+										>{s.className} {localDate(s.startsAt, d.timezone)} {localTime(
+											s.startsAt,
+											d.timezone
+										)}</a
+									>
+									<Badge variant="outline" class="shrink-0"
+										>{s.waiting} waiting</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if atRisk.length}
 				<Card.Root class="border-amber-500/50">
 					<Card.Header class="flex flex-row items-center justify-between space-y-0">

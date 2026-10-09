@@ -19,6 +19,7 @@
 		getPortalOverview,
 		getBookable,
 		memberBook,
+		memberGiveSpot,
 		memberBookSeries,
 		memberCancel,
 		memberMove,
@@ -838,12 +839,33 @@
 	let busy = $state<string | null>(null);
 	// Guests the member wants to bring to each session (guest passes / drop-in priced).
 	let guestPick = $state<Record<string, string>>({});
+	/** Dependents the current member manages (from the family switcher options). */
+	// Dependents the current member manages — empty while switched INTO a
+	// dependent (a child can't re-book the family).
+	const dependents = $derived(
+		data.options.find((o) => o.memberId === memberId)?.dependent
+			? []
+			: data.options.filter((o) => o.dependent && o.memberId !== memberId)
+	);
+	let familyPick = $state<Record<string, boolean>>({});
 	async function book(sessionId: string) {
 		busy = sessionId;
 		try {
 			const guests = Number(guestPick[sessionId] ?? 0) || 0;
 			const b = await memberBook({ memberId, sessionId, guests });
 			toast.success(b.status === 'waitlisted' ? 'Class full — you are on the waitlist' : 'Booked!');
+			if (familyPick[sessionId]) {
+				let added = 0;
+				for (const o of dependents) {
+					try {
+						await memberBook({ memberId: o.memberId, sessionId });
+						added++;
+					} catch {
+						/* a dependent who can't book (cutoff/already in) is skipped */
+					}
+				}
+				if (added) toast.success(`${added} family member${added === 1 ? '' : 's'} booked too`);
+			}
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
 		}
@@ -2538,6 +2560,31 @@
 						{#if u.waitlistPos}<span class="text-xs text-muted-foreground">#{u.waitlistPos}</span
 							>{/if}
 						<StatusBadge status={u.booking.status} />
+						{#if u.booking.status === 'booked'}
+							<button
+								class="text-xs text-muted-foreground underline-offset-4 hover:underline"
+								title="Give this spot to another member"
+								disabled={busy === `give:${u.booking.id}`}
+								onclick={async () => {
+									const email = window.prompt(
+										`Give your ${u.className} spot to which member? (their email)`
+									);
+									if (!email?.trim()) return;
+									busy = `give:${u.booking.id}`;
+									try {
+										const r = await memberGiveSpot({
+											memberId,
+											bookingId: u.booking.id,
+											email: email.trim()
+										});
+										toast.success(`Spot given to ${r.recipient}`);
+									} catch (err) {
+										toast.error(errMsg(err, 'Could not give the spot'));
+									}
+									busy = null;
+								}}>Give</button
+							>
+						{/if}
 					</span>
 				</div>
 			{:else}
@@ -2715,6 +2762,19 @@
 											<option value={String(n)}>+{n} guest{n > 1 ? 's' : ''}</option>
 										{/each}
 									</NativeSelect>
+									{#if dependents.length}
+										<label
+											class="flex items-center gap-1 text-xs whitespace-nowrap text-muted-foreground"
+											title={`Also book: ${dependents.map((o) => o.label).join(', ')}`}
+										>
+											<input
+												type="checkbox"
+												class="size-3"
+												bind:checked={familyPick[b.session.id]}
+											/>
+											+family
+										</label>
+									{/if}
 									<Button
 										size="sm"
 										variant="outline"

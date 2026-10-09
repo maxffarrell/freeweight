@@ -158,6 +158,33 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(sql`coalesce(${membership.cancelRequestedAt}, ${membership.pauseRequestedAt})`));
 
+	// Sessions in the next 3 days that are full AND have a waitlist — the desk
+	// might add capacity, a second slot, or clear the queue before they run.
+	const fullSessions = await db
+		.select({
+			sessionId: classSession.id,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			waiting:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted')`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, new Date(Date.now() + 3 * 86_400_000)),
+				sql`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'waitlisted') > 0`,
+				sql`(select count(*) + coalesce(sum(b2.guest_count), 0) from ${booking} b2 where b2.session_id = ${outer(classSession.id)} and b2.status = 'booked') >= ${outer(classSession.capacity)}`
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(10);
+
 	// Members who asked staff to stop a recurring add-on — folded into the same
 	// Needs-attention list with kind 'addon'.
 	const addonRequests = await db
@@ -439,6 +466,7 @@ export async function dashboard(orgId: string) {
 				requestReason: null
 			}))
 		],
+		fullSessions,
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,
