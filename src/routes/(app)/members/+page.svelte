@@ -253,7 +253,8 @@
 				'Tags',
 				'Open balance',
 				'Joined',
-				'Last visit'
+				'Last visit',
+				'Visits (30d)'
 			],
 			...members.map((m) => [
 				m.name,
@@ -265,7 +266,8 @@
 				m.tags.join(' '),
 				(m.openBalance / 100).toFixed(2),
 				m.joinedAt ? formatDate(m.joinedAt) : '',
-				m.lastVisit ? formatDate(m.lastVisit) : ''
+				m.lastVisit ? formatDate(m.lastVisit) : '',
+				m.visits30
 			])
 		]);
 		const a = document.createElement('a');
@@ -694,6 +696,7 @@
 						<Table.Head class="hidden md:table-cell">Contact</Table.Head>
 						<Table.Head>Membership</Table.Head>
 						<Table.Head class="hidden lg:table-cell">Last visit</Table.Head>
+						<Table.Head class="hidden lg:table-cell">Visits 30d</Table.Head>
 						<Table.Head>Status</Table.Head>
 						<Table.Head class="text-right">Open balance</Table.Head>
 					</Table.Row>
@@ -745,6 +748,9 @@
 							<Table.Cell class="text-muted-foreground">{m.planName ?? '—'}</Table.Cell>
 							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
 								{m.lastVisit ? formatDate(m.lastVisit) : '—'}
+							</Table.Cell>
+							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
+								{m.visits30 || '—'}
 							</Table.Cell>
 							<Table.Cell><StatusBadge status={m.status} /></Table.Cell>
 							<Table.Cell class="text-right tabular-nums">

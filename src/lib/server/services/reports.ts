@@ -679,6 +679,44 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Members bucketed by how many times they checked in this month — the
+ * engagement distribution (0 = active members who haven't come in). */
+async function visitFrequency(orgId: string) {
+	const since = new Date();
+	since.setDate(1);
+	since.setHours(0, 0, 0, 0);
+	const visits = await db
+		.select({
+			memberId: checkIn.memberId,
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, since),
+				isNull(checkIn.guestName)
+			)
+		)
+		.groupBy(checkIn.memberId);
+	const counts = new Map(visits.map((v) => [v.memberId, v.n]));
+	const [active] = await db
+		.select({ n: sql<number>`count(*)::int`.mapWith(Number) })
+		.from(membership)
+		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
+	const buckets = { zero: 0, one: 0, few: 0, regular: 0, frequent: 0 };
+	let seen = 0;
+	for (const n of counts.values()) {
+		seen++;
+		if (n <= 1) buckets.one++;
+		else if (n <= 3) buckets.few++;
+		else if (n <= 7) buckets.regular++;
+		else buckets.frequent++;
+	}
+	buckets.zero = Math.max(0, active.n - seen);
+	return { total: active.n, buckets };
+}
+
 /**
  * Daily cron — keeps an "At risk" member tag in sync with the at-risk report
  * so staff can filter/segment on it without re-reading the report.
@@ -1346,7 +1384,8 @@ export async function getReports(orgId: string) {
 		payrollPaid,
 		staffing,
 		challengeList,
-		saveOffers
+		saveOffers,
+		visitFreq
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1405,7 +1444,8 @@ export async function getReports(orgId: string) {
 		payrollPaidThrough(orgId),
 		rotaVsClocked(orgId),
 		listChallenges(orgId),
-		saveOfferStats(orgId)
+		saveOfferStats(orgId),
+		visitFrequency(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1476,7 +1516,8 @@ export async function getReports(orgId: string) {
 		payrollPaid,
 		staffing,
 		challenges: challengeList,
-		saveOffers
+		saveOffers,
+		visitFrequency: visitFreq
 	};
 }
 

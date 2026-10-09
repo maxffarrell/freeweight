@@ -331,6 +331,7 @@ export const checkInRoster = command(idSchema, async (sessionId) => {
 
 /** The instructor's own upcoming sessions — powers the "My classes" page. */
 export const getMyClasses = query(async () => svc.myTeachingSessions(await requireOrg()));
+export const getMyTeachingMonth = query(async () => svc.myTeachingMonth(await requireOrg()));
 export const getTimeOff = query(async () => svc.myTimeOff(await requireOrg()));
 export const getAvailability = query(async () => svc.myAvailability(await requireOrg()));
 

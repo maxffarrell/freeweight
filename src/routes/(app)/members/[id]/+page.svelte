@@ -17,6 +17,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
+	import { toCsv } from '#lib/csv.ts';
 	import { toast } from 'svelte-sonner';
 	import {
 		getMember,
@@ -2015,6 +2016,28 @@
 						</Button>
 						<Button size="sm" variant="outline" onclick={() => (seriesOpen = true)}
 							>Book into a series…</Button
+						>
+					</div>
+					<div class="mb-2 flex justify-end">
+						<Button
+							size="sm"
+							variant="ghost"
+							disabled={!m.bookings.length}
+							onclick={() => {
+								const csv = toCsv([
+									['Class', 'When', 'Status'],
+									...m.bookings.map((b) => [
+										b.className,
+										new Date(b.startsAt).toISOString(),
+										b.booking.status
+									])
+								]);
+								const a = document.createElement('a');
+								a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+								a.download = `bookings-${m.member.name.replaceAll(' ', '-')}.csv`;
+								a.click();
+								URL.revokeObjectURL(a.href);
+							}}>Export CSV</Button
 						>
 					</div>
 					<Table.Root>

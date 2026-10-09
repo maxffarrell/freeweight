@@ -6,6 +6,7 @@
 	import { toast } from 'svelte-sonner';
 	import {
 		getMyClasses,
+		getMyTeachingMonth,
 		updateSession,
 		getCoverNeeded,
 		claimCover,
@@ -30,6 +31,7 @@
 	const settings = await getSettings();
 	const tz = settings.timezone;
 	const classes = await getMyClasses();
+	const month = await getMyTeachingMonth();
 	const cover = $derived(await getCoverNeeded());
 	const timeOff = $derived(await getTimeOff());
 	const availability = await getAvailability();
@@ -150,6 +152,26 @@
 <PageHeader title="My classes" />
 
 <div class="mx-auto w-full max-w-3xl space-y-4">
+	<Card.Root>
+		<Card.Header><Card.Title class="text-base">This month</Card.Title></Card.Header>
+		<Card.Content class="flex gap-6 px-6 pb-4">
+			<div>
+				<p class="text-2xl font-semibold">{month.sessions}</p>
+				<p class="text-xs text-muted-foreground">sessions taught</p>
+			</div>
+			<div>
+				<p class="text-2xl font-semibold">{month.attendees}</p>
+				<p class="text-xs text-muted-foreground">attendees booked</p>
+			</div>
+			{#if month.cancelled}
+				<div>
+					<p class="text-2xl font-semibold text-muted-foreground">{month.cancelled}</p>
+					<p class="text-xs text-muted-foreground">cancelled</p>
+				</div>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Sessions you teach</Card.Title>
