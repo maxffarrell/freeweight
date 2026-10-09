@@ -57,9 +57,25 @@ jobs:
           commit: Version packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  build:
+  reserve:
     needs: plan
-    if: github.event_name == 'pull_request' || needs.plan.outputs.deploy == 'true'
+    if: github.event_name != 'pull_request' && needs.plan.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Reserve immutable release tag before the build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$RELEASE_VERSION" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$RELEASE_VERSION" -f sha="$SOURCE_COMMIT" >/dev/null
+          fi
+  build:
+    needs: [plan, reserve]
+    if: always() && needs.plan.result == 'success' && (github.event_name == 'pull_request' || (needs.plan.outputs.deploy == 'true' && needs.reserve.result == 'success'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
