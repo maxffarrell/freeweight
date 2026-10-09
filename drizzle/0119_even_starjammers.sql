@@ -1,0 +1,1 @@
+ALTER TABLE "class_type" ADD COLUMN "min_age" integer;

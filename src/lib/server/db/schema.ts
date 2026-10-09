@@ -359,6 +359,8 @@ export const classType = pgTable(
 		memberBookable: boolean('member_bookable').notNull().default(true),
 		/** Members must hold at least this progression level to book — null = open to all. */
 		minLevelId: text('min_level_id'),
+		/** Minimum member age (years) to book — for kids/adults-only classes; null = all ages. */
+		minAge: integer('min_age'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

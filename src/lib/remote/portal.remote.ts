@@ -588,6 +588,12 @@ export const getPortalChallenges = query(idSchema, async (memberId) => {
 	return chalSvc.portalChallenges(m.organizationId, m.id);
 });
 
+export const getPortalBadges = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const st = await getSettings(m.organizationId);
+	return svc.portalBadges(m.organizationId, m.id, st.timezone ?? 'UTC');
+});
+
 /** Announcements this member was actually sent — the portal's News feed. */
 /** Stamps openedAt on the member's announcement rows when the News card renders. */
 export const markNewsRead = command(idSchema, async (memberId) => {

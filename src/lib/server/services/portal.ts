@@ -15,6 +15,10 @@ import {
 	document,
 	sessionFeedback,
 	shopItem,
+	resourceBooking,
+	challenge,
+	challengeEntry,
+	eventRegistration,
 	shopSale,
 	signRequest,
 	classVideo,
@@ -504,6 +508,93 @@ async function attendanceStats(orgId: string, memberId: string, tz: string) {
 		totalVisits: rows.length,
 		recent: rows.slice(0, 10)
 	};
+}
+
+/** Portal badges — achievements computed from existing data (no table). */
+export async function portalBadges(orgId: string, memberId: string, tz: string) {
+	const [stats, [m], [prs], [refs], [rates], [shops], [amen], [evts], [wavs], [fins]] =
+		await Promise.all([
+			attendanceStats(orgId, memberId, tz),
+			db
+				.select({ photoDocumentId: gymMember.photoDocumentId })
+				.from(gymMember)
+				.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)))
+				.limit(1),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(personalRecord)
+				.where(
+					and(eq(personalRecord.organizationId, orgId), eq(personalRecord.memberId, memberId))
+				),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(gymMember)
+				.where(
+					and(eq(gymMember.organizationId, orgId), eq(gymMember.referredByMemberId, memberId))
+				),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(sessionFeedback)
+				.where(
+					and(eq(sessionFeedback.organizationId, orgId), eq(sessionFeedback.memberId, memberId))
+				),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(shopSale)
+				.where(and(eq(shopSale.organizationId, orgId), eq(shopSale.memberId, memberId))),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(resourceBooking)
+				.where(
+					and(
+						eq(resourceBooking.organizationId, orgId),
+						eq(resourceBooking.memberId, memberId),
+						eq(resourceBooking.status, 'booked')
+					)
+				),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(eventRegistration)
+				.where(
+					and(eq(eventRegistration.organizationId, orgId), eq(eventRegistration.memberId, memberId))
+				),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(waiver)
+				.where(and(eq(waiver.organizationId, orgId), eq(waiver.memberId, memberId))),
+			db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(challengeEntry)
+				.innerJoin(challenge, eq(challengeEntry.challengeId, challenge.id))
+				.where(
+					and(
+						eq(challengeEntry.organizationId, orgId),
+						eq(challengeEntry.memberId, memberId),
+						sql`(select count(*) from check_in ci where ci.member_id = ${outer(challengeEntry.memberId)} and ci.organization_id = ${orgId} and ci.guest_name is null and ci.checked_at >= ${challenge.startDate}::timestamptz and ci.checked_at < (${challenge.endDate}::date + 1)::timestamptz) >= ${challenge.goal}`
+					)
+				)
+		]);
+	const v = stats.totalVisits;
+	const badges: { id: string; label: string; earned: boolean }[] = [
+		{ id: 'first-visit', label: 'First check-in', earned: v >= 1 },
+		{ id: 'regular-10', label: '10 visits', earned: v >= 10 },
+		{ id: 'regular-50', label: '50 visits', earned: v >= 50 },
+		{ id: 'regular-100', label: '100 visits', earned: v >= 100 },
+		{ id: 'regular-250', label: '250 visits', earned: v >= 250 },
+		{ id: 'streak-4', label: '4-week streak', earned: stats.longestStreak >= 4 },
+		{ id: 'streak-13', label: '13-week streak', earned: stats.longestStreak >= 13 },
+		{ id: 'streak-26', label: 'Half-year streak', earned: stats.longestStreak >= 26 },
+		{ id: 'record-setter', label: 'Logged a PR', earned: (prs?.n ?? 0) > 0 },
+		{ id: 'finisher', label: 'Finished a challenge', earned: (fins?.n ?? 0) > 0 },
+		{ id: 'recruiter', label: 'Referred a member', earned: (refs?.n ?? 0) > 0 },
+		{ id: 'critic', label: 'Rated a class', earned: (rates?.n ?? 0) > 0 },
+		{ id: 'shopper', label: 'Bought something', earned: (shops?.n ?? 0) > 0 },
+		{ id: 'spa-day', label: 'Booked an amenity', earned: (amen?.n ?? 0) > 0 },
+		{ id: 'event-goer', label: 'Joined an event', earned: (evts?.n ?? 0) > 0 },
+		{ id: 'paperwork', label: 'Waiver signed', earned: (wavs?.n ?? 0) > 0 },
+		{ id: 'photo-ready', label: 'Photo uploaded', earned: !!m?.photoDocumentId }
+	];
+	return badges;
 }
 
 /**

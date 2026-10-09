@@ -1345,7 +1345,8 @@ export async function getReports(orgId: string) {
 		guests,
 		payrollPaid,
 		staffing,
-		challengeList
+		challengeList,
+		saveOffers
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1403,7 +1404,8 @@ export async function getReports(orgId: string) {
 		guestStats(orgId),
 		payrollPaidThrough(orgId),
 		rotaVsClocked(orgId),
-		listChallenges(orgId)
+		listChallenges(orgId),
+		saveOfferStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1473,7 +1475,8 @@ export async function getReports(orgId: string) {
 		guestStats: guests,
 		payrollPaid,
 		staffing,
-		challenges: challengeList
+		challenges: challengeList,
+		saveOffers
 	};
 }
 
@@ -1969,4 +1972,22 @@ export async function rotaVsClocked(orgId: string) {
 			deltaHrs: Math.round((v.clockedMin - v.rotaMin) / 6) / 10
 		}))
 		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Save-offer uptake — members who took the stay-instead offer, per month, and who stayed. */
+export async function saveOfferStats(orgId: string) {
+	const rows = await db
+		.select({
+			month: sql<string>`to_char(${membership.saveOfferAt}, 'YYYY-MM')`,
+			taken: sql<number>`count(*)`.mapWith(Number),
+			stayed:
+				sql<number>`count(*) filter (where ${membership.status} in ('active','paused'))`.mapWith(
+					Number
+				)
+		})
+		.from(membership)
+		.where(and(eq(membership.organizationId, orgId), isNotNull(membership.saveOfferAt)))
+		.groupBy(sql`to_char(${membership.saveOfferAt}, 'YYYY-MM')`)
+		.orderBy(desc(sql`to_char(${membership.saveOfferAt}, 'YYYY-MM')`));
+	return rows;
 }
