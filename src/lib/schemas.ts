@@ -101,7 +101,9 @@ export const membershipUpdate = v.object({
 	/** Staff: custom recurring price in minor units; null clears the override. */
 	price: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0)))),
 	/** Pack memberships: renew automatically when the pack runs out or expires. */
-	autoRenew: v.optional(v.boolean())
+	autoRenew: v.optional(v.boolean()),
+	/** Comp'd membership — billing cron never charges it. */
+	noBill: v.optional(v.boolean())
 });
 
 export const grantCreditsInput = v.object({
@@ -617,7 +619,9 @@ export const announcementInput = v.object({
 	/** Restrict the batch to members carrying this tag. */
 	tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50))),
 	/** Restrict the batch to members holding an active membership on this plan. */
-	planId: v.optional(idSchema)
+	planId: v.optional(idSchema),
+	/** Restrict the batch to the at-risk list (no visit in 30+ days). */
+	atRisk: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({

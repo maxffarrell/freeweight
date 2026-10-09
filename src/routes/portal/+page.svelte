@@ -1133,7 +1133,9 @@
 								<Badge
 									>{mm.plan.name}{mm.plan.isPack
 										? ''
-										: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
+										: mm.membership.noBill
+											? ' · complimentary'
+											: ` · ${formatMoney(mm.membership.price ?? mm.plan.amount, currency)}/${mm.plan.interval}`}</Badge
 								>
 							{/if}
 						{/each}

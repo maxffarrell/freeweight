@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import { atRiskMembers } from '#lib/server/services/reports.ts';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/members.ts';
@@ -216,9 +217,15 @@ export const getRecentAnnouncements = query(async () =>
 
 /** How many members the current audience selection would reach — live preview in the send dialog. */
 export const getAnnouncementAudience = query(
-	v.object({ tag: v.optional(v.string()), planId: v.optional(v.string()) }),
-	async ({ tag, planId }) =>
-		countAnnouncementAudience((await requireOrg()).orgId, tag || undefined, planId || undefined)
+	v.object({
+		tag: v.optional(v.string()),
+		planId: v.optional(v.string()),
+		atRisk: v.optional(v.boolean())
+	}),
+	async ({ tag, planId, atRisk }) =>
+		atRisk
+			? (await atRiskMembers((await requireOrg()).orgId)).length
+			: countAnnouncementAudience((await requireOrg()).orgId, tag || undefined, planId || undefined)
 );
 
 /** Sends the draft to the staff user's own inbox — a render preview before blasting. */
@@ -228,11 +235,15 @@ export const emailMeTest = command(announcementInput, async (input) => {
 });
 
 export const emailAllMembers = command(announcementInput, async (input) => {
+	const ctx = await requireOrg();
+	const memberIds = input.atRisk
+		? (await atRiskMembers(ctx.orgId)).map((m) => m.memberId)
+		: input.memberIds;
 	const r = await sendAnnouncement(
-		(await requireOrg()).orgId,
+		ctx.orgId,
 		input.subject,
 		input.message,
-		input.memberIds,
+		memberIds,
 		input.tag,
 		input.planId
 	);
@@ -248,7 +259,8 @@ export const scheduleEmail = command(scheduledAnnouncementInput, async (input) =
 		message: input.message,
 		sendAt: new Date(input.sendAt),
 		tag: input.tag,
-		planId: input.planId
+		planId: input.planId,
+		atRisk: input.atRisk
 	});
 	void getRecentAnnouncements().refresh();
 	return r;
