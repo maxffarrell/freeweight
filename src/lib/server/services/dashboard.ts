@@ -19,6 +19,7 @@ import {
 	deskTask,
 	deskTaskDone,
 	plan,
+	ptRequest,
 	recurringCharge,
 	shopItem,
 	user,
@@ -170,6 +171,20 @@ export async function dashboard(orgId: string) {
 			)
 		)
 		.orderBy(asc(recurringCharge.removalRequestedAt))
+		.limit(50);
+
+	// Pending PT session requests — instructors approve on My classes.
+	const ptPending = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			preferredAt: ptRequest.preferredAt,
+			requestedAt: ptRequest.createdAt
+		})
+		.from(ptRequest)
+		.innerJoin(gymMember, eq(ptRequest.memberId, gymMember.id))
+		.where(and(eq(ptRequest.organizationId, orgId), eq(ptRequest.status, 'pending')))
+		.orderBy(asc(ptRequest.preferredAt))
 		.limit(50);
 
 	// Upcoming sessions flagged as needing a substitute instructor.
@@ -375,6 +390,15 @@ export async function dashboard(orgId: string) {
 				planName: a.description,
 				kind: 'addon' as const,
 				requestedAt: a.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...ptPending.map((p) => ({
+				memberId: p.memberId,
+				memberName: p.memberName,
+				planName: `PT ${p.preferredAt.toISOString().slice(0, 10)}`,
+				kind: 'pt' as const,
+				requestedAt: p.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
 			}))

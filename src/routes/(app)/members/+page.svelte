@@ -12,6 +12,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -21,6 +22,9 @@
 		emailMeTest,
 		scheduleEmail,
 		cancelScheduledEmail,
+		getRecurringEmails,
+		createRecurringEmail,
+		deleteRecurringEmail,
 		getAnnouncementAudience,
 		getRecentAnnouncements,
 		getTags,
@@ -325,6 +329,39 @@
 			toast.error(errMsg(err, 'Could not send — try again'));
 		}
 		emailPending = false;
+	}
+	const recurringEmails = $derived(await getRecurringEmails());
+	let recurWeekday = $state('1');
+	let recurTime = $state('09:00');
+	async function saveRecurringEmail() {
+		if (!emailSubject.trim() || !emailBody.trim())
+			return toast.error('Write the subject and message first');
+		emailPending = true;
+		try {
+			await createRecurringEmail({
+				subject: emailSubject,
+				message: emailBody,
+				tag: audTag || undefined,
+				planId: audPlan || undefined,
+				weekday: Number(recurWeekday),
+				time: recurTime
+			});
+			toast.success('Repeats weekly — the cron sends it');
+			emailOpen = false;
+			emailSubject = emailBody = emailSendAt = '';
+			emailAudience = '__all';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save'));
+		}
+		emailPending = false;
+	}
+	async function dropRecurring(id: string) {
+		try {
+			await deleteRecurringEmail(id);
+			toast.success('Repeating email removed');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
 	}
 	async function cancelScheduled(id: string) {
 		try {
@@ -760,6 +797,27 @@
 				</ul>
 			</div>
 		{/if}
+		{#if recurringEmails.length}
+			<div class="rounded-md border bg-muted/40 p-3 text-sm">
+				<p class="mb-2 font-medium text-muted-foreground">Repeats weekly</p>
+				<ul class="space-y-1.5">
+					{#each recurringEmails as r (r.rule.id)}
+						<li class="flex items-baseline justify-between gap-3">
+							<span class="truncate">{r.rule.subject}</span>
+							<span class="shrink-0 text-xs text-muted-foreground">
+								{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][r.rule.weekday]}
+								{r.rule.time}{r.rule.tag ? ` · tag: ${r.rule.tag}` : ''}{r.planName
+									? ` · plan: ${r.planName}`
+									: ''}
+								<button class="ml-1 underline" onclick={() => dropRecurring(r.rule.id)}
+									>remove</button
+								>
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		<form class="space-y-4" onsubmit={submitAnnouncement}>
 			{#if allTags.length || audiencePlans.length || selected.size}
 				<Field.Field>
@@ -793,6 +851,23 @@
 					<Input id="a-sendat" type="datetime-local" bind:value={emailSendAt} />
 					<Field.Description>Leave blank to send right away.</Field.Description>
 				</Field.Field>
+				<div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2 text-sm">
+					<span class="text-muted-foreground">Or repeat</span>
+					<NativeSelect bind:value={recurWeekday} size="sm">
+						{#each ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as d, i (d)}
+							<option value={String(i)}>{d}</option>
+						{/each}
+					</NativeSelect>
+					<span class="text-muted-foreground">at</span>
+					<Input type="time" class="h-8 w-auto" bind:value={recurTime} />
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						disabled={emailPending}
+						onclick={saveRecurringEmail}>Repeat weekly</Button
+					>
+				</div>
 			{/if}
 			<Field.Field>
 				<Field.Label for="a-body">Message</Field.Label>

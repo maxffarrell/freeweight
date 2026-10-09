@@ -32,13 +32,19 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
-import { notifyCheckInMilestone, notifyFirstVisit, notifyReviewRequest } from './notifications.ts';
+import {
+	notifyCheckInMilestone,
+	notifyFirstVisit,
+	notifyReviewRequest,
+	notifyStreakReward
+} from './notifications.ts';
 import { getRoster, getSession } from './schedule.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
 const MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+const STREAK_MILESTONES = [4, 8, 13, 26, 52];
 
 function sign(payload: string) {
 	return createHmac('sha256', BETTER_AUTH_SECRET).update(`checkin:${payload}`).digest('base64url');
@@ -273,7 +279,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		.select({
 			timezone: gymSettings.timezone,
 			waiverText: gymSettings.waiver,
-			rewardCredits: gymSettings.rewardCredits
+			rewardCredits: gymSettings.rewardCredits,
+			streakRewardCredits: gymSettings.streakRewardCredits
 		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
@@ -336,6 +343,57 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				await db
 					.update(membership)
 					.set({ bonusCredits: sql`${membership.bonusCredits} + ${st.rewardCredits}` })
+					.where(eq(membership.id, ms.id));
+		}
+	}
+
+	// Streak reward: comp classes at week-streak milestones, deduped per streak.
+	if (st?.streakRewardCredits) {
+		const visits = await db
+			.select({ checkedAt: checkIn.checkedAt })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.memberId, memberId),
+					eq(checkIn.organizationId, ctx.orgId),
+					isNull(checkIn.guestName)
+				)
+			);
+		const weekOf = (iso: string) => {
+			const d = new Date(`${iso}T12:00:00Z`);
+			d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+			return d.toISOString().slice(0, 10);
+		};
+		const weeks = new Set(visits.map((v) => weekOf(localDate(v.checkedAt, tz))));
+		let w = weekOf(today);
+		if (!weeks.has(w)) {
+			const prev = new Date(`${w}T12:00:00Z`);
+			prev.setUTCDate(prev.getUTCDate() - 7);
+			w = prev.toISOString().slice(0, 10);
+		}
+		let streak = 0;
+		while (weeks.has(w)) {
+			streak++;
+			const prev = new Date(`${w}T12:00:00Z`);
+			prev.setUTCDate(prev.getUTCDate() - 7);
+			w = prev.toISOString().slice(0, 10);
+		}
+		if (STREAK_MILESTONES.includes(streak)) {
+			const [ms] = await db
+				.select({ id: membership.id })
+				.from(membership)
+				.where(
+					and(
+						eq(membership.organizationId, ctx.orgId),
+						eq(membership.memberId, memberId),
+						eq(membership.status, 'active')
+					)
+				)
+				.limit(1);
+			if (ms && (await notifyStreakReward(ctx.orgId, memberId, streak, st.streakRewardCredits)))
+				await db
+					.update(membership)
+					.set({ bonusCredits: sql`${membership.bonusCredits} + ${st.streakRewardCredits}` })
 					.where(eq(membership.id, ms.id));
 		}
 	}

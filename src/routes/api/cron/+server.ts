@@ -14,6 +14,7 @@ import {
 	sendClassReminders,
 	sendCourseCompletions,
 	sendDueAnnouncements,
+	sendDueRecurringAnnouncements,
 	sendEventReminders,
 	sendResourceReminders,
 	sendInstructorFeedbackDigests,
@@ -74,6 +75,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let briefings = 0;
 	let billingReminders = 0;
 	let announcements = 0;
+	let recurringAnnouncements = 0;
 	let packNudges = 0;
 	let waiverNudges = 0;
 	let ratingNudgeCount = 0;
@@ -150,6 +152,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 		try {
 			announcements += await sendDueAnnouncements(o.id);
+			recurringAnnouncements += await sendDueRecurringAnnouncements(o.id);
 		} catch (err) {
 			failed++;
 			console.error(`scheduled-announcement cron failed for ${o.id}`, err);
@@ -290,6 +293,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		briefings,
 		billingReminders,
 		announcements,
+		recurringAnnouncements,
 		packNudges,
 		waiverNudges,
 		ratingNudges: ratingNudgeCount,

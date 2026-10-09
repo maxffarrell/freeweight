@@ -22,6 +22,8 @@ import {
 	memberNoteInput,
 	memberTagInput,
 	memberUpdate,
+	lockerInput,
+	recurringEmailInput,
 	scheduledAnnouncementInput,
 	signRequestInput,
 	workoutInput,
@@ -30,12 +32,16 @@ import {
 import {
 	cancelScheduledAnnouncement,
 	countAnnouncementAudience,
+	createRecurringAnnouncement,
+	deleteRecurringAnnouncement,
 	listRecentAnnouncements,
+	listRecurringAnnouncements,
 	requestPaymentNotice,
 	scheduleAnnouncement,
 	sendAnnouncement,
 	sendAnnouncementTest
 } from '#lib/server/services/notifications.ts';
+import * as lockerSvc from '#lib/server/services/lockers.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
 
@@ -244,6 +250,58 @@ export const cancelScheduledEmail = command(idSchema, async (id) => {
 	await cancelScheduledAnnouncement((await requireOrg()).orgId, id);
 	void getRecentAnnouncements().refresh();
 });
+
+// ------- recurring announcements -------
+
+export const getRecurringEmails = query(async () =>
+	listRecurringAnnouncements((await requireOrg()).orgId)
+);
+
+export const createRecurringEmail = command(recurringEmailInput, async (input) => {
+	const ctx = await requireOrg();
+	const r = await createRecurringAnnouncement(ctx.orgId, ctx.userId, input);
+	void getRecurringEmails().refresh();
+	return r;
+});
+
+export const deleteRecurringEmail = command(idSchema, async (id) => {
+	const r = await deleteRecurringAnnouncement((await requireOrg()).orgId, id);
+	void getRecurringEmails().refresh();
+	return r;
+});
+
+// ------- lockers -------
+
+export const getLockers = query(async () => lockerSvc.listLockers((await requireOrg()).orgId));
+export const addLocker = command(lockerInput, async ({ label }) => {
+	const r = await lockerSvc.addLocker((await requireOrg()).orgId, label);
+	void getLockers().refresh();
+	return r;
+});
+export const removeLocker = command(idSchema, async (id) => {
+	const r = await lockerSvc.removeLocker(await requireOrg(), id);
+	void getLockers().refresh();
+	return r;
+});
+export const getMemberLocker = query(idSchema, async (memberId) =>
+	lockerSvc.memberLocker((await requireOrg()).orgId, memberId)
+);
+export const assignLocker = command(
+	v.object({ lockerId: idSchema, memberId: idSchema }),
+	async (input) => {
+		const r = await lockerSvc.assignLocker(await requireOrg(), input.lockerId, input.memberId);
+		void Promise.all([getLockers().refresh(), getMemberLocker(input.memberId).refresh()]);
+		return r;
+	}
+);
+export const releaseLocker = command(
+	v.object({ id: idSchema, memberId: idSchema }),
+	async (input) => {
+		const r = await lockerSvc.releaseLocker(await requireOrg(), input.id);
+		void Promise.all([getLockers().refresh(), getMemberLocker(input.memberId).refresh()]);
+		return r;
+	}
+);
 
 // ------- member notes -------
 
