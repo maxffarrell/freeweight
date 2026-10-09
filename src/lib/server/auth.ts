@@ -1,4 +1,4 @@
-import { BETTER_AUTH_SECRET, ORIGIN } from '$app/env/private';
+import { BETTER_AUTH_SECRET, ORIGIN, FREEWEIGHT_DEMO } from '$app/env/private';
 import { getRequestEvent } from '$app/server';
 import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
@@ -16,7 +16,10 @@ export const auth = betterAuth({
 	secret: BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: 'pg' }),
 	emailAndPassword: { enabled: true },
-	session: { cookieCache: { enabled: true, maxAge: 60 } },
+	session: {
+		...(FREEWEIGHT_DEMO ? { expiresIn: 8 * 60, disableSessionRefresh: true } : {}),
+		cookieCache: { enabled: !FREEWEIGHT_DEMO, maxAge: 60 }
+	},
 	// Deploy targets (Railway, Vercel, Docker via scripts/server.ts) all provide x-forwarded-for.
 	advanced: { ipAddress: { ipAddressHeaders: ['x-forwarded-for'] } },
 	plugins: [

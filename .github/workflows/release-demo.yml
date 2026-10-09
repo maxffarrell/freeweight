@@ -1,0 +1,151 @@
+name: Release demo
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Existing release tag to redeploy (for example v0.0.2)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-demo-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      deploy: ${{ steps.plan.outputs.deploy }}
+      version: ${{ steps.plan.outputs.version }}
+      commit: ${{ steps.plan.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.release_ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - id: plan
+        run: node scripts/release/plan.mjs
+  version:
+    needs: plan
+    if: github.event_name == 'push' && needs.plan.outputs.deploy != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - run: npm install -g pnpm@12.4.1
+      - uses: changesets/action@v1
+        with:
+          version: pnpm release:version
+          title: Version packages
+          commit: Version packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build:
+    needs: plan
+    if: github.event_name == 'pull_request' || needs.plan.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: demo_test
+          POSTGRES_PASSWORD: runner-test-only
+          POSTGRES_DB: demo_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U demo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - name: Validate application and release safeguards
+        env:
+          DATABASE_URL: postgres://demo_test:runner-test-only@localhost:5432/demo_test
+          BETTER_AUTH_SECRET: runner-test-only
+        run: |
+          npm install -g pnpm@12.4.1
+          pnpm install --frozen-lockfile
+          pnpm exec prettier --write .
+          pnpm check
+          pnpm lint
+          node scripts/migrate.ts
+          pnpm test $(git ls-files '*.test.ts' '*.spec.ts' | sed '/\.it\.test\.ts$/d')
+          python3 scripts/release/test_release.py
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: needs.plan.outputs.deploy == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image on GitHub runner
+        id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ needs.plan.outputs.deploy == 'true' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:v${{ needs.plan.outputs.version }}
+            ghcr.io/${{ github.repository }}:sha-${{ needs.plan.outputs.commit }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.plan.outputs.commit }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  deploy:
+    needs: [plan, build]
+    if: needs.plan.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: demo
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+      - name: Deploy immutable image and verify demo
+        env:
+          DEMO_SSH_KEY: ${{ secrets.DEMO_SSH_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ needs.build.outputs.digest }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+        run: python3 scripts/release/send.py
+      - name: Record successful release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
+        run: |
+          if ! gh release view "v$RELEASE_VERSION" >/dev/null 2>&1; then
+            gh release create "v$RELEASE_VERSION" --target "$SOURCE_COMMIT" --title "v$RELEASE_VERSION" --generate-notes
+          fi
