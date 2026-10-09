@@ -656,6 +656,8 @@ export const facilityResource = pgTable(
 		status: text('status').notNull().default('open'),
 		/** Short "why" shown to members when status isn't open ("leak — back Friday"). */
 		statusNote: text('status_note').notNull().default(''),
+		/** Minutes blocked after each booking for cleaning/reset. */
+		bufferMin: integer('buffer_min').notNull().default(0),
 		...timestamps
 	},
 	(t) => [index('facility_resource_org_idx').on(t.organizationId)]
@@ -931,6 +933,9 @@ export const charge = pgTable(
 		dueDate: date('due_date', { mode: 'string' }).notNull(),
 		amount: integer('amount').notNull(),
 		status: chargeStatus('status').notNull().default('open'),
+		/** Cost-of-goods snapshot (cents) for retail sales — feeds the P&L; null for
+		 * non-merch charges. */
+		cogsCents: integer('cogs_cents'),
 		...timestamps
 	},
 	(t) => [
@@ -1058,6 +1063,8 @@ export const shopItem = pgTable(
 		stock: integer('stock'),
 		/** Alert staff when stock falls to or below this; null = never alert. */
 		lowStockAt: integer('low_stock_at'),
+		/** Unit cost (cents) — feeds shop COGS/margin on the P&L; null = untracked. */
+		cost: integer('cost'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},

@@ -1,0 +1,1 @@
+ALTER TABLE "charge" ADD COLUMN "cogs_cents" integer;

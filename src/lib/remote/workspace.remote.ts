@@ -191,3 +191,10 @@ export const seedDemo = command(async () => {
 	void getDashboard().refresh();
 	return result;
 });
+
+/** Staff notification bell — actionable items for the active org. */
+export const getNotifications = query(async () => {
+	const ctx = await requireOrg();
+	const st = await settingsSvc.getSettings(ctx.orgId);
+	return dashboardSvc.notifications(ctx.orgId, st.timezone ?? 'UTC');
+});

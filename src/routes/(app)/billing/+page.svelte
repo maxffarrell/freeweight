@@ -363,6 +363,7 @@
 	let itemPrice = $state<number | null>(null);
 	let itemStock = $state<number | null>(null);
 	let itemLowStock = $state<number | null>(null);
+	let itemCost = $state<number | null>(null);
 	async function addItem(e: SubmitEvent) {
 		e.preventDefault();
 		if (itemPrice == null) return;
@@ -372,24 +373,27 @@
 				name: itemName,
 				price: itemPrice,
 				stock: itemStock,
-				lowStockAt: itemLowStock
+				lowStockAt: itemLowStock,
+				cost: itemCost
 			});
 			itemName = '';
 			itemPrice = null;
 			itemStock = null;
 			itemLowStock = null;
+			itemCost = null;
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not add item'));
 		}
 		pending = false;
 	}
-	/** Prompts for a new count and alert level; blank stock = untracked. */
+	/** Prompts for a new count, alert level and unit cost; blank = untracked. */
 	async function setStock(item: {
 		id: string;
 		name: string;
 		stock: number | null;
 		lowStockAt: number | null;
+		cost: number | null;
 	}) {
 		const raw = prompt(
 			`${item.name} — units on hand (blank = unlimited)`,
@@ -405,8 +409,15 @@
 		if (rawLow === null) return;
 		const low = rawLow.trim() === '' ? null : Math.max(0, Math.floor(Number(rawLow)));
 		if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
+		const rawCost = prompt(
+			`${item.name} — unit cost in cents (blank = untracked)`,
+			String(item.cost ?? '')
+		);
+		if (rawCost === null) return;
+		const cost = rawCost.trim() === '' ? null : Math.max(0, Math.floor(Number(rawCost)));
+		if (cost !== null && !Number.isFinite(cost)) return toast.error('Not a number');
 		try {
-			await updateShopItem({ id: item.id, stock: n, lowStockAt: low });
+			await updateShopItem({ id: item.id, stock: n, lowStockAt: low, cost });
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update stock'));
@@ -727,7 +738,13 @@
 									<Table.Row class={i.active ? '' : 'opacity-50'}>
 										<Table.Cell class="font-medium">{i.name}</Table.Cell>
 										<Table.Cell class="text-right tabular-nums"
-											>{formatMoney(i.price, currency)}</Table.Cell
+											>{formatMoney(i.price, currency)}{#if i.cost !== null}<div
+													class="text-xs {i.cost >= i.price
+														? 'text-destructive'
+														: 'text-muted-foreground'}"
+												>
+													margin {formatMoney(i.price - i.cost, currency)}
+												</div>{/if}</Table.Cell
 										>
 										<Table.Cell class="text-right tabular-nums">
 											{#if i.stock === null}—{:else}<span
@@ -808,6 +825,11 @@
 									bind:value={itemStock}
 									placeholder="Leave blank for unlimited"
 								/>
+							</Field.Field>
+							<Field.Field>
+								<Field.Label>Unit cost — optional</Field.Label>
+								<MoneyInput bind:value={itemCost} />
+								<Field.Description>Feeds COGS and margin on the P&amp;L report.</Field.Description>
 							</Field.Field>
 							<Field.Field>
 								<Field.Label for="i-low">Low-stock alert — optional</Field.Label>

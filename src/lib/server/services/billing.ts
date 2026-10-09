@@ -756,7 +756,8 @@ export async function addCharge(
 			kind: input.kind,
 			description: input.description ?? null,
 			amount: input.amount,
-			dueDate: input.dueDate
+			dueDate: input.dueDate,
+			cogsCents: input.cogsCents ?? null
 		})
 		.returning();
 	await emit({
@@ -827,7 +828,8 @@ export async function createShopItem(
 			name: input.name,
 			price: input.price,
 			stock: input.stock ?? null,
-			lowStockAt: input.lowStockAt ?? null
+			lowStockAt: input.lowStockAt ?? null,
+			cost: input.cost ?? null
 		})
 		.returning();
 	return row;
@@ -877,6 +879,7 @@ export async function sellItem(ctx: OrgContext, input: v.InferOutput<typeof s.sa
 		kind: 'other',
 		description: `${item.name}${input.qty > 1 ? ` ×${input.qty}` : ''}`,
 		amount,
+		cogsCents: item.cost !== null ? item.cost * input.qty : null,
 		dueDate: todayISO()
 	});
 	if (input.payNow)

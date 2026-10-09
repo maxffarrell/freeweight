@@ -16,8 +16,11 @@ import {
 	membership,
 	payment,
 	paymentProvider,
+	deskTask,
+	deskTaskDone,
 	plan,
 	recurringCharge,
+	shopItem,
 	user,
 	outer
 } from '#lib/server/db/schema.ts';
@@ -515,4 +518,137 @@ export async function dismissChecklist(orgId: string) {
 		.update(gymSettings)
 		.set({ setupDismissed: true })
 		.where(eq(gymSettings.organizationId, orgId));
+}
+
+/** Actionable items for the staff notification bell — requests, cover gaps, low
+ * stock, undone desk tasks. Each item links to the page that resolves it. */
+export async function notifications(orgId: string, tz: string) {
+	const items: {
+		kind: 'request' | 'cover' | 'stock' | 'task';
+		label: string;
+		detail: string;
+		href: string;
+	}[] = [];
+	const today = localDate(new Date(), tz);
+
+	const requests = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			kind: sql<
+				'cancel' | 'pause' | 'addon'
+			>`case when ${membership.cancelRequestedAt} is not null then 'cancel' when ${membership.pauseRequestedAt} is not null then 'pause' else 'cancel' end`
+		})
+		.from(membership)
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				or(isNotNull(membership.cancelRequestedAt), isNotNull(membership.pauseRequestedAt))
+			)
+		)
+		.limit(20);
+	for (const r of requests)
+		items.push({
+			kind: 'request',
+			label: `${r.memberName} asked to ${r.kind === 'cancel' ? 'cancel' : 'pause'}`,
+			detail: 'membership request',
+			href: `/members/${r.memberId}`
+		});
+
+	const addons = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			desc: recurringCharge.description
+		})
+		.from(recurringCharge)
+		.innerJoin(gymMember, eq(recurringCharge.memberId, gymMember.id))
+		.where(
+			and(
+				eq(recurringCharge.organizationId, orgId),
+				eq(recurringCharge.active, true),
+				isNotNull(recurringCharge.removalRequestedAt)
+			)
+		)
+		.limit(20);
+	for (const a of addons)
+		items.push({
+			kind: 'request',
+			label: `${a.memberName} wants to stop "${a.desc}"`,
+			detail: 'add-on removal',
+			href: `/members/${a.memberId}`
+		});
+
+	const in7d = new Date(Date.now() + 7 * 86_400_000);
+	const covers = await db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNotNull(classSession.coverRequestedAt),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lte(classSession.startsAt, in7d)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(20);
+	for (const c of covers)
+		items.push({
+			kind: 'cover',
+			label: `${c.className} needs cover`,
+			detail: localDate(c.startsAt, tz),
+			href: '/schedule'
+		});
+
+	const lowStock = await db
+		.select({ name: shopItem.name, stock: shopItem.stock })
+		.from(shopItem)
+		.where(
+			and(
+				eq(shopItem.organizationId, orgId),
+				eq(shopItem.active, true),
+				isNotNull(shopItem.lowStockAt),
+				sql`${shopItem.stock} <= ${shopItem.lowStockAt}`
+			)
+		)
+		.limit(20);
+	for (const i of lowStock)
+		items.push({
+			kind: 'stock',
+			label: `${i.name} is ${i.stock === 0 ? 'out of stock' : `low (${i.stock} left)`}`,
+			detail: 'shop stock',
+			href: '/billing'
+		});
+
+	const tasks = await db
+		.select({ id: deskTask.id, label: deskTask.label })
+		.from(deskTask)
+		.where(and(eq(deskTask.organizationId, orgId), eq(deskTask.active, true)));
+	const done = await db
+		.select({ taskId: deskTaskDone.taskId })
+		.from(deskTaskDone)
+		.where(and(eq(deskTaskDone.organizationId, orgId), eq(deskTaskDone.doneOn, today)));
+	const doneSet = new Set(done.map((d) => d.taskId));
+	const undone = tasks.filter((t) => !doneSet.has(t.id));
+	if (undone.length)
+		items.push({
+			kind: 'task',
+			label: `${undone.length} desk task${undone.length === 1 ? '' : 's'} still open today`,
+			detail:
+				undone
+					.slice(0, 3)
+					.map((t) => t.label)
+					.join(', ') + (undone.length > 3 ? '…' : ''),
+			href: '/dashboard'
+		});
+
+	return items;
 }

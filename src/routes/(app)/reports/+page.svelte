@@ -406,7 +406,8 @@
 			<Card.Header>
 				<Card.Title class="text-base">Profit &amp; loss</Card.Title>
 				<Card.Description>
-					Revenue vs logged expenses per month — record costs on Billing → Expenses
+					Revenue vs logged expenses + shop cost-of-goods per month — costs on Billing → Expenses,
+					item cost on Billing → Shop
 				</Card.Description>
 			</Card.Header>
 			<Card.Content>
@@ -417,6 +418,7 @@
 								<Table.Head>Month</Table.Head>
 								<Table.Head class="text-right">Revenue</Table.Head>
 								<Table.Head class="text-right">Expenses</Table.Head>
+								<Table.Head class="text-right">Shop COGS</Table.Head>
 								<Table.Head class="text-right">Net</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -429,6 +431,9 @@
 									>
 									<Table.Cell class="text-right tabular-nums"
 										>{formatMoney(m.expenses, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-right tabular-nums"
+										>{m.cogs ? formatMoney(m.cogs, currency) : '—'}</Table.Cell
 									>
 									<Table.Cell
 										class="text-right font-medium tabular-nums {m.net < 0
