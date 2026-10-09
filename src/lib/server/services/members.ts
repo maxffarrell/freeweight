@@ -95,7 +95,9 @@ export async function listMembers(
 	risk?: boolean,
 	family?: boolean,
 	birthday?: boolean,
-	noContact?: boolean
+	noContact?: boolean,
+	/** Members who hit the unsubscribe link — excluded from member emails. */
+	unsubscribed?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -165,6 +167,7 @@ export async function listMembers(
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
 					: undefined,
 				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
+				unsubscribed ? isNotNull(gymMember.unsubscribedAt) : undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

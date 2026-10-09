@@ -144,7 +144,8 @@
 			risk: owesFilter === '__risk' || undefined,
 			family: owesFilter === '__family' || undefined,
 			birthday: owesFilter === '__bday' || undefined,
-			noContact: owesFilter === '__nocontact' || undefined
+			noContact: owesFilter === '__nocontact' || undefined,
+			unsubscribed: owesFilter === '__unsub' || undefined
 		});
 	}
 	function search() {
@@ -640,7 +641,9 @@
 										? 'Birthday month'
 										: owesFilter === '__nocontact'
 											? 'No contact info'
-											: 'Any balance'}</Select.Trigger
+											: owesFilter === '__unsub'
+												? 'Unsubscribed'
+												: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -651,6 +654,7 @@
 				<Select.Item value="__family">Has family</Select.Item>
 				<Select.Item value="__bday">Birthday month</Select.Item>
 				<Select.Item value="__nocontact">No contact info</Select.Item>
+				<Select.Item value="__unsub">Unsubscribed</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>

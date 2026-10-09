@@ -1106,10 +1106,9 @@
 			><ChevronRight /></Button
 		>
 		<span class="ml-2 text-sm text-muted-foreground"
-			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.reduce(
-				(a, r) => a + (r.booked ?? 0),
-				0
-			)} booked</span
+			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
+				(r) => !r.session.cancelledAt && !r.session.instructorId
+			).length} unstaffed · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked</span
 		>
 		<Button
 			variant="outline"
@@ -1179,6 +1178,10 @@
 								>{/if}
 							{#if s.session.cancelledAt}<Badge variant="destructive" class="text-xs"
 									>cancelled</Badge
+								>{/if}
+							{#if !s.session.instructorId && !s.session.cancelledAt}<Badge
+									variant="outline"
+									class="border-amber-500/60 text-xs text-amber-600">unstaffed</Badge
 								>{/if}
 							{#if s.session.coverRequestedAt && !s.session.cancelledAt}<Badge
 									variant="outline"
