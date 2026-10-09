@@ -661,13 +661,25 @@
 		bookSessions = await getSessions();
 		bookOpen = true;
 	}
-	/** No active membership → the dialog sells paid drop-ins instead of booking. */
+	/** No active membership → the dialog sells paid drop-ins instead of booking.
+	 * Dependents may draw from a guardian's pack, so a no-membership member tries
+	 * a normal booking first and only falls back to drop-in on the 402. */
 	const hasActiveMembership = m.memberships.some((mm) => mm.membership.status === 'active');
 	async function bookInto(sessionId: string, dropInPrice?: number | null) {
 		bookPending = sessionId;
 		try {
-			const dropIn = !hasActiveMembership;
-			const b = await bookSession({ sessionId, memberId: id, dropIn, guests: bookGuests });
+			let b: Awaited<ReturnType<typeof bookSession>>;
+			let dropIn = false;
+			if (hasActiveMembership) {
+				b = await bookSession({ sessionId, memberId: id, guests: bookGuests });
+			} else {
+				try {
+					b = await bookSession({ sessionId, memberId: id, guests: bookGuests });
+				} catch {
+					dropIn = true;
+					b = await bookSession({ sessionId, memberId: id, dropIn: true, guests: bookGuests });
+				}
+			}
 			toast.success(
 				dropIn
 					? `Drop-in booked — ${formatMoney(dropInPrice ?? 0, currency)} charge posted`

@@ -1079,7 +1079,8 @@ export async function getReports(orgId: string) {
 		giftCards,
 		profitability,
 		memberValue,
-		planChurn
+		planChurn,
+		funnel
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1119,7 +1120,8 @@ export async function getReports(orgId: string) {
 		giftCardStats(orgId),
 		classProfitability(orgId),
 		memberLifetimeValue(orgId),
-		churnByPlan(orgId)
+		churnByPlan(orgId),
+		memberFunnel(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1171,8 +1173,57 @@ export async function getReports(orgId: string) {
 		giftCards,
 		profitability,
 		memberValue,
-		planChurn
+		planChurn,
+		funnel
 	};
+}
+
+/**
+ * Acquisition funnel: leads captured -> members on file -> members who trialed
+ * -> active paying members -> members still active 90+ days after joining.
+ */
+async function memberFunnel(orgId: string) {
+	const [{ n: leads }] = await db
+		.select({ n: sql<number>`count(distinct ${activity.entityId})`.mapWith(Number) })
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'member'),
+				eq(activity.action, 'lead')
+			)
+		);
+	const [{ n: members }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, orgId));
+	const [{ n: trialed }] = await db
+		.select({ n: sql<number>`count(distinct ${membership.memberId})`.mapWith(Number) })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), gt(plan.trialDays, 0)));
+	const [{ n: paying }] = await db
+		.select({ n: sql<number>`count(distinct ${membership.memberId})`.mapWith(Number) })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		);
+	const [{ n: retained }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				lt(gymMember.createdAt, new Date(Date.now() - 90 * 86400_000))
+			)
+		);
+	return { leads, members, trialed, paying, retained };
 }
 
 /**

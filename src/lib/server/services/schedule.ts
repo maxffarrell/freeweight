@@ -925,7 +925,7 @@ function creditWindow(ms: ActiveMembership) {
 
 export async function creditsUsedIn(
 	orgId: string,
-	memberId: string,
+	memberId: string | null,
 	membershipId: string,
 	window: { start: string; end: string },
 	classTypeId?: string | null,
@@ -938,7 +938,9 @@ export async function creditsUsedIn(
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
-				eq(booking.memberId, memberId),
+				// null counts every booking charged to this membership — shared
+				// family packs let dependents drain a guardian's pack.
+				memberId ? eq(booking.memberId, memberId) : undefined,
 				inArray(booking.status, [...CREDIT_STATUSES]),
 				// A cancelled class gives the credit back.
 				isNull(classSession.cancelledAt),
@@ -1108,7 +1110,7 @@ export async function renewExpiredPacks(orgId: string) {
 async function pickEntitlement(
 	q: Pick<typeof db, 'select'>,
 	orgId: string,
-	memberId: string,
+	memberId: string | null,
 	mss: ActiveMembership[],
 	classTypeId: string,
 	className: string
@@ -1161,7 +1163,17 @@ export async function bookSession(
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
-	const mss = await activeMemberships(ctx.orgId, input.memberId);
+	let mss = await activeMemberships(ctx.orgId, input.memberId);
+	// Family packs: a dependent with no own membership may book from the
+	// guardian's — credits then count across the whole household.
+	let sharedPack = false;
+	if (!mss.length && m.guardianId && !input.dropIn) {
+		const gm = await activeMemberships(ctx.orgId, m.guardianId);
+		if (gm.length) {
+			mss = gm;
+			sharedPack = true;
+		}
+	}
 	// Staff-side drop-in: no membership required, the class's drop-in
 	// charge posts to the member's balance instead.
 	if (!mss.length && !input.dropIn) error(402, 'An active membership is required to book');
@@ -1196,7 +1208,14 @@ export async function bookSession(
 		// class first, then a plan, then an open pack. Drop-ins never drain credits.
 		const ms = input.dropIn
 			? null
-			: await pickEntitlement(tx, ctx.orgId, input.memberId, mss, s.classTypeId, s.className);
+			: await pickEntitlement(
+					tx,
+					ctx.orgId,
+					sharedPack ? null : input.memberId,
+					mss,
+					s.classTypeId,
+					s.className
+				);
 		if (input.dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 			error(409, `No drop-in price set on ${s.className}`);
 		// "First class free": a member's first-ever booking skips the drop-in charge.

@@ -171,7 +171,7 @@
 		if (!bookMemberId) return;
 		try {
 			const m = memberList.find((mm) => mm.id === bookMemberId);
-			const dropIn = m ? !m.planName : false;
+			const dropIn = m ? !m.planName && !m.guardianPlanName : false;
 			const b = await bookSession({
 				sessionId: focusId,
 				memberId: bookMemberId,
@@ -1146,7 +1146,7 @@
 						{#each memberList.filter((mm) => mm.status === 'active') as mm (mm.id)}
 							<Select.Item value={mm.id}
 								>{mm.name}{#if !mm.planName}
-									(drop-in){/if}</Select.Item
+									({mm.guardianPlanName ? 'family' : 'drop-in'}){/if}</Select.Item
 							>
 						{/each}
 					</Select.Content>
@@ -1170,13 +1170,17 @@
 				<Button
 					onclick={book}
 					disabled={!bookMemberId ||
-						(!memberList.find((mm) => mm.id === bookMemberId)?.planName && !focus?.dropInPrice)}
-					>Book</Button
+						(!memberList.find((mm) => mm.id === bookMemberId)?.planName &&
+							!memberList.find((mm) => mm.id === bookMemberId)?.guardianPlanName &&
+							!focus?.dropInPrice)}>Book</Button
 				>
 			</div>
 			{#if bookMemberId && !memberList.find((mm) => mm.id === bookMemberId)?.planName}
+				{@const bk = memberList.find((mm) => mm.id === bookMemberId)}
 				<p class="text-xs text-amber-600 dark:text-amber-400">
-					{#if focus?.dropInPrice}
+					{#if bk?.guardianPlanName}
+						No own membership — books from the guardian's {bk.guardianPlanName}.
+					{:else if focus?.dropInPrice}
 						No active membership — booking posts a {formatMoney(focus.dropInPrice, currency)}
 						drop-in charge.
 					{:else}

@@ -91,6 +91,11 @@ export async function listMembers(
 			planName: sql<
 				string | null
 			>`(select p2.name from ${membership} m2 join ${plan} p2 on p2.id = m2.plan_id where m2.member_id = ${outer(gymMember.id)} and m2.status = 'active' order by m2.created_at desc limit 1)`,
+			/** Dependents can book from a guardian's membership — the picker's
+			 * eligibility gate needs to know without a second query. */
+			guardianPlanName: sql<
+				string | null
+			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
 			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`
 		})
 		.from(gymMember)
