@@ -84,7 +84,9 @@
 		setPackAutoRenew,
 		getMyWorkouts,
 		giftPackCredits,
-		getMyDataExport
+		getMyDataExport,
+		getNpsStatus,
+		submitNps
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -207,6 +209,23 @@
 		rateBusy = false;
 	}
 	const d = $derived(await getPortalOverview(memberId));
+	const npsStatus = $derived(await getNpsStatus(memberId));
+	const npsDue = $derived(npsStatus.due);
+	let npsScore = $state<number | null>(null);
+	let npsComment = $state('');
+	let npsPending = $state(false);
+	let npsSent = $state(false);
+	async function sendNps() {
+		if (npsScore == null) return;
+		npsPending = true;
+		try {
+			await submitNps({ memberId, score: npsScore, comment: npsComment || undefined });
+			npsSent = true;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		npsPending = false;
+	}
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
 
@@ -1698,6 +1717,48 @@
 	{/if}
 
 	{#if news.length}
+		<Card.Root class="md:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">How are we doing?</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				{#if npsDue === null}
+					<p class="text-sm text-muted-foreground">Loading…</p>
+				{:else if !npsDue}
+					<p class="text-sm text-muted-foreground">
+						Thanks for the feedback — we'll ask again soon.
+					</p>
+				{:else if npsSent}
+					<p class="text-sm text-muted-foreground">Thanks — noted!</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						How likely are you to recommend us to a friend?
+					</p>
+					<div class="mt-2 flex flex-wrap gap-1">
+						{#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as n (n)}
+							<button
+								type="button"
+								class="size-8 rounded-md border text-sm transition-colors {npsScore === n
+									? 'border-primary bg-primary text-primary-foreground'
+									: 'text-muted-foreground hover:border-primary'}"
+								onclick={() => (npsScore = n)}>{n}</button
+							>
+						{/each}
+					</div>
+					{#if npsScore !== null}
+						<Input
+							class="mt-3"
+							placeholder="Anything we could do better? (optional)"
+							bind:value={npsComment}
+						/>
+						<Button class="mt-2" size="sm" onclick={sendNps} disabled={npsPending}
+							>{npsPending ? 'Sending…' : 'Send feedback'}</Button
+						>
+					{/if}
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
 		<Card.Root class="sm:col-span-2">
 			<Card.Header class="pb-2">
 				<Card.Title class="text-base">News</Card.Title>

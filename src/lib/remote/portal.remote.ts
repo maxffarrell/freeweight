@@ -796,3 +796,22 @@ export const getMyDataExport = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return svc.exportMemberData(m.organizationId, m.id);
 });
+
+export const getNpsStatus = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.npsStatus(m.organizationId, m.id);
+});
+
+export const submitNps = command(
+	v.object({
+		memberId: idSchema,
+		score: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)),
+		comment: v.optional(v.pipe(v.string(), v.maxLength(500)))
+	}),
+	async (input) => {
+		const m = await myMember(input.memberId);
+		const r = await svc.submitNps(m.organizationId, m.id, null, input.score, input.comment);
+		void getNpsStatus(input.memberId).refresh();
+		return r;
+	}
+);

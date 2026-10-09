@@ -48,6 +48,7 @@ import {
 	deleteAnnouncementTemplate as deleteAnnouncementTemplateSvc
 } from '#lib/server/services/notifications.ts';
 import * as levelSvc from '#lib/server/services/levels.ts';
+import * as loanSvc from '#lib/server/services/loans.ts';
 import * as lockerSvc from '#lib/server/services/lockers.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
@@ -449,3 +450,49 @@ export const deleteAnnouncementTemplate = command(idSchema, async (id) => {
 	void getAnnouncementTemplates().refresh();
 	return r;
 });
+
+export const getLoanables = query(async () => loanSvc.listLoanables((await requireOrg()).orgId));
+
+export const addLoanable = command(
+	v.object({
+		name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+		quantity: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99))
+	}),
+	async (input) => {
+		const ctx = await requireOrg('admin');
+		const r = await loanSvc.addLoanable(ctx.orgId, input.name, input.quantity);
+		void getLoanables().refresh();
+		return r;
+	}
+);
+
+export const removeLoanable = command(idSchema, async (id) => {
+	const ctx = await requireOrg('admin');
+	const r = await loanSvc.removeLoanable(ctx.orgId, id);
+	void getLoanables().refresh();
+	return r;
+});
+
+export const getMemberLoans = query(idSchema, async (memberId) =>
+	loanSvc.memberLoans((await requireOrg()).orgId, memberId)
+);
+
+export const loanItem = command(
+	v.object({ itemId: idSchema, memberId: idSchema }),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await loanSvc.loanItem(ctx, input.itemId, input.memberId);
+		void getMemberLoans(input.memberId).refresh();
+		return r;
+	}
+);
+
+export const returnLoan = command(
+	v.object({ loanId: idSchema, memberId: idSchema }),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await loanSvc.returnLoan(ctx, input.loanId);
+		void getMemberLoans(input.memberId).refresh();
+		return r;
+	}
+);

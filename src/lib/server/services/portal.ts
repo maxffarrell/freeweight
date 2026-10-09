@@ -19,6 +19,7 @@ import {
 	gymSettings,
 	location,
 	memberLevel,
+	memberNps,
 	memberMeasurement,
 	memberNote,
 	membership,
@@ -1367,4 +1368,44 @@ export async function exportMemberData(orgId: string, memberId: string) {
 		signRequests,
 		waivers
 	};
+}
+
+/** Latest satisfaction score — the portal asks once every 90 days. */
+export async function npsStatus(orgId: string, memberId: string) {
+	const cutoff = new Date(Date.now() - 90 * 86400_000);
+	const [row] = await db
+		.select({ id: memberNps.id })
+		.from(memberNps)
+		.where(
+			and(
+				eq(memberNps.organizationId, orgId),
+				eq(memberNps.memberId, memberId),
+				gte(memberNps.createdAt, cutoff)
+			)
+		)
+		.limit(1);
+	return { due: !row };
+}
+
+export async function submitNps(
+	orgId: string,
+	memberId: string,
+	userId: string | null,
+	score: number,
+	comment?: string
+) {
+	if (score < 0 || score > 10) error(400, 'Score must be 0–10');
+	const [row] = await db
+		.insert(memberNps)
+		.values({ organizationId: orgId, memberId, score, comment: comment || null })
+		.returning();
+	emit({
+		orgId,
+		actorId: null,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'updated',
+		summary: `Left feedback — ${score}/10`
+	});
+	return row;
 }

@@ -339,6 +339,8 @@ export const classType = pgTable(
 		bookCutoffMin: integer('book_cutoff_min'),
 		/** false = staff-only: members can't self-book in the portal (desk bookings still work). */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
@@ -828,6 +830,8 @@ export const gymEvent = pgTable(
 		price: integer('price'),
 		/** Members can self-register in the portal. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		active: boolean('active').notNull().default(true),
 		...timestamps
@@ -887,6 +891,8 @@ export const course = pgTable(
 		capacity: integer('capacity'),
 		/** false = staff enroll members; members can't self-register. */
 		memberBookable: boolean('member_bookable').notNull().default(true),
+		/** Members must hold at least this progression level to book — null = open to all. */
+		minLevelId: text('min_level_id'),
 		/** Split the course price across this many monthly charges (1 = pay up front). */
 		installments: integer('installments').notNull().default(1),
 		...timestamps
@@ -1441,4 +1447,68 @@ export const announcementTemplate = pgTable(
 		...timestamps
 	},
 	(t) => [index('announcement_template_org_idx').on(t.organizationId)]
+);
+
+/** Which staff may teach which class type — empty per class = anyone. */
+export const instructorQual = pgTable(
+	'instructor_qual',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => member.id, { onDelete: 'cascade' }),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		...timestamps
+	},
+	(t) => [index('instructor_qual_org_idx').on(t.organizationId)]
+);
+
+/** One-tap member satisfaction scores gathered in the portal. */
+export const memberNps = pgTable(
+	'member_nps',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		score: integer('score').notNull(),
+		comment: text('comment'),
+		...timestamps
+	},
+	(t) => [index('member_nps_org_idx').on(t.organizationId)]
+);
+
+/** Loanable kit (ropes, bands, mats) — stock + per-member loans. */
+export const loanableItem = pgTable(
+	'loanable_item',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		quantity: integer('quantity').notNull().default(1),
+		...timestamps
+	},
+	(t) => [index('loanable_item_org_idx').on(t.organizationId)]
+);
+
+export const equipmentLoan = pgTable(
+	'equipment_loan',
+	{
+		id: id(),
+		organizationId: orgId(),
+		itemId: text('item_id')
+			.notNull()
+			.references(() => loanableItem.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		outAt: timestamp('out_at', { withTimezone: true }).notNull().defaultNow(),
+		returnedAt: timestamp('returned_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [index('equipment_loan_org_idx').on(t.organizationId)]
 );

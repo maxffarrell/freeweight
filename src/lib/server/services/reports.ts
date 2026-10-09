@@ -17,6 +17,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
 import {
+	memberNps,
 	activity,
 	booking,
 	charge,
@@ -1084,7 +1085,8 @@ export async function getReports(orgId: string) {
 		memberValue,
 		planChurn,
 		funnel,
-		courses
+		courses,
+		nps
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1126,7 +1128,8 @@ export async function getReports(orgId: string) {
 		memberLifetimeValue(orgId),
 		churnByPlan(orgId),
 		memberFunnel(orgId),
-		courseStats(orgId)
+		courseStats(orgId),
+		npsStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1180,7 +1183,41 @@ export async function getReports(orgId: string) {
 		memberValue,
 		planChurn,
 		funnel,
-		courses
+		courses,
+		nps
+	};
+}
+
+async function npsStats(orgId: string) {
+	const [[agg], recent] = await Promise.all([
+		db
+			.select({
+				n: sql<number>`count(*)`.mapWith(Number),
+				avg: sql<number>`coalesce(avg(${memberNps.score}), 0)`.mapWith(Number),
+				promoters: sql<number>`count(*) filter (where ${memberNps.score} >= 9)`.mapWith(Number),
+				detractors: sql<number>`count(*) filter (where ${memberNps.score} <= 6)`.mapWith(Number)
+			})
+			.from(memberNps)
+			.where(eq(memberNps.organizationId, orgId)),
+		db
+			.select({
+				score: memberNps.score,
+				comment: memberNps.comment,
+				createdAt: memberNps.createdAt,
+				memberName: gymMember.name
+			})
+			.from(memberNps)
+			.innerJoin(gymMember, eq(memberNps.memberId, gymMember.id))
+			.where(eq(memberNps.organizationId, orgId))
+			.orderBy(desc(memberNps.createdAt))
+			.limit(10)
+	]);
+	const n = agg?.n ?? 0;
+	return {
+		n,
+		avg: Math.round((agg?.avg ?? 0) * 10) / 10,
+		score: n > 0 ? Math.round(((agg!.promoters - agg!.detractors) / n) * 100) : null,
+		recent
 	};
 }
 
