@@ -101,6 +101,17 @@ export const getRoster = query(idSchema, async (id) =>
 	svc.getRoster((await requireOrg()).orgId, id)
 );
 
+/** Staff re-seats a booking into another session of the same class. */
+export const moveBooking = command(
+	v.object({ bookingId: idSchema, sessionId: idSchema }),
+	async ({ bookingId, sessionId }) => {
+		const r = await svc.moveBooking(await requireOrg(), bookingId, sessionId);
+		void getSessions().refresh();
+		void getRoster(sessionId).refresh();
+		return r;
+	}
+);
+
 export const setBookingNote = command(
 	v.object({
 		bookingId: idSchema,

@@ -54,6 +54,7 @@
 					<h2 class="text-sm font-semibold tracking-wide uppercase">
 						{localTime(sess.startsAt, sheet.tz)} — {sess.className}
 						{#if sess.cancelled}<span class="text-destructive normal-case">(cancelled)</span>{/if}
+						{#if sess.cover}<span class="text-amber-600 normal-case"> — needs cover</span>{/if}
 					</h2>
 					<p class="text-xs text-muted-foreground">
 						{sess.instructor ?? 'Unassigned'}{#if sess.location}
@@ -61,6 +62,9 @@
 						· {Math.round((sess.endsAt.getTime() - sess.startsAt.getTime()) / 60000)} min
 					</p>
 				</div>
+				{#if sess.note}
+					<p class="mb-1 text-xs text-muted-foreground italic">{sess.note}</p>
+				{/if}
 				<table class="w-full text-sm">
 					<tbody>
 						{#each sess.roster as r (r.name + r.status)}

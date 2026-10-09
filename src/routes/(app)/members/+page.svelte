@@ -19,6 +19,7 @@
 		getMembers,
 		createMember,
 		emailAllMembers,
+	previewAnnouncement,
 		emailMeTest,
 		scheduleEmail,
 		cancelScheduledEmail,
@@ -343,6 +344,17 @@
 			toast.error(errMsg(err, 'Could not add level'));
 		}
 	}
+	let emailPreview = $state<string | null>(null);
+	async function togglePreview() {
+		if (emailPreview != null) return (emailPreview = null);
+		if (!emailSubject.trim() && !emailBody.trim())
+			return toast.error('Write the subject and message first');
+		try {
+			emailPreview = await previewAnnouncement({ subject: emailSubject, message: emailBody });
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not preview'));
+		}
+	}
 	let emailSubject = $state('');
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
@@ -402,6 +414,7 @@
 			}
 			emailOpen = false;
 			emailSubject = emailBody = emailSendAt = '';
+			emailPreview = null;
 			emailAudience = '__all';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not send — try again'));
@@ -427,6 +440,7 @@
 			toast.success('Repeats weekly — the cron sends it');
 			emailOpen = false;
 			emailSubject = emailBody = emailSendAt = '';
+			emailPreview = null;
 			emailAudience = '__all';
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not save'));
@@ -996,6 +1010,13 @@
 					Personalize with {'{name}'} or {'{first_name}'}.
 				</Field.Description>
 			</Field.Field>
+			{#if emailPreview != null}
+				<iframe
+					title="Email preview"
+					srcdoc={emailPreview}
+					class="h-64 w-full rounded-md border bg-white"
+				></iframe>
+			{/if}
 			<Dialog.Footer class="items-center justify-between sm:justify-between">
 				<span class="text-xs text-muted-foreground">
 					{audienceCount == null
@@ -1010,6 +1031,12 @@
 						onclick={sendTest}
 						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
 						>{testPending ? 'Sending…' : 'Send me a test'}</Button
+					>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={togglePreview}>{emailPreview != null ? 'Hide preview' : 'Preview'}</Button
 					>
 					<Button
 						type="button"
