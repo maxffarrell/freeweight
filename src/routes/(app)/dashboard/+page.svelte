@@ -452,7 +452,9 @@
 							{#each d.pendingRequests as r (r.memberId + r.kind + r.planName)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a
-										href={r.kind === 'equipment' ? '/schedule' : `/members/{r.memberId}`}
+										href={r.kind === 'equipment' || r.kind === 'empty'
+											? '/schedule'
+											: `/members/{r.memberId}`}
 										class="truncate hover:underline"
 										title={r.requestReason ?? undefined}>{r.memberName}</a
 									>
@@ -473,7 +475,9 @@
 																	? 'delete my data'
 																	: r.kind === 'equipment'
 																		? r.planName
-																		: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+																		: r.kind === 'empty'
+																			? r.planName
+																			: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>

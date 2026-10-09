@@ -343,6 +343,14 @@
 			.filter((c) => c.charge.status === 'open')
 			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
 	);
+	const memberMonths = $derived(
+		m.member.joinedAt
+			? Math.max(
+					0,
+					Math.floor((Date.now() - new Date(m.member.joinedAt).getTime()) / (30.4 * 86400_000))
+				)
+			: 0
+	);
 	const lifetimePaid = $derived(
 		m.payments.filter((p) => !p.refundedAt).reduce((sum, p) => sum + p.amount, 0)
 	);
@@ -1016,7 +1024,7 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Joined</span><span
-						>{formatDate(m.member.joinedAt)}</span
+						>{formatDate(m.member.joinedAt)}{memberMonths > 0 ? ` · ${memberMonths} mo` : ''}</span
 					>
 				</div>
 				<div class="flex justify-between">
