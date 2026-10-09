@@ -1,6 +1,4 @@
 import { sql, eq, and, desc } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
-import { pgTable, text, timestamp, jsonb, uuid } from 'drizzle-orm/pg-core';
 import { notificationLog, organization, activity } from '../src/lib/server/db/schema.ts';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 
