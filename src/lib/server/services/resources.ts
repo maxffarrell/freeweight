@@ -172,7 +172,10 @@ export async function bookResource(
 					eq(resourceBooking.resourceId, resourceId),
 					eq(resourceBooking.status, 'booked'),
 					lt(resourceBooking.startsAt, endsAt),
-					gt(sql`${resourceBooking.endsAt} + (${r.bufferMin} * interval '1 minute')`, startsAt)
+					gt(
+						sql`${resourceBooking.endsAt} + (${r.bufferMin} * interval '1 minute')`,
+						sql`${startsAt.toISOString()}::timestamptz`
+					)
 				)
 			);
 		if (taken >= r.capacity) error(409, 'That slot is full');
