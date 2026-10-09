@@ -1,0 +1,27 @@
+# Deploy button spec for DigitalOcean App Platform:
+# https://cloud.digitalocean.com/apps/new?repo=https://github.com/maxffarrell/freeweight/tree/main
+spec:
+  name: freeweight
+  services:
+    - name: web
+      dockerfile_path: Dockerfile
+      github:
+        repo: maxffarrell/freeweight
+        branch: main
+        deploy_on_push: true
+      http_port: 3000
+      instance_count: 1
+      instance_size_slug: basic-xxs
+      health_check:
+        http_path: /healthz
+      envs:
+        - key: DATABASE_URL
+          scope: RUN_AND_BUILD_TIME
+          value: ${db.DATABASE_URL}
+        - key: BETTER_AUTH_SECRET
+          scope: RUN_AND_BUILD_TIME
+          type: SECRET
+  databases:
+    - name: db
+      engine: PG
+      production: false
