@@ -5,6 +5,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import Logo from '#lib/components/app/logo.svelte';
 	import {
+		checkOutAll,
 		getTodayCheckIns,
 		recordCheckIn,
 		checkOut,
@@ -21,6 +22,7 @@
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import QrCode from '@lucide/svelte/icons/qr-code';
@@ -365,6 +367,20 @@
 				{#if insideRows.length > 12}
 					<span class="shrink-0 text-xs text-muted-foreground">+{insideRows.length - 12} more</span>
 				{/if}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="ml-auto shrink-0"
+					onclick={async () => {
+						if (!confirm(`Check out all ${insideRows.length} member(s) still inside?`)) return;
+						try {
+							const n = await checkOutAll();
+							toast.success(`Checked out ${n}`);
+						} catch (err) {
+							toast.error(errMsg(err, 'Could not check out'));
+						}
+					}}>Out all</Button
+				>
 			</div>
 		{/if}
 	</header>

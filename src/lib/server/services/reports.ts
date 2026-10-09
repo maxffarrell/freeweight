@@ -40,6 +40,7 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	locker,
 	rota,
 	shift,
 	member,
@@ -676,6 +677,26 @@ async function guestStats(orgId: string) {
 	return {
 		monthTotal: rows.reduce((a, r) => a + r.guests, 0),
 		bringers: rows.slice(0, 8)
+	};
+}
+
+/** Locker bank occupancy — assigned vs total, plus the members holding one. */
+async function lockerStats(orgId: string) {
+	const rows = await db
+		.select({
+			id: locker.id,
+			label: locker.label,
+			memberId: locker.memberId,
+			memberName: gymMember.name
+		})
+		.from(locker)
+		.leftJoin(gymMember, eq(locker.memberId, gymMember.id))
+		.where(eq(locker.organizationId, orgId))
+		.orderBy(locker.label);
+	return {
+		total: rows.length,
+		assigned: rows.filter((r) => r.memberId).length,
+		rows: rows.filter((r) => r.memberId).slice(0, 8)
 	};
 }
 
@@ -1385,7 +1406,8 @@ export async function getReports(orgId: string) {
 		staffing,
 		challengeList,
 		saveOffers,
-		visitFreq
+		visitFreq,
+		lockers
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1445,7 +1467,8 @@ export async function getReports(orgId: string) {
 		rotaVsClocked(orgId),
 		listChallenges(orgId),
 		saveOfferStats(orgId),
-		visitFrequency(orgId)
+		visitFrequency(orgId),
+		lockerStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1517,7 +1540,8 @@ export async function getReports(orgId: string) {
 		staffing,
 		challenges: challengeList,
 		saveOffers,
-		visitFrequency: visitFreq
+		visitFrequency: visitFreq,
+		lockers
 	};
 }
 

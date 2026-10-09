@@ -109,6 +109,7 @@ export async function listMembers(
 			photoDocumentId: gymMember.photoDocumentId,
 			deskNote: gymMember.deskNote,
 			referralSource: gymMember.referralSource,
+			guardianId: gymMember.guardianId,
 			locationName: location.name,
 			tags: sql<
 				string[]

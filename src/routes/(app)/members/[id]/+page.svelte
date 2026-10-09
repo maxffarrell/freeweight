@@ -1115,7 +1115,15 @@
 					<span class="tabular-nums"
 						>{m.attendance.noShows}{m.attendance.showRate != null
 							? ` · ${m.attendance.showRate}% show rate`
-							: ''}</span
+							: ''}{#if m.bookings.some((b) => b.booking.status === 'no_show')}
+							{@const lastNs = m.bookings
+								.filter((b) => b.booking.status === 'no_show')
+								.map((b) => new Date(b.startsAt).getTime())
+								.reduce((a, t) => Math.max(a, t), 0)}
+							<span class="text-xs text-muted-foreground"
+								>· last {formatDate(new Date(lastNs))}</span
+							>
+						{/if}</span
 					>
 				</div>
 				<div class="flex justify-between">
