@@ -114,6 +114,15 @@ export const addMemberTag = command(memberTagInput, async ({ memberId, tag }) =>
 	void getTags().refresh();
 });
 /** Bulk-tag members from the list's selection toolbar. Returns how many got the tag. */
+export const bulkSetInactive = command(
+	v.object({ memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)) }),
+	async ({ memberIds }) => {
+		const n = await svc.setMembersInactive(await requireOrg(), memberIds);
+		void getMembers().refresh();
+		return n;
+	}
+);
+
 export const tagMembers = command(bulkTagInput, async ({ memberIds, tag }) => {
 	const n = await svc.addTagToMembers(await requireOrg(), memberIds, tag);
 	void getMembers().refresh();
@@ -225,9 +234,10 @@ export const getCheckIns = query(
 		q: v.optional(v.string()),
 		inside: v.optional(v.boolean()),
 		guests: v.optional(v.boolean()),
-		method: v.optional(v.picklist(['qr', 'manual']))
+		method: v.optional(v.picklist(['qr', 'manual'])),
+		locationId: v.optional(idSchema)
 	}),
-	async ({ date, q, inside, guests, method }) => {
+	async ({ date, q, inside, guests, method, locationId }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
@@ -238,7 +248,8 @@ export const getCheckIns = query(
 			q,
 			inside,
 			guestsOnly: guests,
-			method
+			method,
+			locationId
 		});
 	}
 );

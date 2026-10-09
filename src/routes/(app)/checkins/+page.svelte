@@ -4,6 +4,7 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
@@ -28,13 +29,15 @@
 	let insideOnly = $state(false);
 	let guestsOnly = $state(false);
 	let method = $state<'' | 'qr' | 'manual'>('');
+	let filterLocation = $state('');
 	async function refilter() {
 		checkIns = await getCheckIns({
 			date: viewDate,
 			q: q.trim() || undefined,
 			inside: insideOnly || undefined,
 			guests: guestsOnly || undefined,
-			method: method || undefined
+			method: method || undefined,
+			locationId: filterLocation === '__all' ? undefined : filterLocation || undefined
 		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -202,6 +205,25 @@
 						void refilter();
 					}}>Guests</Button
 				>
+				{#if locations.length > 1}
+					<Select.Root
+						type="single"
+						bind:value={filterLocation}
+						onValueChange={() => void refilter()}
+					>
+						<Select.Trigger class="w-36"
+							>{filterLocation && filterLocation !== '__all'
+								? (locations.find((l) => l.id === filterLocation)?.name ?? 'Location')
+								: 'All locations'}</Select.Trigger
+						>
+						<Select.Content>
+							<Select.Item value="__all">All locations</Select.Item>
+							{#each locations as l (l.id)}
+								<Select.Item value={l.id}>{l.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
 				<Button
 					size="sm"
 					variant={method === 'qr' ? 'default' : 'outline'}

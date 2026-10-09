@@ -288,6 +288,31 @@ export async function addTagToMembers(ctx: OrgContext, memberIds: string[], tag:
 	return rows.length;
 }
 
+/** Bulk-mark members inactive — reversible, keeps all history. */
+export async function setMembersInactive(ctx: OrgContext, memberIds: string[]) {
+	const rows = await db
+		.update(gymMember)
+		.set({ status: 'inactive', updatedAt: new Date() })
+		.where(
+			and(
+				eq(gymMember.organizationId, ctx.orgId),
+				inArray(gymMember.id, memberIds),
+				eq(gymMember.status, 'active')
+			)
+		)
+		.returning({ id: gymMember.id });
+	if (rows.length)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'gym_member',
+			entityId: rows[0].id,
+			action: 'bulk_set_inactive',
+			summary: `${rows.length} member${rows.length === 1 ? '' : 's'} marked inactive`
+		});
+	return rows.length;
+}
+
 export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: string) {
 	await db
 		.delete(memberTag)
@@ -412,7 +437,8 @@ export async function getMember(orgId: string, id: string) {
 				thisMonth:
 					sql<number>`count(*) filter (where ${checkIn.guestName} is null and ${checkIn.checkedAt} >= date_trunc('month', now()))`.mapWith(
 						Number
-					)
+					),
+				firstVisit: sql<Date | null>`min(${checkIn.checkedAt}) filter (where ${checkIn.guestName} is null)`
 			})
 			.from(checkIn)
 			.where(and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id))),
@@ -601,6 +627,7 @@ export async function getMember(orgId: string, id: string) {
 		attendance: {
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,
+			firstVisit: att?.firstVisit ?? null,
 			noShows: bs?.noShows ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:
