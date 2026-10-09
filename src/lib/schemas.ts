@@ -505,6 +505,9 @@ export const settingsInput = v.object({
 	streakRewardCredits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
 	),
+	lateCancelFreebies: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10)))
+	),
 	reviewAfterVisits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
 	),
@@ -792,6 +795,23 @@ export const recurringEmailInput = v.object({
 	planId: v.optional(v.nullable(idSchema)),
 	weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
 	time: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)'))
+});
+
+export const levelInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(40)),
+	color: v.optional(v.pipe(v.string(), v.maxLength(30)))
+});
+
+export const setLevelInput = v.object({
+	memberId: idSchema,
+	levelId: v.nullable(idSchema)
+});
+
+export const announcementTemplateInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+	subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(150)),
+	message: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(5000)),
+	tag: v.optional(v.pipe(v.string(), v.maxLength(50)))
 });
 
 export const lockerInput = v.object({

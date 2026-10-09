@@ -24,6 +24,9 @@ import {
 	memberUpdate,
 	lockerInput,
 	recurringEmailInput,
+	levelInput,
+	setLevelInput,
+	announcementTemplateInput,
 	scheduledAnnouncementInput,
 	signRequestInput,
 	workoutInput,
@@ -39,8 +42,12 @@ import {
 	requestPaymentNotice,
 	scheduleAnnouncement,
 	sendAnnouncement,
-	sendAnnouncementTest
+	sendAnnouncementTest,
+	listAnnouncementTemplates,
+	createAnnouncementTemplate,
+	deleteAnnouncementTemplate as deleteAnnouncementTemplateSvc
 } from '#lib/server/services/notifications.ts';
+import * as levelSvc from '#lib/server/services/levels.ts';
 import * as lockerSvc from '#lib/server/services/lockers.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
@@ -401,3 +408,44 @@ export const transferPackCredits = command(
 
 /** PR wall: latest records for the lobby display, auto-refreshed by the page. */
 export const getPrWall = query(async () => svc.prWall((await requireOrg()).orgId));
+
+export const getLevels = query(async () => levelSvc.listLevels((await requireOrg()).orgId));
+
+export const addLevel = command(levelInput, async (input) => {
+	const ctx = await requireOrg('admin');
+	const r = await levelSvc.addLevel(ctx.orgId, input.name, input.color);
+	void getLevels().refresh();
+	return r;
+});
+
+export const removeLevel = command(idSchema, async (id) => {
+	const ctx = await requireOrg('admin');
+	const r = await levelSvc.removeLevel(ctx.orgId, id);
+	void getLevels().refresh();
+	return r;
+});
+
+export const setMemberLevel = command(setLevelInput, async (input) => {
+	const ctx = await requireOrg('admin');
+	const r = await levelSvc.setMemberLevel(ctx, input.memberId, input.levelId);
+	void getLevels().refresh();
+	return r;
+});
+
+export const getAnnouncementTemplates = query(async () =>
+	listAnnouncementTemplates((await requireOrg()).orgId)
+);
+
+export const saveAnnouncementTemplate = command(announcementTemplateInput, async (input) => {
+	const ctx = await requireOrg();
+	const r = await createAnnouncementTemplate(ctx.orgId, ctx.userId, input);
+	void getAnnouncementTemplates().refresh();
+	return r;
+});
+
+export const deleteAnnouncementTemplate = command(idSchema, async (id) => {
+	const ctx = await requireOrg();
+	const r = await deleteAnnouncementTemplateSvc(ctx.orgId, id);
+	void getAnnouncementTemplates().refresh();
+	return r;
+});

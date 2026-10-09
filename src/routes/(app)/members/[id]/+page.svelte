@@ -47,6 +47,8 @@
 		transferPackCredits,
 		getMemberLocker,
 		getLockers,
+		getLevels,
+		setMemberLevel,
 		assignLocker,
 		releaseLocker
 	} from '#lib/remote/members.remote.ts';
@@ -210,6 +212,18 @@
 	// ------- tags -------
 	const allTags = $derived(await getTags());
 	const memberLocker = $derived(await getMemberLocker(id));
+	const levels = $derived(await getLevels());
+	const levelName = $derived(levels.find((l) => l.id === m.member.skillLevelId)?.name ?? null);
+	let levelPick = $state('');
+	$effect(() => {
+		if (levelPick) {
+			const levelId = levelPick;
+			levelPick = '';
+			setMemberLevel({ memberId: id, levelId })
+				.then(() => toast.success('Level updated'))
+				.catch((err) => toast.error(errMsg(err, 'Could not set level')));
+		}
+	});
 	const allLockers = $derived(await getLockers());
 	const freeLockers = $derived(allLockers.filter((l) => !l.locker.memberId));
 	let lockerPick = $state('');
@@ -935,6 +949,21 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
+				</div>
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-muted-foreground">Level</span>
+					<span class="flex items-center gap-1.5">
+						{#if levels.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={levelPick}>
+								<option value="">{levelName ?? 'set…'}</option>
+								{#each levels as l (l.id)}
+									<option value={l.id}>{l.name}</option>
+								{/each}
+							</NativeSelect>
+						{:else}
+							<span class="text-muted-foreground">{levelName ?? '—'}</span>
+						{/if}
+					</span>
 				</div>
 				<div class="flex items-center justify-between gap-2">
 					<span class="text-muted-foreground">Locker</span>

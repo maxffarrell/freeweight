@@ -30,7 +30,13 @@
 		getTags,
 		getDuplicates,
 		importMembers,
-		tagMembers
+		tagMembers,
+		getLevels,
+		addLevel,
+		removeLevel,
+		getAnnouncementTemplates,
+		saveAnnouncementTemplate,
+		deleteAnnouncementTemplate
 	} from '#lib/remote/members.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import {
@@ -40,6 +46,7 @@
 	} from '#lib/remote/challenges.remote.ts';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import Trophy from '@lucide/svelte/icons/trophy';
+	import Medal from '@lucide/svelte/icons/medal';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
 	import { getCurrency, getPlans } from '#lib/remote/billing.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -273,6 +280,59 @@
 	}
 	// ------- email all -------
 	let emailOpen = $state(false);
+	const emailTemplates = $derived(await getAnnouncementTemplates());
+	let templatePick = $state('');
+	const templateApplied = $derived(emailTemplates.find((t) => t.id === templatePick) ?? null);
+	$effect(() => {
+		if (templatePick) {
+			const t = emailTemplates.find((x) => x.id === templatePick);
+			if (t) {
+				emailSubject = t.subject;
+				emailBody = t.message;
+				if (t.tag) emailAudience = `tag:${t.tag}`;
+			}
+		}
+	});
+	async function saveTemplate() {
+		const name = window.prompt('Template name', emailSubject.slice(0, 40));
+		if (!name?.trim()) return;
+		try {
+			await saveAnnouncementTemplate({
+				name: name.trim(),
+				subject: emailSubject,
+				message: emailBody,
+				tag: emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined
+			});
+			toast.success('Template saved');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save template'));
+		}
+	}
+	async function removeTemplate() {
+		if (!templateApplied) return;
+		try {
+			await deleteAnnouncementTemplate(templateApplied.id);
+			templatePick = '';
+			toast.success('Template deleted');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
+	let levelsOpen = $state(false);
+	let newLevelName = $state('');
+	let newLevelColor = $state('');
+	const levels = $derived(await getLevels());
+	async function addLevelSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLevel({ name: newLevelName, color: newLevelColor || undefined });
+			newLevelName = '';
+			newLevelColor = '';
+			toast.success('Level added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add level'));
+		}
+	}
 	let emailSubject = $state('');
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
@@ -420,6 +480,8 @@
 		>
 		<Button size="sm" variant="outline" onclick={() => (chalOpen = true)}
 			><Trophy /> Challenges</Button
+		>
+		<Button size="sm" variant="outline" onclick={() => (levelsOpen = true)}><Medal /> Levels</Button
 		>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
@@ -738,6 +800,23 @@
 				Goes to active members with an email on file — closures, schedule changes, news.
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if emailTemplates.length}
+			<div class="flex items-center gap-2">
+				<NativeSelect size="sm" class="w-auto" bind:value={templatePick}>
+					<option value="">Load template…</option>
+					{#each emailTemplates as t (t.id)}
+						<option value={t.id}>{t.name}</option>
+					{/each}
+				</NativeSelect>
+				{#if templateApplied}
+					<button
+						type="button"
+						class="text-xs text-muted-foreground hover:underline"
+						onclick={removeTemplate}>Delete "{templateApplied.name}"</button
+					>
+				{/if}
+			</div>
+		{/if}
 		{#if ai.licensed}
 			<div class="rounded-md border bg-muted/40 p-3">
 				{#if ai.configured}
@@ -897,6 +976,13 @@
 						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
 						>{testPending ? 'Sending…' : 'Send me a test'}</Button
 					>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={saveTemplate}
+						disabled={!emailSubject.trim() || !emailBody.trim()}>Save template</Button
+					>
 					<Button type="submit" disabled={emailPending || audienceCount === 0}>
 						{emailPending
 							? 'Sending…'
@@ -993,5 +1079,47 @@
 				>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={levelsOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Progression levels</Dialog.Title>
+			<Dialog.Description
+				>Belts, ranks, skill tiers — whatever your gym calls them. Set a member's level on their
+				page.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="flex items-center gap-2" onsubmit={addLevelSubmit}>
+			<Input placeholder="Blue belt" bind:value={newLevelName} required />
+			<Input placeholder="#3b82f6" class="w-24" bind:value={newLevelColor} />
+			<Button type="submit" size="sm">Add</Button>
+		</form>
+		<ul class="divide-y">
+			{#each levels as l (l.id)}
+				<li class="flex items-center justify-between py-2.5 text-sm">
+					<span class="flex items-center gap-2">
+						{#if l.color}
+							<span class="size-3 rounded-full" style:background={l.color}></span>
+						{/if}
+						<span class="font-medium">{l.name}</span>
+					</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-7 px-2 text-xs text-destructive"
+						onclick={async () => {
+							await removeLevel(l.id);
+							toast.success('Removed');
+						}}>Remove</Button
+					>
+				</li>
+			{:else}
+				<li class="py-6 text-sm text-muted-foreground">
+					No levels yet — add your first rank above.
+				</li>
+			{/each}
+		</ul>
 	</Dialog.Content>
 </Dialog.Root>

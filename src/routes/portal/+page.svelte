@@ -835,7 +835,11 @@
 		try {
 			const b = await memberCancel({ memberId, bookingId });
 			toast.success(
-				b.lateFeeApplied ? 'Cancelled — a late-cancel fee was charged' : 'Booking cancelled'
+				b.lateFeeApplied
+					? 'Cancelled — a late-cancel fee was charged'
+					: b.lateFeeForgiven
+						? 'Cancelled late — free late cancel used, no fee'
+						: 'Booking cancelled'
 			);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not cancel'));
@@ -1060,6 +1064,15 @@
 					<h1 class="text-xl font-semibold">Hi {d.member.name.split(' ')[0]}</h1>
 					<p class="text-sm text-muted-foreground">Show this code at the front desk to check in.</p>
 					<div class="mt-3 flex flex-wrap gap-1.5">
+						{#if d.level}
+							<Badge variant="secondary" class="gap-1.5">
+								{#if d.level.color}<span
+										class="size-2 rounded-full"
+										style:background={d.level.color}
+									></span>{/if}
+								{d.level.name}
+							</Badge>
+						{/if}
 						{#each d.memberships as mm (mm.membership.id)}
 							{#if mm.membership.status === 'active'}
 								<Badge

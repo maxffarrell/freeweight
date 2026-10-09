@@ -18,6 +18,7 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	memberLevel,
 	memberMeasurement,
 	memberNote,
 	membership,
@@ -318,7 +319,7 @@ export async function portalOverview(memberId: string) {
 	> = {};
 	for (const r of wbRows) (whiteboard[r.sessionId] ??= []).push(r);
 
-	const [priorBooking, [avatarDoc], [firstVisit]] = await Promise.all([
+	const [priorBooking, [avatarDoc], [firstVisit], [level]] = await Promise.all([
 		hasPriorBooking(memberId),
 		db
 			.select({ id: document.id })
@@ -335,11 +336,19 @@ export async function portalOverview(memberId: string) {
 					isNull(checkIn.guestName)
 				)
 			)
-			.limit(1)
+			.limit(1),
+		m.skillLevelId
+			? db
+					.select({ name: memberLevel.name, color: memberLevel.color })
+					.from(memberLevel)
+					.where(eq(memberLevel.id, m.skillLevelId))
+					.limit(1)
+			: Promise.resolve([])
 	]);
 
 	return {
 		member: m,
+		level: level ?? null,
 		settings,
 		memberships,
 		guardianHasMembership,
