@@ -1175,7 +1175,7 @@ export async function bookSession(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.bookingInput>,
 	actorId?: string | null,
-	opts?: { notify?: boolean; skipDailyLimit?: boolean }
+	opts?: { notify?: boolean; skipDailyLimit?: boolean; compFrom?: string }
 ) {
 	const [m] = await db
 		.select()
@@ -1195,7 +1195,8 @@ export async function bookSession(
 	}
 	// Staff-side drop-in: no membership required, the class's drop-in
 	// charge posts to the member's balance instead.
-	if (!mss.length && !input.dropIn) error(402, 'An active membership is required to book');
+	if (!mss.length && !input.dropIn && !opts?.compFrom)
+		error(402, 'An active membership is required to book');
 
 	const [st] = await db
 		.select({
@@ -1240,18 +1241,47 @@ export async function bookSession(
 			if (!gate || !held || held.sort < gate.sort)
 				error(409, `${s.className} requires ${gate?.name ?? 'a higher level'}`);
 		}
+		// Makeup booking: compFrom marks a free replacement for a booking the
+		// member lost to a gym-side cancellation (same class, no credit drain).
+		let compFrom: string | null = null;
+		if (opts?.compFrom) {
+			if (input.dropIn) error(400, 'A makeup booking cannot be a drop-in');
+			const [src] = await tx
+				.select({
+					status: booking.status,
+					sessionCancelled: classSession.cancelledAt,
+					srcClassTypeId: classSession.classTypeId
+				})
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(booking.id, opts.compFrom),
+						eq(booking.memberId, input.memberId),
+						eq(booking.organizationId, ctx.orgId)
+					)
+				)
+				.for('update');
+			if (!src || src.status !== 'booked' || !src.sessionCancelled)
+				error(409, 'Only a booking lost to a class cancellation earns a makeup');
+			if (src.srcClassTypeId !== s.classTypeId)
+				error(409, 'Makeup bookings must be for the same class');
+			compFrom = opts.compFrom;
+		}
 		// Which membership pays for this booking — restricted pack for its own
-		// class first, then a plan, then an open pack. Drop-ins never drain credits.
-		const ms = input.dropIn
-			? null
-			: await pickEntitlement(
-					tx,
-					ctx.orgId,
-					sharedPack ? null : input.memberId,
-					mss,
-					s.classTypeId,
-					s.className
-				);
+		// class first, then a plan, then an open pack. Drop-ins and makeups
+		// never drain credits.
+		const ms =
+			input.dropIn || compFrom
+				? null
+				: await pickEntitlement(
+						tx,
+						ctx.orgId,
+						sharedPack ? null : input.memberId,
+						mss,
+						s.classTypeId,
+						s.className
+					);
 		if (input.dropIn && (s.dropInPrice == null || s.dropInPrice <= 0))
 			error(409, `No drop-in price set on ${s.className}`);
 		// "First class free": a member's first-ever booking skips the drop-in charge.
@@ -1376,7 +1406,8 @@ export async function bookSession(
 					cancelledAt: null,
 					createdAt: new Date(),
 					membershipId: ms?.membership.id ?? null,
-					guestCount: guests
+					guestCount: guests,
+					compBookingId: compFrom
 				})
 				.where(eq(booking.id, existing.id))
 				.returning();
@@ -1390,6 +1421,7 @@ export async function bookSession(
 				memberId: input.memberId,
 				membershipId: ms?.membership.id ?? null,
 				guestCount: guests,
+				compBookingId: compFrom,
 				status
 			})
 			.returning();

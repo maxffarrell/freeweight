@@ -1,0 +1,2 @@
+ALTER TABLE "booking" ADD COLUMN "comp_booking_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "booking_comp_idx" ON "booking" USING btree ("comp_booking_id") WHERE "booking"."comp_booking_id" is not null and "booking"."status" != 'cancelled';

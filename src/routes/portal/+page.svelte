@@ -62,8 +62,10 @@
 		getPortalChallenges,
 		joinChallenge,
 		leaveChallenge,
+		getMakeups,
 		getPortalAnnouncements,
 		markNewsRead,
+		bookMakeup,
 		addDependent,
 		getPortalAi,
 		aiWorkoutPlan,
@@ -477,6 +479,18 @@
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
 	const news = $derived(await getPortalAnnouncements(memberId));
+	const makeups = $derived(await getMakeups(memberId));
+	let mkBusy = $state('');
+	async function bookMk(compFrom: string, sessionId: string) {
+		mkBusy = sessionId;
+		try {
+			const status = await bookMakeup({ memberId, compFrom, sessionId });
+			toast.success(status === 'waitlisted' ? "You're on the waitlist" : 'Makeup class booked');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not book the makeup'));
+		}
+		mkBusy = '';
+	}
 	let newsMarked = $state('');
 	$effect(() => {
 		if (news.length && newsMarked !== memberId) {
@@ -1732,6 +1746,48 @@
 								{c.leaders.map((l, i) => `${i + 1}. ${l.name} (${l.count})`).join(' · ')}
 							</p>
 						{/if}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if makeups.length}
+		<Card.Root class="md:col-span-2">
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Make up a cancelled class</Card.Title>
+				<Card.Description
+					>Your spot was cancelled — rebook free into a later session.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content class="divide-y px-6">
+				{#each makeups as mk (mk.bookingId)}
+					<div class="py-3 first:pt-0 last:pb-0">
+						<p class="text-sm font-medium">
+							{mk.className}
+							<span class="font-normal text-muted-foreground">
+								— was {formatDate(localDate(mk.wasAt, d.settings?.timezone ?? 'UTC'))}</span
+							>
+						</p>
+						<div class="mt-2 flex flex-wrap gap-2">
+							{#each mk.candidates as c (c.sessionId)}
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={mkBusy === c.sessionId}
+									onclick={() => bookMk(mk.bookingId, c.sessionId)}
+								>
+									{formatDate(localDate(c.startsAt, d.settings?.timezone ?? 'UTC'))}
+									{localTime(c.startsAt, d.settings?.timezone ?? 'UTC')}
+									{#if c.locationName}
+										<span class="text-muted-foreground">· {c.locationName}</span>
+									{/if}
+									{#if c.free <= 0}
+										<span class="text-muted-foreground">· waitlist</span>
+									{/if}
+								</Button>
+							{/each}
+						</div>
 					</div>
 				{/each}
 			</Card.Content>

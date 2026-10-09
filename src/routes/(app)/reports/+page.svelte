@@ -1202,6 +1202,32 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">On pause</Card.Title>
+			<Card.Description>Paused memberships and when they come back</Card.Description>
+		</Card.Header>
+		<Card.Content class="divide-y px-6">
+			{#each r.paused as p (p.memberName + p.planName)}
+				<div class="flex items-center justify-between gap-2 py-2 text-sm">
+					<span class="truncate font-medium">{p.memberName}</span>
+					<span class="shrink-0 text-xs text-muted-foreground">
+						{p.planName}
+						{#if p.frozenUntil}
+							· resumes {p.frozenUntil}
+						{:else if p.pauseUntil}
+							· out until {p.pauseUntil}
+						{:else}
+							· manual resume
+						{/if}
+					</span>
+				</div>
+			{:else}
+				<p class="py-2 text-sm text-muted-foreground">No paused memberships.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Member funnel</Card.Title>
 			<Card.Description>Leads → members → trialed → paying → retained 90+ days</Card.Description>
 		</Card.Header>

@@ -4,10 +4,11 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { authClient } from '#lib/auth-client.ts';
-	import { getFranchise } from '#lib/remote/franchise.remote.ts';
+	import { getFranchise, searchFranchiseMembers } from '#lib/remote/franchise.remote.ts';
 	import { formatMoney } from '#lib/format.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -15,6 +16,32 @@
 	const multiCurrency = new Set(f.gyms.map((g) => g.currency)).size > 1;
 	let switching = $state<string | null>(null);
 	const expanded = new SvelteSet<string>();
+	let memberQ = $state('');
+	let memberHits = $state<
+		{
+			orgId: string;
+			orgName: string;
+			memberId: string;
+			name: string;
+			email: string | null;
+			status: string;
+			memberships: number;
+		}[]
+	>([]);
+	let searchPending = $state(false);
+
+	async function runSearch() {
+		if (memberQ.trim().length < 2) {
+			memberHits = [];
+			return;
+		}
+		searchPending = true;
+		try {
+			memberHits = await searchFranchiseMembers(memberQ);
+		} finally {
+			searchPending = false;
+		}
+	}
 
 	function toggle(g: { id: string }) {
 		if (expanded.has(g.id)) {
@@ -72,6 +99,53 @@
 				</Card.Header>
 			</Card.Root>
 		</div>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Find a member across gyms</Card.Title>
+				<Card.Description
+					>Name or email — searches every gym you own or administer.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<form
+					class="flex gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						runSearch();
+					}}
+				>
+					<Input class="max-w-xs" placeholder="member@email.com or a name" bind:value={memberQ} />
+					<Button type="submit" variant="outline" disabled={searchPending}
+						>{searchPending ? 'Searching…' : 'Search'}</Button
+					>
+				</form>
+				{#if memberHits.length}
+					<Table.Root class="mt-4">
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Member</Table.Head>
+								<Table.Head>Email</Table.Head>
+								<Table.Head>Gym</Table.Head>
+								<Table.Head class="text-right">Active plans</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each memberHits as h (h.orgId + h.memberId)}
+								<Table.Row>
+									<Table.Cell class="font-medium">{h.name}</Table.Cell>
+									<Table.Cell class="text-muted-foreground">{h.email ?? '—'}</Table.Cell>
+									<Table.Cell>{h.orgName}</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">{h.memberships}</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				{:else if memberQ.trim().length >= 2 && !searchPending}
+					<p class="mt-3 text-sm text-muted-foreground">No members match across your gyms.</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>

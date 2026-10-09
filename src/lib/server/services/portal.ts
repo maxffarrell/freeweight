@@ -1,5 +1,17 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	ne,
+	sql
+} from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -622,6 +634,84 @@ export async function memberBook(
 		userId,
 		opts
 	);
+}
+
+/**
+ * Makeup offers: bookings the member lost to a gym-side session cancellation
+ * and hasn't replaced yet, each with the free candidate sessions of the same
+ * class coming up in the next 14 days.
+ */
+export async function memberMakeups(orgId: string, memberId: string) {
+	const lost = await db
+		.select({
+			bookingId: booking.id,
+			className: classType.name,
+			classTypeId: classSession.classTypeId,
+			wasAt: classSession.startsAt,
+			replacedBy: sql<
+				string | null
+			>`(select b2.id from ${booking} b2 where b2.comp_booking_id = ${booking.id} and b2.status != 'cancelled' limit 1)`
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.memberId, memberId),
+				eq(booking.status, 'booked'),
+				isNotNull(classSession.cancelledAt)
+			)
+		)
+		.orderBy(desc(classSession.startsAt))
+		.limit(10);
+
+	const now = new Date();
+	const horizon = new Date(Date.now() + 14 * 86_400_000);
+	const out = [];
+	for (const l of lost) {
+		if (l.replacedBy) continue;
+		const candidates = await db
+			.select({
+				sessionId: classSession.id,
+				startsAt: classSession.startsAt,
+				locationName: location.name,
+				free: sql<number>`${classSession.capacity} - (select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status = 'booked')`.mapWith(
+					Number
+				)
+			})
+			.from(classSession)
+			.leftJoin(location, eq(classSession.locationId, location.id))
+			.where(
+				and(
+					eq(classSession.organizationId, orgId),
+					eq(classSession.classTypeId, l.classTypeId),
+					isNull(classSession.cancelledAt),
+					gte(classSession.startsAt, now),
+					lt(classSession.startsAt, horizon),
+					sql`not exists (select 1 from ${booking} b3 where b3.session_id = ${outer(classSession.id)} and b3.member_id = ${memberId} and b3.status in ('booked','waitlisted'))`
+				)
+			)
+			.orderBy(asc(classSession.startsAt))
+			.limit(6);
+		if (candidates.length) out.push({ ...l, candidates });
+	}
+	return out;
+}
+
+/**
+ * Books the member into a makeup session for a booking they lost to a
+ * gym-side cancellation — free, no credit drain, same class only.
+ * `compFrom` is validated inside bookSession's row lock.
+ */
+export async function memberBookMakeup(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	compFrom: string,
+	sessionId: string
+) {
+	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, { compFrom });
 }
 
 /**

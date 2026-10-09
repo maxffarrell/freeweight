@@ -528,6 +528,25 @@ export const markNewsRead = command(idSchema, async (memberId) => {
 	await notif.markAnnouncementsRead(m.organizationId, m.email);
 });
 
+/** Makeup offers for bookings lost to gym-side class cancellations. */
+export const getMakeups = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!m) error(404);
+	return svc.memberMakeups(m.organizationId, memberId);
+});
+
+export const bookMakeup = command(
+	v.object({ memberId: idSchema, compFrom: idSchema, sessionId: idSchema }),
+	async ({ memberId, compFrom, sessionId }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const r = await svc.memberBookMakeup(m.organizationId, user.id, memberId, compFrom, sessionId);
+		await getPortalOverview(memberId).refresh();
+		await getMakeups(memberId).refresh();
+		return r.status;
+	}
+);
+
 export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!m.email) return [];
