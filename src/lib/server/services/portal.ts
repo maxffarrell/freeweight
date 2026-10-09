@@ -4,6 +4,7 @@ import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import {
+	locker,
 	booking,
 	charge,
 	checkIn,
@@ -347,8 +348,15 @@ export async function portalOverview(memberId: string) {
 			: Promise.resolve([])
 	]);
 
+	const [lk] = await db
+		.select({ label: locker.label })
+		.from(locker)
+		.where(and(eq(locker.organizationId, orgId), eq(locker.memberId, memberId)))
+		.limit(1);
+
 	return {
 		member: m,
+		lockerLabel: lk?.label ?? null,
 		level: level ?? null,
 		settings,
 		memberships,
