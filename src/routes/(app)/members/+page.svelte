@@ -78,7 +78,8 @@
 		name: 'Name A–Z',
 		joined: 'Newest',
 		lastVisit: 'Last visit',
-		balance: 'Balance due'
+		balance: 'Balance due',
+		visits30: 'Most visits (30d)'
 	} as const;
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let owesFilter = $state(initOwes ? 'owes' : 'any');
@@ -146,7 +147,8 @@
 			birthday: owesFilter === '__bday' || undefined,
 			noContact: owesFilter === '__nocontact' || undefined,
 			unsubscribed: owesFilter === '__unsub' || undefined,
-			referred: owesFilter === '__referred' || undefined
+			referred: owesFilter === '__referred' || undefined,
+			neverBooked: owesFilter === '__neverbooked' || undefined
 		});
 	}
 	function search() {
@@ -646,7 +648,9 @@
 												? 'Unsubscribed'
 												: owesFilter === '__referred'
 													? 'Referred'
-													: 'Any balance'}</Select.Trigger
+													: owesFilter === '__neverbooked'
+														? 'Never booked'
+														: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -659,6 +663,7 @@
 				<Select.Item value="__nocontact">No contact info</Select.Item>
 				<Select.Item value="__unsub">Unsubscribed</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
+				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>

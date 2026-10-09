@@ -58,13 +58,14 @@ import {
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
-export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance';
+export type MemberSort = 'name' | 'joined' | 'lastVisit' | 'balance' | 'visits30';
 
 const MEMBER_ORDER = {
 	name: asc(gymMember.name),
 	joined: desc(gymMember.joinedAt),
 	lastVisit: sql`"lastVisit" desc nulls last`,
-	balance: sql`"openBalance" desc`
+	balance: sql`"openBalance" desc`,
+	visits30: sql`"visits30" desc`
 } as const;
 
 /** Dependents billing under a member — the kiosk's family check-in rows. */
@@ -99,7 +100,9 @@ export async function listMembers(
 	/** Members who hit the unsubscribe link — excluded from member emails. */
 	unsubscribed?: boolean,
 	/** Members brought in by another member's referral link. */
-	referred?: boolean
+	referred?: boolean,
+	/** Active members who have never had a booking (any status). */
+	neverBooked?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -171,6 +174,9 @@ export async function listMembers(
 				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
 				unsubscribed ? isNotNull(gymMember.unsubscribedAt) : undefined,
 				referred ? isNotNull(gymMember.referredByMemberId) : undefined,
+				neverBooked
+					? sql`not exists (select 1 from booking b where b.member_id = ${gymMember.id})`
+					: undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

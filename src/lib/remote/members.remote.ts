@@ -70,7 +70,7 @@ export const getMembers = query(
 			tag: v.optional(v.string()),
 			status: v.optional(v.picklist(['active', 'inactive'])),
 			planId: v.optional(v.string()),
-			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance'])),
+			sort: v.optional(v.picklist(['name', 'joined', 'lastVisit', 'balance', 'visits30'])),
 			owes: v.optional(v.boolean()),
 			suspended: v.optional(v.boolean()),
 			recent: v.optional(v.boolean()),
@@ -79,7 +79,8 @@ export const getMembers = query(
 			birthday: v.optional(v.boolean()),
 			noContact: v.optional(v.boolean()),
 			unsubscribed: v.optional(v.boolean()),
-			referred: v.optional(v.boolean())
+			referred: v.optional(v.boolean()),
+			neverBooked: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -98,7 +99,8 @@ export const getMembers = query(
 			opts?.birthday,
 			opts?.noContact,
 			opts?.unsubscribed,
-			opts?.referred
+			opts?.referred,
+			opts?.neverBooked
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

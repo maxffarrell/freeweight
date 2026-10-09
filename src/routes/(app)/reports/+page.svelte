@@ -655,6 +655,29 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.referralConversion.referred}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Referral conversion</Card.Title>
+				<Card.Description>Members who joined via a referral link</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				<div class="flex items-center justify-between">
+					<span>Referred members</span><span class="text-muted-foreground tabular-nums"
+						>{r.referralConversion.referred}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>Now paying</span><span class="text-muted-foreground tabular-nums"
+						>{r.referralConversion.paying} ({Math.round(
+							(r.referralConversion.paying / r.referralConversion.referred) * 100
+						)}%)</span
+					>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
