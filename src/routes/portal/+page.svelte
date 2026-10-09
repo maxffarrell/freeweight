@@ -102,6 +102,7 @@
 		setClassWatch,
 		logWorkout,
 		reportIssue,
+		inviteFriend,
 		setMyBookingNote
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
@@ -115,6 +116,7 @@
 	import Dumbbell from '@lucide/svelte/icons/dumbbell';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
+	import Send from '@lucide/svelte/icons/send';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import * as Field from '#lib/components/ui/field/index.js';
@@ -879,6 +881,22 @@
 			.writeText(refLink)
 			.then(() => toast.success('Referral link copied'))
 			.catch(() => toast.error('Could not copy'));
+	}
+
+	let inviteEmail = $state('');
+	let inviteSending = $state(false);
+	async function sendInvite() {
+		const email = inviteEmail.trim();
+		if (!email) return;
+		inviteSending = true;
+		try {
+			const r = await inviteFriend({ memberId, email });
+			toast.success(r.sent ? `Invite sent to ${email}` : `${email} was already invited`);
+			if (r.sent) inviteEmail = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send invite'));
+		}
+		inviteSending = false;
 	}
 
 	let qrUrl = $state('');
@@ -2137,6 +2155,24 @@
 					>
 					<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
 				</div>
+				<form
+					class="mt-2 flex items-center gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void sendInvite();
+					}}
+				>
+					<Input
+						type="email"
+						required
+						placeholder="friend@email.com"
+						class="h-8 flex-1 text-xs"
+						bind:value={inviteEmail}
+					/>
+					<Button size="sm" variant="outline" type="submit" disabled={inviteSending}
+						><Send /> Email it</Button
+					>
+				</form>
 				{#if d.referrals?.length}
 					<div class="mt-3 space-y-1">
 						{#each d.referrals as r (r.name)}

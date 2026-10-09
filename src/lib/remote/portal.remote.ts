@@ -1000,3 +1000,16 @@ export const setClassWatch = command(
 		await getPortalOverview(m.id).refresh();
 	}
 );
+
+/** Member emails their referral join link to a friend. Deduped per (member, address). */
+export const inviteFriend = command(
+	v.object({
+		memberId: idSchema,
+		email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+		name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60)))
+	}),
+	async ({ memberId, email, name }) => {
+		const m = await myMember(memberId);
+		return notif.sendReferralInvite(m.organizationId, m.id, email, name);
+	}
+);

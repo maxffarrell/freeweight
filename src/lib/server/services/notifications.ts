@@ -151,6 +151,44 @@ async function sendMemberEmail(memberId: string | null | undefined, args: Email)
 	await sendEmail(args);
 }
 
+/**
+ * Member-triggered: emails a friend the member's referral join link.
+ * Deduped per (member, recipient) so a member can't spam the same address.
+ */
+export async function sendReferralInvite(
+	orgId: string,
+	memberId: string,
+	toEmail: string,
+	toName?: string
+) {
+	const [m] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)));
+	if (!m) error(404, 'Member not found');
+	const to = toEmail.trim().toLowerCase();
+	const logged = await logOnce(orgId, 'referral_invite', memberId, to);
+	if (!logged) return { sent: 0 };
+	const [o, brand] = await Promise.all([
+		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
+		orgBrand(orgId)
+	]);
+	const link = `${appOrigin()}/j/${o[0]?.slug}?ref=${memberId}`;
+	const inviter = m.name;
+	const { text, html } = renderEmail({
+		...brand,
+		heading: `${inviter} invited you to ${brand.orgName}`,
+		lines: [
+			toName ? `Hi ${toName},` : 'Hi,',
+			`${inviter} thinks you'd like ${brand.orgName} — their link takes you to the join page:`,
+			link
+		],
+		action: { label: `Join ${brand.orgName}`, url: link }
+	});
+	await sendEmail({ to, subject: `${brand.orgName}: ${inviter} invited you`, text, html });
+	return { sent: 1 };
+}
+
 /** Writes one notification_log row per (kind, entity, recipient), so repeats are no-ops.
  * Returns the new row's id, or null when the row already existed. */
 async function logOnce(orgId: string, kind: string, entityId: string, recipient: string) {

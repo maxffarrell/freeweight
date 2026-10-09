@@ -723,6 +723,27 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.tenureAtCancel.length}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Tenure at cancel</Card.Title>
+				<Card.Description
+					>How long members kept each plan before cancelling (12 months)</Card.Description
+				>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				{#each r.tenureAtCancel as t (t.name)}
+					<div class="flex items-center justify-between">
+						<span class="truncate">{t.name}</span>
+						<span class="text-muted-foreground tabular-nums"
+							>{Math.round(t.avgDays / 30)} mo avg · {t.n} cancelled</span
+						>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
