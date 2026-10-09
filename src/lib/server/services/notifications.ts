@@ -1893,7 +1893,7 @@ export async function listRecentAnnouncements(orgId: string, limit = 5) {
 			sendAt: sql<string | null>`${activity.data}->>'sendAt'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
 			plan: sql<string | null>`${activity.data}->>'plan'`,
-			read: sql<number>`(select count(*) from ${notificationLog} nl where nl.organization_id = ${organization.id} and nl.kind = 'announcement' and nl.opened_at is not null and nl.entity_id = 'announcement:' || (${activity.data}->>'subject') || '::' || (${activity.data}->>'message'))`.mapWith(
+			read: sql<number>`(select count(*) from ${notificationLog} nl where nl.organization_id = ${orgId} and nl.kind = 'announcement' and nl.opened_at is not null and nl.entity_id = 'announcement:' || (${activity.data}->>'subject') || '::' || (${activity.data}->>'message'))`.mapWith(
 				Number
 			)
 		})
