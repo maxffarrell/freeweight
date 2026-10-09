@@ -748,6 +748,33 @@
 	let eqNext = $state('');
 	let eqNotes = $state('');
 	const today = $derived(localDate(new Date(), tz));
+		async function duplicateEvent(ev: (typeof events)[number]) {
+		const at = new Date(new Date(ev.event.startsAt).getTime() + 7 * 86_400_000);
+		try {
+			await createEvent({
+				name: ev.event.name,
+				description: ev.event.description || undefined,
+				startsAt: `${localDate(at, tz)}T${localTime(at, tz)}`,
+				durationMin: Math.max(
+					15,
+					Math.round(
+						(new Date(ev.event.endsAt).getTime() - new Date(ev.event.startsAt).getTime()) /
+							60_000
+					)
+				),
+				capacity: ev.event.capacity,
+				price: ev.event.price,
+				locationId: ev.event.locationId ?? undefined,
+				memberBookable: ev.event.memberBookable,
+				minLevelId: ev.event.minLevelId ?? undefined
+			});
+			toast.success(`Duplicated — same time next week (${localDate(at, tz)})`);
+			await getEvents().refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not duplicate the event'));
+		}
+	}
+
 	async function submitEquipment(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -1278,6 +1305,38 @@
 				>
 				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
 					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
+				>
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-7 px-2 text-xs"
+					title="Download the roster as CSV"
+					onclick={() => {
+						const rows = [
+							['name', 'email', 'status', 'guests', 'waitlist_pos', 'note'],
+							...roster.map((r) => [
+								r.memberName,
+								r.memberEmail ?? '',
+								r.booking.status,
+								String(r.booking.guestCount ?? 0),
+								r.booking.status === 'waitlisted'
+									? String(waitlistPos.get(r.booking.id) ?? '')
+									: '',
+								r.booking.note ?? ''
+							])
+						];
+						const csv = rows
+							.map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(','))
+							.join('\n');
+						const a = document.createElement('a');
+						a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+						a.download = `roster-${focus?.className ?? 'session'}-${localDate(
+							new Date(focus?.session.startsAt ?? Date.now()),
+							tz
+						)}.csv`;
+						a.click();
+						URL.revokeObjectURL(a.href);
+					}}>CSV</Button
 				>
 				{#if focus && new Date(focus.session.endsAt).getTime() < Date.now() && roster.some((r) => r.booking.status === 'booked')}
 					<Button
@@ -2363,6 +2422,13 @@
 									<Button
 										variant="ghost"
 										size="sm"
+										class="h-6 px-2 text-xs"
+										title="Same event, same time next week"
+										onclick={() => duplicateEvent(ev)}>Duplicate</Button
+									>
+									<Button
+										variant="ghost"
+										size="sm"
 										class="h-6 px-2 text-xs text-destructive"
 										onclick={() => cancelWholeEvent(ev.event.id)}>Cancel event</Button
 									>
@@ -2584,7 +2650,11 @@
 								{#if cRoster}
 									{#each cRoster as r (r.enrollment.id)}
 										<div class="flex items-center justify-between py-1 text-sm">
-											<span>{r.memberName}</span>
+											<span class="flex items-center gap-1.5"
+												>{r.memberName}{#if r.enrollment.waitlisted}<Badge variant="outline"
+														>waitlist</Badge
+													>{/if}</span
+											>
 											<span class="text-xs text-muted-foreground"
 												>{localDate(r.enrollment.createdAt, tz)}</span
 											>
@@ -2592,7 +2662,10 @@
 									{:else}
 										<p class="py-1 text-xs text-muted-foreground">Nobody enrolled yet.</p>
 									{/each}
-									{#if c.course.capacity === null || c.enrolled < c.course.capacity}
+									{#if c.waiting}<p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+											{c.waiting} on the waitlist — enrolling a member queues them too.
+										</p>{/if}
+									{#if true}
 										<div class="mt-2 flex gap-2">
 											<Select.Root type="single" bind:value={cMemberId}>
 												<Select.Trigger class="h-8 flex-1 text-sm">

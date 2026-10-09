@@ -373,6 +373,71 @@ export async function notifyEventWaitlisted(orgId: string, registrationId: strin
 	});
 }
 
+/** "You're on the waitlist" for a full course — no charge was posted. */
+export async function notifyCourseWaitlisted(orgId: string, enrollmentId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			courseName: course.name,
+			startsOn: course.startsOn
+		})
+		.from(courseEnrollment)
+		.innerJoin(gymMember, eq(courseEnrollment.memberId, gymMember.id))
+		.innerJoin(course, eq(courseEnrollment.courseId, course.id))
+		.where(eq(courseEnrollment.id, enrollmentId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'course_waitlisted', enrollmentId, row.email))) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Waitlist: ${row.courseName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `You're on the waitlist, ${row.memberName}`,
+			lines: [
+				`${row.courseName} (starting ${localDate(new Date(row.startsOn + 'T12:00:00Z'), tz)}) is full — you're on the waitlist.`,
+				"Nothing is charged and no sessions are booked until a spot opens — we'll email you then."
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/** "You're in" when a course waitlist row is promoted into a freed seat. */
+export async function notifyCourseEnrolled(orgId: string, enrollmentId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			courseName: course.name,
+			startsOn: course.startsOn,
+			priceCents: course.priceCents
+		})
+		.from(courseEnrollment)
+		.innerJoin(gymMember, eq(courseEnrollment.memberId, gymMember.id))
+		.innerJoin(course, eq(courseEnrollment.courseId, course.id))
+		.where(eq(courseEnrollment.id, enrollmentId));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'course_enrolled', enrollmentId, row.email))) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `You're in: ${row.courseName} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `A spot opened, ${row.memberName}`,
+			lines: [
+				`You're enrolled in ${row.courseName}, starting ${localDate(new Date(row.startsOn + 'T12:00:00Z'), tz)} — you're booked into every session.`,
+				row.priceCents > 0 ? 'The course fee is on your balance.' : null
+			].filter(Boolean) as string[],
+			action: { label: 'See my classes', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
 /** "Event cancelled" to every registrant when staff cancels an event. */
 export async function notifyEventCancelled(orgId: string, registrationId: string) {
 	const [row] = await db

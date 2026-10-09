@@ -73,7 +73,8 @@ export const getMembers = query(
 			suspended: v.optional(v.boolean()),
 			recent: v.optional(v.boolean()),
 			risk: v.optional(v.boolean()),
-			family: v.optional(v.boolean())
+			family: v.optional(v.boolean()),
+			birthday: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -88,7 +89,8 @@ export const getMembers = query(
 			opts?.suspended,
 			opts?.recent,
 			opts?.risk,
-			opts?.family
+			opts?.family,
+			opts?.birthday
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

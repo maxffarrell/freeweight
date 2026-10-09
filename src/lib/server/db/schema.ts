@@ -927,6 +927,8 @@ export const courseEnrollment = pgTable(
 			.notNull()
 			.references(() => gymMember.id, { onDelete: 'cascade' }),
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
+		/** Queued behind a full course — no charge or bookings until promoted. */
+		waitlisted: boolean('waitlisted').notNull().default(false),
 		...timestamps
 	},
 	(t) => [

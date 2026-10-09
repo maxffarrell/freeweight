@@ -17,6 +17,7 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { addCharge } from './billing.ts';
 import { materializeTemplates } from './schedule.ts';
+import { notifyCourseEnrolled, notifyCourseWaitlisted } from './notifications.ts';
 import { emit } from './events.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
 import { addDays } from '#lib/tz.ts';
@@ -76,7 +77,15 @@ export async function listCourses(orgId: string) {
 	const out = [];
 	for (const r of rows) {
 		const [en] = await db
-			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.select({
+				n: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = false)`.mapWith(
+					Number
+				),
+				waiting:
+					sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
+						Number
+					)
+			})
 			.from(courseEnrollment)
 			.where(eq(courseEnrollment.courseId, r.course.id));
 		const sessions = await courseSessions(orgId, r.course);
@@ -84,6 +93,7 @@ export async function listCourses(orgId: string) {
 		out.push({
 			...r,
 			enrolled: en?.n ?? 0,
+			waiting: en?.waiting ?? 0,
 			sessionsLeft: sessions.length,
 			schedule: t.length
 				? `${t.map((x) => WEEKDAYS_SHORT[x.weekday]).join('/')} ${t[0]!.startTime}`
@@ -225,10 +235,11 @@ export async function portalCourses(orgId: string, memberId: string) {
 				)
 		: [];
 	const mine = await db
-		.select({ courseId: courseEnrollment.courseId })
+		.select({ courseId: courseEnrollment.courseId, waitlisted: courseEnrollment.waitlisted })
 		.from(courseEnrollment)
 		.where(eq(courseEnrollment.memberId, memberId));
 	const enrolled = new Set(mine.map((m) => m.courseId));
+	const myWaitlist = new Set(mine.filter((m) => m.waitlisted).map((m) => m.courseId));
 	// The member's bookings on upcoming sessions of their enrolled courses —
 	// cancelled rows included so a dropped occurrence can be re-booked.
 	const myBookRows = mine.length
@@ -258,7 +269,15 @@ export async function portalCourses(orgId: string, memberId: string) {
 	const out = [];
 	for (const r of rows) {
 		const [en] = await db
-			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.select({
+				n: sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = false)`.mapWith(
+					Number
+				),
+				waiting:
+					sql<number>`count(*) filter (where ${courseEnrollment.waitlisted} = true)`.mapWith(
+						Number
+					)
+			})
 			.from(courseEnrollment)
 			.where(eq(courseEnrollment.courseId, r.course.id));
 		const n = en?.n ?? 0;
@@ -267,8 +286,10 @@ export async function portalCourses(orgId: string, memberId: string) {
 			course: r.course,
 			className: r.className,
 			enrolled: n,
+			waiting: en?.waiting ?? 0,
 			full: r.course.capacity !== null && n >= r.course.capacity,
 			mine: enrolled.has(r.course.id),
+			myWaitlisted: myWaitlist.has(r.course.id),
 			schedule: t.length
 				? `${t.map((x) => WEEKDAYS_SHORT[x.weekday]).join('/')} ${t[0]!.startTime}`
 				: null,
@@ -304,12 +325,55 @@ export async function enrollCourse(orgId: string, memberId: string, courseId: st
 		const [en] = await db
 			.select({ n: sql<number>`count(*)`.mapWith(Number) })
 			.from(courseEnrollment)
-			.where(eq(courseEnrollment.courseId, courseId));
-		if ((en?.n ?? 0) >= c.capacity) error(409, 'Course is full');
+			.where(
+				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false))
+			);
+		if ((en?.n ?? 0) >= c.capacity) {
+			// Queue behind the course — no charge and no session bookings until a
+			// spot frees (unenrollCourse promotes the oldest row).
+			const [enrollment] = await db
+				.insert(courseEnrollment)
+				.values({ organizationId: orgId, courseId, memberId, waitlisted: true })
+				.returning();
+			await emit({
+				orgId,
+				entityType: 'course',
+				entityId: courseId,
+				action: 'waitlisted',
+				summary: `Waitlisted for course "${c.name}"`
+			});
+			notifyCourseWaitlisted(orgId, enrollment.id).catch(() => {});
+			return { enrollment, booked: 0, waitlisted: 1, charge: null, courseWaitlisted: true };
+		}
 	}
 	const sessions = await courseSessions(orgId, c);
 	if (!sessions.length) error(404, 'No upcoming sessions in this course');
+	const [enrollment] = await db
+		.insert(courseEnrollment)
+		.values({ organizationId: orgId, courseId, memberId })
+		.returning();
+	const placed = await placeEnrollee(orgId, c, memberId, enrollment.id, sessions);
+	await emit({
+		orgId,
+		entityType: 'course',
+		entityId: courseId,
+		action: 'enrolled',
+		summary: `Enrolled in course "${c.name}"${c.priceCents ? ` (${formatMoney(c.priceCents)})` : ''}`
+	});
+	return { enrollment, ...placed, courseWaitlisted: false };
+}
 
+/**
+ * Charge + book one enrollee into every course session — shared by enrollCourse
+ * and the waitlist promoter. The enrollment row must already exist.
+ */
+async function placeEnrollee(
+	orgId: string,
+	c: typeof course.$inferSelect,
+	memberId: string,
+	enrollmentId: string,
+	sessions: { id: string; capacity: number }[]
+) {
 	// Charge first so a failure doesn't leave bookings behind. Installments
 	// split the price into equal monthly charges; the first is linked on the
 	// enrollment, the rest are found by description prefix when voiding.
@@ -331,11 +395,12 @@ export async function enrollCourse(orgId: string, memberId: string, courseId: st
 			);
 			chargeRow ??= row;
 		}
+		if (chargeRow)
+			await db
+				.update(courseEnrollment)
+				.set({ chargeId: chargeRow.id })
+				.where(eq(courseEnrollment.id, enrollmentId));
 	}
-	const [enrollment] = await db
-		.insert(courseEnrollment)
-		.values({ organizationId: orgId, courseId, memberId, chargeId: chargeRow?.id ?? null })
-		.returning();
 
 	// Skip sessions the member is already booked into (unique open-booking index).
 	const existing = await db
@@ -382,14 +447,49 @@ export async function enrollCourse(orgId: string, memberId: string, courseId: st
 		if (status === 'booked') booked++;
 		else waitlisted++;
 	}
-	await emit({
-		orgId,
-		entityType: 'course',
-		entityId: courseId,
-		action: 'enrolled',
-		summary: `Enrolled in course "${c.name}"${c.priceCents ? ` (${formatMoney(c.priceCents)})` : ''}`
-	});
-	return { enrollment, booked, waitlisted, charge: chargeRow };
+	return { booked, waitlisted, charge: chargeRow };
+}
+
+/**
+ * Fill freed course seats from the waitlist, oldest first. Each promoted
+ * enrollee is charged + booked by placeEnrollee and emailed. Returns the
+ * promoted enrollment ids.
+ */
+export async function promoteCourseWaitlist(orgId: string, courseId: string) {
+	const [c] = await db
+		.select()
+		.from(course)
+		.where(and(eq(course.id, courseId), eq(course.organizationId, orgId)));
+	if (!c || c.capacity === null) return [];
+	const sessions = await courseSessions(orgId, c);
+	if (!sessions.length) return [];
+	const promoted: string[] = [];
+	for (;;) {
+		const [en] = await db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(courseEnrollment)
+			.where(
+				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, false))
+			);
+		if ((en?.n ?? 0) >= c.capacity) break;
+		const [next] = await db
+			.select()
+			.from(courseEnrollment)
+			.where(
+				and(eq(courseEnrollment.courseId, courseId), eq(courseEnrollment.waitlisted, true))
+			)
+			.orderBy(asc(courseEnrollment.createdAt))
+			.limit(1);
+		if (!next) break;
+		await db
+			.update(courseEnrollment)
+			.set({ waitlisted: false })
+			.where(eq(courseEnrollment.id, next.id));
+		await placeEnrollee(orgId, c, next.memberId, next.id, sessions);
+		promoted.push(next.id);
+	}
+	for (const id of promoted) notifyCourseEnrolled(orgId, id).catch(() => {});
+	return promoted;
 }
 
 /**
@@ -447,6 +547,9 @@ export async function unenrollCourse(orgId: string, memberId: string, courseId: 
 		action: 'unenrolled',
 		summary: `Left course "${c?.name ?? courseId}"${enrollment.chargeId ? ' (charge voided if unpaid)' : ''}`
 	});
+	// A real seat only frees when an actual enrollee left — waitlist rows leave
+	// no gap behind.
+	if (!enrollment.waitlisted) await promoteCourseWaitlist(orgId, courseId).catch(() => {});
 	return { ok: true };
 }
 
