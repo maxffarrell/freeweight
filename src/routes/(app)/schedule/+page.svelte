@@ -1063,6 +1063,9 @@
 	function dayBooked(day: (typeof days)[number]) {
 		return day.sessions.filter((x) => !x.session.cancelledAt).reduce((a, x) => a + x.booked, 0);
 	}
+	function dayWaitlisted(day: (typeof days)[number]) {
+		return day.sessions.filter((x) => !x.session.cancelledAt).reduce((a, x) => a + x.waitlisted, 0);
+	}
 </script>
 
 <PageHeader title="Schedule">
@@ -1203,6 +1206,9 @@
 				<p class="text-xs font-medium text-muted-foreground">
 					{day.label} <span class="tabular-nums">{day.date.slice(5)}</span>
 					{#if dayBooked(day)}<span class="font-normal tabular-nums">· {dayBooked(day)} booked</span
+						>{/if}
+					{#if dayWaitlisted(day)}<span class="font-normal tabular-nums"
+							>· {dayWaitlisted(day)} waiting</span
 						>{/if}
 				</p>
 				{#each day.sessions as s (s.session.id)}

@@ -126,7 +126,9 @@ export async function listMembers(
 	/** Members whose pack is set to auto-renew. */
 	autoRenew?: boolean,
 	/** Members with a pending portal cancel request. */
-	cancelRequested?: boolean
+	cancelRequested?: boolean,
+	/** Members with a pending portal pause request. */
+	pauseRequested?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -245,6 +247,9 @@ export async function listMembers(
 					: undefined,
 				cancelRequested
 					? sql`exists (select 1 from membership m13 where m13.member_id = ${gymMember.id} and m13.cancel_requested_at is not null)`
+					: undefined,
+				pauseRequested
+					? sql`exists (select 1 from membership m14 where m14.member_id = ${gymMember.id} and m14.status = 'active' and m14.pause_requested_at is not null)`
 					: undefined,
 				recent
 					? gte(
