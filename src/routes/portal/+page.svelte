@@ -840,8 +840,12 @@
 	// Guests the member wants to bring to each session (guest passes / drop-in priced).
 	let guestPick = $state<Record<string, string>>({});
 	/** Dependents the current member manages (from the family switcher options). */
+	// Dependents the current member manages — empty while switched INTO a
+	// dependent (a child can't re-book the family).
 	const dependents = $derived(
-		data.options.filter((o) => o.dependent && o.memberId !== memberId)
+		data.options.find((o) => o.memberId === memberId)?.dependent
+			? []
+			: data.options.filter((o) => o.dependent && o.memberId !== memberId)
 	);
 	let familyPick = $state<Record<string, boolean>>({});
 	async function book(sessionId: string) {
