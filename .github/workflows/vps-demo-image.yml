@@ -1,0 +1,30 @@
+name: Build VPS demo image
+on:
+  push:
+    branches: [codex/vps-demo-image]
+    paths: ['.github/workflows/vps-demo-image.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build linux/amd64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          tags: ghcr.io/${{ github.repository }}:latest
+          outputs: type=docker,dest=/tmp/demo-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Save image for VPS deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-image
+          path: /tmp/demo-image.tar
+          retention-days: 1
+          compression-level: 0
