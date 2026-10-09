@@ -1142,7 +1142,7 @@
 									>
 								{/if}
 								<input
-									class="ml-1 w-28 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground"
+									class="ml-1 w-20 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground sm:w-28"
 									placeholder="+ note"
 									value={r.booking.note ?? ''}
 									onchange={async (e) => {
