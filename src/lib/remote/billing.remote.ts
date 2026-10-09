@@ -131,6 +131,7 @@ export const sellItem = command(saleInput, async (input) => {
 	void getPayments().refresh();
 	void getMember(input.memberId).refresh();
 	void getPendingPickups().refresh();
+	void getShopItems().refresh();
 	return r;
 });
 
