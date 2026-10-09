@@ -38,7 +38,7 @@ export async function entryProgress(orgId: string, challengeId: string, start: D
 		.where(
 			and(eq(challengeEntry.organizationId, orgId), eq(challengeEntry.challengeId, challengeId))
 		)
-		.groupBy(challengeEntry.id, gymMember.name)
+		.groupBy(challengeEntry.id, gymMember.name, gymMember.email)
 		.orderBy(desc(sql`count(${checkIn.id})`), asc(gymMember.name));
 }
 

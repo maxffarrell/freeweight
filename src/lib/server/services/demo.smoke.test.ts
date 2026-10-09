@@ -32,7 +32,9 @@ describe('loadDemoData', () => {
 				(select count(*) from desk_task where organization_id=${orgId}) dt`)) as never as {
 				rows?: Record<string, number>[];
 			}[];
-			console.log(JSON.stringify((row as never as { rows: Record<string, number>[] })?.rows?.[0] ?? row));
+			console.log(
+				JSON.stringify((row as never as { rows: Record<string, number>[] })?.rows?.[0] ?? row)
+			);
 		} finally {
 			await db.execute(sql`delete from organization where id=${orgId}`);
 		}
