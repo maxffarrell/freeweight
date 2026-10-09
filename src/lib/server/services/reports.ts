@@ -681,6 +681,22 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Members who joined via a referral link — how many became paying members. */
+async function referralConversion(orgId: string) {
+	const [r] = await db
+		.select({
+			referred: count(),
+			paying: sql<number>`count(*) filter (where exists (
+				select 1 from payment p
+				join charge c on p.charge_id = c.id
+				where c.member_id = ${gymMember.id} and c.kind = 'membership'
+			))`.mapWith(Number)
+		})
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), isNotNull(gymMember.referredByMemberId)));
+	return { referred: r?.referred ?? 0, paying: r?.paying ?? 0 };
+}
+
 /** Revenue collected on membership charges per plan this month. */
 async function planRevenue(orgId: string) {
 	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
@@ -1475,7 +1491,8 @@ export async function getReports(orgId: string) {
 		lockers,
 		ages,
 		cim,
-		planRev
+		planRev,
+		refConv
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1539,7 +1556,8 @@ export async function getReports(orgId: string) {
 		lockerStats(orgId),
 		ageDistribution(orgId),
 		checkInMethods(orgId),
-		planRevenue(orgId)
+		planRevenue(orgId),
+		referralConversion(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1615,7 +1633,8 @@ export async function getReports(orgId: string) {
 		lockers,
 		ages,
 		checkInMethods: cim,
-		planRevenue: planRev
+		planRevenue: planRev,
+		referralConversion: refConv
 	};
 }
 
