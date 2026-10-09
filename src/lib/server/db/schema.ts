@@ -1115,6 +1115,29 @@ export const shopItem = pgTable(
 	(t) => [index('shop_item_org_idx').on(t.organizationId)]
 );
 
+/** One retail sale — links the charge to item+member and tracks desk pickup. */
+export const shopSale = pgTable(
+	'shop_sale',
+	{
+		id: id(),
+		organizationId: orgId(),
+		itemId: text('item_id')
+			.notNull()
+			.references(() => shopItem.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
+		qty: integer('qty').notNull().default(1),
+		pickedUpAt: timestamp('picked_up_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [
+		index('shop_sale_org_idx').on(t.organizationId),
+		index('shop_sale_member_idx').on(t.memberId)
+	]
+);
+
 /** A workspace's settings for one online payment provider (`stripe`, …). */
 export const paymentProvider = pgTable(
 	'payment_provider',

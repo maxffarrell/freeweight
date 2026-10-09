@@ -130,6 +130,18 @@ export const sellItem = command(saleInput, async (input) => {
 	void getCharges().refresh();
 	void getPayments().refresh();
 	void getMember(input.memberId).refresh();
+	void getPendingPickups().refresh();
+	void getShopItems().refresh();
+	return r;
+});
+
+export const getPendingPickups = query(async () =>
+	svc.pendingPickups((await requireOrg()).orgId)
+);
+
+export const markPickedUp = command(idSchema, async (saleId) => {
+	const r = await svc.markPickedUp(await requireOrg(), saleId);
+	void getPendingPickups().refresh();
 	return r;
 });
 
