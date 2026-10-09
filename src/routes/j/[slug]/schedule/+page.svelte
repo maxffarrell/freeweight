@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import Logo from '#lib/components/app/logo.svelte';
-	import { formatMoney } from '#lib/format.ts';
+	import { requestTrialForm } from '#lib/remote/public.remote.ts';
+	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -22,6 +28,45 @@
 		);
 	});
 	const currency = $derived(settings.currency);
+
+	// ------- free trial request -------
+	let trialOpen = $state(false);
+	let trialSessionId = $state('');
+	let trialTitle = $state('');
+	let tName = $state('');
+	let tEmail = $state('');
+	let tPhone = $state('');
+	let tPending = $state(false);
+	let tDone = $state(false);
+	const trialRequested = new SvelteSet<string>();
+
+	function openTrial(s: { session: { id: string }; className: string }) {
+		trialSessionId = s.session.id;
+		trialTitle = s.className;
+		tDone = trialRequested.has(s.session.id);
+		trialOpen = true;
+	}
+
+	async function submitTrial(e: SubmitEvent) {
+		e.preventDefault();
+		tPending = true;
+		try {
+			await requestTrialForm({
+				slug: org.slug,
+				input: {
+					sessionId: trialSessionId,
+					name: tName,
+					email: tEmail,
+					phone: tPhone || undefined
+				}
+			});
+			tDone = true;
+			trialRequested.add(trialSessionId);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send — try again'));
+		}
+		tPending = false;
+	}
 
 	const dayLabel = (d: Date) =>
 		new Intl.DateTimeFormat('en-US', {
@@ -122,12 +167,21 @@
 								</span>
 							</div>
 							<span class="flex shrink-0 items-center gap-2">
-								{#if s.dropInPrice}<span class="text-xs text-muted-foreground"
+								{#if s.dropInPrice}<span class="hidden text-xs text-muted-foreground sm:inline"
 										>{formatMoney(s.dropInPrice, currency)} drop-in</span
 									>{/if}
 								<Badge variant={spots <= 0 ? 'outline' : 'secondary'}>
 									{spots <= 0 ? 'Full' : `${spots} spot${spots === 1 ? '' : 's'} left`}
 								</Badge>
+								{#if spots > 0}
+									{#if trialRequested.has(s.session.id)}
+										<Badge variant="secondary">Requested</Badge>
+									{:else}
+										<Button size="sm" variant="outline" onclick={() => openTrial(s)}
+											>Free trial</Button
+										>
+									{/if}
+								{/if}
 							</span>
 						</div>
 					{/each}
@@ -146,4 +200,45 @@
 			<Button href="/j/{org.slug}">Join {org.name}</Button>
 		</div>
 	</main>
+
+	<Dialog.Root bind:open={trialOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>Free trial — {trialTitle}</Dialog.Title>
+				<Dialog.Description>
+					Leave your details and the gym will confirm your free class.
+				</Dialog.Description>
+			</Dialog.Header>
+			{#if tDone}
+				<div class="space-y-3 py-2 text-sm">
+					<p class="font-medium">Request sent.</p>
+					<p class="text-muted-foreground">
+						The gym will confirm your spot — keep an eye on your email.
+					</p>
+				</div>
+			{:else}
+				<form class="space-y-4" onsubmit={submitTrial}>
+					<Field.Field>
+						<Field.Label for="t-name">Name</Field.Label>
+						<Input id="t-name" required bind:value={tName} autocomplete="name" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="t-email">Email</Field.Label>
+						<Input id="t-email" type="email" required bind:value={tEmail} autocomplete="email" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="t-phone"
+							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
+						>
+						<Input id="t-phone" type="tel" bind:value={tPhone} autocomplete="tel" />
+					</Field.Field>
+					<Dialog.Footer>
+						<Button type="submit" disabled={tPending}
+							>{tPending ? 'Sending…' : 'Request free trial'}</Button
+						>
+					</Dialog.Footer>
+				</form>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
 </div>

@@ -174,6 +174,8 @@ export const gymMember = pgTable(
 		skillLevelId: text('skill_level_id'),
 		joinedAt: date('joined_at', { mode: 'string' }),
 		birthday: date('birthday', { mode: 'string' }),
+		/** Member asked (via the portal) for their personal data to be deleted — staff anonymize. */
+		deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [
@@ -508,6 +510,38 @@ export const booking = pgTable(
 		uniqueIndex('booking_comp_idx')
 			.on(t.compBookingId)
 			.where(sql`${t.compBookingId} is not null and ${t.status} != 'cancelled'`)
+	]
+);
+
+export const trialRequestStatus = pgEnum('trial_request_status', [
+	'pending',
+	'confirmed',
+	'declined'
+]);
+
+/** Visitor "book a free trial class" request from the public schedule — staff confirm or decline. */
+export const trialRequest = pgTable(
+	'trial_request',
+	{
+		id: id(),
+		organizationId: orgId(),
+		sessionId: text('session_id')
+			.notNull()
+			.references(() => classSession.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		status: trialRequestStatus('status').notNull().default('pending'),
+		/** Booking created on confirmation — the comp'd trial seat. */
+		bookingId: text('booking_id').references(() => booking.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [
+		index('trial_request_org_idx').on(t.organizationId),
+		index('trial_request_member_idx').on(t.memberId),
+		uniqueIndex('trial_request_open_idx')
+			.on(t.sessionId, t.memberId)
+			.where(sql`${t.status} != 'declined'`)
 	]
 );
 

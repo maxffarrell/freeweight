@@ -18,6 +18,7 @@ import {
 	organization,
 	plan,
 	outer,
+	trialRequest,
 	user
 } from '#lib/server/db/schema.ts';
 import { localDate } from '#lib/tz.ts';
@@ -30,7 +31,7 @@ import {
 	promoState,
 	redeemablePromo
 } from './billing.ts';
-import { notifyReferralJoin } from './notifications.ts';
+import { notifyReferralJoin, notifyTrialRequested } from './notifications.ts';
 import { providers } from '../payments/index.ts';
 import { providerRow } from '../payments/settings.ts';
 import type * as s from '#lib/schemas.ts';
@@ -547,4 +548,105 @@ export async function buyDayPass(
 		summary: `${input.name} bought a day pass for ${today}`
 	});
 	return { member, chargeId: c.id, checkoutUrl };
+}
+
+/**
+ * Public "book a free trial class" form on /j/[slug]/schedule — same rate-limited
+ * treatment as the lead form. Creates/reuses a `lead`-tagged member and queues a
+ * pending trial_request; staff confirm (comp'd seat, no membership needed) or
+ * decline from the member page / Needs-attention card.
+ */
+export async function requestTrial(
+	slug: string,
+	ip: string,
+	input: v.InferOutput<typeof s.trialInput>
+) {
+	const now = Date.now();
+	const hits = (leadRate.get(ip) ?? []).filter((t) => now - t < 3600_000);
+	if (hits.length >= 10) error(429, 'Too many attempts — try again later');
+	leadRate.set(ip, [...hits, now]);
+
+	const { org } = await getPublicGym(slug);
+	const email = input.email.toLowerCase();
+
+	const [sess] = await db
+		.select({
+			id: classSession.id,
+			capacity: classSession.capacity,
+			startsAt: classSession.startsAt,
+			cancelledAt: classSession.cancelledAt,
+			bookable: classType.memberBookable,
+			className: classType.name
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(classSession.organizationId, org.id), eq(classSession.id, input.sessionId)))
+		.limit(1);
+	if (!sess || sess.cancelledAt || sess.startsAt.getTime() <= now || !sess.bookable)
+		error(404, 'Class not found');
+
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.limit(1);
+	const member =
+		m ??
+		(
+			await db
+				.insert(gymMember)
+				.values({
+					organizationId: org.id,
+					name: input.name,
+					email,
+					phone: input.phone ?? null,
+					joinedAt: new Date().toISOString().slice(0, 10)
+				})
+				.returning()
+		)[0]!;
+	if (!m) await db.insert(memberTag).values({ organizationId: org.id, memberId: member.id, tag: 'lead' });
+
+	const [alreadyBooked] = await db
+		.select({ id: booking.id })
+		.from(booking)
+		.where(
+			and(
+				eq(booking.sessionId, sess.id),
+				eq(booking.memberId, member.id),
+				ne(booking.status, 'cancelled')
+			)
+		)
+		.limit(1);
+	if (alreadyBooked) error(409, "You're already booked into this class");
+
+	const [prior] = await db
+		.select({ status: trialRequest.status })
+		.from(trialRequest)
+		.where(
+			and(
+				eq(trialRequest.sessionId, sess.id),
+				eq(trialRequest.memberId, member.id),
+				ne(trialRequest.status, 'declined')
+			)
+		)
+		.limit(1);
+	if (prior)
+		error(
+			409,
+			prior.status === 'confirmed' ? 'Your trial for this class is already booked' : 'Trial already requested — the gym will confirm shortly'
+		);
+
+	const [req] = await db
+		.insert(trialRequest)
+		.values({ organizationId: org.id, sessionId: sess.id, memberId: member.id })
+		.returning();
+	await emit({
+		orgId: org.id,
+		entityType: 'member',
+		entityId: member.id,
+		action: 'trial_request',
+		summary: `${input.name} requested a free trial: ${sess.className} ${sess.startsAt.toISOString().slice(0, 10)}`
+	});
+	notifyTrialRequested(org.id, req!.id).catch(() => {});
+	return { requested: true };
 }

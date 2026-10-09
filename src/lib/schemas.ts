@@ -586,6 +586,14 @@ export const leadInput = v.object({
 	website: v.optional(v.string(), '')
 });
 
+/** Visitor requesting a free trial class on the public schedule. */
+export const trialInput = v.object({
+	sessionId: idSchema,
+	name: requiredText('Name'),
+	email: v.pipe(v.string(), v.trim(), v.email('Invalid email')),
+	phone: v.optional(optionalText)
+});
+
 /** Visitor buying a single class on the public page. */
 export const dropInInput = v.object({
 	sessionId: idSchema,
