@@ -483,6 +483,18 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		)
 		.orderBy(desc(checkIn.checkedAt))
 		.limit(1);
+	// How many visits today (this one included) — ≥3 hints a shared card.
+	const [{ n: visitsToday }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.memberId, memberId),
+				eq(checkIn.organizationId, ctx.orgId),
+				gte(checkIn.checkedAt, zonedToUtc(`${today}T00:00`, tz)),
+				isNull(checkIn.guestName)
+			)
+		);
 	return {
 		checkIn: row!,
 		member: m,
@@ -490,6 +502,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		attended: attended.length,
 		birthday,
 		visits: n,
+		visitsToday,
 		waiverMissing,
 		suspended,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,

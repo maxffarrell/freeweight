@@ -2788,6 +2788,9 @@
 							{localDate(u.startsAt, tz)}
 							{localTime(u.startsAt, tz)}
 						</p>
+						{#if u.booking.coachNote}
+							<p class="mt-0.5 text-xs text-primary">Coach: {u.booking.coachNote}</p>
+						{/if}
 						{#if u.workout}
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{u.workout}
@@ -2884,6 +2887,9 @@
 							{localDate(h.startsAt, tz)}{#if h.locationName}
 								· {h.locationName}{/if}
 						</p>
+						{#if h.booking.coachNote}
+							<p class="mt-0.5 text-xs text-primary">Coach: {h.booking.coachNote}</p>
+						{/if}
 						{#if h.workout}
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{h.workout}

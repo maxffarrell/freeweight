@@ -126,6 +126,19 @@ export const setBookingNote = command(
 		return r;
 	}
 );
+export const setCoachNote = command(
+	v.object({
+		bookingId: idSchema,
+		sessionId: idSchema,
+		note: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await svc.setCoachNote(ctx, input.bookingId, input.note);
+		void getRoster(input.sessionId).refresh();
+		return r;
+	}
+);
 /** Flip a finished session's 'booked' rows to no_show now (fees + emails run
  * via the same path as the nightly sweep) — staff don't wait for the cron. */
 export const markSessionNoShows = command(idSchema, async (sessionId) => {

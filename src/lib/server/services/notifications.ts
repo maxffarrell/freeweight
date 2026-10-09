@@ -53,7 +53,8 @@ import {
 	signRequest,
 	trialRequest,
 	user,
-	waiver
+	waiver,
+	personalRecord
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
@@ -3022,6 +3023,97 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/** Congrats email when a member logs a personal record. One per record row. */
+export async function notifyPersonalRecord(orgId: string, prId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			label: personalRecord.label,
+			value: personalRecord.value
+		})
+		.from(personalRecord)
+		.innerJoin(gymMember, eq(personalRecord.memberId, gymMember.id))
+		.where(and(eq(personalRecord.organizationId, orgId), eq(personalRecord.id, prId)));
+	if (!row?.email) return;
+	if (!(await logOnce(orgId, 'pr_logged', prId, row.email))) return;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `New PR at ${name.orgName}: ${row.label} — ${row.value}`,
+		...renderEmail({
+			...name,
+			heading: `New personal record, ${row.memberName.split(' ')[0]}!`,
+			lines: [
+				`You just logged ${row.label}: ${row.value}.`,
+				'See it on your leaderboard in the member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+}
+
+/**
+ * New-member drip: day-3 check-in on how it's going + day-7 tips email.
+ * Deduped per member per touch via logOnce — safe to run daily.
+ */
+export async function sendNewMemberDrip(orgId: string) {
+	const tz = await orgTimezone(orgId);
+	const today = localDate(new Date(), tz);
+	const day3 = new Date(`${today}T00:00:00Z`);
+	day3.setUTCDate(day3.getUTCDate() - 3);
+	const day7 = new Date(`${today}T00:00:00Z`);
+	day7.setUTCDate(day7.getUTCDate() - 7);
+	const target = (d: Date) => d.toISOString().slice(0, 10);
+	const rows = await db
+		.select({
+			id: gymMember.id,
+			name: gymMember.name,
+			email: gymMember.email,
+			joinedAt: gymMember.joinedAt
+		})
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				or(eq(gymMember.joinedAt, target(day3)), eq(gymMember.joinedAt, target(day7)))
+			)
+		);
+	const name = await orgBrand(orgId);
+	let sent = 0;
+	for (const m of rows) {
+		if (!m.email) continue;
+		const day = m.joinedAt === target(day7) ? 7 : 3;
+		if (!(await logOnce(orgId, 'member_drip', `${m.id}:${day}`, m.email))) continue;
+		await sendMemberEmail(m.id, {
+			to: m.email,
+			subject:
+				day === 3
+					? `How's it going, ${m.name.split(' ')[0]}?`
+					: `Your first week at ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: day === 3 ? `How's it going?` : `Week one — done.`,
+				lines:
+					day === 3
+						? [
+								`Hi ${m.name} — you joined ${name.orgName} a few days ago. Booked your first class yet?`,
+								'Grab a spot from your portal — it takes ten seconds.'
+							]
+						: [
+								`Hi ${m.name} — a week in at ${name.orgName}. Consistency now is what makes this stick.`,
+								'Set a monthly visit goal in your portal, then pick the classes that fit your week.'
+							],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
 
 /**

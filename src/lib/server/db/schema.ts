@@ -508,6 +508,8 @@ export const booking = pgTable(
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
 		/** Staff note on this booking ("first visit", "spot near fan") — roster + sign-in sheet. */
 		note: text('note'),
+		/** Coach note shared with the member — shown in their portal. */
+		coachNote: text('coach_note'),
 		/** Cancelled booking this one replaces (member makeup for a gym-cancelled class). */
 		compBookingId: text('comp_booking_id'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
