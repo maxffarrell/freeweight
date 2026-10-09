@@ -9,7 +9,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { toast } from 'svelte-sonner';
-	import { getCheckIns, recordCheckIn, voidCheckIn } from '#lib/remote/members.remote.ts';
+	import { checkOut, getCheckIns, recordCheckIn, voidCheckIn } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import ScanLine from '@lucide/svelte/icons/scan-line';
@@ -346,6 +346,21 @@
 										>
 									{:else}
 										<Badge variant="default">In {dur(c.checkIn.checkedAt, new Date())}</Badge>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-6 px-2 text-xs"
+											title="Mark this member checked out now"
+											onclick={async () => {
+												try {
+													await checkOut(c.checkIn.id);
+													toast.success('Checked out');
+													await refilter();
+												} catch (err) {
+													toast.error(errMsg(err, 'Failed'));
+												}
+											}}>Out</Button
+										>
 									{/if}
 									<Button
 										variant="ghost"

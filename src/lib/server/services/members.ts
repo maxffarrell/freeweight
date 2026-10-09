@@ -114,7 +114,11 @@ export async function listMembers(
 	/** Members with no upcoming booked sessions. */
 	noUpcoming?: boolean,
 	/** Members on a comp'd (no-bill) membership. */
-	comped?: boolean
+	comped?: boolean,
+	/** Members with an active class pack expiring within 14 days. */
+	packExpiring?: boolean,
+	/** Members currently checked in (no check-out yet). */
+	insideNow?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -215,6 +219,12 @@ export async function listMembers(
 					: undefined,
 				comped
 					? sql`exists (select 1 from membership m9 where m9.member_id = ${gymMember.id} and m9.status = 'active' and m9.no_bill)`
+					: undefined,
+				packExpiring
+					? sql`exists (select 1 from membership m10 join plan p10 on p10.id = m10.plan_id where m10.member_id = ${gymMember.id} and m10.status = 'active' and p10.is_pack and m10.ends_at is not null and m10.ends_at >= now() and m10.ends_at <= now() + interval '14 days')`
+					: undefined,
+				insideNow
+					? sql`exists (select 1 from check_in c10 where c10.member_id = ${gymMember.id} and c10.checked_out_at is null)`
 					: undefined,
 				recent
 					? gte(
