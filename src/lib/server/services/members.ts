@@ -1,5 +1,18 @@
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, ilike, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import {
+	isNull,
+	gte,
+	and,
+	asc,
+	desc,
+	eq,
+	ilike,
+	inArray,
+	isNotNull,
+	ne,
+	or,
+	sql
+} from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	activity,
@@ -116,9 +129,13 @@ export async function listMembers(
 				status ? eq(gymMember.status, status) : undefined,
 				planId === 'none'
 					? sql`not exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active')`
-					: planId
-						? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
-						: undefined,
+					: planId === 'pack'
+						? sql`exists (select 1 from ${membership} m3 join ${plan} p4 on p4.id = m3.plan_id where m3.member_id = ${gymMember.id} and m3.status = 'active' and p4.is_pack)`
+						: planId === 'recurring'
+							? sql`exists (select 1 from ${membership} m3 join ${plan} p4 on p4.id = m3.plan_id where m3.member_id = ${gymMember.id} and m3.status = 'active' and not p4.is_pack)`
+							: planId
+								? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
+								: undefined,
 				owes
 					? sql`exists (select 1 from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open' and c.amount > coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0))`
 					: undefined,
@@ -1248,7 +1265,7 @@ export async function giftPackCredits(
 
 /** Latest personal records across the gym — the lobby PR wall. */
 export async function prWall(orgId: string) {
-	return db
+	const records = await db
 		.select({
 			pr: personalRecord,
 			memberName: gymMember.name,
@@ -1259,4 +1276,50 @@ export async function prWall(orgId: string) {
 		.where(eq(personalRecord.organizationId, orgId))
 		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
 		.limit(40);
+
+	// Top current week-streaks — one year of check-ins, grouped by ISO week.
+	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
+	const visits = await db
+		.select({
+			memberId: checkIn.memberId,
+			checkedAt: checkIn.checkedAt,
+			memberName: gymMember.name
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, since),
+				isNull(checkIn.guestName)
+			)
+		);
+	const weekOf = (d: Date) => {
+		const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+		x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+		return x.getTime();
+	};
+	const byMember = new Map<string, { name: string; weeks: Set<number> }>();
+	for (const v of visits) {
+		const e = byMember.get(v.memberId) ?? { name: v.memberName, weeks: new Set<number>() };
+		e.weeks.add(weekOf(v.checkedAt));
+		byMember.set(v.memberId, e);
+	}
+	const thisWeek = weekOf(new Date());
+	const streaks = [...byMember.entries()]
+		.map(([memberId, e]) => {
+			let w = thisWeek;
+			if (!e.weeks.has(w)) w -= 7 * 86_400_000;
+			let streak = 0;
+			while (e.weeks.has(w)) {
+				streak++;
+				w -= 7 * 86_400_000;
+			}
+			return { memberId, memberName: e.name, streak };
+		})
+		.filter((r) => r.streak >= 2)
+		.sort((a, b) => b.streak - a.streak)
+		.slice(0, 5);
+
+	return { records, streaks };
 }

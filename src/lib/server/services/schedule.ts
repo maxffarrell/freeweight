@@ -446,6 +446,17 @@ export async function getRoster(orgId: string, sessionId: string) {
 		.orderBy(asc(booking.createdAt));
 }
 
+/** Staff note on a roster row — saved on blur in the roster dialog. */
+export async function setBookingNote(ctx: OrgContext, bookingId: string, note: string | null) {
+	const [row] = await db
+		.update(booking)
+		.set({ note })
+		.where(and(eq(booking.id, bookingId), eq(booking.organizationId, ctx.orgId)))
+		.returning({ sessionId: booking.sessionId });
+	if (!row) error(404, 'Booking not found');
+	return { ok: true };
+}
+
 /** REST API listing: bookings across sessions, newest session first. */
 export async function listBookings(
 	orgId: string,

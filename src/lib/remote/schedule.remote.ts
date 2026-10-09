@@ -95,6 +95,20 @@ export const getSession = query(idSchema, async (id) =>
 export const getRoster = query(idSchema, async (id) =>
 	svc.getRoster((await requireOrg()).orgId, id)
 );
+
+export const setBookingNote = command(
+	v.object({
+		bookingId: idSchema,
+		sessionId: idSchema,
+		note: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await svc.setBookingNote(ctx, input.bookingId, input.note);
+		void getRoster(input.sessionId).refresh();
+		return r;
+	}
+);
 /** Email everyone booked or waitlisted on a session — "AC is out tonight" notes. */
 export const emailSessionRoster = command(
 	emailRosterInput,

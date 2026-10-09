@@ -126,7 +126,14 @@
 			q,
 			tag: tag === '__all' ? undefined : tag,
 			status: statusFilter === '__all' ? undefined : (statusFilter as 'active' | 'inactive'),
-			planId: planFilter === '__all' ? undefined : planFilter === '__none' ? 'none' : planFilter,
+			planId:
+				planFilter === '__all'
+					? undefined
+					: planFilter === '__none'
+						? 'none'
+						: planFilter === 'pack' || planFilter === 'recurring'
+							? planFilter
+							: planFilter,
 			sort,
 			owes: owesFilter === 'owes' || undefined,
 			suspended: owesFilter === 'suspended' || undefined
@@ -530,11 +537,18 @@
 						? 'All plans'
 						: planFilter === '__none'
 							? 'No plan'
-							: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}</Select.Trigger
+							: planFilter === 'pack'
+								? 'Has pack'
+								: planFilter === 'recurring'
+									? 'On a plan'
+									: (audiencePlans.find((p) => p.id === planFilter)?.name ??
+										'Plan')}</Select.Trigger
 				>
 				<Select.Content>
 					<Select.Item value="__all">All plans</Select.Item>
 					<Select.Item value="__none">No plan</Select.Item>
+					<Select.Item value="pack">Has pack</Select.Item>
+					<Select.Item value="recurring">On a plan</Select.Item>
 					{#each audiencePlans as p (p.id)}
 						<Select.Item value={p.id}>{p.name}</Select.Item>
 					{/each}
