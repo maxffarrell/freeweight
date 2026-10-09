@@ -59,6 +59,23 @@ export const getBookable = query(idSchema, async (memberId) => {
 	return svc.bookableSessions(m.id);
 });
 
+/** The member hands an upcoming booking to another member by email. */
+export const memberGiveSpot = command(
+	v.object({
+		memberId: idSchema,
+		bookingId: idSchema,
+		email: v.pipe(v.string(), v.trim(), v.email())
+	}),
+	async ({ memberId, bookingId, email }) => {
+		const m = await myMember(memberId);
+		const { user } = requireUser();
+		const r = await svc.giveSpot(m.organizationId, user.id, m.id, bookingId, email);
+		void getPortalOverview(memberId).refresh();
+		void getBookable(memberId).refresh();
+		return r;
+	}
+);
+
 export const memberBook = command(
 	v.object({
 		memberId: idSchema,

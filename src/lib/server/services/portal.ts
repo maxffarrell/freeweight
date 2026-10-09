@@ -661,6 +661,73 @@ export async function memberBook(
 }
 
 /**
+ * "Give my spot" — the member hands an upcoming booking to another member by
+ * email. Their seat is released (credits returned as with any cancel) and the
+ * recipient books it on their own entitlement — an active membership (their own
+ * or a guardian's shared pack) is required so no surprise charge lands. If the
+ * recipient's book fails after the seat freed, the giver's booking is restored.
+ */
+export async function giveSpot(
+	orgId: string,
+	userId: string,
+	memberId: string,
+	bookingId: string,
+	recipientEmail: string
+) {
+	const [b] = await db
+		.select({
+			memberId: booking.memberId,
+			status: booking.status,
+			sessionId: booking.sessionId,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.where(and(eq(booking.organizationId, orgId), eq(booking.id, bookingId)));
+	if (!b || b.memberId !== memberId) error(404, 'Booking not found');
+	if (b.status !== 'booked') error(409, 'Only a booked spot can be given');
+	if (b.startsAt.getTime() <= Date.now()) error(409, 'That class already started');
+	const email = recipientEmail.trim().toLowerCase();
+	const [r] = await db
+		.select({ id: gymMember.id, name: gymMember.name, guardianId: gymMember.guardianId })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`lower(${gymMember.email}) = ${email}`
+			)
+		)
+		.limit(1);
+	if (!r) error(404, 'No member with that email');
+	if (r.id === memberId) error(400, 'That is your own email');
+	// Recipient must hold an active membership — their own or a guardian's.
+	let rms = await activeMembership(orgId, r.id);
+	if (!rms && r.guardianId) rms = await activeMembership(orgId, r.guardianId);
+	if (!rms) error(409, `${r.name} has no active membership — they can't take the spot`);
+	await cancelBooking(memberCtx(orgId, userId), bookingId, userId, { notify: false });
+	try {
+		await memberBook(orgId, userId, b.sessionId, r.id, { skipDailyLimit: true });
+	} catch (err) {
+		// Put the giver's seat back rather than lose it.
+		await memberBook(orgId, userId, b.sessionId, memberId, {
+			notify: false,
+			skipDailyLimit: true
+		}).catch(() => {});
+		throw err;
+	}
+	await emit({
+		orgId,
+		actorId: userId,
+		entityType: 'booking',
+		entityId: bookingId,
+		action: 'spot_given',
+		summary: `Spot given to ${r.name}`
+	});
+	return { recipient: r.name };
+}
+
+/**
  * Makeup offers: bookings the member lost to a gym-side session cancellation
  * and hasn't replaced yet, each with the free candidate sessions of the same
  * class coming up in the next 14 days.
