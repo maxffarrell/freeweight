@@ -639,6 +639,23 @@ export const signRequest = pgTable(
 	]
 );
 
+/** Member's own free-form workout journal, written from the portal ("Ran 5k — 24:30"). */
+export const workoutLog = pgTable(
+	'workout_log',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Entry date YYYY-MM-DD (org-local). */
+		day: text('day').notNull(),
+		text: text('text').notNull(),
+		...timestamps
+	},
+	(t) => [index('workout_log_member_idx').on(t.memberId)]
+);
+
 /** Movement/video links attached to a class type — the coaching library shown in the portal. */
 export const classVideo = pgTable(
 	'class_video',

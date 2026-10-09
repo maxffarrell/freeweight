@@ -1690,6 +1690,23 @@
 			</Card.Root>
 		{/if}
 
+		{#if m.workoutLogs.length}
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Workout log</Card.Title>
+					<Card.Description>Free-form entries the member logged in the portal</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-4">
+					{#each m.workoutLogs as w (w.id)}
+						<div class="flex items-baseline gap-2 py-1 text-sm">
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">{w.day}</span>
+							<span class="min-w-0 break-words">{w.text}</span>
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<Card.Root>
 			<Card.Header class="flex-row items-center justify-between">
 				<div>

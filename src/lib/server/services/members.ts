@@ -40,6 +40,7 @@ import {
 	waiver,
 	plan,
 	outer,
+	workoutLog,
 	workoutResult
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
@@ -374,7 +375,8 @@ export async function getMember(orgId: string, id: string) {
 		scores,
 		prs,
 		incidents,
-		signRequests
+		signRequests,
+		workoutLogs
 	] = await Promise.all([
 		db
 			.select({
@@ -476,7 +478,13 @@ export async function getMember(orgId: string, id: string) {
 			.from(signRequest)
 			.where(and(eq(signRequest.organizationId, orgId), eq(signRequest.memberId, id)))
 			.orderBy(desc(signRequest.createdAt))
-			.limit(25)
+			.limit(25),
+		db
+			.select()
+			.from(workoutLog)
+			.where(and(eq(workoutLog.organizationId, orgId), eq(workoutLog.memberId, id)))
+			.orderBy(desc(workoutLog.day), desc(workoutLog.createdAt))
+			.limit(10)
 	]);
 	// Current week-streak for the member page (same rule as the portal card).
 	const yearAgo = new Date(Date.now() - 370 * 86400_000);
@@ -551,6 +559,7 @@ export async function getMember(orgId: string, id: string) {
 		prs,
 		incidents,
 		signRequests,
+		workoutLogs,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),

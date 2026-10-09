@@ -28,6 +28,7 @@ import {
 	gymSettings,
 	location,
 	membership,
+	signRequest,
 	plan,
 	waiver
 } from '#lib/server/db/schema.ts';
@@ -420,6 +421,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			.where(and(eq(membership.memberId, memberId), eq(membership.status, 'suspended')))
 			.limit(1)
 	).length;
+	// Desk heads-up: a document signature is pending on this member.
+	const [ps] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(signRequest)
+		.where(and(eq(signRequest.memberId, memberId), eq(signRequest.status, 'pending')));
+	const pendingSigns = ps!.n;
 	// Desk heads-up: remaining classes on a capped plan/pack (null = unlimited or none).
 	const credits = await creditUsage(ctx.orgId, memberId);
 	// Desk heads-up: guest passes left this month (null = the plan has none).
@@ -505,6 +512,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		visitsToday,
 		waiverMissing,
 		suspended,
+		pendingSigns,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
 		creditsClass: credits?.className ?? null,
 		guestPassesLeft,

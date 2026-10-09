@@ -64,6 +64,8 @@
 				toast.warning(
 					`${r.member.name} — ${r.visitsToday ?? 0}th visit today. Possible shared card.`
 				);
+			if ((r.pendingSigns ?? 0) > 0)
+				toast.warning(`${r.member.name} — a document needs their signature.`);
 			toast.success(
 				`${r.member.name} checked in` +
 					(r.attended
