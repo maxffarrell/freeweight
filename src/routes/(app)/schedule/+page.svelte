@@ -1245,6 +1245,10 @@
 									variant="outline"
 									class="text-xs text-muted-foreground">closed</Badge
 								>{/if}
+							{#if s.memberBookable === false && !s.session.cancelledAt}<Badge
+									variant="outline"
+									class="text-xs text-muted-foreground">staff only</Badge
+								>{/if}
 						</div>
 					</button>
 				{:else}

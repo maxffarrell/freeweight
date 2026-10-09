@@ -198,6 +198,7 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 			durationMin: classType.durationMin,
 			dropInPrice: classType.dropInPrice,
 			payRate: classType.payRate,
+			memberBookable: classType.memberBookable,
 			locationName: location.name,
 			instructorName: user.name,
 			booked: bookedCount(classSession.id),
