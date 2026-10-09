@@ -107,8 +107,9 @@
 			m.default.toDataURL(joinInfo.url, { width: 280, margin: 1 }).then((u: string) => (joinQr = u))
 		);
 	});
-	async function copyJoinLink() {
-		await navigator.clipboard.writeText(joinInfo.url);
+	async function copyJoinLink(short = false) {
+		const link = short ? joinInfo.url + '/schedule' : joinInfo.url;
+		await navigator.clipboard.writeText(link);
 		toast.success('Join link copied');
 	}
 	let pending = $state(false);
@@ -891,8 +892,11 @@
 								</p>
 							{/if}
 							<div class="flex flex-wrap gap-2">
-								<Button size="sm" variant="outline" onclick={copyJoinLink}
+								<Button size="sm" variant="outline" onclick={() => copyJoinLink()}
 									><Copy /> Copy link</Button
+								>
+								<Button size="sm" variant="outline" onclick={() => copyJoinLink(true)}
+									>Timetable link</Button
 								>
 								<Button
 									size="sm"
