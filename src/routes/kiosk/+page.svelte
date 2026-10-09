@@ -21,7 +21,7 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { errMsg, formatMoney, formatRelative } from '#lib/format.ts';
 	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
 	import LogOut from '@lucide/svelte/icons/log-out';
@@ -65,6 +65,7 @@
 			photoDocumentId: string | null;
 			deskNote: string | null;
 			tags: string[];
+			lastVisit: Date | string | null;
 		}[]
 	>([]);
 	/** Dependents per suggested member — family check-in rows under each result. */
@@ -467,6 +468,11 @@
 												>{m.deskNote}</span
 											>
 										{/if}
+										<span class="block truncate text-xs text-muted-foreground"
+											>{m.lastVisit
+												? `last visit ${formatRelative(m.lastVisit)}`
+												: 'no visits yet'}</span
+										>
 									</span>
 								</span>
 								<span class="flex items-center gap-2">

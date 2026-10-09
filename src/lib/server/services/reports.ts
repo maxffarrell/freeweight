@@ -682,6 +682,31 @@ async function guestStats(orgId: string) {
 }
 
 /** Sessions in the next 14 days with people still on the waitlist. */
+/** This month's collected revenue per active member (ARPU). */
+async function arpu(orgId: string) {
+	const monthStart = new Date();
+	monthStart.setUTCDate(1);
+	monthStart.setUTCHours(0, 0, 0, 0);
+	const [[pay], [mem]] = await Promise.all([
+		db
+			.select({ total: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number) })
+			.from(payment)
+			.where(
+				and(
+					eq(payment.organizationId, orgId),
+					isNull(payment.refundedAt),
+					notInArray(payment.method, ['gift_card', 'credit']),
+					gte(payment.paidAt, monthStart)
+				)
+			),
+		db
+			.select({ n: count().mapWith(Number) })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.status, 'active')))
+	]);
+	return { collected: pay?.total ?? 0, members: mem?.n ?? 0 };
+}
+
 /** Per-plan average months a membership lasted before cancelling (last 12 months). */
 async function tenureAtCancel(orgId: string) {
 	const yr = new Date(Date.now() - 365 * 86400_000);
@@ -1572,7 +1597,8 @@ export async function getReports(orgId: string) {
 		refConv,
 		nvr,
 		wl,
-		tenure
+		tenure,
+		arpuNow
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1640,7 +1666,8 @@ export async function getReports(orgId: string) {
 		referralConversion(orgId),
 		newVsReturning(orgId),
 		waitlistedNow(orgId),
-		tenureAtCancel(orgId)
+		tenureAtCancel(orgId),
+		arpu(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1720,7 +1747,8 @@ export async function getReports(orgId: string) {
 		referralConversion: refConv,
 		newVsReturning: nvr,
 		waitlistedNow: wl,
-		tenureAtCancel: tenure
+		tenureAtCancel: tenure,
+		arpu: arpuNow
 	};
 }
 
