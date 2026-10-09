@@ -46,7 +46,9 @@ export const memberInput = v.object({
 export const memberImportRow = v.object({
 	name: requiredText('Name'),
 	email: emailField,
-	phone: optionalText
+	phone: optionalText,
+	/** Optional 4th column — YYYY-MM-DD. */
+	birthday: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')))
 });
 export const memberImportInput = v.pipe(
 	v.array(memberImportRow),

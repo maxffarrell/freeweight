@@ -175,7 +175,8 @@
 		let rows = parseCsv(importText).map((r) => ({
 			name: r[0]?.trim() ?? '',
 			email: r[1]?.trim() ?? '',
-			phone: r[2]?.trim() ?? ''
+			phone: r[2]?.trim() ?? '',
+			birthday: /^\d{4}-\d{2}-\d{2}$/.test(r[3]?.trim() ?? '') ? r[3]!.trim() : undefined
 		}));
 		if (rows.length && rows[0]!.name.toLowerCase() === 'name') rows = rows.slice(1);
 		return rows.filter((r) => r.name);
@@ -190,7 +191,12 @@
 		importPending = true;
 		try {
 			const r = await importMembers(
-				importRows.map((row) => ({ name: row.name, email: row.email, phone: row.phone || null }))
+				importRows.map((row) => ({
+					name: row.name,
+					email: row.email,
+					phone: row.phone || null,
+					birthday: row.birthday
+				}))
 			);
 			toast.success(
 				`Imported ${r.created} member${r.created === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} duplicate${r.skipped === 1 ? '' : 's'}` : ''}`

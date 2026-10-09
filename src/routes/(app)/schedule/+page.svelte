@@ -1108,8 +1108,15 @@
 		>
 		<span class="ml-2 text-sm text-muted-foreground"
 			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
-				(r) => !r.session.cancelledAt && !r.session.instructorId
-			).length} unstaffed · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked</span
+				(s) => !s.session.instructorId && !s.session.cancelledAt
+			).length} unstaffed · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked · {Math.round(
+				(sessions.reduce((a, r) => a + (r.booked ?? 0), 0) /
+					Math.max(
+						1,
+						sessions.reduce((a, r) => a + (r.session.capacity ?? 0), 0)
+					)) *
+					100
+			)}% full</span
 		>
 		<Button
 			variant="outline"

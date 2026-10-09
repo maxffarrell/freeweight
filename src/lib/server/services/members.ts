@@ -726,7 +726,8 @@ export async function importMembers(
 				organizationId: ctx.orgId,
 				name: r.name,
 				email: r.email || null,
-				phone: r.phone ?? null
+				phone: r.phone ?? null,
+				birthday: r.birthday || null
 			}))
 		);
 	await emit({

@@ -223,6 +223,31 @@ export async function dashboard(orgId: string) {
 		)
 		.orderBy(asc(classSession.startsAt));
 
+	// Tomorrow's sessions with zero bookings — a same-day cancel warning for the desk.
+	const tomorrowEnd = new Date(dayEnd.getTime() + 86400_000);
+	const emptyTomorrow = await db
+		.select({
+			id: classSession.id,
+			name: classType.name,
+			startsAt: classSession.startsAt,
+			booked:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','waitlisted'))`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, dayEnd),
+				lt(classSession.startsAt, tomorrowEnd)
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.then((rows) => rows.filter((r) => r.booked === 0).slice(0, 4));
+
 	const recentActivity = await db
 		.select()
 		.from(activity)
@@ -716,6 +741,15 @@ export async function dashboard(orgId: string) {
 				planName: 'delete my data',
 				kind: 'deletion' as const,
 				requestedAt: d.requestedAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...emptyTomorrow.map((t) => ({
+				memberId: '',
+				memberName: t.name,
+				planName: '0 booked tomorrow',
+				kind: 'empty' as const,
+				requestedAt: t.startsAt,
 				pauseUntil: null,
 				requestReason: null
 			})),
