@@ -136,6 +136,8 @@ export async function listMembers(
 				string | null
 			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
 			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`,
+			/** Nearest end date of an active membership (pack expiry or commitment end); null = open-ended. */
+			memberEnds: sql<Date | null>`(select m6.ends_at from ${membership} m6 where m6.member_id = ${outer(gymMember.id)} and m6.status = 'active' and m6.ends_at is not null order by m6.ends_at asc limit 1)`,
 			/** Member's own visits in the trailing 30 days (excludes their guest check-ins). */
 			visits30:
 				sql<number>`(select count(*)::int from ${checkIn} c where c.member_id = ${outer(gymMember.id)} and c.guest_name is null and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`.mapWith(

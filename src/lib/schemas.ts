@@ -657,7 +657,9 @@ export const announcementInput = v.object({
 	/** Restrict the batch to members of this location. */
 	locationId: v.optional(idSchema),
 	/** Restrict the batch to the at-risk list (no visit in 30+ days). */
-	atRisk: v.optional(v.boolean())
+	atRisk: v.optional(v.boolean()),
+	/** Target inactive members instead of actives (win-back mail). */
+	inactive: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({

@@ -1768,7 +1768,8 @@ export async function sendAnnouncement(
 	memberIds?: string[],
 	tag?: string,
 	planId?: string,
-	locationId?: string
+	locationId?: string,
+	inactive?: boolean
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
@@ -1777,7 +1778,7 @@ export async function sendAnnouncement(
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
-				eq(gymMember.status, 'active'),
+				eq(gymMember.status, inactive ? 'inactive' : 'active'),
 				memberIds?.length ? inArray(gymMember.id, memberIds) : undefined,
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
@@ -1859,7 +1860,8 @@ export async function countAnnouncementAudience(
 	orgId: string,
 	tag?: string,
 	planId?: string,
-	locationId?: string
+	locationId?: string,
+	inactive?: boolean
 ) {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
@@ -1867,7 +1869,7 @@ export async function countAnnouncementAudience(
 		.where(
 			and(
 				eq(gymMember.organizationId, orgId),
-				eq(gymMember.status, 'active'),
+				eq(gymMember.status, inactive ? 'inactive' : 'active'),
 				tag
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
@@ -1892,6 +1894,7 @@ export async function scheduleAnnouncement(
 		planId?: string;
 		locationId?: string;
 		atRisk?: boolean;
+		inactive?: boolean;
 	}
 ) {
 	if (opts.sendAt.getTime() <= Date.now()) error(400, 'Pick a send time in the future');
@@ -1912,7 +1915,8 @@ export async function scheduleAnnouncement(
 			tag: opts.tag ?? null,
 			planId: opts.planId ?? null,
 			locationId: opts.locationId ?? null,
-			atRisk: opts.atRisk ?? null
+			atRisk: opts.atRisk ?? null,
+			inactive: opts.inactive ?? null
 		}
 	});
 	return { scheduledFor: opts.sendAt };
@@ -1932,7 +1936,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			tag: sql<string | null>`${activity.data}->>'tag'`,
 			planId: sql<string | null>`${activity.data}->>'planId'`,
 			locationId: sql<string | null>`${activity.data}->>'locationId'`,
-			atRisk: sql<string | null>`${activity.data}->>'atRisk'`
+			atRisk: sql<string | null>`${activity.data}->>'atRisk'`,
+			inactive: sql<string | null>`${activity.data}->>'inactive'`
 		})
 		.from(activity)
 		.where(
@@ -1954,7 +1959,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			memberIds,
 			a.tag ?? undefined,
 			a.planId ?? undefined,
-			a.locationId ?? undefined
+			a.locationId ?? undefined,
+			a.inactive === 'true'
 		);
 		await db.delete(activity).where(eq(activity.id, a.id));
 		sent++;

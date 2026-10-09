@@ -261,6 +261,7 @@
 				'Open balance',
 				'Joined',
 				'Last visit',
+				'Membership ends',
 				'Visits (30d)',
 				'Referral source'
 			],
@@ -275,6 +276,7 @@
 				(m.openBalance / 100).toFixed(2),
 				m.joinedAt ? formatDate(m.joinedAt) : '',
 				m.lastVisit ? formatDate(m.lastVisit) : '',
+				m.memberEnds ? formatDate(m.memberEnds) : '',
 				m.visits30,
 				m.referralSource ?? ''
 			])
@@ -394,11 +396,13 @@
 				? 'At-risk members (no visit in 30+ days)'
 				: emailAudience === '__all'
 					? 'All active members'
-					: audTag
-						? `Tag: ${audTag}`
-						: audLoc
-							? `Location: ${audLocName}`
-							: `Plan: ${audPlanName}`
+					: emailAudience === '__inactive'
+						? 'Inactive members'
+						: audTag
+							? `Tag: ${audTag}`
+							: audLoc
+								? `Location: ${audLocName}`
+								: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -408,7 +412,8 @@
 						tag: audTag,
 						planId: audPlan,
 						locationId: audLoc,
-						atRisk: emailAudience === '__risk'
+						atRisk: emailAudience === '__risk',
+						inactive: emailAudience === '__inactive'
 					})
 				: null
 	);
@@ -424,6 +429,7 @@
 					planId: audPlan,
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
+					inactive: emailAudience === '__inactive',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
 				toast.success('Scheduled — the daily job sends it');
@@ -435,6 +441,7 @@
 					planId: audPlan,
 					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
+					inactive: emailAudience === '__inactive',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -1061,6 +1068,7 @@
 							{/if}
 							<Select.Item value="__all">All active members</Select.Item>
 							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
+							<Select.Item value="__inactive">Inactive members</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}

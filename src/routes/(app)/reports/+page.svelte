@@ -744,6 +744,25 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.arpu.members}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Revenue per member</Card.Title>
+				<Card.Description>Collected this month per active member</Card.Description>
+			</Card.Header>
+			<Card.Content class="text-sm">
+				<div class="flex items-center justify-between">
+					<span class="text-2xl font-semibold tabular-nums"
+						>{formatMoney(Math.round(r.arpu.collected / r.arpu.members), currency)}</span
+					>
+					<span class="text-muted-foreground tabular-nums"
+						>{formatMoney(r.arpu.collected, currency)} ÷ {r.arpu.members}</span
+					>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
