@@ -465,6 +465,58 @@
 		</Card.Root>
 
 	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Wrong plan?</Card.Title>
+			<Card.Description>Members paying for more (or less) than they use</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3 text-sm">
+			{#if !r.wrongPlan.overpaying.length && !r.wrongPlan.upgrading.length}
+				<p class="text-muted-foreground">Everyone's on the right plan.</p>
+			{:else}
+				{#each r.wrongPlan.overpaying as m (m.memberId)}
+					<div class="flex items-center justify-between gap-2">
+						<span class="min-w-0 flex-1 truncate"
+							><a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
+							<span class="text-muted-foreground"> · {m.plan}</span></span
+						>
+						<span class="shrink-0 text-xs text-amber-600 dark:text-amber-400">{m.alt}</span>
+					</div>
+				{/each}
+				{#each r.wrongPlan.upgrading as m (m.memberId)}
+					<div class="flex items-center justify-between gap-2">
+						<span class="min-w-0 flex-1 truncate"
+							><a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
+							<span class="text-muted-foreground"> · {m.plan}</span></span
+						>
+						<span class="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">{m.alt}</span>
+					</div>
+				{/each}
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Guests</Card.Title>
+			<Card.Description>{r.guestStats.monthTotal} guest check-ins this month</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			{#each r.guestStats.bringers as g (g.memberId)}
+				<div class="flex items-center justify-between">
+					<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{g.memberId}"
+						>{g.name}</a
+					>
+					<span class="tabular-nums text-muted-foreground"
+						>{g.guests} guest{g.guests === 1 ? '' : 's'}</span
+					>
+				</div>
+			{:else}
+				<p class="text-muted-foreground">No guest check-ins yet this month.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
 			<Card.Description

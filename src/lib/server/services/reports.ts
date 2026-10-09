@@ -507,6 +507,155 @@ async function packBurnDown(orgId: string) {
 	};
 }
 
+/**
+ * Wrong-plan hints — recurring-plan members visiting so little a pack/drop-in
+ * would cost less, and pack members burning through classes so fast the
+ * cheapest unlimited plan would save them money.
+ */
+async function wrongPlan(orgId: string) {
+	const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000);
+	// Monthly visit rate per member over the last 60 days.
+	const visitRows = await db
+		.select({
+			memberId: checkIn.memberId,
+			visits: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, sixtyDaysAgo)
+			)
+		)
+		.groupBy(checkIn.memberId);
+	const visits = new Map(visitRows.map((r) => [r.memberId, r.visits / 2])); // ~per-month
+	const memberships = await db
+		.select({
+			memberId: membership.memberId,
+			memberName: gymMember.name,
+			planName: plan.name,
+			amount: plan.amount,
+			interval: plan.interval,
+			isPack: plan.isPack
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
+		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'active')));
+	// Cheapest class drop-in price and the cheapest unlimited-style plan.
+	const [di] = await db
+		.select({ min: sql<number | null>`min(${classType.dropInPrice})`.mapWith((v) => v ? Number(v) : null) })
+		.from(classType)
+		.where(
+			and(
+				eq(classType.organizationId, orgId),
+				eq(classType.active, true),
+				sql`${classType.dropInPrice} > 0`
+			)
+		);
+	const plans = await db
+		.select({ name: plan.name, amount: plan.amount, interval: plan.interval })
+		.from(plan)
+		.where(
+			and(eq(plan.organizationId, orgId), eq(plan.active, true), eq(plan.isPack, false))
+		)
+		.orderBy(plan.amount);
+	const dropIn = di?.min ?? 0;
+	const cheapest = plans.find((p) => p.amount > 0) ?? null;
+	const overpaying: { memberId: string; name: string; plan: string; monthly: number; alt: string }[] =
+		[];
+	const upgrading: typeof overpaying = [];
+	const monthlyOf = (amount: number, interval: string) =>
+		(interval === 'year' ? amount / 12 : interval === 'week' ? amount * 4.33 : amount) / 100;
+	for (const m of memberships) {
+		const monthly = monthlyOf(m.amount, m.interval);
+		const vpm = visits.get(m.memberId) ?? 0;
+		if (!m.isPack && dropIn > 0 && monthly > 0 && vpm * (dropIn / 100) < monthly * 0.85) {
+			overpaying.push({
+				memberId: m.memberId,
+				name: m.memberName,
+				plan: m.planName,
+				monthly: Math.round(monthly),
+				alt: `~${vpm.toFixed(0)} visits/mo — drop-ins would cost ~$${Math.round(vpm * (dropIn / 100))}`
+			});
+		}
+		if (m.isPack && cheapest && vpm * (dropIn / 100) > monthlyOf(cheapest.amount, cheapest.interval)) {
+			upgrading.push({
+				memberId: m.memberId,
+				name: m.memberName,
+				plan: m.planName,
+				monthly: Math.round(vpm * (dropIn / 100)),
+				alt: `~${vpm.toFixed(0)} visits/mo — ${cheapest.name} would be $${Math.round(monthlyOf(cheapest.amount, cheapest.interval))}/mo`
+			});
+		}
+	}
+	return {
+		overpaying: overpaying.sort((a, b) => b.monthly - a.monthly).slice(0, 10),
+		upgrading: upgrading.sort((a, b) => b.monthly - a.monthly).slice(0, 10)
+	};
+}
+
+/** Guest visits this month + the members bringing the most guests. */
+async function guestStats(orgId: string) {
+	const since = new Date();
+	since.setDate(1);
+	since.setHours(0, 0, 0, 0);
+	const rows = await db
+		.select({
+			memberId: checkIn.memberId,
+			name: gymMember.name,
+			guests: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, since),
+				sql`${checkIn.guestName} is not null`
+			)
+		)
+		.groupBy(checkIn.memberId, gymMember.name)
+		.orderBy(desc(sql`count(*)`));
+	return {
+		monthTotal: rows.reduce((a, r) => a + r.guests, 0),
+		bringers: rows.slice(0, 8)
+	};
+}
+
+/**
+ * Daily cron — keeps an "At risk" member tag in sync with the at-risk report
+ * so staff can filter/segment on it without re-reading the report.
+ */
+export async function syncAtRiskTags(orgId: string) {
+	const TAG = 'At risk';
+	const risk = new Set((await atRiskMembers(orgId)).map((m) => m.memberId));
+	const tagged = await db
+		.select({ memberId: memberTag.memberId })
+		.from(memberTag)
+		.where(and(eq(memberTag.organizationId, orgId), eq(memberTag.tag, TAG)));
+	const taggedSet = new Set(tagged.map((t) => t.memberId));
+	const toAdd = [...risk].filter((id) => !taggedSet.has(id));
+	const toDrop = [...taggedSet].filter((id) => !risk.has(id));
+	if (toAdd.length)
+		await db
+			.insert(memberTag)
+			.values(toAdd.map((memberId) => ({ organizationId: orgId, memberId, tag: TAG })))
+			.onConflictDoNothing();
+	if (toDrop.length)
+		await db
+			.delete(memberTag)
+			.where(
+				and(
+					eq(memberTag.organizationId, orgId),
+					eq(memberTag.tag, TAG),
+					inArray(memberTag.memberId, toDrop)
+				)
+			);
+	return { tagged: risk.size, added: toAdd.length, removed: toDrop.length };
+}
+
 async function topAttendees(orgId: string) {
 	return db
 		.select({
@@ -1134,7 +1283,9 @@ export async function getReports(orgId: string) {
 		renewals,
 		heatmap,
 		spenders,
-		packBurn
+		packBurn,
+		planMisfits,
+		guests
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1185,7 +1336,9 @@ export async function getReports(orgId: string) {
 		renewalForecast(orgId),
 		checkinHeatmap(orgId),
 		topSpenders(orgId),
-		packBurnDown(orgId)
+		packBurnDown(orgId),
+		wrongPlan(orgId),
+		guestStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1248,7 +1401,9 @@ export async function getReports(orgId: string) {
 		renewals,
 		heatmap,
 		spenders,
-		packBurn
+		packBurn,
+		wrongPlan: planMisfits,
+		guestStats: guests
 	};
 }
 

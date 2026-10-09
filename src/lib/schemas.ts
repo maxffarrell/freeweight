@@ -641,6 +641,8 @@ export const announcementInput = v.object({
 	tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(50))),
 	/** Restrict the batch to members holding an active membership on this plan. */
 	planId: v.optional(idSchema),
+	/** Restrict the batch to members of this location. */
+	locationId: v.optional(idSchema),
 	/** Restrict the batch to the at-risk list (no visit in 30+ days). */
 	atRisk: v.optional(v.boolean())
 });
