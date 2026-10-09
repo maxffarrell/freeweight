@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
@@ -11,7 +12,8 @@
 	import { emailAllMembers } from '#lib/remote/members.remote.ts';
 	import { errMsg } from '#lib/format.ts';
 	import Mail from '@lucide/svelte/icons/mail';
-	import { getReportsQuery } from '#lib/remote/reports.remote.ts';
+	import {
+	markPayrollPaid, getReportsQuery } from '#lib/remote/reports.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
@@ -42,6 +44,21 @@
 	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
 	const hourLabel = (h: number) =>
 		h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
+
+	let payrollPending = $state(false);
+	const thisMonth = new Date().toISOString().slice(0, 7);
+	let payrollPaidMonth = $state<string | null>(r.payrollPaid?.month ?? null);
+	async function markPaid() {
+		payrollPending = true;
+		try {
+			const res = await markPayrollPaid();
+			toast.success(`${res.month} payroll marked paid`);
+			payrollPaidMonth = res.month;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not mark paid'));
+		}
+		payrollPending = false;
+	}
 
 	function exportPayroll() {
 		const csv = toCsv([
@@ -1045,11 +1062,22 @@
 				<Card.Title class="text-base">Instructor pay — this month</Card.Title>
 				<Card.Description>Rated classes taught × per-class pay rate</Card.Description>
 			</div>
-			{#if r.payrollDetail.length}
-				<Button variant="ghost" size="sm" onclick={exportPayroll}>
-					<Download class="size-3.5" /> CSV
-				</Button>
-			{/if}
+			<div class="flex items-center gap-1">
+				{#if payrollPaidMonth === thisMonth}
+					<Badge variant="secondary" class="text-emerald-600 dark:text-emerald-400"
+						>Paid {thisMonth}</Badge
+					>
+				{:else}
+					<Button variant="outline" size="sm" disabled={payrollPending} onclick={markPaid}
+						>Mark paid</Button
+					>
+				{/if}
+				{#if r.payrollDetail.length}
+					<Button variant="ghost" size="sm" onclick={exportPayroll}>
+						<Download class="size-3.5" /> CSV
+					</Button>
+				{/if}
+			</div>
 		</Card.Header>
 		<Card.Content>
 			<Table.Root>

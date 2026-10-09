@@ -13,6 +13,7 @@ import {
 	sendChallengeInvites,
 	sendChallengeResults,
 	sendClassReminders,
+	sendUsualClassNudges,
 	sendCourseCompletions,
 	sendDueAnnouncements,
 	sendDueRecurringAnnouncements,
@@ -89,6 +90,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let shiftCloses = 0;
 	let recurringPosted = 0;
 	let riskTagged = 0;
+	let usualNudges = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -104,6 +106,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`at-risk tag sync failed for ${o.id}`, err);
+		}
+		try {
+			usualNudges += await sendUsualClassNudges(o.id);
+		} catch (err) {
+			failed++;
+			console.error(`usual-class nudge failed for ${o.id}`, err);
 		}
 		try {
 			reminders += await sendClassReminders(o.id);
@@ -282,6 +290,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	return json({
 		workspaces: orgs.length,
 		riskTagChanges: riskTagged,
+		usualNudges,
 		failed,
 		reminders,
 		eventReminders,

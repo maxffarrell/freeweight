@@ -1,0 +1,1 @@
+ALTER TYPE "public"."charge_status" ADD VALUE 'written_off';

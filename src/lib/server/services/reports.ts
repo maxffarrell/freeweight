@@ -15,7 +15,10 @@ import {
 	sql
 } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { error } from '@sveltejs/kit';
+import type { OrgContext } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
+import { emit } from './events.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
 import {
 	memberNps,
@@ -505,6 +508,45 @@ async function packBurnDown(orgId: string) {
 		activePct: pct(usedA, issuedA),
 		unusedFinished: Math.max(0, issuedF - usedF)
 	};
+}
+
+/** Latest month stamped as paid on the instructor-payroll card. */
+export async function payrollPaidThrough(orgId: string) {
+	const [row] = await db
+		.select({
+			month: sql<string>`${activity.data}->>'month'`,
+			total: sql<number>`(${activity.data}->>'total')::int`.mapWith(Number),
+			at: activity.createdAt
+		})
+		.from(activity)
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'payroll'),
+				eq(activity.action, 'payroll_paid')
+			)
+		)
+		.orderBy(desc(activity.createdAt))
+		.limit(1);
+	return row ?? null;
+}
+
+/** Staff stamps the current month's instructor payroll as settled. */
+export async function markPayrollPaid(ctx: OrgContext) {
+	const month = new Date().toISOString().slice(0, 7);
+	const existing = await payrollPaidThrough(ctx.orgId);
+	if (existing?.month === month) error(409, `${month} is already marked paid`);
+	const { total } = await instructorPayroll(ctx.orgId);
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'payroll',
+		entityId: month,
+		action: 'payroll_paid',
+		summary: `Instructor payroll for ${month} marked paid (${(total / 100).toFixed(2)})`,
+		data: { month, total }
+	});
+	return { month, total };
 }
 
 /**
@@ -1285,7 +1327,8 @@ export async function getReports(orgId: string) {
 		spenders,
 		packBurn,
 		planMisfits,
-		guests
+		guests,
+		payrollPaid
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1338,7 +1381,8 @@ export async function getReports(orgId: string) {
 		topSpenders(orgId),
 		packBurnDown(orgId),
 		wrongPlan(orgId),
-		guestStats(orgId)
+		guestStats(orgId),
+		payrollPaidThrough(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1403,7 +1447,8 @@ export async function getReports(orgId: string) {
 		spenders,
 		packBurn,
 		wrongPlan: planMisfits,
-		guestStats: guests
+		guestStats: guests,
+		payrollPaid
 	};
 }
 

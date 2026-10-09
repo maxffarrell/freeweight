@@ -1006,7 +1006,7 @@ export const checkIn = pgTable(
 );
 
 export const chargeKind = pgEnum('charge_kind', ['membership', 'signup', 'dropin', 'other']);
-export const chargeStatus = pgEnum('charge_status', ['open', 'paid', 'void']);
+export const chargeStatus = pgEnum('charge_status', ['open', 'paid', 'void', 'written_off']);
 
 /** A receivable against a member: membership dues, signup fees, drop-ins. */
 export const charge = pgTable(

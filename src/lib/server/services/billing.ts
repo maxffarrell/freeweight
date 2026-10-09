@@ -623,7 +623,8 @@ export async function runBilling(orgId: string) {
 			.where(eq(membership.id, m.id));
 	}
 	await resumeFrozenMemberships(orgId);
-	return posted;
+	const ended = await endExpiredCommitments(orgId);
+	return posted + ended;
 }
 
 /**
@@ -1478,4 +1479,50 @@ export async function freezeAllMemberships(ctx: OrgContext, until: string) {
 		summary: `Froze ${rows.length} active membership${rows.length === 1 ? '' : 's'} until ${until} (holiday freeze)`
 	});
 	return { frozen: rows.length, until };
+}
+
+/**
+ * Fixed-term plans: a membership on a plan with `commitmentMonths` that has
+ * aged past the term and isn't auto-renewing ends itself — status cancelled,
+ * endReason 'Term ended', and the member gets the cancel email.
+ */
+export async function endExpiredCommitments(orgId: string) {
+	const rows = await db
+		.select({
+			id: membership.id,
+			memberId: membership.memberId,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(membership.autoRenew, false),
+				sql`${plan.commitmentMonths} > 0`,
+				sql`${membership.createdAt} + (${plan.commitmentMonths} || ' months')::interval < now()`
+			)
+		);
+	for (const r of rows) {
+		await db
+			.update(membership)
+			.set({
+				status: 'cancelled',
+				endsAt: new Date(),
+				nextChargeAt: null,
+				endReason: 'Term ended'
+			})
+			.where(eq(membership.id, r.id));
+		await emit({
+			orgId,
+			actorId: null,
+			entityType: 'membership',
+			entityId: r.id,
+			action: 'term_ended',
+			summary: `${r.planName} commitment ended — membership closed`
+		});
+		await notifyMembershipCancelled(orgId, r.id).catch(() => {});
+	}
+	return rows.length;
 }
