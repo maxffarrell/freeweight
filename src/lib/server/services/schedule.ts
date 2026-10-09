@@ -2789,6 +2789,8 @@ export async function daySheet(orgId: string, date: string) {
 			instructor: user.name,
 			location: location.name,
 			cancelled: classSession.cancelledAt,
+			note: classSession.note,
+			cover: classSession.coverRequestedAt,
 			memberName: gymMember.name,
 			status: booking.status,
 			guests: booking.guestCount
@@ -2823,6 +2825,8 @@ export async function daySheet(orgId: string, date: string) {
 		instructor: string | null;
 		location: string | null;
 		cancelled: boolean;
+		note: string | null;
+		cover: boolean;
 		roster: { name: string; status: string; guests: number }[];
 	}[] = [];
 	const byId = new Map<string, (typeof sessions)[number]>();
@@ -2837,6 +2841,8 @@ export async function daySheet(orgId: string, date: string) {
 				instructor: r.instructor,
 				location: r.location,
 				cancelled: !!r.cancelled,
+				note: r.note,
+				cover: !!r.cover,
 				roster: []
 			};
 			byId.set(r.sessionId, e);
@@ -2845,4 +2851,66 @@ export async function daySheet(orgId: string, date: string) {
 		if (r.memberName) e.roster.push({ name: r.memberName, status: r.status!, guests: r.guests ?? 0 });
 	}
 	return { tz, date, sessions };
+}
+
+/**
+ * Staff-side move: re-seat a booking into another session of the same class.
+ * The desk overrides member-facing rules (cutoffs, booking windows); capacity
+ * still applies — a full target puts them on its waitlist. The member gets the
+ * new booking confirmation, never a cancellation.
+ */
+export async function moveBooking(ctx: OrgContext, bookingId: string, newSessionId: string) {
+	const [b] = await db
+		.select({
+			status: booking.status,
+			sessionId: booking.sessionId,
+			classTypeId: classSession.classTypeId,
+			memberName: gymMember.name
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(and(eq(booking.organizationId, ctx.orgId), eq(booking.id, bookingId)));
+	if (!b) error(404, 'Booking not found');
+	if (b.status !== 'booked' && b.status !== 'waitlisted')
+		error(409, 'That booking already ended');
+	if (b.sessionId === newSessionId) error(400, 'Already in that session');
+	const [target] = await db
+		.select({
+			id: classSession.id,
+			classTypeId: classSession.classTypeId,
+			capacity: classSession.capacity,
+			startsAt: classSession.startsAt,
+			cancelledAt: classSession.cancelledAt
+		})
+		.from(classSession)
+		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, newSessionId)));
+	if (!target) error(404, 'Session not found');
+	if (target.cancelledAt) error(409, 'That session is cancelled');
+	if (target.classTypeId !== b.classTypeId) error(400, 'Pick a session of the same class');
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.where(
+			and(
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.sessionId, newSessionId),
+				inArray(booking.status, ['booked', 'attended'])
+			)
+		);
+	const status = n < target.capacity ? 'booked' : 'waitlisted';
+	await db
+		.update(booking)
+		.set({ sessionId: newSessionId, status })
+		.where(eq(booking.id, bookingId));
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'booking',
+		entityId: bookingId,
+		action: 'moved',
+		summary: `${b.memberName} moved to another session`
+	});
+	if (status === 'booked') notifyBookingConfirmed(ctx.orgId, bookingId).catch(() => {});
+	return { status };
 }

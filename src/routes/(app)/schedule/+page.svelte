@@ -25,6 +25,7 @@
 		updateSession,
 		getRoster,
 		setBookingNote,
+		moveBooking,
 		bookSession,
 		forgiveNoShow,
 		updateBooking,
@@ -182,6 +183,18 @@
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
 	);
 	const printWaitlist = $derived(roster.filter((r) => r.booking.status === 'waitlisted'));
+	let moveFor = $state<string | null>(null);
+	const moveTargets = $derived(
+		moveFor && focus
+			? sessions.filter(
+					(s) =>
+						s.session.classTypeId === focus.session.classTypeId &&
+						s.session.id !== focus.session.id &&
+						!s.session.cancelledAt &&
+						new Date(s.session.startsAt).getTime() > Date.now()
+				)
+			: []
+	);
 	const waitlistPos = $derived(
 		new Map(
 			roster
@@ -233,6 +246,21 @@
 			await reload();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not book'));
+		}
+	}
+	async function doMove(sessionId: string) {
+		const bid = moveFor;
+		moveFor = null;
+		if (!bid) return;
+		try {
+			const r = await moveBooking({ bookingId: bid, sessionId });
+			toast.success(
+				r.status === 'booked' ? 'Moved' : 'Moved to the waitlist — that session is full'
+			);
+			await getRoster(focusId).refresh();
+			await reload();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not move'));
 		}
 	}
 	async function setBooking(id: string, status: 'cancelled' | 'attended' | 'no_show' | 'booked') {
@@ -1189,6 +1217,14 @@
 										onclick={() => setBooking(r.booking.id, 'no_show')}>No-show</Button
 									>
 								{/if}
+								{#if r.booking.status === 'booked' || r.booking.status === 'waitlisted'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										onclick={() => (moveFor = r.booking.id)}>Move</Button
+									>
+								{/if}
 								{#if r.booking.status === 'waitlisted'}
 									<Button
 										variant="ghost"
@@ -1356,6 +1392,34 @@
 </Sheet.Root>
 
 {#if focus}
+	<Dialog.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
+		<Dialog.Content class="sm:max-w-sm">
+			<Dialog.Header>
+				<Dialog.Title>Move to another session</Dialog.Title>
+				<Dialog.Description
+					>Same class ({focus?.className}) — pick the new session in view.</Dialog.Description
+				>
+			</Dialog.Header>
+			<div class="max-h-64 divide-y overflow-auto">
+				{#each moveTargets as t (t.session.id)}
+					<button
+						class="flex w-full items-center justify-between gap-2 rounded px-2 py-2 text-left text-sm hover:bg-muted/60"
+						onclick={() => doMove(t.session.id)}
+					>
+						<span class="font-medium">{localTime(t.session.startsAt, tz)}</span>
+						<span class="text-xs text-muted-foreground"
+							>{localDate(t.session.startsAt, tz)} · {t.booked}/{t.session.capacity}</span
+						>
+					</button>
+				{:else}
+					<p class="py-3 text-sm text-muted-foreground">
+						No other upcoming sessions of this class in view — try another week.
+					</p>
+				{/each}
+			</div>
+		</Dialog.Content>
+	</Dialog.Root>
+
 	<div id="roster-print" class="hidden print:block">
 		<h1 class="text-2xl font-bold">{focus.className}</h1>
 		<p class="mt-1 text-sm">

@@ -43,6 +43,7 @@ import {
 	requestPaymentNotice,
 	scheduleAnnouncement,
 	sendAnnouncement,
+	previewAnnouncement as previewAnnouncementSvc,
 	sendAnnouncementTest,
 	listAnnouncementTemplates,
 	createAnnouncementTemplate,
@@ -339,6 +340,13 @@ export const requestPayment = command(idSchema, async (memberId) =>
 
 export const getMemberNotes = query(idSchema, async (memberId) =>
 	svc.listMemberNotes((await requireOrg()).orgId, memberId)
+);
+
+/** Renders the announcement as the member will see it — the compose dialog's Preview. */
+export const previewAnnouncement = command(
+	v.object({ subject: v.string(), message: v.string() }),
+	async ({ subject, message }) =>
+		previewAnnouncementSvc((await requireOrg()).orgId, subject, message)
 );
 
 export const addMemberNote = command(memberNoteInput, async ({ memberId, body }) => {

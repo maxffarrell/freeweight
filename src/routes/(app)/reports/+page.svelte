@@ -1323,6 +1323,35 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Renewals</Card.Title>
+			<Card.Description>Expected membership billing, next 3 months</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Month</Table.Head>
+						<Table.Head class="text-right">Renewals</Table.Head>
+						<Table.Head class="text-right">Expected</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.renewals as m (m.month)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{m.month}</Table.Cell>
+							<Table.Cell class="text-right">{m.n}</Table.Cell>
+							<Table.Cell class="text-right">{formatMoney(m.total, currency, true)}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row><Table.Cell colspan={3} class="text-muted-foreground">No renewals due in the next 90 days.</Table.Cell></Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Member funnel</Card.Title>
 			<Card.Description>Leads → members → trialed → paying → retained 90+ days</Card.Description>
 		</Card.Header>

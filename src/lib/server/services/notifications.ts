@@ -1665,6 +1665,20 @@ export async function sendAnnouncement(
 	return { sent, total: members.length };
 }
 
+/** Renders the announcement email exactly as members see it — the compose
+ * dialog's live preview (merge tags resolved against a sample name). */
+export async function previewAnnouncement(orgId: string, subject: string, message: string) {
+	const name = await orgBrand(orgId);
+	return renderEmail({
+		...name,
+		heading: mergeTags(subject || '(no subject)', 'Casey Rivera'),
+		lines: mergeTags(message || '(empty message)', 'Casey Rivera')
+			.split(/\n+/)
+			.filter(Boolean),
+		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+	}).html;
+}
+
 /** EXISTS clause: the member holds an active membership on this plan. */
 const membersOnPlan = (orgId: string, planId: string) =>
 	sql`exists (select 1 from ${membership} mm where mm.member_id = ${gymMember.id} and mm.organization_id = ${orgId} and mm.status = 'active' and mm.plan_id = ${planId})`;

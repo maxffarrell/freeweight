@@ -9,6 +9,7 @@ import {
 	isNotNull,
 	isNull,
 	lt,
+	lte,
 	ne,
 	notInArray,
 	sql
@@ -1091,7 +1092,8 @@ export async function getReports(orgId: string) {
 		paused,
 		covers,
 		tags,
-		never
+		never,
+		renewals
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1138,7 +1140,8 @@ export async function getReports(orgId: string) {
 		pausedMemberships(orgId),
 		coverScorecard(orgId),
 		tagBreakdown(orgId),
-		neverVisited(orgId)
+		neverVisited(orgId),
+		renewalForecast(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1197,7 +1200,8 @@ export async function getReports(orgId: string) {
 		paused,
 		covers,
 		tags,
-		never
+		never,
+		renewals
 	};
 }
 
@@ -1461,4 +1465,34 @@ async function neverVisited(orgId: string) {
 		)
 		.orderBy(desc(gymMember.createdAt))
 		.limit(25);
+}
+
+/**
+ * Expected renewals over the next 90 days, bucketed by month — active, billed
+ * memberships grouped on their next charge date at the plan price (or the
+ * member's price override).
+ */
+async function renewalForecast(orgId: string) {
+	return db
+		.select({
+			month: sql<string>`to_char(${membership.nextChargeAt}, 'YYYY-MM')`,
+			n: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`coalesce(sum(coalesce(${membership.price}, ${plan.amount})), 0)`.mapWith(
+				Number
+			)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(membership.noBill, false),
+				isNotNull(membership.nextChargeAt),
+				gte(membership.nextChargeAt, new Date()),
+				lte(membership.nextChargeAt, new Date(Date.now() + 90 * 86_400_000))
+			)
+		)
+		.groupBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`)
+		.orderBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`);
 }
