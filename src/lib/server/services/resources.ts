@@ -5,11 +5,13 @@ import {
 	equipment,
 	facilityResource,
 	gymMember,
+	gymSettings,
 	location,
-	resourceBooking
+	resourceBooking,
+	resourceRecurring
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
-import { localDate, zonedToUtc } from '#lib/tz.ts';
+import { localDate, localTime, zonedToUtc } from '#lib/tz.ts';
 import { getSettings } from './settings.ts';
 import { emit } from './events.ts';
 import { notifyResourceBooked } from './notifications.ts';
@@ -330,4 +332,135 @@ export async function deleteEquipment(ctx: OrgContext, id: string) {
 		.returning();
 	if (!row) error(404, 'Equipment not found');
 	return row;
+}
+
+/** A member's weekly amenity rules (portal manage view). */
+export async function memberRecurringRules(orgId: string, memberId: string) {
+	return db
+		.select({
+			rule: resourceRecurring,
+			resourceName: facilityResource.name
+		})
+		.from(resourceRecurring)
+		.innerJoin(facilityResource, eq(resourceRecurring.resourceId, facilityResource.id))
+		.where(
+			and(
+				eq(resourceRecurring.organizationId, orgId),
+				eq(resourceRecurring.memberId, memberId),
+				eq(resourceRecurring.active, true)
+			)
+		)
+		.orderBy(asc(resourceRecurring.weekday), asc(resourceRecurring.startTime));
+}
+
+/** Turn an existing reservation into a weekly rule at the same day/time. */
+export async function repeatResourceWeekly(
+	orgId: string,
+	memberId: string,
+	bookingId: string,
+	tz: string
+) {
+	const [b] = await db
+		.select()
+		.from(resourceBooking)
+		.where(
+			and(
+				eq(resourceBooking.organizationId, orgId),
+				eq(resourceBooking.id, bookingId),
+				eq(resourceBooking.memberId, memberId),
+				eq(resourceBooking.status, 'booked')
+			)
+		);
+	if (!b) error(404, 'Reservation not found');
+	const day = localDate(b.startsAt, tz);
+	const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
+	const startTime = localTime(b.startsAt, tz);
+	// Already holding that slot weekly?
+	const [dup] = await db
+		.select({ id: resourceRecurring.id })
+		.from(resourceRecurring)
+		.where(
+			and(
+				eq(resourceRecurring.organizationId, orgId),
+				eq(resourceRecurring.memberId, memberId),
+				eq(resourceRecurring.resourceId, b.resourceId),
+				eq(resourceRecurring.weekday, weekday),
+				eq(resourceRecurring.startTime, startTime),
+				eq(resourceRecurring.active, true)
+			)
+		)
+		.limit(1);
+	if (dup) error(409, 'You already hold this slot every week');
+	const [row] = await db
+		.insert(resourceRecurring)
+		.values({
+			organizationId: orgId,
+			resourceId: b.resourceId,
+			memberId,
+			weekday,
+			startTime
+		})
+		.returning();
+	await emit({
+		orgId,
+		actorId: null,
+		entityType: 'resource_recurring',
+		entityId: row!.id,
+		action: 'created',
+		summary: `Weekly amenity reservation created (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][weekday]} ${startTime})`
+	});
+	return row;
+}
+
+export async function cancelResourceRecurring(orgId: string, memberId: string, id: string) {
+	const [row] = await db
+		.update(resourceRecurring)
+		.set({ active: false })
+		.where(
+			and(
+				eq(resourceRecurring.organizationId, orgId),
+				eq(resourceRecurring.id, id),
+				eq(resourceRecurring.memberId, memberId)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Rule not found');
+	return row;
+}
+
+/**
+ * Cron: materialize each active rule's bookings ~14 days ahead. Existing
+ * bookings at the same slot are skipped (bookResource dedupes anyway via the
+ * member-already-booked check), full/closed slots are quietly skipped — the
+ * member keeps the rule.
+ */
+export async function materializeResourceRecurring(orgId: string) {
+	const [st] = await db
+		.select({ tz: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.tz ?? 'UTC';
+	const rules = await db
+		.select()
+		.from(resourceRecurring)
+		.where(and(eq(resourceRecurring.organizationId, orgId), eq(resourceRecurring.active, true)));
+	let created = 0;
+	const today = localDate(new Date(), tz);
+	for (const r of rules) {
+		for (let i = 0; i < 14; i++) {
+			const d = new Date(`${today}T12:00:00Z`);
+			d.setUTCDate(d.getUTCDate() + i);
+			const day = d.toISOString().slice(0, 10);
+			const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
+			if (weekday !== r.weekday) continue;
+			if (r.runsUntil && day > r.runsUntil) break;
+			try {
+				await bookResource(orgId, r.memberId, r.resourceId, day, r.startTime, undefined, tz);
+				created++;
+			} catch {
+				// Full, closed, already booked, inside cutoff — skip; rule survives.
+			}
+		}
+	}
+	return created;
 }

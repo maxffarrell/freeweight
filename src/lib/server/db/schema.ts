@@ -783,6 +783,29 @@ export const resourceBooking = pgTable(
 	]
 );
 
+/** Member holds a weekly amenity slot — cron materializes bookings ~2 weeks out. */
+export const resourceRecurring = pgTable(
+	'resource_recurring',
+	{
+		id: id(),
+		organizationId: orgId(),
+		resourceId: text('resource_id')
+			.notNull()
+			.references(() => facilityResource.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** 0=Sun..6=Sat in the org's timezone. */
+		weekday: integer('weekday').notNull(),
+		/** Slot start, `HH:MM` org-local. */
+		startTime: text('start_time').notNull(),
+		runsUntil: date('runs_until', { mode: 'string' }),
+		active: boolean('active').notNull().default(true),
+		...timestamps
+	},
+	(t) => [index('resource_recurring_org_idx').on(t.organizationId)]
+);
+
 /** A one-off paid/free event — seminar, comp, bring-a-friend day. */
 export const gymEvent = pgTable(
 	'gym_event',
