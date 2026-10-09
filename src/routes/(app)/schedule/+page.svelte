@@ -23,6 +23,7 @@
 		createSession,
 		updateSession,
 		getRoster,
+		setBookingNote,
 		bookSession,
 		forgiveNoShow,
 		updateBooking,
@@ -1140,6 +1141,23 @@
 										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span
 									>
 								{/if}
+								<input
+									class="ml-1 w-28 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground"
+									placeholder="+ note"
+									value={r.booking.note ?? ''}
+									onchange={async (e) => {
+										const v2 = (e.target as HTMLInputElement).value;
+										try {
+											await setBookingNote({
+												bookingId: r.booking.id,
+												sessionId: focus!.session.id,
+												note: v2 || null
+											});
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not save note'));
+										}
+									}}
+								/>
 							</Table.Cell>
 							<Table.Cell>
 								<StatusBadge status={r.booking.status} />

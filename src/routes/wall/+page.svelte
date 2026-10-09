@@ -4,10 +4,10 @@
 	import Logo from '#lib/components/app/logo.svelte';
 
 	let { data } = $props();
-	const prs = $derived(await getPrWall());
+	const wall = $derived(await getPrWall());
 	const today = new Date().toISOString().slice(0, 10);
-	const todays = $derived(prs.filter((p) => p.pr.recordedOn === today));
-	const rest = $derived(prs.filter((p) => p.pr.recordedOn !== today));
+	const todays = $derived(wall.records.filter((p) => p.pr.recordedOn === today));
+	const rest = $derived(wall.records.filter((p) => p.pr.recordedOn !== today));
 
 	onMount(() => {
 		const t = setInterval(() => void getPrWall().refresh(), 30_000);
@@ -47,4 +47,17 @@
 			<li class="text-xl text-muted-foreground">No records yet — members log PRs in the portal.</li>
 		{/each}
 	</ul>
+
+	{#if wall.streaks.length}
+		<h2 class="mt-12 mb-4 text-xl font-semibold text-muted-foreground">Hot streaks</h2>
+		<ul class="space-y-2">
+			{#each wall.streaks as st, i (st.memberId)}
+				<li class="flex items-baseline gap-4">
+					<span class="w-10 text-2xl font-bold text-primary">#{i + 1}</span>
+					<span class="w-64 truncate text-xl font-medium">{st.memberName}</span>
+					<span class="text-2xl font-bold">{st.streak}wk</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </div>

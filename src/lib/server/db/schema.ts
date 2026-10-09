@@ -486,6 +486,8 @@ export const booking = pgTable(
 		/** Drop-in charge this booking created — voided when the booking/session is cancelled. */
 		chargeId: text('charge_id').references(() => charge.id, { onDelete: 'set null' }),
 		cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+		/** Staff note on this booking ("first visit", "spot near fan") — roster + sign-in sheet. */
+		note: text('note'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
