@@ -1626,7 +1626,8 @@ export async function getReports(orgId: string) {
 		tenure,
 		arpuNow,
 		lost,
-		streaks
+		streaks,
+		rel
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1697,7 +1698,8 @@ export async function getReports(orgId: string) {
 		tenureAtCancel(orgId),
 		arpu(orgId),
 		lostMrr(orgId),
-		weekStreakLeaders(orgId, 8)
+		weekStreakLeaders(orgId, 8),
+		instructorReliability(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1780,8 +1782,36 @@ export async function getReports(orgId: string) {
 		tenureAtCancel: tenure,
 		arpu: arpuNow,
 		lostMrr: lost,
-		streakLeaders: streaks
+		streakLeaders: streaks,
+		instructorReliability: rel
 	};
+}
+
+/** Sessions taught vs cancelled per instructor over the last 90 days. */
+async function instructorReliability(orgId: string) {
+	const since = new Date(Date.now() - 90 * 86400_000);
+	return db
+		.select({
+			instructorName: user.name,
+			taught: sql<number>`count(*) filter (where ${classSession.cancelledAt} is null)`.mapWith(
+				Number
+			),
+			cancelled:
+				sql<number>`count(*) filter (where ${classSession.cancelledAt} is not null)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, since),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(user.name)
+		.orderBy(desc(sql`count(*) filter (where ${classSession.cancelledAt} is not null)`))
+		.limit(8);
 }
 
 async function npsStats(orgId: string) {

@@ -797,6 +797,29 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Instructor reliability</Card.Title>
+				<Card.Description>Sessions taught vs cancelled, last 90 days.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				{#if !r.instructorReliability.length}
+					<p class="text-sm text-muted-foreground">No sessions yet.</p>
+				{:else}
+					<ul class="space-y-1.5 text-sm">
+						{#each r.instructorReliability as i (i.instructorName)}
+							<li class="flex items-center justify-between gap-2">
+								<span class="truncate">{i.instructorName}</span>
+								<span class="shrink-0 text-muted-foreground tabular-nums"
+									>{i.taught} taught{#if i.cancelled}
+										· <span class="text-amber-600">{i.cancelled} cancelled</span>{/if}</span
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<Card.Root>

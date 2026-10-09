@@ -94,6 +94,20 @@
 		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
 	}
 
+	const avgVisit = $derived.by(() => {
+		const done = checkIns.filter((c) => c.checkIn.checkedOutAt);
+		if (!done.length) return '';
+		const mins =
+			done.reduce(
+				(a, c) => a + (c.checkIn.checkedOutAt!.getTime() - c.checkIn.checkedAt.getTime()),
+				0
+			) /
+			done.length /
+			60000;
+		const m = Math.round(mins);
+		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
+	});
+
 	function exportCheckIns() {
 		const csv = toCsv([
 			['Member', 'Guest of', 'Checked at', 'Location', 'Method', 'Duration'],
@@ -175,7 +189,7 @@
 					? ' so far'
 					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
 					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
-					: ''}.</Card.Description
+					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}.</Card.Description
 			>
 		</Card.Header>
 		<Card.Content class="px-4">

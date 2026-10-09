@@ -503,6 +503,32 @@ export async function getRoster(orgId: string, sessionId: string) {
 		.orderBy(asc(booking.createdAt));
 }
 
+/** Fill history for a session's class — the last 4 past sessions of the same class type. */
+export async function recentClassSessions(orgId: string, sessionId: string) {
+	const sess = await getSession(orgId, sessionId);
+	return db
+		.select({
+			id: classSession.id,
+			startsAt: classSession.startsAt,
+			capacity: classSession.capacity,
+			cancelledAt: classSession.cancelledAt,
+			booked:
+				sql<number>`(select count(*) from ${booking} b where b.session_id = ${classSession.id} and b.status in ('booked','attended'))`.mapWith(
+					Number
+				)
+		})
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				eq(classSession.classTypeId, sess.session.classTypeId),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.orderBy(desc(classSession.startsAt))
+		.limit(4);
+}
+
 /** Coach note shared with the member — the member sees it in their portal. */
 export async function setCoachNote(ctx: OrgContext, bookingId: string, note: string | null) {
 	const [row] = await db
@@ -2139,6 +2165,55 @@ export async function copyWeek(
 			summary: `Copied ${inserted.length} session${inserted.length === 1 ? '' : 's'} to week of ${target}${src.length - rows.length ? ` — ${src.length - rows.length} skipped (closed)` : ''}`
 		});
 	return { created: inserted.length, skipped: src.length - rows.length };
+}
+
+/** Copies one day's sessions onto another date (org-local), skipping closures. */
+export async function copyDay(ctx: OrgContext, tz: string, fromDate: string, toDate: string) {
+	const from = zonedToUtc(`${fromDate}T00:00`, tz);
+	const to = zonedToUtc(`${addDays(fromDate, 1)}T00:00`, tz);
+	const shiftMs = zonedToUtc(`${toDate}T00:00`, tz).getTime() - from.getTime();
+	const [closedDay] = await db
+		.select({ date: closure.date })
+		.from(closure)
+		.where(and(eq(closure.organizationId, ctx.orgId), eq(closure.date, toDate)))
+		.limit(1);
+	const src = await db
+		.select()
+		.from(classSession)
+		.where(
+			and(
+				eq(classSession.organizationId, ctx.orgId),
+				gte(classSession.startsAt, from),
+				lt(classSession.startsAt, to),
+				isNull(classSession.cancelledAt)
+			)
+		);
+	const rows = closedDay
+		? []
+		: src.map((s) => ({
+				organizationId: ctx.orgId,
+				classTypeId: s.classTypeId,
+				locationId: s.locationId,
+				instructorId: s.instructorId,
+				startsAt: new Date(s.startsAt.getTime() + shiftMs),
+				endsAt: new Date(s.endsAt.getTime() + shiftMs),
+				capacity: s.capacity,
+				note: s.note,
+				checkinCode: sessionCode()
+			}));
+	const inserted = rows.length
+		? await db.insert(classSession).values(rows).returning({ id: classSession.id })
+		: [];
+	if (inserted.length)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId,
+			entityType: 'class_session',
+			entityId: inserted[0]!.id,
+			action: 'copied',
+			summary: `Copied ${inserted.length} session${inserted.length === 1 ? '' : 's'} from ${fromDate} to ${toDate}`
+		});
+	return { created: inserted.length, skipped: closedDay ? src.length : 0 };
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

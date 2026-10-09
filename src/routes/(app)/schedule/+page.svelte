@@ -23,7 +23,9 @@
 		updateClassType,
 		createSession,
 		updateSession,
+		copyDay,
 		getRoster,
+		recentClassSessions,
 		setBookingNote,
 		setCoachNote,
 		moveBooking,
@@ -180,7 +182,11 @@
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
+	let copyDayOpen = $state(false);
+	let copyFrom = $state('');
+	let copyTo = $state('');
 	const roster = $derived(focusId ? await getRoster(focusId) : []);
+	const recentFill = $derived(focusId ? await recentClassSessions(focusId) : []);
 	const rosterGuests = $derived(roster.reduce((a, r) => a + (r.booking.guestCount ?? 0), 0));
 	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
 	const printBooked = $derived(
@@ -1139,6 +1145,15 @@
 				pending = false;
 			}}><Copy /> Copy week</Button
 		>
+		<Button
+			variant="outline"
+			size="sm"
+			onclick={() => {
+				copyFrom = localDate(new Date(), tz);
+				copyTo = localDate(new Date(Date.now() + 86400_000), tz);
+				copyDayOpen = true;
+			}}><Copy /> Copy day…</Button
+		>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
 			<NativeSelect bind:value={fType}>
 				<option value="">All classes</option>
@@ -1217,6 +1232,18 @@
 			</Sheet.Title>
 			<Sheet.Description>Roster — booked first, waitlist below.</Sheet.Description>
 		</Sheet.Header>
+		{#if recentFill.length}
+			<div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2">
+				<span class="text-xs text-muted-foreground">Recent:</span>
+				{#each recentFill as rs (rs.id)}
+					<Badge variant="outline" class="text-xs tabular-nums"
+						>{localDate(rs.startsAt, tz).slice(5)}{rs.cancelledAt
+							? ' cancelled'
+							: ` ${rs.booked}/${rs.capacity}`}</Badge
+					>
+				{/each}
+			</div>
+		{/if}
 		{#if focus?.session.note}
 			<p class="border-b px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
 				{focus.session.note}
@@ -1548,6 +1575,51 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<Dialog.Root bind:open={copyDayOpen}>
+	<Dialog.Content class="sm:max-w-xs">
+		<Dialog.Header>
+			<Dialog.Title>Copy a day</Dialog.Title>
+			<Dialog.Description
+				>Duplicate every session from one day onto another — same times, rooms and instructors.</Dialog.Description
+			>
+		</Dialog.Header>
+		<div class="grid grid-cols-2 gap-3">
+			<Field.Field>
+				<Field.Label>From</Field.Label>
+				<Input type="date" bind:value={copyFrom} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>To</Field.Label>
+				<Input type="date" bind:value={copyTo} />
+			</Field.Field>
+		</div>
+		<Dialog.Footer>
+			<Button
+				disabled={pending || !copyFrom || !copyTo}
+				onclick={async () => {
+					pending = true;
+					try {
+						const r = await copyDay({ from: copyFrom, to: copyTo });
+						toast.success(
+							r.created
+								? `Copied ${r.created} session${r.created === 1 ? '' : 's'} to ${copyTo}` +
+										(r.skipped ? ` — ${r.skipped} skipped (gym closed)` : '')
+								: r.skipped
+									? 'Target day is a gym closure'
+									: 'No sessions on that day'
+						);
+						copyDayOpen = false;
+						await reload();
+					} catch (err) {
+						toast.error(errMsg(err, 'Could not copy day'));
+					}
+					pending = false;
+				}}>Copy</Button
+			>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 {#if focus}
 	<Dialog.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
