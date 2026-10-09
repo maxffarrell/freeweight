@@ -84,7 +84,8 @@ export const getMembers = query(
 			referred: v.optional(v.boolean()),
 			neverBooked: v.optional(v.boolean()),
 			endingSoon: v.optional(v.boolean()),
-			noWaiver: v.optional(v.boolean())
+			noWaiver: v.optional(v.boolean()),
+			onWaitlist: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -106,7 +107,8 @@ export const getMembers = query(
 			opts?.referred,
 			opts?.neverBooked,
 			opts?.endingSoon,
-			opts?.noWaiver
+			opts?.noWaiver,
+			opts?.onWaitlist
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

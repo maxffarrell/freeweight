@@ -106,7 +106,9 @@ export async function listMembers(
 	/** Members whose active membership (pack or term) ends within 30 days. */
 	endingSoon?: boolean,
 	/** Members missing a signature for the org's current waiver text (no-op when none is set). */
-	noWaiver?: boolean
+	noWaiver?: boolean,
+	/** Members currently waitlisted on an upcoming session. */
+	onWaitlist?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -195,6 +197,9 @@ export async function listMembers(
 					: undefined,
 				noWaiver && st?.waiver
 					? sql`not exists (select 1 from waiver w where w.member_id = ${gymMember.id} and w.text = ${st.waiver})`
+					: undefined,
+				onWaitlist
+					? sql`exists (select 1 from booking b6 join class_session s6 on s6.id = b6.session_id where b6.member_id = ${gymMember.id} and b6.status = 'waitlisted' and s6.starts_at > now())`
 					: undefined,
 				recent
 					? gte(
