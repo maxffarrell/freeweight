@@ -1105,7 +1105,12 @@
 			onclick={async () => ((weekStart = addDays(weekStart, 7)), await reload())}
 			><ChevronRight /></Button
 		>
-		<span class="ml-2 text-sm text-muted-foreground">Week of {weekStart}</span>
+		<span class="ml-2 text-sm text-muted-foreground"
+			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.reduce(
+				(a, r) => a + (r.booked ?? 0),
+				0
+			)} booked</span
+		>
 		<Button
 			variant="outline"
 			size="sm"

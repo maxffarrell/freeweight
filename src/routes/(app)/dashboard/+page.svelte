@@ -445,7 +445,7 @@
 							{#each d.pendingRequests as r (r.memberId + r.kind + r.planName)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a
-										href="/members/{r.memberId}"
+										href={r.kind === 'equipment' ? '/schedule' : `/members/{r.memberId}`}
 										class="truncate hover:underline"
 										title={r.requestReason ?? undefined}>{r.memberName}</a
 									>
@@ -464,7 +464,9 @@
 																? r.planName
 																: r.kind === 'deletion'
 																	? 'delete my data'
-																	: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+																	: r.kind === 'equipment'
+																		? r.planName
+																		: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>
