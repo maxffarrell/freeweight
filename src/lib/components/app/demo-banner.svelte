@@ -36,8 +36,8 @@
 			role="timer"
 			aria-label="Demo session time remaining"
 			aria-live="off"
-			class="font-medium tabular-nums"
-		>{countdown}</span>
+			class="font-medium tabular-nums">{countdown}</span
+		>
 	</span>
 	<a class="font-medium underline underline-offset-2" href={deployUrl}>Deploy your own</a>
 </div>

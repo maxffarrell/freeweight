@@ -1131,7 +1131,12 @@
 				(s) => !s.session.instructorId && !s.session.cancelledAt
 			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
 				? ` · ${sessions.filter((r) => r.session.cancelledAt).length} cancelled`
-				: ''} · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked · {Math.round(
+				: ''} · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked{sessions.reduce(
+				(a, r) => a + (r.waitlisted ?? 0),
+				0
+			)
+				? ` · ${sessions.reduce((a, r) => a + (r.waitlisted ?? 0), 0)} waitlisted`
+				: ''} · {Math.round(
 				(sessions.reduce((a, r) => a + (r.booked ?? 0), 0) /
 					Math.max(
 						1,

@@ -74,7 +74,7 @@
 	let q = $state('');
 	let tag = $state('__all');
 	let statusFilter = $state('__all');
-	let planFilter = $state('__all');
+	let planFilter = $state(page.url.searchParams.get('plan') ?? '__all');
 	// Deep links like /members?owes=1 (billing aging card) preselect the balance filter.
 	const initOwes = page.url.searchParams.get('owes') === '1';
 	const SORT_LABELS = {

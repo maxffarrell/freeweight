@@ -343,7 +343,7 @@
 					<p class="border-t px-4 py-2 text-xs text-muted-foreground">
 						Tomorrow: {d.tomorrow.sessions} class{d.tomorrow.sessions === 1 ? '' : 'es'} · {d
 							.tomorrow.booked}
-						booked
+						booked{d.tomorrow.waitlisted ? ` · ${d.tomorrow.waitlisted} waitlisted` : ''}
 					</p>
 				{/if}
 			</Card.Content>
