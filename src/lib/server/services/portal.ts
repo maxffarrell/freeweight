@@ -23,6 +23,7 @@ import {
 	signRequest,
 	classVideo,
 	workoutResult,
+	workoutLog,
 	gymMember,
 	gymSettings,
 	location,
@@ -223,6 +224,14 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(recurringCharge.memberId, memberId), eq(recurringCharge.organizationId, orgId)))
 		.orderBy(asc(recurringCharge.nextDue));
 
+	// The member's own workout journal — newest first, portal "Workout log" card.
+	const workouts = await db
+		.select()
+		.from(workoutLog)
+		.where(eq(workoutLog.memberId, memberId))
+		.orderBy(desc(workoutLog.day), desc(workoutLog.createdAt))
+		.limit(10);
+
 	const [[org], [referred], referralRows] = await Promise.all([
 		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
 		db
@@ -388,6 +397,14 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(locker.organizationId, orgId), eq(locker.memberId, memberId)))
 		.limit(1);
 
+	// Next scheduled membership charge + what it'll bill (staff override or plan price).
+	const nb = memberships.find(
+		(r) => r.membership.status === 'active' && !r.membership.noBill && r.membership.nextChargeAt
+	);
+	const nextBill = nb
+		? { date: nb.membership.nextChargeAt!, amount: nb.membership.price ?? nb.plan.amount }
+		: null;
+
 	return {
 		member: m,
 		lockerLabel: lk?.label ?? null,
@@ -400,6 +417,8 @@ export async function portalOverview(memberId: string) {
 		openCharges,
 		payments,
 		addOns,
+		nextBill,
+		workouts,
 		history,
 		feedback,
 		results,
@@ -857,6 +876,17 @@ export async function giveSpot(
  * and hasn't replaced yet, each with the free candidate sessions of the same
  * class coming up in the next 14 days.
  */
+/** Portal: member logs a free-form workout entry ("Ran 5k — 24:30"). */
+export async function logWorkout(orgId: string, memberId: string, day: string, text: string) {
+	const t = text.trim().slice(0, 500);
+	if (!t) error(400, 'Write something first');
+	const [row] = await db
+		.insert(workoutLog)
+		.values({ organizationId: orgId, memberId, day, text: t })
+		.returning();
+	return row!;
+}
+
 export async function memberMakeups(orgId: string, memberId: string) {
 	const lost = await db
 		.select({

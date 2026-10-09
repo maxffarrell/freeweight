@@ -99,7 +99,8 @@
 		getMyDataExport,
 		getNpsStatus,
 		submitNps,
-		setClassWatch
+		setClassWatch,
+		logWorkout
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -264,6 +265,28 @@
 			toast.error(errMsg(err, 'Could not send'));
 		}
 		npsPending = false;
+	}
+	let wlogText = $state('');
+	let wlogBusy = $state(false);
+	let wlogFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== wlogFor) {
+			wlogFor = memberId;
+			wlogText = '';
+		}
+	});
+	async function addWlog() {
+		const t = wlogText.trim();
+		if (!t) return;
+		wlogBusy = true;
+		try {
+			await logWorkout({ memberId, text: t });
+			wlogText = '';
+			await getPortalOverview(memberId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not log'));
+		}
+		wlogBusy = false;
 	}
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -2358,6 +2381,11 @@
 			{:else}
 				<p class="text-3xl font-semibold tabular-nums">{formatMoney(d.balance, currency)}</p>
 			{/if}
+			{#if d.nextBill}
+				<p class="text-sm text-muted-foreground">
+					Next bill {localDate(d.nextBill.date, tz)} — {formatMoney(d.nextBill.amount, currency)}
+				</p>
+			{/if}
 			{#if d.openCharges.length}
 				<ul class="space-y-1 text-sm">
 					{#each d.openCharges as c (c.charge.id)}
@@ -2441,6 +2469,29 @@
 				{/each}
 			</Card.Footer>
 		{/if}
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="flex items-center gap-2 text-base"><Dumbbell /> Workout log</Card.Title>
+			<Card.Description>Your own journal — runs, lifts, anything outside class</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="flex gap-2">
+				<Input bind:value={wlogText} placeholder="Ran 5k — 24:30" maxlength={500} />
+				<Button size="sm" disabled={!wlogText.trim() || wlogBusy} onclick={addWlog}>
+					{wlogBusy ? '…' : 'Log'}
+				</Button>
+			</div>
+			{#each d.workouts as w (w.id)}
+				<div class="flex items-baseline gap-2 text-sm">
+					<span class="w-24 shrink-0 text-xs text-muted-foreground">{w.day}</span>
+					<span class="min-w-0 break-words">{w.text}</span>
+				</div>
+			{:else}
+				<p class="text-sm text-muted-foreground">Nothing logged yet.</p>
+			{/each}
+		</Card.Content>
 	</Card.Root>
 
 	{#if docs.length}

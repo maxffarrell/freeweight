@@ -3761,6 +3761,45 @@ export async function notifySignRequest(orgId: string, signRequestId: string) {
 	});
 }
 
+/** Reminder for a sign request still pending ~3 days — one nudge per request ever. */
+export async function sendSignReminders(orgId: string) {
+	const rows = await db
+		.select({
+			id: signRequest.id,
+			memberId: signRequest.memberId,
+			title: signRequest.title,
+			email: gymMember.email,
+			memberName: gymMember.name
+		})
+		.from(signRequest)
+		.innerJoin(gymMember, eq(signRequest.memberId, gymMember.id))
+		.where(
+			and(
+				eq(signRequest.organizationId, orgId),
+				eq(signRequest.status, 'pending'),
+				lte(signRequest.createdAt, new Date(Date.now() - 3 * 86400_000))
+			)
+		);
+	const name = await orgBrand(orgId);
+	for (const r of rows) {
+		if (!r.email) continue;
+		if (!(await logOnce(orgId, 'sign_reminder', r.id, r.email))) continue;
+		await sendMemberEmail(r.memberId, {
+			to: r.email,
+			subject: `Reminder: please sign "${r.title}" — ${name.orgName}`,
+			...renderEmail({
+				...name,
+				heading: `Hi ${r.memberName}, a signature is still needed`,
+				lines: [
+					`"${r.title}" from ${name.orgName} is still waiting for your signature.`,
+					'It only takes a minute in your member portal.'
+				],
+				action: { label: 'Review and sign', url: `${appOrigin()}/portal` }
+			})
+		});
+	}
+}
+
 /**
  * "How are we doing?" — after a member crosses the gym's reviewAfterVisits
  * threshold, send them the review link once ever (notification_log).

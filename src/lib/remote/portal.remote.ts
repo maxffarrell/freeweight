@@ -89,6 +89,23 @@ export const getBookable = query(idSchema, async (memberId) => {
 });
 
 /** The member hands an upcoming booking to another member by email. */
+export const logWorkout = command(
+	v.object({
+		memberId: idSchema,
+		day: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+		text: v.pipe(v.string(), v.minLength(1), v.maxLength(500))
+	}),
+	async ({ memberId, day, text }) => {
+		const m = await myMember(memberId);
+		return await svc.logWorkout(
+			m.organizationId,
+			m.id,
+			day ?? new Date().toISOString().slice(0, 10),
+			text
+		);
+	}
+);
+
 export const memberGiveSpot = command(
 	v.object({
 		memberId: idSchema,

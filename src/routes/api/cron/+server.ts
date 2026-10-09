@@ -32,7 +32,8 @@ import {
 	sendLeadNudges,
 	sendEquipmentServiceReminders,
 	sendOwnerInsights,
-	sendNewMemberDrip
+	sendNewMemberDrip,
+	sendSignReminders
 } from '#lib/server/services/notifications.ts';
 import {
 	autoCancelUnderEnrolled,
@@ -104,6 +105,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			recurringPosted += await postDueRecurringExpenses(o.id);
 			try {
 				await sendNewMemberDrip(o.id);
+				await sendSignReminders(o.id);
 			} catch (err) {
 				console.error(`member-drip cron failed for ${o.id}`, err);
 			}
