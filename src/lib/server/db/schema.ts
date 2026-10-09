@@ -103,6 +103,8 @@ export const gymSettings = pgTable('gym_settings', {
 	reviewAfterVisits: integer('review_after_visits'),
 	/** Comp classes granted when a member hits a check-in milestone; null/0 = off. */
 	rewardCredits: integer('reward_credits'),
+	/** Comp classes granted at week-streak milestones (4/8/13/26/52); null = off. */
+	streakRewardCredits: integer('streak_reward_credits'),
 	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
 	revenueTarget: integer('revenue_target'),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -1369,4 +1371,40 @@ export const ptRequest = pgTable(
 		...timestamps
 	},
 	(t) => [index('pt_request_org_idx').on(t.organizationId, t.status)]
+);
+
+/** A gym locker optionally assigned to a member. */
+export const locker = pgTable(
+	'locker',
+	{
+		id: id(),
+		organizationId: orgId(),
+		label: text('label').notNull(),
+		memberId: text('member_id').references(() => gymMember.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [uniqueIndex('locker_org_label_idx').on(t.organizationId, t.label)]
+);
+
+/** A weekly bulk email that the cron resends to an audience on a set weekday+time. */
+export const recurringAnnouncement = pgTable(
+	'recurring_announcement',
+	{
+		id: id(),
+		organizationId: orgId(),
+		subject: text('subject').notNull(),
+		message: text('message').notNull(),
+		/** Member tag to target; null = all active members. */
+		tag: text('tag'),
+		planId: text('plan_id').references(() => plan.id, { onDelete: 'set null' }),
+		/** Org-local weekday: 0 = Sunday … 6 = Saturday. */
+		weekday: integer('weekday').notNull(),
+		/** Org-local `HH:MM` 24h send time. */
+		time: text('time').notNull(),
+		active: boolean('active').notNull().default(true),
+		lastSentOn: date('last_sent_on', { mode: 'string' }),
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [index('recurring_announcement_org_idx').on(t.organizationId)]
 );

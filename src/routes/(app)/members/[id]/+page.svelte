@@ -44,7 +44,11 @@
 		updateMemberWorkout,
 		deleteMemberWorkout,
 		getPackRemaining,
-		transferPackCredits
+		transferPackCredits,
+		getMemberLocker,
+		getLockers,
+		assignLocker,
+		releaseLocker
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -205,6 +209,28 @@
 
 	// ------- tags -------
 	const allTags = $derived(await getTags());
+	const memberLocker = $derived(await getMemberLocker(id));
+	const allLockers = $derived(await getLockers());
+	const freeLockers = $derived(allLockers.filter((l) => !l.locker.memberId));
+	let lockerPick = $state('');
+	$effect(() => {
+		if (lockerPick) {
+			const lockerId = lockerPick;
+			lockerPick = '';
+			assignLocker({ lockerId, memberId: id })
+				.then(() => toast.success('Locker assigned'))
+				.catch((err) => toast.error(errMsg(err, 'Could not assign')));
+		}
+	});
+	async function releaseMemberLocker() {
+		if (!memberLocker) return;
+		try {
+			await releaseLocker({ id: memberLocker.id, memberId: id });
+			toast.success('Locker released');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not release'));
+		}
+	}
 	let newTag = $state('');
 	async function addTag() {
 		const t = newTag.trim();
@@ -909,6 +935,27 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
+				</div>
+				<div class="flex items-center justify-between gap-2">
+					<span class="text-muted-foreground">Locker</span>
+					<span class="flex items-center gap-1.5">
+						{#if memberLocker}
+							<span class="font-medium">{memberLocker.label}</span>
+							<button
+								class="text-xs text-muted-foreground underline-offset-2 hover:underline"
+								onclick={releaseMemberLocker}>release</button
+							>
+						{:else if freeLockers.length}
+							<NativeSelect size="sm" class="w-auto" bind:value={lockerPick}>
+								<option value="">assign…</option>
+								{#each freeLockers as l (l.locker.id)}
+									<option value={l.locker.id}>{l.locker.label}</option>
+								{/each}
+							</NativeSelect>
+						{:else}
+							<span class="text-muted-foreground">—</span>
+						{/if}
+					</span>
 				</div>
 				<div class="flex items-start justify-between gap-2">
 					<span class="pt-0.5 text-muted-foreground">Tags</span>

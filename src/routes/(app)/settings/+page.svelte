@@ -41,6 +41,12 @@
 	} from '#lib/remote/payments.remote.ts';
 	import { getApiKeys, createApiKey, deleteApiKey } from '#lib/remote/api-keys.remote.ts';
 	import { getClosures, addClosure, removeClosure } from '#lib/remote/schedule.remote.ts';
+	import {
+		getLockers,
+		addLocker,
+		removeLocker,
+		releaseLocker
+	} from '#lib/remote/members.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -54,6 +60,18 @@
 
 	let settings = $state(await getSettings());
 	let locations = $state(await getLocations());
+	const lockers = $derived(await getLockers());
+	let newLocker = $state('');
+	async function addLockerSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		try {
+			await addLocker({ label: newLocker });
+			newLocker = '';
+			toast.success('Locker added');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not add'));
+		}
+	}
 	let webhooks = $state(await getWebhooks());
 	let apiKeys = $state(await getApiKeys());
 	let providerList = $state(await getPaymentProviders());
@@ -160,6 +178,7 @@
 	let reviewUrl = $state(settings.reviewUrl ?? '');
 	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
 	let rewardCredits = $state<number | null>(settings.rewardCredits);
+	let streakRewardCredits = $state<number | null>(settings.streakRewardCredits);
 	let revenueTarget = $state<number | null>(settings.revenueTarget);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
@@ -196,6 +215,7 @@
 				reviewUrl: reviewUrl.trim() || null,
 				reviewAfterVisits,
 				rewardCredits,
+				streakRewardCredits,
 				revenueTarget,
 				publicPage,
 				staffBriefing,
@@ -609,6 +629,20 @@
 								blank or 0 = off.</Field.Description
 							>
 						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-streak-reward">Streak reward — comp classes</Field.Label>
+							<Input
+								id="s-streak-reward"
+								type="number"
+								min={0}
+								bind:value={streakRewardCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Comp classes granted at week-streak milestones (4, 8, 13, 26, 52) — each streak
+								pays once.</Field.Description
+							>
+						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
 								<p class="font-medium">Public join page</p>
@@ -753,6 +787,55 @@
 							<li class="py-6 text-sm text-muted-foreground">
 								No locations — add your gym's site.
 							</li>
+						{/each}
+					</ul>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="max-w-2xl">
+				<Card.Header class="flex-row items-center justify-between">
+					<div>
+						<Card.Title class="text-base">Lockers</Card.Title>
+						<Card.Description>Locker bank — assign them to members on their page.</Card.Description>
+					</div>
+					<form class="flex items-center gap-2" onsubmit={addLockerSubmit}>
+						<Input placeholder="#42" class="h-8 w-28" bind:value={newLocker} required />
+						<Button size="sm" variant="outline" type="submit">Add</Button>
+					</form>
+				</Card.Header>
+				<Card.Content class="px-6">
+					<ul class="divide-y">
+						{#each lockers as l (l.locker.id)}
+							<li class="flex items-center justify-between py-2.5 text-sm">
+								<span class="font-medium">{l.locker.label}</span>
+								<span class="flex items-center gap-2">
+									{#if l.memberName}
+										<span class="text-muted-foreground">{l.memberName}</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											onclick={async () => {
+												await releaseLocker({ id: l.locker.id, memberId: l.locker.memberId! });
+												toast.success('Released');
+											}}>Release</Button
+										>
+									{:else}
+										<span class="text-muted-foreground">free</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs text-destructive"
+											onclick={async () => {
+												await removeLocker(l.locker.id);
+												toast.success('Removed');
+											}}>Remove</Button
+										>
+									{/if}
+								</span>
+							</li>
+						{:else}
+							<li class="py-6 text-sm text-muted-foreground">No lockers — add your bank above.</li>
 						{/each}
 					</ul>
 				</Card.Content>

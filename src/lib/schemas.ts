@@ -502,6 +502,9 @@ export const settingsInput = v.object({
 	rewardCredits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
 	),
+	streakRewardCredits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
+	),
 	reviewAfterVisits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
 	),
@@ -779,4 +782,18 @@ export const ptApproveInput = v.object({
 	id: idSchema,
 	classTypeId: idSchema,
 	startsAt: v.optional(v.pipe(v.string(), v.nonEmpty()))
+});
+
+/** Weekly recurring announcement (cron-delivered). */
+export const recurringEmailInput = v.object({
+	subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(150)),
+	message: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(5000)),
+	tag: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+	planId: v.optional(v.nullable(idSchema)),
+	weekday: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(6)),
+	time: v.pipe(v.string(), v.regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)'))
+});
+
+export const lockerInput = v.object({
+	label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(30))
 });

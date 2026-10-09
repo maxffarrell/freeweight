@@ -41,6 +41,7 @@ import {
 	organization,
 	payment,
 	plan,
+	recurringAnnouncement,
 	resourceBooking,
 	rota,
 	sessionFeedback,
@@ -55,7 +56,7 @@ import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
 import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
-import { addDays, localDate, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { entryProgress } from './challenges.ts';
 
 async function orgBrand(orgId: string) {
@@ -1725,6 +1726,108 @@ export async function sendDueAnnouncements(orgId: string) {
 	return sent;
 }
 
+// ---------- Recurring announcements (weekly sends the cron delivers) ----------
+
+export async function listRecurringAnnouncements(orgId: string) {
+	return db
+		.select({ rule: recurringAnnouncement, planName: plan.name })
+		.from(recurringAnnouncement)
+		.leftJoin(plan, eq(plan.id, recurringAnnouncement.planId))
+		.where(eq(recurringAnnouncement.organizationId, orgId))
+		.orderBy(recurringAnnouncement.weekday, recurringAnnouncement.time);
+}
+
+export async function createRecurringAnnouncement(
+	orgId: string,
+	actorId: string | null | undefined,
+	input: {
+		subject: string;
+		message: string;
+		tag?: string;
+		planId?: string | null;
+		weekday: number;
+		time: string;
+	}
+) {
+	const [row] = await db
+		.insert(recurringAnnouncement)
+		.values({
+			organizationId: orgId,
+			subject: input.subject.trim().slice(0, 150),
+			message: input.message.trim().slice(0, 5000),
+			tag: input.tag || null,
+			planId: input.planId || null,
+			weekday: input.weekday,
+			time: input.time,
+			createdBy: actorId ?? null
+		})
+		.returning();
+	void emit({
+		orgId,
+		actorId: actorId ?? null,
+		entityType: 'announcement',
+		entityId: row.id,
+		action: 'recurring_created',
+		summary: `Weekly announcement scheduled (${input.time}): ${input.subject}`
+	});
+	return row;
+}
+
+export async function deleteRecurringAnnouncement(orgId: string, id: string) {
+	const [row] = await db
+		.delete(recurringAnnouncement)
+		.where(and(eq(recurringAnnouncement.organizationId, orgId), eq(recurringAnnouncement.id, id)))
+		.returning();
+	if (!row) error(404, 'Recurring announcement not found');
+	return { ok: true };
+}
+
+/**
+ * Sends each active recurring announcement whose weekday+time has arrived
+ * (org-local), once per day. Runs from the daily cron.
+ */
+export async function sendDueRecurringAnnouncements(orgId: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const tz = st?.timezone ?? 'UTC';
+	const now = new Date();
+	const todayISO = localDate(now, tz);
+	const nowMin = localMinutes(now, tz);
+	const weekday = localWeekday(now, tz);
+	const rules = await db
+		.select()
+		.from(recurringAnnouncement)
+		.where(
+			and(
+				eq(recurringAnnouncement.organizationId, orgId),
+				eq(recurringAnnouncement.active, true),
+				eq(recurringAnnouncement.weekday, weekday)
+			)
+		);
+	let sent = 0;
+	for (const r of rules) {
+		const [hh, mm] = r.time.split(':').map(Number);
+		if ((hh ?? 0) * 60 + (mm ?? 0) > nowMin) continue;
+		if (r.lastSentOn === todayISO) continue;
+		await sendAnnouncement(
+			orgId,
+			r.subject,
+			r.message,
+			undefined,
+			r.tag ?? undefined,
+			r.planId ?? undefined
+		);
+		await db
+			.update(recurringAnnouncement)
+			.set({ lastSentOn: todayISO, updatedAt: new Date() })
+			.where(eq(recurringAnnouncement.id, r.id));
+		sent++;
+	}
+	return sent;
+}
+
 /**
  * Announcements this member actually received — notification_log 'announcement'
  * rows for their email. The portal shows these as a News feed so a member who
@@ -2577,6 +2680,40 @@ export async function notifyCheckInMilestone(orgId: string, memberId: string, co
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		})
 	});
+}
+
+/**
+ * Streak-reward email at week-streak milestones. Returns true only when this
+ * check-in actually won the dedupe — callers grant the comp credits then, so a
+ * re-run can't double-pay. Also sends the congrats email (best-effort).
+ */
+export async function notifyStreakReward(
+	orgId: string,
+	memberId: string,
+	weeks: number,
+	credits: number
+) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m?.email) return false;
+	if (!(await logOnce(orgId, 'streak_reward', `${memberId}:${weeks}`, m.email))) return false;
+	const name = await orgBrand(orgId);
+	await sendMemberEmail(memberId, {
+		to: m.email,
+		subject: `${weeks}-week streak at ${name.orgName} — ${credits} free class${credits === 1 ? '' : 'es'} on us`,
+		...renderEmail({
+			...name,
+			heading: `${weeks} weeks in a row. Impressive.`,
+			lines: [
+				`Hi ${m.name} — you've checked in every week for ${weeks} weeks straight.`,
+				`We've added ${credits} free class${credits === 1 ? '' : 'es'} to your membership. Keep the streak alive.`
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	}).catch(() => {});
+	return true;
 }
 
 /** Welcome note on a member's very first check-in. Deduped per member. */
