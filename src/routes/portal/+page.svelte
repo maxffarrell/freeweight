@@ -114,7 +114,8 @@
 				email: giftEmail.trim(),
 				credits: parseInt(giftCredits) || 0
 			});
-			toast.success(`${giftCredits} class${giftCredits === '1' ? '' : 'es'} sent to ${r.toName}`);
+			const n = parseInt(giftCredits) || 0;
+			toast.success(`${n} class${n === 1 ? '' : 'es'} sent to ${r.toName}`);
 			giftOpen = false;
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not gift classes'));
@@ -483,6 +484,7 @@
 				...(prDate ? { recordedOn: prDate } : {})
 			});
 			prLabel = prValue = prDate = '';
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 			toast.success('PR logged');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not save'));
@@ -492,6 +494,7 @@
 	async function delPr(prId: string) {
 		try {
 			await deletePersonalRecord({ memberId, prId });
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete'));
 		}

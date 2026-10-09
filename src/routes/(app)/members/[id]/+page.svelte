@@ -503,7 +503,8 @@
 				toMemberId: trTo,
 				credits: parseInt(trCredits) || 0
 			});
-			toast.success(`${r.toName} got ${trCredits} class${trCredits === '1' ? '' : 'es'}`);
+			const n = parseInt(trCredits) || 0;
+			toast.success(`${r.toName} got ${n} class${n === 1 ? '' : 'es'}`);
 			trOpen = false;
 			await getMember(id).refresh();
 		} catch (err) {
@@ -983,7 +984,7 @@
 								<p class="text-xs text-muted-foreground">“{mm.membership.endReason}”</p>
 							{/if}
 						</div>
-						<div class="flex items-center gap-2">
+						<div class="flex flex-wrap items-center justify-end gap-2">
 							<StatusBadge status={mm.membership.status} />
 							{#if mm.membership.status === 'active'}
 								{#if mm.isPack}
