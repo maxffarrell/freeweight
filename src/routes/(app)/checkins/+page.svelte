@@ -204,6 +204,8 @@
 					? ` · ${uniqueMembers} unique`
 					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
 					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
+					: ''}{checkIns.filter((c) => c.firstVisit).length
+					? ` · ${checkIns.filter((c) => c.firstVisit).length} first visit${checkIns.filter((c) => c.firstVisit).length === 1 ? '' : 's'}`
 					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}{peakHour
 					? ` · peak ${peakHour}`
 					: ''}.</Card.Description
