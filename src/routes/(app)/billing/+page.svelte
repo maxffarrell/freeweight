@@ -187,14 +187,21 @@
 	async function filterCharges() {
 		charges = applyChargeFilter(
 			await getCharges({
-				status: chargeFilter === '__overdue' ? 'open' : chargeFilter || undefined,
+				status:
+					chargeFilter === '__overdue' || chargeFilter === '__duetoday'
+						? 'open'
+						: chargeFilter || undefined,
 				kind: kindFilter || undefined
 			})
 		);
 	}
 
 	function applyChargeFilter(rows: Awaited<ReturnType<typeof getCharges>>) {
-		return chargeFilter === '__overdue' ? rows.filter((c) => c.charge.dueDate < todayISO()) : rows;
+		return chargeFilter === '__overdue'
+			? rows.filter((c) => c.charge.dueDate < todayISO())
+			: chargeFilter === '__duetoday'
+				? rows.filter((c) => c.charge.dueDate === todayISO())
+				: rows;
 	}
 
 	async function refreshCharges() {
@@ -648,6 +655,7 @@
 				<NativeSelect bind:value={chargeFilter} onchange={filterCharges}>
 					<option value="">All</option>
 					<option value="open">Open</option>
+					<option value="__duetoday">Due today</option>
 					<option value="__overdue">Overdue</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>

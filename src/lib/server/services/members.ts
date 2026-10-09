@@ -506,6 +506,10 @@ export async function getMember(orgId: string, id: string) {
 				waitlisted:
 					sql<number>`count(*) filter (where ${booking.status} = 'waitlisted' and ${classSession.startsAt} > now())`.mapWith(
 						Number
+					),
+				thisWeek:
+					sql<number>`count(*) filter (where ${booking.status} != 'cancelled' and ${classSession.startsAt} >= date_trunc('week', now()) and ${classSession.startsAt} < date_trunc('week', now()) + interval '1 week')`.mapWith(
+						Number
 					)
 			})
 			.from(booking)
@@ -701,6 +705,7 @@ export async function getMember(orgId: string, id: string) {
 			lastVisit: att?.lastVisit ?? null,
 			noShows: bs?.noShows ?? 0,
 			bookedMonth: bs?.thisMonth ?? 0,
+			bookedWeek: bs?.thisWeek ?? 0,
 			waitlisted: bs?.waitlisted ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:

@@ -1131,6 +1131,8 @@
 				(s) => !s.session.instructorId && !s.session.cancelledAt
 			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
 				? ` · ${sessions.filter((r) => r.session.cancelledAt).length} cancelled`
+				: ''}{sessions.filter((r) => r.session.coverRequestedAt && !r.session.cancelledAt).length
+				? ` · ${sessions.filter((r) => r.session.coverRequestedAt && !r.session.cancelledAt).length} need cover`
 				: ''} · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked{sessions.reduce(
 				(a, r) => a + (r.waitlisted ?? 0),
 				0
