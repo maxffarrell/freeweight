@@ -23,7 +23,8 @@ jobs:
           pnpm exec prettier --write src/lib/server/auth.ts 'src/routes/(auth)/login/+page.svelte'
           pnpm check
           pnpm lint
-          env -u DATABASE_URL pnpm test
+          # Seeded-database integration tests run separately from this unit suite.
+          pnpm test --exclude '**/*.it.test.ts'
       - uses: docker/setup-buildx-action@v3
       - name: Build linux/amd64 image
         uses: docker/build-push-action@v6
