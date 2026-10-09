@@ -343,6 +343,9 @@
 			.filter((c) => c.charge.status === 'open')
 			.reduce((sum, c) => sum + c.charge.amount - c.paid, 0)
 	);
+	const lifetimePaid = $derived(
+		m.payments.filter((p) => !p.refundedAt).reduce((sum, p) => sum + p.amount, 0)
+	);
 
 	// ------- documents -------
 	const docs = $derived(await getMemberDocuments(id));
@@ -1144,6 +1147,12 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
 					<span class="font-medium tabular-nums">{formatMoney(balance, currency)}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Lifetime paid</span>
+					<span class="text-muted-foreground tabular-nums"
+						>{formatMoney(lifetimePaid, currency)}</span
+					>
 				</div>
 				<div class="flex items-center justify-between gap-2">
 					<span class="text-muted-foreground">Level</span>

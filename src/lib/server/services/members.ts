@@ -1507,7 +1507,15 @@ export async function prWall(orgId: string) {
 		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
 		.limit(40);
 
-	// Top current week-streaks — one year of check-ins, grouped by ISO week.
+	const streaks = await weekStreakLeaders(orgId, 5);
+	return { records, streaks };
+}
+
+/**
+ * Top current week-streaks — one year of check-ins grouped by ISO week,
+ * streak counted back from this week (or last when this week isn't over).
+ */
+export async function weekStreakLeaders(orgId: string, limit = 5) {
 	const since = new Date(Date.now() - 52 * 7 * 86_400_000);
 	const visits = await db
 		.select({
@@ -1536,7 +1544,7 @@ export async function prWall(orgId: string) {
 		byMember.set(v.memberId, e);
 	}
 	const thisWeek = weekOf(new Date());
-	const streaks = [...byMember.entries()]
+	return [...byMember.entries()]
 		.map(([memberId, e]) => {
 			let w = thisWeek;
 			if (!e.weeks.has(w)) w -= 7 * 86_400_000;
@@ -1549,9 +1557,7 @@ export async function prWall(orgId: string) {
 		})
 		.filter((r) => r.streak >= 2)
 		.sort((a, b) => b.streak - a.streak)
-		.slice(0, 5);
-
-	return { records, streaks };
+		.slice(0, limit);
 }
 
 /** Member asks (via the portal) for their personal data to be deleted. */

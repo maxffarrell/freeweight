@@ -37,6 +37,7 @@ import {
 	location,
 	member,
 	membership,
+	payment,
 	plan,
 	sessionFeedback,
 	user,
@@ -477,6 +478,10 @@ export async function getRoster(orgId: string, sessionId: string) {
 			booking,
 			memberName: gymMember.name,
 			memberEmail: gymMember.email,
+			openBalance:
+				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open'), 0)`.mapWith(
+					Number
+				),
 			resultScore: workoutResult.score,
 			resultRx: workoutResult.asRx,
 			// First-timer: no prior check-in or attended booking at this org.
