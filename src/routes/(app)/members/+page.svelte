@@ -31,6 +31,7 @@
 		getTags,
 		getDuplicates,
 		importMembers,
+		bulkGrantCredits,
 		bulkSetInactive,
 		tagMembers,
 		getLevels,
@@ -59,6 +60,7 @@
 	import Download from '@lucide/svelte/icons/download';
 	import Mail from '@lucide/svelte/icons/mail';
 	import TagIcon from '@lucide/svelte/icons/tag';
+	import TicketCheck from '@lucide/svelte/icons/ticket-check';
 	import Upload from '@lucide/svelte/icons/upload';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -100,6 +102,9 @@
 	let tagOpen = $state(false);
 	let bulkTag = $state('');
 	let tagPending = $state(false);
+	let compOpen = $state(false);
+	let compCount = $state(1);
+	let compPending = $state(false);
 	function toggleSelect(memberId: string) {
 		if (selected.has(memberId)) selected.delete(memberId);
 		else selected.add(memberId);
@@ -124,6 +129,25 @@
 			toast.error(errMsg(err, 'Could not tag members'));
 		}
 		tagPending = false;
+	}
+	async function applyBulkComp(e: SubmitEvent) {
+		e.preventDefault();
+		compPending = true;
+		try {
+			const r = await bulkGrantCredits({ memberIds: [...selected], count: compCount });
+			toast.success(
+				`Granted ${compCount} comp class${compCount === 1 ? '' : 'es'} to ${r.granted} member${r.granted === 1 ? '' : 's'}` +
+					(r.skipped ? ` — ${r.skipped} had no active membership` : '')
+			);
+			if (r.granted) {
+				selected.clear();
+				compOpen = false;
+				await refilter();
+			}
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not grant comp classes'));
+		}
+		compPending = false;
 	}
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	async function refilter() {
@@ -725,6 +749,9 @@
 		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
 			<span class="font-medium tabular-nums">{selected.size} selected</span>
 			<Button size="sm" variant="outline" onclick={() => (tagOpen = true)}><TagIcon /> Tag</Button>
+			<Button size="sm" variant="outline" onclick={() => (compOpen = true)}
+				><TicketCheck /> Comp classes</Button
+			>
 			<Button
 				size="sm"
 				variant="outline"
@@ -876,6 +903,31 @@
 			<Dialog.Footer>
 				<Button type="submit" disabled={tagPending}>
 					{tagPending ? 'Tagging…' : 'Add tag'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={compOpen}>
+	<Dialog.Content class="sm:max-w-sm">
+		<Dialog.Header>
+			<Dialog.Title
+				>Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}</Dialog.Title
+			>
+			<Dialog.Description>
+				Adds bonus class credits to each selected member's active membership — on top of their plan
+				or pack.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={applyBulkComp}>
+			<Field.Field>
+				<Field.Label for="bulk-comp">Classes to grant</Field.Label>
+				<Input id="bulk-comp" type="number" min="1" max="100" bind:value={compCount} required />
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="submit" disabled={compPending || compCount < 1}>
+					{compPending ? 'Granting…' : 'Grant'}
 				</Button>
 			</Dialog.Footer>
 		</form>

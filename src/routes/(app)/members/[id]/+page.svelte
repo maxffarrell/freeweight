@@ -66,7 +66,8 @@
 		releaseLocker,
 		approveTrial,
 		declineTrial,
-		anonymizeMember
+		anonymizeMember,
+		getMemberGiftCards
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -270,6 +271,7 @@
 	const allTags = $derived(await getTags());
 	const memberLocker = $derived(await getMemberLocker(id));
 	const memberLoans = $derived(await getMemberLoans(id));
+	const memberGiftCards = $derived(await getMemberGiftCards(id));
 	const loanables = $derived(await getLoanables());
 	const freeKit = $derived(loanables.filter((k) => k.out < k.item.quantity));
 	let kitPick = $state('');
@@ -1999,6 +2001,7 @@
 					<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 					<Tabs.Trigger value="bookings">Bookings</Tabs.Trigger>
 					<Tabs.Trigger value="checkins">Check-ins</Tabs.Trigger>
+					<Tabs.Trigger value="giftcards">Gift cards</Tabs.Trigger>
 				</Tabs.List>
 			</Card.Header>
 			<Card.Content class="px-4 pb-4">
@@ -2155,6 +2158,43 @@
 							{:else}
 								<Table.Row
 									><Table.Cell colspan={3} class="text-muted-foreground">No check-ins.</Table.Cell
+									></Table.Row
+								>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Tabs.Content>
+				<Tabs.Content value="giftcards">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Code</Table.Head>
+								<Table.Head>Amount</Table.Head>
+								<Table.Head>Balance</Table.Head>
+								<Table.Head>Status</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each memberGiftCards as g (g.card.id)}
+								<Table.Row>
+									<Table.Cell class="font-mono text-xs">{g.card.code}</Table.Cell>
+									<Table.Cell class="tabular-nums"
+										>{formatMoney(g.card.amount, currency)}</Table.Cell
+									>
+									<Table.Cell class="tabular-nums"
+										>{formatMoney(g.card.balance, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-muted-foreground"
+										>{g.card.redeemedAt
+											? `redeemed ${formatDate(g.card.redeemedAt)}`
+											: g.card.purchaserMemberId === id
+												? 'purchased — unused'
+												: 'unused'}</Table.Cell
+									>
+								</Table.Row>
+							{:else}
+								<Table.Row
+									><Table.Cell colspan={4} class="text-muted-foreground">No gift cards.</Table.Cell
 									></Table.Row
 								>
 							{/each}

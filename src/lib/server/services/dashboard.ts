@@ -29,6 +29,7 @@ import {
 	ptRequest,
 	recurringCharge,
 	shopItem,
+	shopSale,
 	trialRequest,
 	user,
 	outer
@@ -438,6 +439,28 @@ export async function dashboard(orgId: string) {
 		.where(and(eq(equipment.organizationId, orgId), ne(equipment.status, 'operational')))
 		.limit(20);
 
+	// Shop orders waiting on pickup for over a day — the desk should chase them.
+	const stalePickups = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: shopItem.name,
+			qty: shopSale.qty,
+			soldAt: shopSale.createdAt
+		})
+		.from(shopSale)
+		.innerJoin(gymMember, eq(shopSale.memberId, gymMember.id))
+		.innerJoin(shopItem, eq(shopSale.itemId, shopItem.id))
+		.where(
+			and(
+				eq(shopSale.organizationId, orgId),
+				isNull(shopSale.pickedUpAt),
+				lt(shopSale.createdAt, new Date(Date.now() - 86_400_000))
+			)
+		)
+		.orderBy(asc(shopSale.createdAt))
+		.limit(10);
+
 	// Instructors/staff with time off starting in the next 14 days (or underway).
 	const offSoon = await db
 		.select({
@@ -761,6 +784,15 @@ export async function dashboard(orgId: string) {
 				requestedAt: new Date(),
 				pauseUntil: null,
 				requestReason: e.nextServiceOn ? `service due ${e.nextServiceOn}` : null
+			})),
+			...stalePickups.map((p) => ({
+				memberId: p.memberId,
+				memberName: p.memberName,
+				planName: `${p.qty}× ${p.itemName} awaiting pickup`,
+				kind: 'pickup' as const,
+				requestedAt: p.soldAt,
+				pauseUntil: null,
+				requestReason: null
 			}))
 		],
 		fullSessions,

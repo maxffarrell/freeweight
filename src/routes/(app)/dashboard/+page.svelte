@@ -477,7 +477,9 @@
 																		? r.planName
 																		: r.kind === 'empty'
 																			? r.planName
-																			: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
+																			: r.kind === 'pickup'
+																				? r.planName
+																				: `pause${r.pauseUntil ? ` until ${formatDate(r.pauseUntil)}` : ''}`}{r.requestReason
 											? ` · ${r.requestReason}`
 											: ''}
 									</Badge>

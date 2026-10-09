@@ -7,6 +7,8 @@ import * as workoutSvc from '#lib/server/services/workouts.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import * as trialSvc from '#lib/server/services/trials.ts';
+import * as billingSvc from '#lib/server/services/billing.ts';
+import * as giftcardSvc from '#lib/server/services/giftcards.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
 import { appOrigin } from '#lib/server/email.ts';
 import {
@@ -131,6 +133,24 @@ export const tagMembers = command(bulkTagInput, async ({ memberIds, tag }) => {
 	void getTags().refresh();
 	return n;
 });
+
+/** Gift cards this member bought or redeemed. */
+export const getMemberGiftCards = query(v.pipe(v.string(), v.minLength(1)), async (memberId) => {
+	return giftcardSvc.listMemberGiftCards((await requireOrg()).orgId, memberId);
+});
+
+/** Grants comp classes to every selected member's active membership. */
+export const bulkGrantCredits = command(
+	v.object({
+		memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(500)),
+		count: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))
+	}),
+	async ({ memberIds, count }) => {
+		const r = await billingSvc.bulkGrantCredits(await requireOrg(), memberIds, count);
+		void getMembers().refresh();
+		return r;
+	}
+);
 /** Merge a duplicate member into the survivor (admin-only — the loser is deleted). */
 export const mergeMembers = command(memberMergeInput, async ({ keepId, dropId }) => {
 	await svc.mergeMembers(await requireOrg('admin'), keepId, dropId);
