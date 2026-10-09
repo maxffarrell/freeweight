@@ -78,7 +78,8 @@ export const getMembers = query(
 			family: v.optional(v.boolean()),
 			birthday: v.optional(v.boolean()),
 			noContact: v.optional(v.boolean()),
-			unsubscribed: v.optional(v.boolean())
+			unsubscribed: v.optional(v.boolean()),
+			referred: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -96,7 +97,8 @@ export const getMembers = query(
 			opts?.family,
 			opts?.birthday,
 			opts?.noContact,
-			opts?.unsubscribed
+			opts?.unsubscribed,
+			opts?.referred
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

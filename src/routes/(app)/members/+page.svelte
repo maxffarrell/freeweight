@@ -145,7 +145,8 @@
 			family: owesFilter === '__family' || undefined,
 			birthday: owesFilter === '__bday' || undefined,
 			noContact: owesFilter === '__nocontact' || undefined,
-			unsubscribed: owesFilter === '__unsub' || undefined
+			unsubscribed: owesFilter === '__unsub' || undefined,
+			referred: owesFilter === '__referred' || undefined
 		});
 	}
 	function search() {
@@ -643,7 +644,9 @@
 											? 'No contact info'
 											: owesFilter === '__unsub'
 												? 'Unsubscribed'
-												: 'Any balance'}</Select.Trigger
+												: owesFilter === '__referred'
+													? 'Referred'
+													: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -655,6 +658,7 @@
 				<Select.Item value="__bday">Birthday month</Select.Item>
 				<Select.Item value="__nocontact">No contact info</Select.Item>
 				<Select.Item value="__unsub">Unsubscribed</Select.Item>
+				<Select.Item value="__referred">Referred</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>

@@ -97,7 +97,9 @@ export async function listMembers(
 	birthday?: boolean,
 	noContact?: boolean,
 	/** Members who hit the unsubscribe link — excluded from member emails. */
-	unsubscribed?: boolean
+	unsubscribed?: boolean,
+	/** Members brought in by another member's referral link. */
+	referred?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -168,6 +170,7 @@ export async function listMembers(
 					: undefined,
 				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
 				unsubscribed ? isNotNull(gymMember.unsubscribedAt) : undefined,
+				referred ? isNotNull(gymMember.referredByMemberId) : undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

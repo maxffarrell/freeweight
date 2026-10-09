@@ -185,6 +185,13 @@
 			sub: `yesterday ${formatMoney(d.collectedYesterday, d.currency, true)} · 7d ${formatMoney(d.collectedWeek, d.currency, true)} vs ${formatMoney(d.collectedPrevWeek, d.currency, true)}`
 		},
 		{
+			label: 'Check-ins this week',
+			value: String(d.checkInsWeek),
+			icon: Users,
+			href: '/checkins',
+			sub: `last week ${d.checkInsPrevWeek}`
+		},
+		{
 			label: 'Monthly recurring',
 			value: formatMoney(d.mrr, d.currency, true),
 			icon: CalendarDays,

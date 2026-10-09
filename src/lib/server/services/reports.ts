@@ -681,6 +681,30 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Revenue collected on membership charges per plan this month. */
+async function planRevenue(orgId: string) {
+	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
+	return db
+		.select({
+			planName: plan.name,
+			collected: sql<number>`coalesce(sum(${payment.amount}), 0)`.mapWith(Number),
+			payers: sql<number>`count(distinct ${charge.memberId})`.mapWith(Number)
+		})
+		.from(payment)
+		.innerJoin(charge, eq(payment.chargeId, charge.id))
+		.innerJoin(membership, eq(charge.membershipId, membership.id))
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.kind, 'membership'),
+				sql`${payment.createdAt} >= ${monthStart}::date`
+			)
+		)
+		.groupBy(plan.name)
+		.orderBy(desc(sql`sum(${payment.amount})`));
+}
+
 /** Check-ins this month split by method — QR self-scan vs manual desk entry. */
 async function checkInMethods(orgId: string) {
 	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
@@ -1450,7 +1474,8 @@ export async function getReports(orgId: string) {
 		visitFreq,
 		lockers,
 		ages,
-		cim
+		cim,
+		planRev
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1513,7 +1538,8 @@ export async function getReports(orgId: string) {
 		visitFrequency(orgId),
 		lockerStats(orgId),
 		ageDistribution(orgId),
-		checkInMethods(orgId)
+		checkInMethods(orgId),
+		planRevenue(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1588,7 +1614,8 @@ export async function getReports(orgId: string) {
 		visitFrequency: visitFreq,
 		lockers,
 		ages,
-		checkInMethods: cim
+		checkInMethods: cim,
+		planRevenue: planRev
 	};
 }
 
