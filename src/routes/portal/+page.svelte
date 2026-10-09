@@ -1134,6 +1134,9 @@
 						<button class="text-muted-foreground underline" onclick={openProfile}
 							>Edit profile</button
 						>
+						{#if d.lockerLabel}
+							· <span class="text-muted-foreground">Locker {d.lockerLabel}</span>
+						{/if}
 						·
 						<button
 							class="text-muted-foreground underline"

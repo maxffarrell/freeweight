@@ -26,7 +26,7 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	const { org, settings, plans, sessions } = $derived(data);
+	const { org, settings, plans, sessions, closures } = $derived(data);
 	const tz = $derived(settings.timezone);
 	const currency = $derived(settings.currency);
 
@@ -275,6 +275,13 @@
 			</section>
 		{/if}
 
+		{#if closures.length}
+			<div class="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm">
+				{#each closures as c (c.id)}
+					<p><span class="font-medium">Closed {c.date}</span>{c.reason ? ` — ${c.reason}` : ''}</p>
+				{/each}
+			</div>
+		{/if}
 		{#if sessions.length}
 			<section class="space-y-3">
 				<h2 class="flex items-baseline justify-between text-lg font-semibold">
