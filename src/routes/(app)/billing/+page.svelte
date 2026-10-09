@@ -64,6 +64,16 @@
 		await getCharges({ status: page.url.searchParams.get('status') ?? undefined })
 	);
 	let memberships = $state(await getMemberships());
+	let msPlanFilter = $state('');
+	let msStatusFilter = $state('');
+	const msPlans = $derived([...new Set(memberships.map((m) => m.planName))].sort());
+	const filteredMemberships = $derived(
+		memberships.filter(
+			(m) =>
+				(!msPlanFilter || m.planName === msPlanFilter) &&
+				(!msStatusFilter || m.membership.status === msStatusFilter)
+		)
+	);
 	let payments = $state(await getPayments());
 	let payMethodFilter = $state('');
 	const payMethods = $derived([...new Set(payments.map((p) => p.payment.method))].sort());
@@ -701,6 +711,26 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="memberships">
+			<div class="mb-3 flex items-center gap-2">
+				<NativeSelect bind:value={msPlanFilter}>
+					<option value="">All plans</option>
+					{#each msPlans as p (p)}
+						<option value={p}>{p}</option>
+					{/each}
+				</NativeSelect>
+				<NativeSelect bind:value={msStatusFilter}>
+					<option value="">All statuses</option>
+					<option value="active">Active</option>
+					<option value="paused">Paused</option>
+					<option value="suspended">Suspended</option>
+					<option value="cancelled">Cancelled</option>
+				</NativeSelect>
+				<span class="ml-auto text-xs text-muted-foreground"
+					>{filteredMemberships.length} membership{filteredMemberships.length === 1
+						? ''
+						: 's'}</span
+				>
+			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
 					<Table.Root>
@@ -715,7 +745,7 @@
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each memberships as mm (mm.membership.id)}
+							{#each filteredMemberships as mm (mm.membership.id)}
 								<Table.Row>
 									<Table.Cell>
 										<a class="font-medium hover:underline" href="/members/{mm.membership.memberId}"
@@ -732,7 +762,10 @@
 									<Table.Cell
 										>{mm.membership.status === 'active'
 											? formatDate(mm.membership.nextChargeAt)
-											: '—'}</Table.Cell
+											: '—'}
+										{#if mm.membership.endsAt && new Date(mm.membership.endsAt).getTime() > Date.now() && new Date(mm.membership.endsAt).getTime() - Date.now() < 30 * 86400_000}
+											<Badge variant="outline" class="ml-1 text-amber-600">ending soon</Badge>
+										{/if}</Table.Cell
 									>
 									<Table.Cell><StatusBadge status={mm.membership.status} /></Table.Cell>
 									<Table.Cell class="text-right">
