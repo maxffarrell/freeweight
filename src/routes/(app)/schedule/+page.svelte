@@ -1454,7 +1454,7 @@
 				{#if focus && unqualWarn(focus.session.classTypeId, editInstructorId)}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{unqualWarn(focus.session.classTypeId, editInstructorId)} isn't marked qualified for
-						{focus.session.className}.
+						{classTypes.find((c) => c.id === focus.session.classTypeId)?.name ?? 'this class'}.
 					</p>
 				{/if}
 				{#if editConflicts.length}

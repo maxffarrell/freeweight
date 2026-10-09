@@ -34,12 +34,24 @@ export async function franchiseOverview(userId: string) {
 	const monthStart = new Date();
 	monthStart.setUTCDate(1);
 	monthStart.setUTCHours(0, 0, 0, 0);
+	const prevMonthStart = new Date(monthStart);
+	prevMonthStart.setUTCMonth(prevMonthStart.getUTCMonth() - 1);
+	const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
 	const weekEnd = new Date(Date.now() + 7 * 86_400_000);
 	const now = new Date();
 
 	const gyms = await Promise.all(
 		orgs.map(async (o) => {
-			const [[members], [revenue], [checkIns], [sessions], [settings], mrr] = await Promise.all([
+			const [
+				[members],
+				[revenue],
+				[prevRevenue],
+				[newMembers],
+				[checkIns],
+				[sessions],
+				[settings],
+				mrr
+			] = await Promise.all([
 				db
 					.select({ n: sql<number>`count(*)`.mapWith(Number) })
 					.from(gymMember)
@@ -53,6 +65,27 @@ export async function franchiseOverview(userId: string) {
 							isNull(payment.refundedAt),
 							notInArray(payment.method, ['gift_card', 'credit']),
 							gte(payment.paidAt, monthStart)
+						)
+					),
+				db
+					.select({ total: sql<number>`sum(${payment.amount})`.mapWith(Number) })
+					.from(payment)
+					.where(
+						and(
+							eq(payment.organizationId, o.id),
+							isNull(payment.refundedAt),
+							notInArray(payment.method, ['gift_card', 'credit']),
+							gte(payment.paidAt, prevMonthStart),
+							lt(payment.paidAt, monthStart)
+						)
+					),
+				db
+					.select({ n: sql<number>`count(*)`.mapWith(Number) })
+					.from(gymMember)
+					.where(
+						and(
+							eq(gymMember.organizationId, o.id),
+							gte(gymMember.joinedAt, thirtyDaysAgo.toISOString().slice(0, 10))
 						)
 					),
 				db
@@ -82,6 +115,8 @@ export async function franchiseOverview(userId: string) {
 				members: members?.n ?? 0,
 				mrr: mrr.total,
 				monthRevenue: revenue?.total ?? 0,
+				prevMonthRevenue: prevRevenue?.total ?? 0,
+				newMembers30: newMembers?.n ?? 0,
 				monthCheckIns: checkIns?.n ?? 0,
 				sessionsNext7: sessions?.n ?? 0
 			};

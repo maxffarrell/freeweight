@@ -40,6 +40,12 @@
 		sendSignRequest,
 		voidSignRequest,
 		getMemberWorkouts,
+		getMemberPrograms,
+		getPrograms,
+		assignProgram,
+		setProgramStatus,
+		saveProgram,
+		removeProgram,
 		addMemberWorkout,
 		updateMemberWorkout,
 		deleteMemberWorkout,
@@ -96,6 +102,38 @@
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
 	const workouts = $derived(await getMemberWorkouts(id));
+	const memberPrograms = $derived(await getMemberPrograms(id));
+	const programs = $derived(await getPrograms());
+	let assignOpen = $state(false);
+	let assignProgramId = $state('');
+	let assignStart = $state(new Date().toISOString().slice(0, 10));
+	let libOpen = $state(false);
+	let libEditing = $state<null | {
+		id?: string;
+		name: string;
+		weeks: number;
+		note: string;
+		days: { dayNo: number; title: string; body: string }[];
+	}>(null);
+	function openProgram(p?: {
+		program: { id: string; name: string; weeks: number; note: string | null };
+		days: { dayNo: number; title: string; body: string }[];
+	}) {
+		libEditing = p
+			? {
+					id: p.program.id,
+					name: p.program.name,
+					weeks: p.program.weeks,
+					note: p.program.note ?? '',
+					days: p.days.map((d) => ({ dayNo: d.dayNo, title: d.title, body: d.body }))
+				}
+			: {
+					name: '',
+					weeks: 4,
+					note: '',
+					days: [{ dayNo: 1, title: 'Day 1', body: '' }]
+				};
+	}
 	const mSignReqs = $derived(m.signRequests);
 	const mIncidents = $derived(m.incidents);
 	const memberNotes = $derived(await getMemberNotes(id));
@@ -1523,6 +1561,73 @@
 		</Card.Root>
 
 		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Workout program</Card.Title>
+					<Card.Description
+						>Reusable multi-week plans — the member's portal shows today's day</Card.Description
+					>
+				</div>
+				<span class="flex gap-1">
+					<Button size="sm" variant="ghost" onclick={() => (libOpen = true)}>Library</Button>
+					<Button size="sm" variant="outline" onclick={() => (assignOpen = true)}
+						><Plus /> Assign</Button
+					>
+				</span>
+			</Card.Header>
+			<Card.Content class="space-y-2 px-4">
+				{#each memberPrograms as mp (mp.assignment.id)}
+					<div class="flex items-center justify-between gap-2 rounded-md border p-3 text-sm">
+						<div class="min-w-0">
+							<p class="truncate font-medium">
+								{mp.program.name}
+								<span class="font-normal text-muted-foreground">
+									· {mp.program.weeks}w · from {formatRelative(
+										new Date(mp.assignment.startDate)
+									)}</span
+								>
+							</p>
+						</div>
+						<span class="flex shrink-0 items-center gap-1">
+							<Badge variant={mp.assignment.status === 'active' ? 'default' : 'secondary'}
+								>{mp.assignment.status}</Badge
+							>
+							{#if mp.assignment.status === 'active'}
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs"
+									onclick={async () => {
+										await setProgramStatus({
+											assignmentId: mp.assignment.id,
+											memberId: id,
+											status: 'done'
+										});
+										toast.success('Marked done');
+									}}>Done</Button
+								>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={async () => {
+										await setProgramStatus({
+											assignmentId: mp.assignment.id,
+											memberId: id,
+											status: 'stopped'
+										});
+									}}>Stop</Button
+								>
+							{/if}
+						</span>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No program assigned.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Challenges</Card.Title>
 				<Card.Description>Check-in challenges this member is in</Card.Description>
@@ -2317,6 +2422,166 @@
 				>{pending ? 'Moving…' : 'Gift classes'}</Button
 			>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={assignOpen}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header><Dialog.Title>Assign a program</Dialog.Title></Dialog.Header>
+		<form
+			class="space-y-4"
+			onsubmit={async (e) => {
+				e.preventDefault();
+				try {
+					await assignProgram({ memberId: id, programId: assignProgramId, startDate: assignStart });
+					assignOpen = false;
+					toast.success('Program assigned');
+				} catch (err) {
+					toast.error(errMsg(err, 'Could not assign'));
+				}
+			}}
+		>
+			<Field.Field>
+				<Field.Label>Program</Field.Label>
+				<NativeSelect bind:value={assignProgramId} required>
+					<option value="" disabled>Pick a program…</option>
+					{#each programs as p (p.program.id)}
+						<option value={p.program.id}
+							>{p.program.name} — {p.program.weeks}w, {p.days.length} days</option
+						>
+					{/each}
+				</NativeSelect>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label>Starts</Field.Label>
+				<Input type="date" bind:value={assignStart} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={!assignProgramId}>Assign</Button>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={libOpen}>
+	<Dialog.Content class="max-w-2xl">
+		<Dialog.Header><Dialog.Title>Program library</Dialog.Title></Dialog.Header>
+		{#if libEditing}
+			<form
+				class="space-y-3"
+				onsubmit={async (e) => {
+					e.preventDefault();
+					try {
+						await saveProgram({
+							id: libEditing!.id,
+							name: libEditing!.name,
+							weeks: libEditing!.weeks,
+							note: libEditing!.note || undefined,
+							days: libEditing!.days
+						});
+						libEditing = null;
+						toast.success('Program saved');
+					} catch (err) {
+						toast.error(errMsg(err, 'Could not save'));
+					}
+				}}
+			>
+				<div class="grid grid-cols-[1fr_5rem] gap-2">
+					<Field.Field>
+						<Field.Label>Name</Field.Label>
+						<Input bind:value={libEditing.name} required placeholder="Base strength" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Weeks</Field.Label>
+						<Input type="number" min={1} max={52} bind:value={libEditing.weeks} required />
+					</Field.Field>
+				</div>
+				<Input bind:value={libEditing.note} placeholder="Note (optional)" />
+				<div class="max-h-64 space-y-2 overflow-y-auto rounded-md border p-2">
+					{#each libEditing.days as day, i (day.dayNo)}
+						<div class="space-y-1 rounded border p-2">
+							<div class="flex items-center justify-between gap-2">
+								<Input
+									class="h-8 flex-1"
+									bind:value={day.title}
+									placeholder="Day {day.dayNo} title"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={() => {
+										libEditing!.days.splice(i, 1);
+										libEditing!.days.forEach((d2, j) => (d2.dayNo = j + 1));
+									}}>Remove</Button
+								>
+							</div>
+							<Textarea
+								bind:value={day.body}
+								placeholder="Back squat 5×5 · RDL 3×8 · Plank 3×60s"
+								rows={2}
+								required
+							/>
+						</div>
+					{/each}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						class="w-full"
+						onclick={() =>
+							libEditing!.days.push({
+								dayNo: libEditing!.days.length + 1,
+								title: `Day ${libEditing!.days.length + 1}`,
+								body: ''
+							})}>Add day</Button
+					>
+				</div>
+				<div class="flex justify-end gap-2">
+					<Button type="button" variant="outline" onclick={() => (libEditing = null)}>Back</Button>
+					<Button type="submit">Save program</Button>
+				</div>
+			</form>
+		{:else}
+			<div class="space-y-2">
+				{#each programs as p (p.program.id)}
+					<div class="flex items-center justify-between gap-2 rounded-md border p-3 text-sm">
+						<div class="min-w-0">
+							<p class="truncate font-medium">{p.program.name}</p>
+							<p class="text-xs text-muted-foreground">
+								{p.program.weeks} week{p.program.weeks === 1 ? '' : 's'} · {p.days.length} days{p
+									.program.note
+									? ` — ${p.program.note}`
+									: ''}
+							</p>
+						</div>
+						<span class="flex shrink-0 gap-1">
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-xs"
+								onclick={() => openProgram(p)}>Edit</Button
+							>
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-xs text-destructive"
+								onclick={async () => {
+									if (!confirm(`Delete "${p.program.name}"?`)) return;
+									await removeProgram(p.program.id);
+									toast.success('Deleted');
+								}}>Delete</Button
+							>
+						</span>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No programs yet.</p>
+				{/each}
+				<Button size="sm" variant="outline" class="w-full" onclick={() => openProgram()}
+					><Plus /> New program</Button
+				>
+			</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
 

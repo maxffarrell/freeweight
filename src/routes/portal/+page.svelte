@@ -83,6 +83,7 @@
 		getMovementVideos,
 		setPackAutoRenew,
 		getMyWorkouts,
+		getMyPrograms,
 		giftPackCredits,
 		getMyDataExport,
 		getNpsStatus,
@@ -650,6 +651,7 @@
 		d.memberships.some((mm) => mm.membership.status === 'active') || d.guardianHasMembership
 	);
 	const myWorkouts = $derived(await getMyWorkouts(memberId));
+	const myPrograms = $derived(await getMyPrograms(memberId));
 
 	const buyablePacks = $derived(
 		joinablePlans.filter(
@@ -2240,6 +2242,48 @@
 			{/if}
 		</Card.Content>
 	</Card.Root>
+
+	{#if myPrograms.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Your program</Card.Title>
+				<Card.Description>Day-by-day plan from your coach</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				{#each myPrograms as mp (mp.assignment.id)}
+					<div class="space-y-2">
+						<div class="flex items-baseline justify-between">
+							<p class="font-medium">{mp.program.name}</p>
+							<span class="text-xs text-muted-foreground">
+								{mp.finished ? 'Finished — well done!' : `Day ${mp.dayNo} of ${mp.days.length}`}
+							</span>
+						</div>
+						<div class="h-1.5 overflow-hidden rounded bg-muted">
+							<div
+								class="h-full bg-primary transition-all"
+								style="width: {Math.min(
+									100,
+									Math.round((mp.dayNo / Math.max(1, mp.days.length)) * 100)
+								)}%"
+							></div>
+						</div>
+						{#each mp.days.slice(Math.max(0, mp.dayNo - 1), mp.dayNo + 2) as day (day.id)}
+							<div
+								class="rounded-md border p-3 text-sm {day.dayNo === mp.dayNo
+									? 'border-primary'
+									: 'opacity-75'}"
+							>
+								<p class="font-medium">
+									Day {day.dayNo} — {day.title}{day.dayNo === mp.dayNo ? ' · today' : ''}
+								</p>
+								<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{day.body}</p>
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	{#if myWorkouts.length}
 		<Card.Root>
