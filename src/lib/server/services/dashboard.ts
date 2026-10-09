@@ -17,6 +17,7 @@ import {
 	location,
 	member,
 	memberIssue,
+	instructorTimeOff,
 	membership,
 	payment,
 	paymentProvider,
@@ -31,7 +32,7 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import { monthlyRecurring } from './billing.ts';
-import { localDate, zonedToUtc } from '#lib/tz.ts';
+import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 
 /** KPIs and today's schedule for the dashboard. */
 export async function dashboard(orgId: string) {
@@ -333,6 +334,26 @@ export async function dashboard(orgId: string) {
 		.orderBy(desc(memberIssue.createdAt))
 		.limit(50);
 
+	// Instructors/staff with time off starting in the next 14 days (or underway).
+	const offSoon = await db
+		.select({
+			name: user.name,
+			startDate: instructorTimeOff.startDate,
+			endDate: instructorTimeOff.endDate
+		})
+		.from(instructorTimeOff)
+		.innerJoin(member, eq(instructorTimeOff.instructorId, member.id))
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(
+			and(
+				eq(instructorTimeOff.organizationId, orgId),
+				lte(instructorTimeOff.startDate, addDays(today, 14)),
+				gte(instructorTimeOff.endDate, today)
+			)
+		)
+		.orderBy(asc(instructorTimeOff.startDate))
+		.limit(10);
+
 	// Members currently inside (checked in today, not yet checked out).
 	const insideNow = await db
 		.select({ name: gymMember.name })
@@ -616,6 +637,7 @@ export async function dashboard(orgId: string) {
 			}))
 		],
 		fullSessions,
+		offSoon,
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,

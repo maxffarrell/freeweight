@@ -106,6 +106,18 @@ export const logWorkout = command(
 	}
 );
 
+export const setMyBookingNote = command(
+	v.object({
+		memberId: idSchema,
+		bookingId: idSchema,
+		note: v.optional(v.pipe(v.string(), v.maxLength(120)))
+	}),
+	async ({ memberId, bookingId, note }) => {
+		const m = await myMember(memberId);
+		return await svc.setMemberNote(m.organizationId, m.id, bookingId, note ?? '');
+	}
+);
+
 export const reportIssue = command(
 	v.object({
 		memberId: idSchema,

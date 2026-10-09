@@ -215,14 +215,15 @@ export const getCheckIns = query(
 	v.object({
 		date: v.pipe(v.string(), v.isoDate()),
 		q: v.optional(v.string()),
-		inside: v.optional(v.boolean())
+		inside: v.optional(v.boolean()),
+		guests: v.optional(v.boolean())
 	}),
-	async ({ date, q, inside }) => {
+	async ({ date, q, inside, guests }) => {
 		const { orgId } = await requireOrg();
 		const tz = (await settingsSvc.getSettings(orgId)).timezone;
 		const since = zonedToUtc(`${date}T00:00`, tz);
 		const until = new Date(since.getTime() + 86400_000);
-		return checkins.listCheckIns(orgId, { since, until, q, inside });
+		return checkins.listCheckIns(orgId, { since, until, q, inside, guestsOnly: guests });
 	}
 );
 export const recordCheckIn = command(checkInInput, async (input) => {

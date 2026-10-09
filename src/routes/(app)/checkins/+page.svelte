@@ -26,11 +26,13 @@
 	let q = $state('');
 	let checkIns = $state(await getCheckIns({ date: viewDate }));
 	let insideOnly = $state(false);
+	let guestsOnly = $state(false);
 	async function refilter() {
 		checkIns = await getCheckIns({
 			date: viewDate,
 			q: q.trim() || undefined,
-			inside: insideOnly || undefined
+			inside: insideOnly || undefined,
+			guests: guestsOnly || undefined
 		});
 	}
 	let searchTimer: ReturnType<typeof setTimeout>;
@@ -179,8 +181,18 @@
 					variant={insideOnly ? 'default' : 'outline'}
 					onclick={() => {
 						insideOnly = !insideOnly;
+						guestsOnly = false;
 						void refilter();
 					}}>Still inside</Button
+				>
+				<Button
+					size="sm"
+					variant={guestsOnly ? 'default' : 'outline'}
+					onclick={() => {
+						guestsOnly = !guestsOnly;
+						if (guestsOnly) insideOnly = false;
+						void refilter();
+					}}>Guests</Button
 				>
 			</div>
 			<Table.Root>
