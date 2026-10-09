@@ -118,7 +118,9 @@ export async function listMembers(
 	/** Members with an active class pack expiring within 14 days. */
 	packExpiring?: boolean,
 	/** Members currently checked in (no check-out yet). */
-	insideNow?: boolean
+	insideNow?: boolean,
+	/** Members holding an assigned locker. */
+	hasLocker?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -225,6 +227,9 @@ export async function listMembers(
 					: undefined,
 				insideNow
 					? sql`exists (select 1 from check_in c10 where c10.member_id = ${gymMember.id} and c10.checked_out_at is null)`
+					: undefined,
+				hasLocker
+					? sql`exists (select 1 from locker l10 where l10.member_id = ${gymMember.id})`
 					: undefined,
 				recent
 					? gte(

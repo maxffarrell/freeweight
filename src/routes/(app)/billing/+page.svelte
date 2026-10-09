@@ -188,7 +188,9 @@
 		charges = applyChargeFilter(
 			await getCharges({
 				status:
-					chargeFilter === '__overdue' || chargeFilter === '__duetoday'
+					chargeFilter === '__overdue' ||
+					chargeFilter === '__duetoday' ||
+					chargeFilter === '__aging90'
 						? 'open'
 						: chargeFilter || undefined,
 				kind: kindFilter || undefined
@@ -201,7 +203,12 @@
 			? rows.filter((c) => c.charge.dueDate < todayISO())
 			: chargeFilter === '__duetoday'
 				? rows.filter((c) => c.charge.dueDate === todayISO())
-				: rows;
+				: chargeFilter === '__aging90'
+					? rows.filter(
+							(c) =>
+								c.charge.dueDate < new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10)
+						)
+					: rows;
 	}
 
 	async function refreshCharges() {
@@ -657,6 +664,7 @@
 					<option value="open">Open</option>
 					<option value="__duetoday">Due today</option>
 					<option value="__overdue">Overdue</option>
+					<option value="__aging90">90+ days overdue</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
 					<option value="written_off">Written off</option>
