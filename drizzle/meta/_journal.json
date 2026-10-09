@@ -764,6 +764,13 @@
       "when": 1791534803247,
       "tag": "0108_membership-nobill",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1791541538703,
+      "tag": "0109_open-hours",
+      "breakpoints": true
     }
   ]
 }

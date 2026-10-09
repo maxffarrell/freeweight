@@ -23,6 +23,7 @@
 		getMemberships,
 		updateMembership,
 		getPayments,
+		resendReceipt,
 		recordPayment,
 		refundPayment,
 		requestAllPayments,
@@ -724,6 +725,19 @@
 												>refunded {formatDate(p.payment.refundedAt)}</span
 											>
 										{:else}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="h-7 px-2 text-xs"
+												onclick={async () => {
+													try {
+														await resendReceipt(p.payment.id);
+														toast.success('Receipt sent');
+													} catch (err) {
+														toast.error(errMsg(err, 'Could not resend'));
+													}
+												}}>Receipt</Button
+											>
 											<Button
 												variant="ghost"
 												size="sm"

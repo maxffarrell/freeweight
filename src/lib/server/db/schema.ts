@@ -65,6 +65,8 @@ export const gymSettings = pgTable('gym_settings', {
 	waiver: text('waiver').notNull().default(''),
 	/** Persistent notice shown at the top of every member's portal; empty = hidden. */
 	portalNotice: text('portal_notice').notNull().default(''),
+	/** Weekly opening hours, {weekday(0=Sun): 'HH:MM-HH:MM'}; ''/missing = closed. Shown on the public timetable. */
+	openHours: jsonb('open_hours').$type<Record<string, string>>().notNull().default({}),
 	/** Daily morning briefing email to owner/admin staff; off skips the cron send. */
 	staffBriefing: boolean('staff_briefing').notNull().default(true),
 	/** Owner dismissed the launch checklist on the dashboard. */

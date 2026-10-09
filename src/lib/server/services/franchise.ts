@@ -1,5 +1,7 @@
+import { error } from '@sveltejs/kit';
 import { and, asc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
+import { emit } from './events.ts';
 import {
 	booking,
 	charge,
@@ -217,4 +219,53 @@ export async function franchiseMemberSearch(userId: string, q: string) {
 		.limit(20);
 	const orgName = new Map(orgs.map((o) => [o.id, o.name]));
 	return rows.map((r) => ({ ...r, orgName: orgName.get(r.orgId) ?? '' }));
+}
+
+/**
+ * Copies a member's record into another gym the caller owns/administers —
+ * franchise ops moving a member between locations. Both orgs must be admin'd
+ * by the caller; the member is created active in the target with the same
+ * name/email/phone/birthday. Memberships don't travel — billing stays per-gym.
+ */
+export async function copyFranchiseMember(userId: string, memberId: string, targetOrgId: string) {
+	const orgs = await db
+		.select({ id: member.organizationId })
+		.from(member)
+		.where(and(eq(member.userId, userId), inArray(member.role, ['owner', 'admin'])));
+	const admin = new Set(orgs.map((o) => o.id));
+	const [src] = await db
+		.select()
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId))
+		.limit(1);
+	if (!src || !admin.has(src.organizationId)) error(404, 'Member not found');
+	if (!admin.has(targetOrgId)) error(403, 'Not an admin of that gym');
+	if (src.organizationId === targetOrgId) error(400, 'Already in that gym');
+	if (src.email) {
+		const [dup] = await db
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(and(eq(gymMember.organizationId, targetOrgId), eq(gymMember.email, src.email)))
+			.limit(1);
+		if (dup) error(409, 'A member with that email already exists at that gym');
+	}
+	const [row] = await db
+		.insert(gymMember)
+		.values({
+			organizationId: targetOrgId,
+			name: src.name,
+			email: src.email,
+			phone: src.phone,
+			birthday: src.birthday
+		})
+		.returning();
+	await emit({
+		orgId: targetOrgId,
+		actorId: userId,
+		entityType: 'member',
+		entityId: row!.id,
+		action: 'created',
+		summary: `${src.name} copied from another location`
+	});
+	return { memberId: row!.id };
 }

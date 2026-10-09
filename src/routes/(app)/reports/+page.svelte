@@ -142,6 +142,42 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root class="lg:col-span-2">
+		<Card.Header>
+			<Card.Title class="text-base">Traffic heatmap — last 90 days</Card.Title>
+			<Card.Description>Check-ins by day × hour, gym timezone</Card.Description>
+		</Card.Header>
+		<Card.Content class="overflow-x-auto">
+			{@const maxCell = Math.max(1, ...r.heatmap.map((c) => c.n))}
+			{@const hrs = [...new Set(r.heatmap.map((c) => c.hour))].sort((a, b) => a - b)}
+			<table class="w-full min-w-150 border-collapse text-[10px] tabular-nums">
+				<thead>
+					<tr>
+						<th class="p-1 text-left font-medium text-muted-foreground"></th>
+						{#each hrs as h (h)}
+							<th class="p-1 font-medium text-muted-foreground">{hourLabel(h)}</th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d, dow (d)}
+						<tr>
+							<td class="p-1 pr-2 font-medium text-muted-foreground">{d}</td>
+							{#each hrs as h (h)}
+								{@const c = r.heatmap.find((x) => x.dow === dow && x.hour === h)}
+								<td
+									class="p-1 text-center {c?.n ? 'font-medium' : 'text-muted-foreground'}"
+									style="background: {c?.n ? `rgb(37 99 235 / ${Math.round(15 + 85 * (c.n / maxCell))}%)` : 'transparent'}"
+									title="{d} {hourLabel(h)} — {c?.n ?? 0} check-ins">{c?.n || ''}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Member growth</Card.Title>

@@ -4,11 +4,17 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
+	import { errMsg } from '#lib/format.ts';
 	import { authClient } from '#lib/auth-client.ts';
-	import { getFranchise, searchFranchiseMembers } from '#lib/remote/franchise.remote.ts';
+	import {
+		copyFranchiseMember,
+		getFranchise,
+		searchFranchiseMembers
+	} from '#lib/remote/franchise.remote.ts';
 	import { formatMoney } from '#lib/format.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -128,6 +134,7 @@
 								<Table.Head>Email</Table.Head>
 								<Table.Head>Gym</Table.Head>
 								<Table.Head class="text-right">Active plans</Table.Head>
+							<Table.Head class="text-right">Copy to</Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
@@ -137,6 +144,32 @@
 									<Table.Cell class="text-muted-foreground">{h.email ?? '—'}</Table.Cell>
 									<Table.Cell>{h.orgName}</Table.Cell>
 									<Table.Cell class="text-right tabular-nums">{h.memberships}</Table.Cell>
+									<Table.Cell class="text-right">
+										<NativeSelect
+											size="sm"
+											class="ml-auto w-28"
+											value=""
+											onchange={async (e) => {
+												const target = (e.target as HTMLSelectElement).value;
+												if (!target) return;
+												try {
+													await copyFranchiseMember({
+														memberId: h.memberId,
+														targetOrgId: target
+													});
+													toast.success(`${h.name} copied`);
+												} catch (err) {
+													toast.error(errMsg(err, 'Could not copy'));
+												}
+												(e.target as HTMLSelectElement).value = '';
+											}}
+										>
+											<option value="">Copy to…</option>
+											{#each f.gyms.filter((g) => g.id !== h.orgId) as g (g.id)}
+												<option value={g.id}>{g.name}</option>
+											{/each}
+										</NativeSelect>
+									</Table.Cell>
 								</Table.Row>
 							{/each}
 						</Table.Body>

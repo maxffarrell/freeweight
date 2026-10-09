@@ -204,6 +204,22 @@
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
+	type DayHours = { open: string; close: string; closed: boolean };
+	const hourDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	let hours = $state<DayHours[]>(
+		hourDays.map((_, i) => {
+			const v2 = (settings.openHours ?? {})[String(i)] ?? '';
+			const [open = '', close = ''] = v2.split('-');
+			return { open, close, closed: v2 === '' };
+		})
+	);
+	/** Serializes the editor back to the {weekday: 'HH:MM-HH:MM'|''} record. */
+	const hoursOut = $derived(
+		Object.fromEntries(
+			hours.map((h, i) => [String(i), h.closed || !h.open || !h.close ? '' : `${h.open}-${h.close}`])
+		)
+	);
+
 	async function saveSettings(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -238,7 +254,8 @@
 				revenueTarget,
 				publicPage,
 				staffBriefing,
-				firstClassFree
+				firstClassFree,
+				openHours: hoursOut
 			});
 			toast.success('Settings saved');
 		} catch (err) {
@@ -707,6 +724,36 @@
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Opening hours</Card.Title>
+					<Card.Description>Shown on the gym's public timetable. Saved with the General settings above.</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-2">
+					{#each hourDays as d, i (d)}
+						<div class="flex items-center gap-3 text-sm">
+							<span class="w-10 font-medium">{d}</span>
+							<Input
+								type="time"
+								class="h-8 w-28"
+								disabled={hours[i].closed}
+								bind:value={hours[i].open}
+							/>
+							<span class="text-muted-foreground">–</span>
+							<Input
+								type="time"
+								class="h-8 w-28"
+								disabled={hours[i].closed}
+								bind:value={hours[i].close}
+							/>
+							<label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<input type="checkbox" class="size-3.5" bind:checked={hours[i].closed} /> Closed
+							</label>
+						</div>
+					{/each}
 				</Card.Content>
 			</Card.Root>
 
