@@ -842,6 +842,23 @@
 				{/if}
 			</Card.Content>
 		</Card.Root>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Members by status</Card.Title>
+				<Card.Description>Current headcount per status.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="flex flex-wrap gap-2">
+					{#each r.statusBreakdown as b (b.status)}
+						<Badge variant={b.status === 'active' ? 'default' : 'outline'} class="text-sm"
+							>{b.status}: <span class="ml-1 font-semibold tabular-nums">{b.n}</span></Badge
+						>
+					{:else}
+						<p class="text-sm text-muted-foreground">No members yet.</p>
+					{/each}
+				</div>
+			</Card.Content>
+		</Card.Root>
 	{/if}
 
 	<Card.Root>
