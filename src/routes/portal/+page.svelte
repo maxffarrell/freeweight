@@ -2482,6 +2482,43 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if d.leaderboard.top.length}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="flex items-center gap-2 text-base"><Trophy /> Visits leaderboard</Card.Title
+				>
+				<Card.Description>
+					Most check-ins this month
+					{d.leaderboard.mine !== null
+						? ` · you're #${d.leaderboard.rank} with ${d.leaderboard.mine.visits} visit${d.leaderboard.mine.visits === 1 ? '' : 's'}`
+						: ''}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<ol class="space-y-1 text-sm">
+					{#each d.leaderboard.top as row, i (row.memberId)}
+						<li class="flex items-center gap-2 {row.memberId === d.member.id ? 'font-medium' : ''}">
+							<span class="w-5 shrink-0 text-xs text-muted-foreground">{i + 1}</span>
+							<span class="min-w-0 flex-1 truncate"
+								>{row.memberId === d.member.id ? 'You' : row.name}</span
+							>
+							<span class="shrink-0 text-xs tabular-nums text-muted-foreground"
+								>{row.visits} visit{row.visits === 1 ? '' : 's'}</span
+							>
+						</li>
+					{/each}
+				</ol>
+				{#if d.leaderboard.mine !== null && d.leaderboard.rank! > 10}
+					<p class="mt-2 border-t pt-2 text-xs text-muted-foreground">
+						#{d.leaderboard.rank} — you, {d.leaderboard.mine!.visits} visit{d.leaderboard.mine!.visits === 1
+							? ''
+							: 's'}
+					</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if myPrograms.length}
 		<Card.Root>
 			<Card.Header>

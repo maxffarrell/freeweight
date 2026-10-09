@@ -6,6 +6,7 @@ import * as pt from '#lib/server/services/pt.ts';
 import * as res from '#lib/server/services/resources.ts';
 import * as evt from '#lib/server/services/gym-events.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
+import * as billingSvc from '#lib/server/services/billing.ts';
 import { getMember, getTodayCheckIns } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import {
@@ -246,6 +247,15 @@ export const addClosure = command(closureInput, async (input) => {
 	void getSessions().refresh();
 	return c;
 });
+/** Holiday freeze — pause every active plan until the given date. */
+export const freezeAllMemberships = command(
+	v.object({ until: v.pipe(v.string(), v.trim(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date')) }),
+	async (input) => {
+		const ctx = await requireOrg('admin');
+		return billingSvc.freezeAllMemberships(ctx, input.until);
+	}
+);
+
 export const removeClosure = command(idSchema, async (id) => {
 	const c = await svc.removeClosure(await requireOrg(), id);
 	void getClosures().refresh();

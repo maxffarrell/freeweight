@@ -437,6 +437,33 @@
 		</Card.Content>
 	</Card.Root>
 
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Pack burn-down</Card.Title>
+				<Card.Description>How much of each sold pack gets used before it ends</Card.Description>
+			</Card.Header>
+			<Card.Content class="grid gap-2 text-sm">
+				{#if r.packBurn.finished === 0 && r.packBurn.active === 0}
+					<p class="text-muted-foreground">No class packs yet.</p>
+				{:else}
+					<div class="flex items-center justify-between">
+						<span class="text-muted-foreground">Finished packs ({r.packBurn.finished})</span>
+						<span>{r.packBurn.finishedPct}% used</span>
+					</div>
+					<div class="flex items-center justify-between">
+						<span class="text-muted-foreground">Active packs ({r.packBurn.active})</span>
+						<span>{r.packBurn.activePct}% used so far</span>
+					</div>
+					{#if r.packBurn.unusedFinished > 0}
+						<p class="text-xs text-muted-foreground">
+							{r.packBurn.unusedFinished} credits expired unused — packs that didn't finish are money
+							left on the table.
+						</p>
+					{/if}
+				{/if}
+			</Card.Content>
+		</Card.Root>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
