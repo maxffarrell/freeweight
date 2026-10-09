@@ -1377,6 +1377,14 @@
 										: 'es'} banked
 								</p>
 							{/if}
+							{#if mm.membership.selfFreezeUsedDays}
+								<p class="text-xs text-muted-foreground">
+									{mm.membership.selfFreezeUsedDays} self-freeze day{mm.membership
+										.selfFreezeUsedDays === 1
+										? ''
+										: 's'} used this year
+								</p>
+							{/if}
 							{#if mm.membership.cancelRequestedAt}
 								<p class="text-xs text-amber-600 dark:text-amber-400">
 									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}{mm.membership

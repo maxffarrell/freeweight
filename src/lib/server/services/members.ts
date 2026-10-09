@@ -120,7 +120,9 @@ export async function listMembers(
 	/** Members currently checked in (no check-out yet). */
 	insideNow?: boolean,
 	/** Members holding an assigned locker. */
-	hasLocker?: boolean
+	hasLocker?: boolean,
+	/** Members with one or fewer credits left on an active class pack. */
+	lowCredits?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -230,6 +232,9 @@ export async function listMembers(
 					: undefined,
 				hasLocker
 					? sql`exists (select 1 from locker l10 where l10.member_id = ${gymMember.id})`
+					: undefined,
+				lowCredits
+					? sql`exists (select 1 from membership m11 join plan p11 on p11.id = m11.plan_id where m11.member_id = ${gymMember.id} and m11.status = 'active' and p11.is_pack and p11.class_credits is not null and (select count(*) from booking b11 join class_session s11 on s11.id = b11.session_id where b11.membership_id = m11.id and b11.status in ('booked','attended','no_show') and s11.cancelled_at is null) >= p11.class_credits - 1)`
 					: undefined,
 				recent
 					? gte(

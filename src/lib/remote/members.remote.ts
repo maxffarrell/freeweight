@@ -91,7 +91,8 @@ export const getMembers = query(
 			comped: v.optional(v.boolean()),
 			packExpiring: v.optional(v.boolean()),
 			insideNow: v.optional(v.boolean()),
-			hasLocker: v.optional(v.boolean())
+			hasLocker: v.optional(v.boolean()),
+			lowCredits: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -120,7 +121,8 @@ export const getMembers = query(
 			opts?.comped,
 			opts?.packExpiring,
 			opts?.insideNow,
-			opts?.hasLocker
+			opts?.hasLocker,
+			opts?.lowCredits
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

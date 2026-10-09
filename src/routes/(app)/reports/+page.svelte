@@ -414,6 +414,14 @@
 					<span class="text-muted-foreground">Add-ons</span>
 					<span class="tabular-nums">{formatMoney(r.mrr.addons, currency, true)}</span>
 				</div>
+				{#if r.compValue.members > 0}
+					<div class="flex justify-between text-muted-foreground">
+						<span>Comp'd ({r.compValue.members})</span>
+						<span class="tabular-nums"
+							>{formatMoney(r.compValue.monthly, currency, true)}/mo foregone</span
+						>
+					</div>
+				{/if}
 				<div class="flex justify-between border-t pt-1 text-muted-foreground">
 					<span>Annualized</span>
 					<span class="tabular-nums">{formatMoney(r.mrr.total * 12, currency, true)}</span>

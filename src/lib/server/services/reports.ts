@@ -1707,7 +1707,8 @@ export async function getReports(orgId: string) {
 		statusBreakdown,
 		walkIns,
 		leadTimes,
-		sessCancels
+		sessCancels,
+		compVal
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1784,7 +1785,8 @@ export async function getReports(orgId: string) {
 		memberStatusBreakdown(orgId),
 		walkInStats(orgId),
 		bookingLeadTimes(orgId),
-		sessionCancels(orgId)
+		sessionCancels(orgId),
+		compValue(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1873,7 +1875,8 @@ export async function getReports(orgId: string) {
 		statusBreakdown,
 		walkIns,
 		leadTimes,
-		sessionCancels: sessCancels
+		sessionCancels: sessCancels,
+		compValue: compVal
 	};
 }
 
@@ -1908,6 +1911,24 @@ async function sessionCancels(orgId: string) {
 		.orderBy(desc(sql`count(*)`))
 		.limit(5);
 	return { cancelled: tot?.cancelled ?? 0, held: tot?.held ?? 0, byClass };
+}
+
+/** Monthly-equivalent value of comp'd (no-bill) memberships — what the gym gives away. */
+async function compValue(orgId: string) {
+	const [row] = await db
+		.select({
+			members: sql<number>`count(*)`.mapWith(Number),
+			monthly:
+				sql<number>`coalesce(sum(case ${plan.interval} when 'week' then ${plan.amount} * 52.0 / 12 when 'year' then ${plan.amount} / 12.0 else ${plan.amount} end), 0)`.mapWith(
+					Number
+				)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(eq(membership.organizationId, orgId), eq(membership.status, 'active'), membership.noBill)
+		);
+	return { members: row?.members ?? 0, monthly: row?.monthly ?? 0 };
 }
 
 /** Sessions taught vs cancelled per instructor over the last 90 days. */
