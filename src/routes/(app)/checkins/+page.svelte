@@ -95,6 +95,16 @@
 	}
 
 	const uniqueMembers = $derived(new Set(checkIns.map((c) => c.checkIn.memberId)).size);
+	const peakHour = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const c of checkIns) {
+			const h = localTime(c.checkIn.checkedAt, settings.timezone).slice(0, 2);
+			counts.set(h, (counts.get(h) ?? 0) + 1);
+		}
+		let peak = '';
+		for (const [h, n] of counts) if (!peak || n > counts.get(peak)!) peak = h;
+		return peak ? `${peak}:00 (${counts.get(peak)})` : '';
+	});
 	const avgVisit = $derived.by(() => {
 		const done = checkIns.filter((c) => c.checkIn.checkedOutAt);
 		if (!done.length) return '';
@@ -192,7 +202,9 @@
 					? ` · ${uniqueMembers} unique`
 					: ''}{checkIns.filter((c) => !c.checkIn.checkedOutAt).length
 					? ` · ${checkIns.filter((c) => !c.checkIn.checkedOutAt).length} still inside`
-					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}.</Card.Description
+					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}{peakHour
+					? ` · peak ${peakHour}`
+					: ''}.</Card.Description
 			>
 		</Card.Header>
 		<Card.Content class="px-4">

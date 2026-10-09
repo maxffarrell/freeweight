@@ -182,6 +182,7 @@
 		timer = setTimeout(refilter, 150);
 	}
 
+	const joinedWeekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 	let open = $state(page.url.searchParams.get('new') === '1');
 	let pending = $state(false);
 	let name = $state('');
@@ -828,6 +829,9 @@
 									{m.name}
 									{#if m.guardianId}
 										<Badge variant="outline" class="px-1.5 py-0 text-[10px]">family</Badge>
+									{/if}
+									{#if m.joinedAt && m.joinedAt >= joinedWeekAgo}
+										<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">new</Badge>
 									{/if}
 								</span>
 								{#if m.tags.length}

@@ -13,6 +13,7 @@
 		getSettings
 	} from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatRelative } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 
 	const settings = await getSettings();
@@ -73,6 +74,24 @@
 		closure: 'Closure'
 	};
 	const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replaceAll('_', ' ');
+
+	function exportCsv() {
+		const csv = toCsv([
+			['When', 'Actor', 'Type', 'Action', 'Summary'],
+			...items.map((a) => [
+				new Date(a.createdAt).toISOString(),
+				a.actorName ?? '',
+				typeLabel(a.entityType),
+				a.action,
+				a.summary
+			])
+		]);
+		const el = document.createElement('a');
+		el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+		el.download = `activity-${new Date().toISOString().slice(0, 10)}.csv`;
+		el.click();
+		URL.revokeObjectURL(el.href);
+	}
 </script>
 
 <svelte:head><title>Activity · Freeweight</title></svelte:head>
@@ -87,6 +106,9 @@
 				<Card.Description>Every staff and system event — who did what, when.</Card.Description>
 			</div>
 			<div class="flex items-center gap-2">
+				<Button variant="outline" size="sm" onclick={exportCsv} disabled={!items.length}
+					>Export</Button
+				>
 				{#if actors.length > 1}
 					<Select.Root type="single" bind:value={actorId} onValueChange={() => void refilter()}>
 						<Select.Trigger class="w-36">

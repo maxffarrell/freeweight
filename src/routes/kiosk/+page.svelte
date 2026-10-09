@@ -145,6 +145,7 @@
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					r.welcomeBack ? 'welcome back' : '',
+					(r.anniversary ?? 0) > 0 ? `${r.anniversary}yr member!` : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
@@ -169,7 +170,10 @@
 				true,
 				r.checkedIn
 					? `Checked in ${r.checkedIn} member${r.checkedIn === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} skipped)` : ''}` +
-							(r.birthdays.length ? ` — happy birthday, ${r.birthdays.join(' + ')}!` : '')
+							(r.birthdays.length ? ` — happy birthday, ${r.birthdays.join(' + ')}!` : '') +
+							(r.anniversaries.length
+								? ` — ${r.anniversaries.map((a) => `${a.name} ${a.years}yr!`).join(', ')}`
+								: '')
 					: 'Nobody left to check in'
 			);
 			await getRoster(rosterSess!.session.id).refresh();
