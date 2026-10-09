@@ -602,6 +602,26 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Session cancels</Card.Title>
+			<Card.Description
+				>{r.sessionCancels.cancelled} cancelled of {r.sessionCancels.cancelled +
+					r.sessionCancels.held} sessions — last 30 days</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-1.5 text-sm">
+			{#each r.sessionCancels.byClass as c (c.name)}
+				<div class="flex items-center justify-between">
+					<span class="min-w-0 flex-1 truncate">{c.name}</span>
+					<span class="text-muted-foreground tabular-nums">{c.cancelled} cancelled</span>
+				</div>
+			{:else}
+				<p class="text-muted-foreground">No sessions cancelled.</p>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
 	{#if r.lockers.total}
 		<Card.Root>
 			<Card.Header class="pb-2">

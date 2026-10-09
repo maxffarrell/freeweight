@@ -866,7 +866,14 @@
 							)
 							.reduce((a, p) => a + p.payment.amount, 0),
 						currency
-					)} collected</span
+					)} collected{payments.filter((p) => p.payment.refundedAt).length
+						? ` · ${formatMoney(
+								payments
+									.filter((p) => p.payment.refundedAt)
+									.reduce((a, p) => a + p.payment.amount, 0),
+								currency
+							)} refunded`
+						: ''}</span
 				>
 				<Button size="sm" variant="outline" class="ml-auto" onclick={exportPayments}
 					><Download /> Export</Button

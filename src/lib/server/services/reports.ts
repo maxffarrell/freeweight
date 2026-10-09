@@ -1706,7 +1706,8 @@ export async function getReports(orgId: string) {
 		shopTop,
 		statusBreakdown,
 		walkIns,
-		leadTimes
+		leadTimes,
+		sessCancels
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1782,7 +1783,8 @@ export async function getReports(orgId: string) {
 		shopSales30d(orgId),
 		memberStatusBreakdown(orgId),
 		walkInStats(orgId),
-		bookingLeadTimes(orgId)
+		bookingLeadTimes(orgId),
+		sessionCancels(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1870,8 +1872,42 @@ export async function getReports(orgId: string) {
 		shopTop,
 		statusBreakdown,
 		walkIns,
-		leadTimes
+		leadTimes,
+		sessionCancels: sessCancels
 	};
+}
+
+/** Sessions cancelled vs held over the last 30 days, with the most-cancelled class types. */
+async function sessionCancels(orgId: string) {
+	const cutoff = new Date(Date.now() - 30 * 86400_000);
+	const [tot] = await db
+		.select({
+			cancelled:
+				sql<number>`count(*) filter (where ${classSession.cancelledAt} is not null)`.mapWith(
+					Number
+				),
+			held: sql<number>`count(*) filter (where ${classSession.cancelledAt} is null)`.mapWith(Number)
+		})
+		.from(classSession)
+		.where(and(eq(classSession.organizationId, orgId), gte(classSession.startsAt, cutoff)));
+	const byClass = await db
+		.select({
+			name: classType.name,
+			cancelled: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, cutoff),
+				isNotNull(classSession.cancelledAt)
+			)
+		)
+		.groupBy(classType.name)
+		.orderBy(desc(sql`count(*)`))
+		.limit(5);
+	return { cancelled: tot?.cancelled ?? 0, held: tot?.held ?? 0, byClass };
 }
 
 /** Sessions taught vs cancelled per instructor over the last 90 days. */
