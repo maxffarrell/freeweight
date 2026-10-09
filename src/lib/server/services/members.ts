@@ -104,9 +104,18 @@ export async function listMembers(
 	/** Active members who have never had a booking (any status). */
 	neverBooked?: boolean,
 	/** Members whose active membership (pack or term) ends within 30 days. */
-	endingSoon?: boolean
+	endingSoon?: boolean,
+	/** Members missing a signature for the org's current waiver text (no-op when none is set). */
+	noWaiver?: boolean
 ) {
 	const term = q?.trim();
+	const [st] = noWaiver
+		? await db
+				.select({ waiver: gymSettings.waiver })
+				.from(gymSettings)
+				.where(eq(gymSettings.organizationId, orgId))
+				.limit(1)
+		: [undefined];
 	return db
 		.select({
 			id: gymMember.id,
@@ -183,6 +192,9 @@ export async function listMembers(
 					: undefined,
 				endingSoon
 					? sql`exists (select 1 from membership m5 where m5.member_id = ${gymMember.id} and m5.status = 'active' and m5.ends_at is not null and m5.ends_at >= now() and m5.ends_at <= now() + interval '30 days')`
+					: undefined,
+				noWaiver && st?.waiver
+					? sql`not exists (select 1 from waiver w where w.member_id = ${gymMember.id} and w.text = ${st.waiver})`
 					: undefined,
 				recent
 					? gte(
