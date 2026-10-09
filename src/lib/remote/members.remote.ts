@@ -92,7 +92,9 @@ export const getMembers = query(
 			packExpiring: v.optional(v.boolean()),
 			insideNow: v.optional(v.boolean()),
 			hasLocker: v.optional(v.boolean()),
-			lowCredits: v.optional(v.boolean())
+			lowCredits: v.optional(v.boolean()),
+			autoRenew: v.optional(v.boolean()),
+			cancelRequested: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -122,7 +124,9 @@ export const getMembers = query(
 			opts?.packExpiring,
 			opts?.insideNow,
 			opts?.hasLocker,
-			opts?.lowCredits
+			opts?.lowCredits,
+			opts?.autoRenew,
+			opts?.cancelRequested
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
