@@ -1062,6 +1062,14 @@
 						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
 					>
 				</div>
+				{#if m.weekStreak > 0}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Streak</span>
+						<span class="tabular-nums"
+							>{m.weekStreak} week{m.weekStreak === 1 ? '' : 's'} in a row</span
+						>
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">No-shows</span>
 					<span class="tabular-nums"

@@ -469,6 +469,44 @@ export async function atRiskMembers(orgId: string) {
 }
 
 /** Members with the most check-ins over the last 30 days (member visits only, no guests). */
+/**
+ * Pack burn-down — how much of each sold punch-pass actually gets used.
+ * issued = plan.classCredits + bonusCredits per pack membership; used =
+ * bookings charged to it. Finished packs = expired or no longer active.
+ */
+async function packBurnDown(orgId: string) {
+	const packs = await db
+		.select({
+			id: membership.id,
+			status: membership.status,
+			endsAt: membership.endsAt,
+			issued: sql<number>`${plan.classCredits} + coalesce(${membership.bonusCredits}, 0)`.mapWith(
+				Number
+			),
+			used: sql<number>`(select count(*) from ${booking} b join ${classSession} cs on cs.id = b.session_id where b.membership_id = ${outer(membership.id)} and b.status in ('booked','attended','no_show') and cs.cancelled_at is null)`.mapWith(
+				Number
+			)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(and(eq(membership.organizationId, orgId), eq(plan.isPack, true)));
+	const now = new Date();
+	const finished = packs.filter((p) => p.status !== 'active' || (p.endsAt && p.endsAt < now));
+	const active = packs.filter((p) => p.status === 'active' && (!p.endsAt || p.endsAt >= now));
+	const pct = (u: number, i: number) => (i > 0 ? Math.min(100, Math.round((u / i) * 100)) : 0);
+	const issuedF = finished.reduce((a, p) => a + p.issued, 0);
+	const usedF = finished.reduce((a, p) => a + p.used, 0);
+	const issuedA = active.reduce((a, p) => a + p.issued, 0);
+	const usedA = active.reduce((a, p) => a + p.used, 0);
+	return {
+		finished: finished.length,
+		active: active.length,
+		finishedPct: pct(usedF, issuedF),
+		activePct: pct(usedA, issuedA),
+		unusedFinished: Math.max(0, issuedF - usedF)
+	};
+}
+
 async function topAttendees(orgId: string) {
 	return db
 		.select({
@@ -1095,7 +1133,8 @@ export async function getReports(orgId: string) {
 		never,
 		renewals,
 		heatmap,
-		spenders
+		spenders,
+		packBurn
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1145,7 +1184,8 @@ export async function getReports(orgId: string) {
 		neverVisited(orgId),
 		renewalForecast(orgId),
 		checkinHeatmap(orgId),
-		topSpenders(orgId)
+		topSpenders(orgId),
+		packBurnDown(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1207,7 +1247,8 @@ export async function getReports(orgId: string) {
 		never,
 		renewals,
 		heatmap,
-		spenders
+		spenders,
+		packBurn
 	};
 }
 

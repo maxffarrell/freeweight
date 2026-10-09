@@ -23,6 +23,7 @@ import {
 	classType,
 	document,
 	gymMember,
+	gymSettings,
 	incident,
 	location,
 	memberMeasurement,
@@ -43,6 +44,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
+import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
 import { creditUsage, creditsUsedIn } from './schedule.ts';
 import {
@@ -472,6 +474,43 @@ export async function getMember(orgId: string, id: string) {
 			.orderBy(desc(signRequest.createdAt))
 			.limit(25)
 	]);
+	// Current week-streak for the member page (same rule as the portal card).
+	const yearAgo = new Date(Date.now() - 370 * 86400_000);
+	const streakVisits = await db
+		.select({ checkedAt: checkIn.checkedAt })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, id),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, yearAgo)
+			)
+		);
+	const [stz] = await db
+		.select({ tz: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const mweekOf = (iso: string) => {
+		const d = new Date(`${iso}T12:00:00Z`);
+		d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+		return d.toISOString().slice(0, 10);
+	};
+	const mweeks = new Set(streakVisits.map((v) => mweekOf(localDate(v.checkedAt, stz?.tz ?? 'UTC'))));
+	let weekStreak = 0;
+	let mw = mweekOf(localDate(new Date(), stz?.tz ?? 'UTC'));
+	if (!mweeks.has(mw)) {
+		const prev = new Date(`${mw}T12:00:00Z`);
+		prev.setUTCDate(prev.getUTCDate() - 7);
+		mw = prev.toISOString().slice(0, 10);
+	}
+	while (mweeks.has(mw)) {
+		weekStreak++;
+		const prev = new Date(`${mw}T12:00:00Z`);
+		prev.setUTCDate(prev.getUTCDate() - 7);
+		mw = prev.toISOString().slice(0, 10);
+	}
+
 	const trialRequests = await db
 		.select({
 			request: trialRequest,
@@ -490,6 +529,7 @@ export async function getMember(orgId: string, id: string) {
 		payments,
 		bookings,
 		trialRequests,
+		weekStreak,
 		checkIns,
 		credits,
 		signedWaiver,
@@ -946,6 +986,34 @@ export async function portalMembers(userId: string) {
 			)
 		);
 	return [...mine, ...deps.map((d) => ({ ...d, dependent: true }))];
+}
+
+/**
+ * Portal-visible check-in leaderboard: top-10 visitors this calendar month plus
+ * the caller's own rank + count (rank counts members with strictly more visits).
+ */
+export async function membersLeaderboard(orgId: string, memberId: string, tz: string) {
+	const month = localDate(new Date(), tz).slice(0, 7);
+	const rows = await db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			visits: sql<number>`count(${checkIn.id})`.mapWith(Number)
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				isNull(checkIn.guestName),
+				sql`to_char(${checkIn.checkedAt} at time zone ${sql.raw(`'${tz.replace(/'/g, '')}'`)}, 'YYYY-MM') = ${month}`
+			)
+		)
+		.groupBy(gymMember.id, gymMember.name)
+		.orderBy(desc(sql`count(${checkIn.id})`), gymMember.name);
+	const mine = rows.find((r) => r.memberId === memberId);
+	const rank = mine ? rows.filter((r) => r.visits > mine.visits).length + 1 : null;
+	return { top: rows.slice(0, 10), mine: mine ?? null, rank };
 }
 
 /** Latest PRs across the gym — the portal's PR leaderboard. */

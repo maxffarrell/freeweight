@@ -1443,3 +1443,39 @@ export async function selfFreezeMembership(
 	});
 	return { until, remaining: remaining - days };
 }
+
+/**
+ * Holiday freeze — pauses every active non-pack membership until `until`
+ * (YYYY-MM-DD). Auto-resume + welcome-back emails ride the existing cron.
+ */
+export async function freezeAllMemberships(ctx: OrgContext, until: string) {
+	const rows = await db
+		.update(membership)
+		.set({
+			status: 'paused',
+			frozenUntil: until,
+			nextChargeAt: null,
+			pauseRequestedAt: null,
+			pauseUntil: null,
+			requestReason: null
+		})
+		.from(plan)
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.status, 'active'),
+				eq(plan.id, membership.planId),
+				eq(plan.isPack, false)
+			)
+		)
+		.returning({ id: membership.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'membership',
+		entityId: ctx.orgId,
+		action: 'freeze_all',
+		summary: `Froze ${rows.length} active membership${rows.length === 1 ? '' : 's'} until ${until} (holiday freeze)`
+	});
+	return { frozen: rows.length, until };
+}

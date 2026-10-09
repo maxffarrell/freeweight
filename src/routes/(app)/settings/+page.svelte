@@ -40,7 +40,12 @@
 		refreshProvider
 	} from '#lib/remote/payments.remote.ts';
 	import { getApiKeys, createApiKey, deleteApiKey } from '#lib/remote/api-keys.remote.ts';
-	import { getClosures, addClosure, removeClosure } from '#lib/remote/schedule.remote.ts';
+	import {
+		getClosures,
+		addClosure,
+		removeClosure,
+		freezeAllMemberships
+	} from '#lib/remote/schedule.remote.ts';
 	import {
 		getLockers,
 		addLocker,
@@ -133,6 +138,26 @@
 	async function delClosure(id: string) {
 		await removeClosure(id).catch((err) => toast.error(errMsg(err, 'Could not remove')));
 		closures = await getClosures();
+	}
+
+	let fzUntil = $state('');
+	let fzPending = $state(false);
+	async function submitFreezeAll(e: SubmitEvent) {
+		e.preventDefault();
+		if (
+			!confirm(
+				`Pause every active plan until ${fzUntil}? They auto-resume that day and no fees are charged.`
+			)
+		)
+			return;
+		fzPending = true;
+		try {
+			const r = await freezeAllMemberships({ until: fzUntil });
+			toast.success(`Froze ${r.frozen} active plan${r.frozen === 1 ? '' : 's'} until ${r.until}`);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not freeze memberships'));
+		}
+		fzPending = false;
 	}
 
 	// ------- general -------
@@ -810,6 +835,17 @@
 							<Input bind:value={cReason} placeholder="Holiday, maintenance…" />
 						</Field.Field>
 						<Button type="submit" disabled={cPending}>Add</Button>
+					</form>
+					<form class="flex flex-wrap items-end gap-2 border-t pt-4" onsubmit={submitFreezeAll}>
+						<Field.Field>
+							<Field.Label>Holiday freeze — resume date</Field.Label>
+							<Input type="date" bind:value={fzUntil} required />
+						</Field.Field>
+						<Button type="submit" variant="outline" disabled={fzPending}>Freeze all plans</Button>
+						<p class="w-full text-xs text-muted-foreground">
+							Pauses every active plan until that date (packs are untouched). Members auto-resume and
+							get their welcome-back email as usual.
+						</p>
 					</form>
 					<ul class="divide-y">
 						{#each closures as c (c.id)}

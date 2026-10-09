@@ -15,6 +15,7 @@ import {
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
+import { membersLeaderboard } from './members.ts';
 import {
 	locker,
 	booking,
@@ -422,7 +423,8 @@ export async function portalOverview(memberId: string) {
 		waiverRequired: !!settings?.waiver,
 		signedWaiver,
 		waiverStale: !!settings?.waiver && !!signedWaiver && signedWaiver.text !== settings.waiver,
-		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC')
+		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC'),
+		leaderboard: await membersLeaderboard(orgId, memberId, settings?.timezone ?? 'UTC')
 	};
 }
 
