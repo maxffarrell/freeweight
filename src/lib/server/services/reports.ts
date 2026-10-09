@@ -1090,7 +1090,8 @@ export async function getReports(orgId: string) {
 		nps,
 		paused,
 		covers,
-		tags
+		tags,
+		never
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1136,7 +1137,8 @@ export async function getReports(orgId: string) {
 		npsStats(orgId),
 		pausedMemberships(orgId),
 		coverScorecard(orgId),
-		tagBreakdown(orgId)
+		tagBreakdown(orgId),
+		neverVisited(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1194,7 +1196,8 @@ export async function getReports(orgId: string) {
 		nps,
 		paused,
 		covers,
-		tags
+		tags,
+		never
 	};
 }
 
@@ -1434,4 +1437,28 @@ async function tagBreakdown(orgId: string) {
 		.groupBy(memberTag.tag)
 		.orderBy(desc(sql`count(distinct ${memberTag.memberId})`))
 		.limit(20);
+}
+
+/**
+ * Active members who have never checked in, newest joiners first — the "signed
+ * up but never showed" list the desk should call before they churn quietly.
+ */
+async function neverVisited(orgId: string) {
+	return db
+		.select({
+			memberId: gymMember.id,
+			name: gymMember.name,
+			joinedAt: gymMember.joinedAt,
+			email: gymMember.email
+		})
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id})`
+			)
+		)
+		.orderBy(desc(gymMember.createdAt))
+		.limit(25);
 }

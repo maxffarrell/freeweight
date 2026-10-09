@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import {
 	and,
+	asc,
 	desc,
 	eq,
 	gte,
@@ -451,6 +452,24 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			);
 		guestPassesLeft = Math.max(0, gp.guestPasses - used!.n);
 	}
+	// Desk heads-up: their next class today (booked or waitlisted).
+	const [nb] = await db
+		.select({ className: classType.name, startsAt: classSession.startsAt })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, ctx.orgId),
+				eq(booking.memberId, memberId),
+				inArray(booking.status, ['booked', 'waitlisted']),
+				isNull(classSession.cancelledAt),
+				gt(classSession.startsAt, new Date()),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(today, 1)}T00:00`, tz))
+			)
+		)
+		.orderBy(asc(classSession.startsAt))
+		.limit(1);
 	return {
 		checkIn: row!,
 		member: m,
@@ -461,7 +480,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		suspended,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
 		creditsClass: credits?.className ?? null,
-		guestPassesLeft
+		guestPassesLeft,
+		nextClass: nb ?? null
 	};
 }
 
