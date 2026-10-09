@@ -149,6 +149,11 @@ jobs:
           RELEASE_VERSION: ${{ needs.plan.outputs.version }}
           SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
         run: |
+          # Anchor the exact deployed commit before creating release metadata.
+          # Main can advance (including workflow edits) while an image is building.
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$RELEASE_VERSION" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$RELEASE_VERSION" -f sha="$SOURCE_COMMIT" >/dev/null
+          fi
           if ! gh release view "v$RELEASE_VERSION" >/dev/null 2>&1; then
-            gh release create "v$RELEASE_VERSION" --target "$SOURCE_COMMIT" --title "v$RELEASE_VERSION" --generate-notes
+            gh release create "v$RELEASE_VERSION" --verify-tag --title "v$RELEASE_VERSION" --generate-notes
           fi
