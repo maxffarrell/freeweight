@@ -822,7 +822,17 @@
 											<Badge variant="outline" class="ml-1 text-amber-600">ending soon</Badge>
 										{/if}</Table.Cell
 									>
-									<Table.Cell><StatusBadge status={mm.membership.status} /></Table.Cell>
+									<Table.Cell
+										><StatusBadge
+											status={mm.membership.status}
+										/>{#if mm.membership.cancelRequestedAt}<Badge
+												variant="outline"
+												class="ml-1 text-amber-600">cancel req</Badge
+											>{/if}{#if mm.membership.pauseRequestedAt}<Badge
+												variant="outline"
+												class="ml-1 text-amber-600">pause req</Badge
+											>{/if}</Table.Cell
+									>
 									<Table.Cell class="text-right">
 										{#if mm.membership.status === 'active'}
 											<Button

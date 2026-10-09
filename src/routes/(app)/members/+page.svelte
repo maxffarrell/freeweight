@@ -896,7 +896,13 @@
 							<Table.Cell class="hidden text-muted-foreground md:table-cell">
 								{m.email ?? m.phone ?? '—'}
 							</Table.Cell>
-							<Table.Cell class="text-muted-foreground">{m.planName ?? '—'}</Table.Cell>
+							<Table.Cell class="text-muted-foreground"
+								>{m.planName ??
+									'—'}{#if m.memberEnds && new Date(m.memberEnds).getTime() > Date.now() && new Date(m.memberEnds).getTime() - Date.now() < 30 * 86400_000}
+									<span class="text-amber-600">
+										· ends {formatDate(m.memberEnds)}</span
+									>{/if}</Table.Cell
+							>
 							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
 								{m.lastVisit ? formatDate(m.lastVisit) : '—'}
 							</Table.Cell>
