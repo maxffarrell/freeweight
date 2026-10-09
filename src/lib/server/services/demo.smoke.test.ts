@@ -10,7 +10,10 @@ describe('loadDemoData', () => {
 			sql`insert into organization (id, name, slug, created_at) values (${orgId}, 'Smoke', ${orgId}, now())`
 		);
 		try {
-			const r = await loadDemoData({ orgId } as never);
+			const r = await loadDemoData({
+				orgId,
+				org: { id: orgId, name: 'Smoke', slug: orgId, logo: null }
+			} as never);
 			expect(r.members).toBe(8);
 			const [row] = (await db.execute(sql`select
 				(select count(*) from challenge where organization_id=${orgId}) chal,

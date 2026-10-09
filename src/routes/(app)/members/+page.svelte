@@ -898,7 +898,7 @@
 				<Field.Label for="c-prize">Prize (optional)</Field.Label>
 				<Input id="c-prize" bind:value={cPrize} placeholder="A free month, gym hoodie…" />
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-goal">Goal (check-ins)</Field.Label>
 					<Input id="c-goal" type="number" min={1} max={1000} required bind:value={cGoal} />

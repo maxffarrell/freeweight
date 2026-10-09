@@ -12,6 +12,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -516,16 +517,12 @@
 				</Card.Root>
 			{/if}
 			<div class="mb-3 flex items-center gap-2">
-				<select
-					bind:value={chargeFilter}
-					onchange={filterCharges}
-					class="h-8 rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect bind:value={chargeFilter} onchange={filterCharges}>
 					<option value="">All</option>
 					<option value="open">Open</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
-				</select>
+				</NativeSelect>
 				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>
 			<Card.Root class="py-0">
@@ -981,7 +978,7 @@
 								<Field.Label for="rc-desc">Item</Field.Label>
 								<Input id="rc-desc" required bind:value={rcDesc} placeholder="Towel service" />
 							</Field.Field>
-							<div class="grid grid-cols-3 gap-3">
+							<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Field.Field>
 									<Field.Label>Amount</Field.Label>
 									<MoneyInput bind:value={rcAmount} />
@@ -1070,7 +1067,7 @@
 								<Field.Label for="exp-label">Item</Field.Label>
 								<Input id="exp-label" required bind:value={expLabel} placeholder="Monthly rent" />
 							</Field.Field>
-							<div class="grid grid-cols-3 gap-3">
+							<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 								<Field.Field>
 									<Field.Label>Category</Field.Label>
 									<Select.Root type="single" bind:value={expCategory}>

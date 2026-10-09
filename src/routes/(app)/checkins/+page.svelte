@@ -6,6 +6,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { toast } from 'svelte-sonner';
 	import { getCheckIns, recordCheckIn, voidCheckIn } from '#lib/remote/members.remote.ts';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -131,15 +132,12 @@
 				{#if locations.filter((l) => !l.archivedAt).length > 1}
 					<Field.Field>
 						<Field.Label>Location</Field.Label>
-						<select
-							bind:value={locationId}
-							class="flex h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-						>
+						<NativeSelect bind:value={locationId}>
 							<option value="">None</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
 							{/each}
-						</select>
+						</NativeSelect>
 					</Field.Field>
 				{/if}
 				<Button type="submit" class="w-full" disabled={pending || !code.trim()}>
