@@ -273,6 +273,8 @@ export const sessionUpdate = v.object({
 	locationId: v.optional(v.nullable(idSchema)),
 	instructorId: v.optional(v.nullable(idSchema)),
 	cancelled: v.optional(v.boolean()),
+	/** On cancel: try re-booking 'booked' members into the next session of this class. */
+	rebookNext: v.optional(v.boolean()),
 	/** Flag/unflag the session as needing a substitute instructor. */
 	needsCover: v.optional(v.boolean()),
 	note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
@@ -496,6 +498,10 @@ export const settingsInput = v.object({
 	/** Review link (Google/Yelp) sent to members after `reviewAfterVisits` visits; null = off. */
 	reviewUrl: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.url(), v.maxLength(300)))),
 	/** Lifetime attended visits that triggers a once-per-member review request; null = off. */
+	/** Comp classes granted at each check-in milestone; null/0 = off. */
+	rewardCredits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
+	),
 	reviewAfterVisits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
 	),

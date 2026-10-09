@@ -45,6 +45,12 @@
 	const notifications = $derived(await getNotifications());
 	const unread = $derived(notifications.length);
 
+	// Keep the bell fresh while staff sit on a page — poll every 30s.
+	$effect(() => {
+		const t = setInterval(() => getNotifications().refresh(), 30_000);
+		return () => clearInterval(t);
+	});
+
 	async function signOut() {
 		await authClient.signOut();
 		await goto('/login', { invalidateAll: true });

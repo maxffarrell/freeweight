@@ -680,6 +680,13 @@
       "when": 1791518836329,
       "tag": "0096_charge-cogs",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1791519781724,
+      "tag": "0097_reward-credits",
+      "breakpoints": true
     }
   ]
 }

@@ -965,6 +965,13 @@
 									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
 									: ''}
 							</p>
+							{#if mm.membership.bonusCredits}
+								<p class="text-xs text-emerald-600 dark:text-emerald-400">
+									{mm.membership.bonusCredits} comp class{mm.membership.bonusCredits === 1
+										? ''
+										: 'es'} banked
+								</p>
+							{/if}
 							{#if mm.membership.cancelRequestedAt}
 								<p class="text-xs text-amber-600 dark:text-amber-400">
 									Cancellation requested {formatDate(mm.membership.cancelRequestedAt)}{mm.membership

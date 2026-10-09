@@ -532,6 +532,17 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.expectedRevenue30d > 0}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Expected revenue</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<p class="text-2xl font-bold">{formatMoney(d.expectedRevenue30d, d.currency, true)}</p>
+						<p class="text-xs text-muted-foreground">
+							Open charges + membership renewals due in the next 30 days.
+						</p>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.renewalsThisWeek.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Renewing this week</Card.Title></Card.Header>

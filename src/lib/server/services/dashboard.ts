@@ -248,6 +248,37 @@ export async function dashboard(orgId: string) {
 		.orderBy(asc(membership.endsAt))
 		.limit(10);
 
+	// Cash expected over the next 30 days: open charges coming due plus
+	// membership renewals scheduled to bill in that window.
+	const in30d = new Date(Date.now() + 30 * 86400_000);
+	const [{ n: openDue30d }] = await db
+		.select({ n: sql<string>`coalesce(sum(${charge.amount}), 0)`.mapWith(Number) })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.status, 'open'),
+				lte(charge.dueDate, in30d.toISOString().slice(0, 10))
+			)
+		);
+	const [{ n: renewals30d }] = await db
+		.select({
+			n: sql<string>`coalesce(sum(coalesce(${membership.price}, ${plan.amount})), 0)`.mapWith(
+				Number
+			)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				isNotNull(membership.nextChargeAt),
+				gt(membership.nextChargeAt, new Date()),
+				lte(membership.nextChargeAt, in30d)
+			)
+		);
+
 	// Class packs expiring within 7 days — same window as the pack-expiry
 	// email. Staff can nudge a last visit or sell a top-up pack.
 	const packsExpiring = await db
@@ -351,6 +382,7 @@ export async function dashboard(orgId: string) {
 		coverNeeded,
 		birthdaysThisWeek,
 		renewalsThisWeek,
+		expectedRevenue30d: openDue30d + renewals30d,
 		trialsEnding,
 		packsExpiring,
 		liveChallenges
