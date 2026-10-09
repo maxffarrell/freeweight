@@ -7,7 +7,10 @@ import * as recSvc from '#lib/server/services/recurring.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { getMember } from './members.remote.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
-import { requestAllPaymentNotices } from '#lib/server/services/notifications.ts';
+import {
+	requestAllPaymentNotices,
+	resendPaymentReceipt
+} from '#lib/server/services/notifications.ts';
 import {
 	bulkChargeInput,
 	chargeInput,
@@ -200,6 +203,11 @@ export const recordPayment = command(paymentInput, async (input) => {
 /** "Email all" on the aging card — balance-due emails to every member with an unpaid charge. */
 export const requestAllPayments = command(async () =>
 	requestAllPaymentNotices((await requireOrg()).orgId)
+);
+
+/** Re-emails the payment receipt — the desk's "member lost the receipt" fix. */
+export const resendReceipt = command(idSchema, async (id) =>
+	resendPaymentReceipt((await requireOrg()).orgId, id)
 );
 
 export const refundPayment = command(idSchema, async (id) => {

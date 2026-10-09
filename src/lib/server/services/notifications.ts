@@ -539,6 +539,50 @@ export async function notifyPaymentReceived(
 	});
 }
 
+/** Staff "Resend receipt" on the billing page — same email as the original
+ * receipt, but always sends (the once-per-payment log key doesn't apply). */
+export async function resendPaymentReceipt(orgId: string, paymentId: string) {
+	const [row] = await db
+		.select({
+			memberId: gymMember.id,
+			email: gymMember.email,
+			memberName: gymMember.name,
+			amount: payment.amount,
+			method: payment.method
+		})
+		.from(payment)
+		.innerJoin(gymMember, eq(payment.memberId, gymMember.id))
+		.where(and(eq(payment.organizationId, orgId), eq(payment.id, paymentId)));
+	if (!row) error(404, 'Payment not found');
+	if (!row.email) error(409, 'That member has no email');
+	if (!emailProvider()) error(409, 'No email provider configured');
+	const [name, st] = await Promise.all([
+		orgBrand(orgId),
+		db.select().from(gymSettings).where(eq(gymSettings.organizationId, orgId)).limit(1)
+	]);
+	const money = formatMoney(row.amount, st[0]?.currency ?? 'usd');
+	const logId = await logOnce(
+		orgId,
+		'payment_received',
+		`${paymentId}:resend:${Date.now()}`,
+		row.email
+	);
+	await sendMemberEmail(row.memberId, {
+		to: row.email,
+		subject: `Payment received: ${money} at ${name.orgName}`,
+		...renderEmail({
+			...name,
+			heading: `Thanks, ${row.memberName} — ${money} received`,
+			lines: [
+				`${name.orgName} received your ${money} payment (${row.method}).`,
+				'Any remaining balance shows in your member portal.'
+			],
+			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+		})
+	});
+	return { sent: logId ? 1 : 0 };
+}
+
 /** "Your payment was refunded" — one email per refundPayment call. */
 export async function notifyPaymentRefunded(orgId: string, paymentId: string) {
 	const [row] = await db

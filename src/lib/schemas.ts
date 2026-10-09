@@ -516,7 +516,9 @@ export const settingsInput = v.object({
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)))
 	),
 	/** Monthly revenue goal in minor units for the Reports progress bar; null = off. */
-	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1))))
+	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Weekly opening hours {weekday: 'HH:MM-HH:MM'}; '' = closed that day. */
+	openHours: v.optional(v.record(v.string(), v.pipe(v.string(), v.trim(), v.maxLength(11))))
 });
 
 export const webhookInput = v.object({

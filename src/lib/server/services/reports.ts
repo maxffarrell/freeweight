@@ -1093,7 +1093,8 @@ export async function getReports(orgId: string) {
 		covers,
 		tags,
 		never,
-		renewals
+		renewals,
+		heatmap
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1141,7 +1142,8 @@ export async function getReports(orgId: string) {
 		coverScorecard(orgId),
 		tagBreakdown(orgId),
 		neverVisited(orgId),
-		renewalForecast(orgId)
+		renewalForecast(orgId),
+		checkinHeatmap(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1201,7 +1203,8 @@ export async function getReports(orgId: string) {
 		covers,
 		tags,
 		never,
-		renewals
+		renewals,
+		heatmap
 	};
 }
 
@@ -1495,4 +1498,32 @@ async function renewalForecast(orgId: string) {
 		)
 		.groupBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`)
 		.orderBy(sql`to_char(${membership.nextChargeAt}, 'YYYY-MM')`);
+}
+
+/**
+ * Check-ins over the last 90 days bucketed by weekday × hour in the org's
+ * timezone — the gym's traffic heatmap.
+ */
+async function checkinHeatmap(orgId: string) {
+	const [s] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const tz = s?.timezone ?? 'UTC';
+	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
+	const since = new Date(Date.now() - 90 * 86_400_000);
+	return db
+		.select({
+			dow: sql<number>`extract(dow from ${checkIn.checkedAt} at time zone ${tzLit})::int`.mapWith(
+				Number
+			),
+			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})::int`.mapWith(
+				Number
+			),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(and(eq(checkIn.organizationId, orgId), gte(checkIn.checkedAt, since)))
+		.groupBy(sql`1, 2`);
 }
