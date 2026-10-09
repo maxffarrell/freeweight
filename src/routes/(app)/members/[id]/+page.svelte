@@ -1112,7 +1112,9 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Classes booked</span>
-					<span class="tabular-nums">{m.attendance.bookedMonth} this month</span>
+					<span class="tabular-nums"
+						>{m.attendance.bookedWeek} this week · {m.attendance.bookedMonth} this month</span
+					>
 				</div>
 				{#if m.attendance.waitlisted > 0}
 					<div class="flex justify-between">
