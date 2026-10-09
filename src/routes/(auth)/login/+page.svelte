@@ -47,7 +47,7 @@
 			<h2 class="font-semibold">Try the live demo</h2>
 			<p class="text-sm text-muted-foreground">
 				Get a private sample gym with members, memberships, classes, bookings and check-ins. No
-				sign-up. It's deleted after 24 hours.
+				sign-up. Sessions end after 8 minutes. Sample workspaces are deleted after 24 hours.
 			</p>
 		</div>
 		<Button type="submit" class="w-full"><Sparkles /> Open demo workspace</Button>
