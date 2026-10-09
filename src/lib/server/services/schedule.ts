@@ -367,7 +367,7 @@ export async function sessionsNeedingCover(ctx: OrgContext) {
 				isNotNull(classSession.coverRequestedAt),
 				isNull(classSession.cancelledAt),
 				gt(classSession.startsAt, new Date()),
-				me ? ne(classSession.instructorId, me.id) : undefined
+				me ? or(ne(classSession.instructorId, me.id), isNull(classSession.instructorId)) : undefined
 			)
 		)
 		.orderBy(asc(classSession.startsAt))
@@ -399,6 +399,14 @@ export async function claimCover(ctx: OrgContext, tz: string, sessionId: string)
 	if (!s.coverRequestedAt) error(409, 'Already covered');
 	if (s.instructorId === me.id) error(409, 'You already teach it');
 	const row = await updateSession(ctx, tz, { id: sessionId, instructorId: me.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'session',
+		entityId: sessionId,
+		action: 'cover_claimed',
+		summary: `Cover claimed — ${s.className}`
+	});
 	return { session: row, className: s.className };
 }
 

@@ -127,9 +127,16 @@
 			});
 			showFlash(
 				true,
-				`${memberName} checked in` + (r.birthday ? ' — happy birthday!' : '') + visitNote(r.visits),
+				`${memberName} checked in` +
+					(r.birthday ? ' — happy birthday!' : '') +
+					visitNote(r.visits) +
+					(r.creditsLeft != null ? ` — ${r.creditsLeft} ${r.creditsClass ?? 'class'} left` : ''),
 				r.member.photoDocumentId,
-				[r.waiverMissing ? 'waiver unsigned' : '', r.suspended ? 'membership suspended' : '']
+				[
+					r.waiverMissing ? 'waiver unsigned' : '',
+					r.suspended ? 'membership suspended' : '',
+					r.creditsLeft === 0 ? 'pack empty' : ''
+				]
 					.filter(Boolean)
 					.join(' · ') || null
 			);
@@ -244,11 +251,15 @@
 					: `${r.member.name} checked in` +
 							(r.attended ? ` — attended ${r.attended} class${r.attended > 1 ? 'es' : ''}` : '') +
 							(r.birthday ? ' — happy birthday!' : '') +
-							visitNote(r.visits),
+							visitNote(r.visits) +
+							(r.creditsLeft != null && r.creditsLeft > 0
+								? ` — ${r.creditsLeft} ${r.creditsClass ?? 'class'} left`
+								: ''),
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.suspended ? 'membership suspended' : '',
+					r.creditsLeft === 0 ? 'pack empty' : '',
 					r.member.deskNote
 				]
 					.filter(Boolean)
