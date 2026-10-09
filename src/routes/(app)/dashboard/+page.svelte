@@ -582,6 +582,23 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.upcomingEvents.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Upcoming events</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.upcomingEvents as e (e.event.id)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{e.event.name}</span>
+									<Badge variant="outline" class="shrink-0"
+										>{formatDate(e.event.startsAt)} · {e.registered}/{e.event.capacity}</Badge
+									>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.liveChallenges.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Live challenges</Card.Title></Card.Header>

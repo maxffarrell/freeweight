@@ -86,15 +86,21 @@
 		inputEl?.focus();
 	}
 
+	function dur(from: Date, to: Date) {
+		const m = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+		return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}m` : ''}` : `${m}m`;
+	}
+
 	function exportCheckIns() {
 		const csv = toCsv([
-			['Member', 'Guest of', 'Checked at', 'Location', 'Method'],
+			['Member', 'Guest of', 'Checked at', 'Location', 'Method', 'Duration'],
 			...checkIns.map((c) => [
 				c.checkIn.guestName ?? c.memberName,
 				c.checkIn.guestName ? c.memberName : '',
 				c.checkIn.checkedAt.toISOString(),
 				c.locationName ?? '',
-				c.checkIn.method
+				c.checkIn.method,
+				c.checkIn.checkedOutAt ? dur(c.checkIn.checkedAt, c.checkIn.checkedOutAt) : ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -256,10 +262,13 @@
 								><div class="flex items-center justify-end gap-1">
 									{#if c.checkIn.checkedOutAt}
 										<span class="text-muted-foreground"
-											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)}</span
+											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)} · {dur(
+												c.checkIn.checkedAt,
+												c.checkIn.checkedOutAt
+											)}</span
 										>
 									{:else}
-										<Badge variant="default">In</Badge>
+										<Badge variant="default">In {dur(c.checkIn.checkedAt, new Date())}</Badge>
 									{/if}
 									<Button
 										variant="ghost"

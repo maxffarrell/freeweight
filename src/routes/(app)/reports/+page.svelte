@@ -678,6 +678,32 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.newVsReturning.newMembers + r.newVsReturning.returning + r.newVsReturning.guests}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">New vs returning</Card.Title>
+				<Card.Description>Check-ins this month by member tenure</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				<div class="flex items-center justify-between">
+					<span>New members (&lt;30d)</span><span class="text-muted-foreground tabular-nums"
+						>{r.newVsReturning.newMembers}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>Returning members</span><span class="text-muted-foreground tabular-nums"
+						>{r.newVsReturning.returning}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>Guests</span><span class="text-muted-foreground tabular-nums"
+						>{r.newVsReturning.guests}</span
+					>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
