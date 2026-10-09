@@ -66,6 +66,7 @@
 		rebookCourseSession,
 		checkInWithCode,
 		getPortalChallenges,
+		getPortalBadges,
 		joinChallenge,
 		leaveChallenge,
 		getMakeups,
@@ -536,6 +537,7 @@
 
 	// ------- challenges -------
 	const portalChallenges = $derived(await getPortalChallenges(memberId));
+	const portalBadges = $derived(await getPortalBadges(memberId));
 	const news = $derived(await getPortalAnnouncements(memberId));
 	const makeups = $derived(await getMakeups(memberId));
 	let mkBusy = $state('');
@@ -1864,6 +1866,23 @@
 						{/if}
 					</div>
 				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if portalBadges.some((b) => b.earned)}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Badges</Card.Title>
+			</Card.Header>
+			<Card.Content class="px-6 pb-4">
+				<div class="flex flex-wrap gap-1.5">
+					{#each portalBadges as b (b.id)}
+						<Badge variant={b.earned ? 'default' : 'outline'} class={b.earned ? '' : 'opacity-50'}>
+							{b.label}
+						</Badge>
+					{/each}
+				</div>
 			</Card.Content>
 		</Card.Root>
 	{/if}

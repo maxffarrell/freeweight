@@ -154,6 +154,7 @@ export async function createClassType(
 			defaultStreamUrl: input.defaultStreamUrl ?? null,
 			memberBookable: input.memberBookable,
 			minLevelId: input.minLevelId ?? null,
+			minAge: input.minAge ?? null,
 			active: input.active
 		})
 		.returning();
@@ -1246,6 +1247,7 @@ export async function bookSession(
 				dropInPrice: classType.dropInPrice,
 				waitlistLimit: classType.waitlistLimit,
 				minLevelId: classType.minLevelId,
+				minAge: classType.minAge,
 				className: classType.name
 			})
 			.from(classSession)
@@ -1269,6 +1271,13 @@ export async function bookSession(
 				: [undefined];
 			if (!gate || !held || held.sort < gate.sort)
 				error(409, `${s.className} requires ${gate?.name ?? 'a higher level'}`);
+		}
+		// Age gate: birthday must be set and at least minAge years old.
+		if (s.minAge != null) {
+			const today = new Date().toISOString().slice(0, 10);
+			const cutoff = `${Number(today.slice(0, 4)) - s.minAge}${today.slice(4)}`;
+			if (!m.birthday) error(409, `${s.className} is ${s.minAge}+ — set your birthday first`);
+			if (m.birthday > cutoff) error(409, `${s.className} is ${s.minAge}+`);
 		}
 		// Makeup booking: compFrom marks a free replacement for a booking the
 		// member lost to a gym-side cancellation (same class, no credit drain).

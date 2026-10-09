@@ -147,6 +147,8 @@ export const classTypeInput = v.object({
 	/** false = members can't self-book in the portal; staff bookings unaffected. */
 	memberBookable: v.optional(v.boolean(), true),
 	minLevelId: v.optional(v.nullable(idSchema)),
+	/** Minimum member age in years to self-book; null = all ages. */
+	minAge: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(3), v.maxValue(99)))),
 	active: v.optional(v.boolean(), true)
 });
 export const classTypeUpdate = v.object({ id: idSchema, ...v.partial(classTypeInput).entries });

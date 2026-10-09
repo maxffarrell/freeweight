@@ -1295,6 +1295,41 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.saveOffers.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Save offers</Card.Title>
+				<Card.Description
+					>Members who took the stay-instead discount — and how many stayed</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Month</Table.Head>
+							<Table.Head class="text-right">Taken</Table.Head>
+							<Table.Head class="text-right">Still active</Table.Head>
+							<Table.Head class="text-right">Held %</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.saveOffers as m (m.month)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{m.month}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{m.taken}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{m.stayed}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{Math.round((m.stayed / m.taken) * 100)}%</Table.Cell
+								>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if r.locations.length}
 		<Card.Root>
 			<Card.Header>

@@ -930,6 +930,7 @@
 	let tActive = $state(true);
 	let tMemberBookable = $state(true);
 	let tMinLevel = $state('');
+	let tMinAge = $state<number | null>(null);
 	let tQuals = new SvelteSet<string>();
 	let tStream = $state('');
 	const levels = $derived(await getLevels());
@@ -955,6 +956,7 @@
 		tMemberBookable = c.memberBookable;
 		tStream = c.defaultStreamUrl ?? '';
 		tMinLevel = c.minLevelId ?? '';
+		tMinAge = c.minAge ?? null;
 		tQuals = new SvelteSet(cQualsByType[c.id] ?? []);
 	}
 	// ------- movement video library -------
@@ -1021,6 +1023,7 @@
 				memberBookable: tMemberBookable,
 				defaultStreamUrl: tStream.trim() || null,
 				minLevelId: tMinLevel || null,
+				minAge: tMinAge,
 				active: tActive
 			};
 			let savedTypeId = editTypeId;
@@ -2017,6 +2020,18 @@
 				<span class="text-sm">Members can book online — off for front-desk-only classes</span>
 				<Switch bind:checked={tMemberBookable} />
 			</div>
+			<Field.Field>
+				<Field.Label for="t-min-age">Minimum age (optional)</Field.Label>
+				<Input
+					id="t-min-age"
+					type="number"
+					min={3}
+					max={99}
+					bind:value={tMinAge}
+					placeholder="All ages"
+				/>
+				<Field.Description>Under-age members can't book this class.</Field.Description>
+			</Field.Field>
 			{#if levels.length}
 				<Field.Field>
 					<Field.Label for="t-min-level">Required level</Field.Label>
