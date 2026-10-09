@@ -135,9 +135,16 @@ export const sellItem = command(saleInput, async (input) => {
 	return r;
 });
 
-export const getPendingPickups = query(async () =>
-	svc.pendingPickups((await requireOrg()).orgId)
-);
+export const getPendingPickups = query(async () => svc.pendingPickups((await requireOrg()).orgId));
+
+/** Desk day-pass sale — posts the day's dropin charge for the member. */
+export const sellDayPass = command(idSchema, async (memberId) => {
+	const ctx = await requireOrg();
+	const r = await svc.sellDayPass(ctx, memberId);
+	void getCharges().refresh();
+	void getMember(memberId).refresh();
+	return r;
+});
 
 export const markPickedUp = command(idSchema, async (saleId) => {
 	const r = await svc.markPickedUp(await requireOrg(), saleId);

@@ -69,7 +69,8 @@
 		recordPayment,
 		refundPayment,
 		getCurrency,
-		grantCredits
+		grantCredits,
+		sellDayPass
 	} from '#lib/remote/billing.remote.ts';
 	import {
 		getClassTypes,
@@ -699,6 +700,14 @@
 
 	// ------- payment -------
 	let payOpen = $state(false);
+	async function sellPass() {
+		try {
+			const r = await sellDayPass(id);
+			toast.success(`Day pass posted — ${formatMoney(r.charge.amount, currency)} on their balance`);
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not sell the pass'));
+		}
+	}
 	let payAmount = $state<number | null>(null);
 	let method = $state<'card' | 'cash' | 'bank' | 'other'>('cash');
 	let notes = $state('');
@@ -1103,6 +1112,11 @@
 					</span>
 				</div>
 			</Card.Content>
+			<Card.Footer>
+				<Button variant="outline" size="sm" class="w-full" onclick={() => void sellPass()}
+					>Sell day pass</Button
+				>
+			</Card.Footer>
 			{#if balance > 0}
 				<Card.Footer class="flex-col gap-2">
 					<Button class="w-full" onclick={() => ((payAmount = balance), (payOpen = true))}

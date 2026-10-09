@@ -38,7 +38,7 @@ import {
 	notifyReviewRequest,
 	notifyStreakReward
 } from './notifications.ts';
-import { getRoster, getSession } from './schedule.ts';
+import { creditUsage, getRoster, getSession } from './schedule.ts';
 import { addDays, localDate, zonedToUtc } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -419,6 +419,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			.where(and(eq(membership.memberId, memberId), eq(membership.status, 'suspended')))
 			.limit(1)
 	).length;
+	// Desk heads-up: remaining classes on a capped plan/pack (null = unlimited or none).
+	const credits = await creditUsage(ctx.orgId, memberId);
 	return {
 		checkIn: row!,
 		member: m,
@@ -426,7 +428,9 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		birthday,
 		visits: n,
 		waiverMissing,
-		suspended
+		suspended,
+		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
+		creditsClass: credits?.className ?? null
 	};
 }
 

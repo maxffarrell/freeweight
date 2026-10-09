@@ -11,7 +11,8 @@ import {
 	isNull,
 	lt,
 	lte,
-	sql
+	sql,
+	ne
 } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -44,7 +45,7 @@ import {
 	notifyReferralReward
 } from './notifications.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
-import { addDays } from '#lib/tz.ts';
+import { addDays, localDate } from '#lib/tz.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -1264,6 +1265,58 @@ export async function removeExpense(ctx: OrgContext, id: string) {
 }
 
 /** Sales waiting on the member to collect the goods at the desk. */
+/**
+ * Desk day-pass sale — posts the same "Day pass — <today>" dropin charge the
+ * join page sells online, minus the checkout (staff collect at the desk).
+ */
+export async function sellDayPass(ctx: OrgContext, memberId: string) {
+	const [st] = await db
+		.select({ dayPassPrice: gymSettings.dayPassPrice, timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, ctx.orgId));
+	if (!st?.dayPassPrice) error(409, 'Set a day pass price in Settings first');
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const today = localDate(new Date(), st.timezone);
+	const [dup] = await db
+		.select({ id: charge.id })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, ctx.orgId),
+				eq(charge.memberId, memberId),
+				eq(charge.kind, 'dropin'),
+				eq(charge.dueDate, today),
+				ne(charge.status, 'void')
+			)
+		)
+		.limit(1);
+	if (dup) error(409, 'Already has a pass for today');
+	const [c] = await db
+		.insert(charge)
+		.values({
+			organizationId: ctx.orgId,
+			memberId,
+			kind: 'dropin',
+			description: `Day pass — ${today}`,
+			dueDate: today,
+			amount: st.dayPassPrice
+		})
+		.returning();
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'charge',
+		entityId: c.id,
+		action: 'day_pass',
+		summary: `Day pass sold to ${m.name}`
+	});
+	return { charge: c };
+}
+
 export async function pendingPickups(orgId: string) {
 	return db
 		.select({

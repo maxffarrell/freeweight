@@ -232,6 +232,39 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Cover claims</Card.Title>
+			<Card.Description>Who flags sessions for cover vs who picks them up</Card.Description>
+		</Card.Header>
+		<Card.Content class="p-0">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Staff</Table.Head>
+						<Table.Head class="text-right">Flagged</Table.Head>
+						<Table.Head class="text-right">Covered</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each r.covers as c (c.name)}
+						<Table.Row>
+							<Table.Cell class="font-medium">{c.name}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.requested}</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">{c.claimed}</Table.Cell>
+						</Table.Row>
+					{:else}
+						<Table.Row
+							><Table.Cell colspan={3} class="text-muted-foreground"
+								>No cover activity yet.</Table.Cell
+							></Table.Row
+						>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Churn by plan</Card.Title>
 			<Card.Description>Memberships cancelled in the last 90 days vs still active</Card.Description>
 		</Card.Header>

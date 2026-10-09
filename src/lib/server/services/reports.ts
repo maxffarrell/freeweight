@@ -1087,7 +1087,8 @@ export async function getReports(orgId: string) {
 		funnel,
 		courses,
 		nps,
-		paused
+		paused,
+		covers
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1131,7 +1132,8 @@ export async function getReports(orgId: string) {
 		memberFunnel(orgId),
 		courseStats(orgId),
 		npsStats(orgId),
-		pausedMemberships(orgId)
+		pausedMemberships(orgId),
+		coverScorecard(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1187,7 +1189,8 @@ export async function getReports(orgId: string) {
 		funnel,
 		courses,
 		nps,
-		paused
+		paused,
+		covers
 	};
 }
 
@@ -1222,6 +1225,33 @@ async function npsStats(orgId: string) {
 		score: n > 0 ? Math.round(((agg!.promoters - agg!.detractors) / n) * 100) : null,
 		recent
 	};
+}
+
+/** Cover-claim scorecard: per staff member, sessions they flagged for cover
+ * vs sessions they picked up — who's reliable when the roster needs help. */
+async function coverScorecard(orgId: string) {
+	const rows = await db
+		.select({
+			userId: activity.actorId,
+			name: user.name,
+			requested:
+				sql<number>`count(*) filter (where ${activity.action} = 'cover_requested')`.mapWith(Number),
+			claimed: sql<number>`count(*) filter (where ${activity.action} = 'cover_claimed')`.mapWith(
+				Number
+			)
+		})
+		.from(activity)
+		.innerJoin(user, eq(activity.actorId, user.id))
+		.where(
+			and(
+				eq(activity.organizationId, orgId),
+				eq(activity.entityType, 'session'),
+				inArray(activity.action, ['cover_requested', 'cover_claimed'])
+			)
+		)
+		.groupBy(activity.actorId, user.name)
+		.orderBy(desc(sql`count(*) filter (where ${activity.action} = 'cover_claimed')`));
+	return rows.map((r) => ({ name: r.name ?? 'Staff', requested: r.requested, claimed: r.claimed }));
 }
 
 /** Per-course stats: enrollees, sessions held, attendance rate, revenue posted. */
