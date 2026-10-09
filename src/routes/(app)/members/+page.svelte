@@ -182,7 +182,8 @@
 			comped: owesFilter === '__comped' || undefined,
 			packExpiring: owesFilter === '__packexp' || undefined,
 			insideNow: owesFilter === '__inside' || undefined,
-			hasLocker: owesFilter === '__locker' || undefined
+			hasLocker: owesFilter === '__locker' || undefined,
+			lowCredits: owesFilter === '__lowcredits' || undefined
 		});
 	}
 	function search() {
@@ -714,15 +715,17 @@
 																	? 'Paused'
 																	: owesFilter === '__noupcoming'
 																		? 'No upcoming'
-																		: owesFilter === '__locker'
-																			? 'Has locker'
-																			: owesFilter === '__inside'
-																				? 'In gym now'
-																				: owesFilter === '__packexp'
-																					? 'Pack expiring'
-																					: owesFilter === '__comped'
-																						? "Comp'd"
-																						: 'Any balance'}</Select.Trigger
+																		: owesFilter === '__lowcredits'
+																			? 'Low credits'
+																			: owesFilter === '__locker'
+																				? 'Has locker'
+																				: owesFilter === '__inside'
+																					? 'In gym now'
+																					: owesFilter === '__packexp'
+																						? 'Pack expiring'
+																						: owesFilter === '__comped'
+																							? "Comp'd"
+																							: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -743,6 +746,7 @@
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
 				<Select.Item value="__locker">Has locker</Select.Item>
+				<Select.Item value="__lowcredits">Low pack credits</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
