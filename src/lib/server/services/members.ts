@@ -122,7 +122,11 @@ export async function listMembers(
 	/** Members holding an assigned locker. */
 	hasLocker?: boolean,
 	/** Members with one or fewer credits left on an active class pack. */
-	lowCredits?: boolean
+	lowCredits?: boolean,
+	/** Members whose pack is set to auto-renew. */
+	autoRenew?: boolean,
+	/** Members with a pending portal cancel request. */
+	cancelRequested?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -235,6 +239,12 @@ export async function listMembers(
 					: undefined,
 				lowCredits
 					? sql`exists (select 1 from membership m11 join plan p11 on p11.id = m11.plan_id where m11.member_id = ${gymMember.id} and m11.status = 'active' and p11.is_pack and p11.class_credits is not null and (select count(*) from booking b11 join class_session s11 on s11.id = b11.session_id where b11.membership_id = m11.id and b11.status in ('booked','attended','no_show') and s11.cancelled_at is null) >= p11.class_credits - 1)`
+					: undefined,
+				autoRenew
+					? sql`exists (select 1 from membership m12 where m12.member_id = ${gymMember.id} and m12.status = 'active' and m12.auto_renew)`
+					: undefined,
+				cancelRequested
+					? sql`exists (select 1 from membership m13 where m13.member_id = ${gymMember.id} and m13.cancel_requested_at is not null)`
 					: undefined,
 				recent
 					? gte(

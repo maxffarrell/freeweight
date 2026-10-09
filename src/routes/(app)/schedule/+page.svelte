@@ -1235,6 +1235,10 @@
 									variant="outline"
 									class="border-amber-500/60 text-xs text-amber-600">cover</Badge
 								>{/if}
+							{#if s.session.bookingClosed && !s.session.cancelledAt}<Badge
+									variant="outline"
+									class="text-xs text-muted-foreground">closed</Badge
+								>{/if}
 						</div>
 					</button>
 				{:else}

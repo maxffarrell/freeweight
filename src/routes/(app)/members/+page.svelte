@@ -183,7 +183,9 @@
 			packExpiring: owesFilter === '__packexp' || undefined,
 			insideNow: owesFilter === '__inside' || undefined,
 			hasLocker: owesFilter === '__locker' || undefined,
-			lowCredits: owesFilter === '__lowcredits' || undefined
+			lowCredits: owesFilter === '__lowcredits' || undefined,
+			autoRenew: owesFilter === '__autorenew' || undefined,
+			cancelRequested: owesFilter === '__cancelreq' || undefined
 		});
 	}
 	function search() {
@@ -715,17 +717,21 @@
 																	? 'Paused'
 																	: owesFilter === '__noupcoming'
 																		? 'No upcoming'
-																		: owesFilter === '__lowcredits'
-																			? 'Low credits'
-																			: owesFilter === '__locker'
-																				? 'Has locker'
-																				: owesFilter === '__inside'
-																					? 'In gym now'
-																					: owesFilter === '__packexp'
-																						? 'Pack expiring'
-																						: owesFilter === '__comped'
-																							? "Comp'd"
-																							: 'Any balance'}</Select.Trigger
+																		: owesFilter === '__cancelreq'
+																			? 'Cancel requested'
+																			: owesFilter === '__autorenew'
+																				? 'Auto-renew'
+																				: owesFilter === '__lowcredits'
+																					? 'Low credits'
+																					: owesFilter === '__locker'
+																						? 'Has locker'
+																						: owesFilter === '__inside'
+																							? 'In gym now'
+																							: owesFilter === '__packexp'
+																								? 'Pack expiring'
+																								: owesFilter === '__comped'
+																									? "Comp'd"
+																									: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -747,6 +753,8 @@
 				<Select.Item value="__inside">In gym now</Select.Item>
 				<Select.Item value="__locker">Has locker</Select.Item>
 				<Select.Item value="__lowcredits">Low pack credits</Select.Item>
+				<Select.Item value="__autorenew">Auto-renewing pack</Select.Item>
+				<Select.Item value="__cancelreq">Cancel requested</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
