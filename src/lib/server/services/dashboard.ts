@@ -19,6 +19,7 @@ import {
 	memberIssue,
 	instructorTimeOff,
 	equipment,
+	gymEvent,
 	membership,
 	payment,
 	paymentProvider,
@@ -92,6 +93,27 @@ export async function dashboard(orgId: string) {
 	// Trailing-7d check-ins vs the week before — feeds the KPI card.
 	const wk7 = new Date(dayStart.getTime() - 7 * 86400_000);
 	const wk14 = new Date(dayStart.getTime() - 14 * 86400_000);
+	const upcomingEvents = await db
+		.select({
+			event: gymEvent,
+			registered:
+				sql<number>`(select count(*) from event_registration r where r.event_id = ${gymEvent.id} and r.status = 'registered')`.mapWith(
+					Number
+				)
+		})
+		.from(gymEvent)
+		.where(
+			and(
+				eq(gymEvent.organizationId, orgId),
+				eq(gymEvent.active, true),
+				isNull(gymEvent.cancelledAt),
+				gte(gymEvent.startsAt, new Date()),
+				lte(gymEvent.startsAt, new Date(Date.now() + 7 * 86400_000))
+			)
+		)
+		.orderBy(asc(gymEvent.startsAt))
+		.limit(3);
+
 	const [checkInsWk] = await db
 		.select({
 			week: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz)`.mapWith(
@@ -595,6 +617,7 @@ export async function dashboard(orgId: string) {
 		collectedYesterday: collectedToday.yesterday,
 		collectedWeek: collectedToday.week,
 		collectedPrevWeek: collectedToday.prevWeek,
+		upcomingEvents,
 		checkInsToday: checkInStats?.today ?? 0,
 		checkInsWeek: checkInsWk?.week ?? 0,
 		checkInsPrevWeek: checkInsWk?.prev ?? 0,

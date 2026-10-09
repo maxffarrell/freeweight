@@ -681,6 +681,32 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** This month's check-ins split by member tenure — new (<30d) vs returning. */
+async function newVsReturning(orgId: string) {
+	const monthStart = `${new Date().toISOString().slice(0, 8)}01`;
+	const cutoff = new Date(Date.now() - 30 * 86400_000).toISOString();
+	const [r] = await db
+		.select({
+			newMembers:
+				sql<number>`count(*) filter (where ${gymMember.joinedAt} >= ${cutoff}::timestamptz)`.mapWith(
+					Number
+				),
+			returning:
+				sql<number>`count(*) filter (where ${gymMember.joinedAt} < ${cutoff}::timestamptz)`.mapWith(
+					Number
+				),
+			guests: sql<number>`count(*) filter (where ${checkIn.guestName} is not null)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.innerJoin(gymMember, eq(checkIn.memberId, gymMember.id))
+		.where(and(eq(checkIn.organizationId, orgId), sql`${checkIn.checkedAt} >= ${monthStart}`));
+	return {
+		newMembers: r?.newMembers ?? 0,
+		returning: r?.returning ?? 0,
+		guests: r?.guests ?? 0
+	};
+}
+
 /** Members who joined via a referral link — how many became paying members. */
 async function referralConversion(orgId: string) {
 	const [r] = await db
@@ -1492,7 +1518,8 @@ export async function getReports(orgId: string) {
 		ages,
 		cim,
 		planRev,
-		refConv
+		refConv,
+		nvr
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1557,7 +1584,8 @@ export async function getReports(orgId: string) {
 		ageDistribution(orgId),
 		checkInMethods(orgId),
 		planRevenue(orgId),
-		referralConversion(orgId)
+		referralConversion(orgId),
+		newVsReturning(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1634,7 +1662,8 @@ export async function getReports(orgId: string) {
 		ages,
 		checkInMethods: cim,
 		planRevenue: planRev,
-		referralConversion: refConv
+		referralConversion: refConv,
+		newVsReturning: nvr
 	};
 }
 
