@@ -402,6 +402,11 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 
 	// Desk heads-up: it's the member's birthday today (MM-DD compare, org tz).
 	const birthday = !!m.birthday && m.birthday.slice(5) === today.slice(5);
+	// Join-date anniversary (same MM-DD, at least one year in) — nice flash moment.
+	const anniversary =
+		m.joinedAt && m.joinedAt.slice(5) === today.slice(5)
+			? Number(today.slice(0, 4)) - Number(m.joinedAt.slice(0, 4))
+			: 0;
 	// Same heads-up when the gym requires a waiver and theirs is missing or stale.
 	const waiverMissing =
 		!!st?.waiverText &&
@@ -508,6 +513,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		welcomeBack: !!prevVisit && Date.now() - prevVisit.at.getTime() > 30 * 86400_000,
 		attended: attended.length,
 		birthday,
+		anniversary,
 		visits: n,
 		visitsToday,
 		waiverMissing,
@@ -574,7 +580,13 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 		getRoster(ctx.orgId, sessionId)
 	]);
 	const booked = roster.filter((r) => r.booking.status === 'booked');
-	if (!booked.length) return { checkedIn: 0, skipped: 0, birthdays: [] as string[] };
+	if (!booked.length)
+		return {
+			checkedIn: 0,
+			skipped: 0,
+			birthdays: [] as string[],
+			anniversaries: [] as { name: string; years: number }[]
+		};
 	const open = await db
 		.select({ memberId: checkIn.memberId })
 		.from(checkIn)
@@ -592,6 +604,7 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 	let checkedIn = 0;
 	let skipped = 0;
 	const birthdays: string[] = [];
+	const anniversaries: { name: string; years: number }[] = [];
 	for (const r of booked) {
 		if (inside.has(r.booking.memberId)) {
 			skipped++;
@@ -604,11 +617,12 @@ export async function checkInRoster(ctx: OrgContext, sessionId: string) {
 			});
 			checkedIn++;
 			if (res.birthday) birthdays.push(r.memberName);
+			if (res.anniversary) anniversaries.push({ name: r.memberName, years: res.anniversary });
 		} catch {
 			skipped++;
 		}
 	}
-	return { checkedIn, skipped, birthdays };
+	return { checkedIn, skipped, birthdays, anniversaries };
 }
 
 /**
