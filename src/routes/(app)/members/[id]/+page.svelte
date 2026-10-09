@@ -1131,6 +1131,12 @@
 						<Badge variant="secondary" class={m.loyalty.className}>{m.loyalty.name}</Badge>
 					</div>
 				{/if}
+				{#if m.attendance.topClass}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Go-to class</span>
+						<span class="truncate">{m.attendance.topClass}</span>
+					</div>
+				{/if}
 				{#if m.weekStreak > 0}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Streak</span>
