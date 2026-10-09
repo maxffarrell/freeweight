@@ -2,6 +2,7 @@ import * as v from 'valibot';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/members.ts';
+import * as workoutSvc from '#lib/server/services/workouts.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as sched from '#lib/server/services/schedule.ts';
 import { portalToken } from '#lib/server/services/portal.ts';
@@ -10,6 +11,7 @@ import {
 	announcementInput,
 	bulkTagInput,
 	checkInInput,
+	creditTransferInput,
 	guestVisitInput,
 	idSchema,
 	incidentInput,
@@ -21,7 +23,9 @@ import {
 	memberTagInput,
 	memberUpdate,
 	scheduledAnnouncementInput,
-	signRequestInput
+	signRequestInput,
+	workoutInput,
+	workoutUpdate
 } from '#lib/schemas.ts';
 import {
 	cancelScheduledAnnouncement,
@@ -297,3 +301,45 @@ export const voidSignRequest = command(
 		return r;
 	}
 );
+
+/** Staff: assigned workouts on the member page. */
+export const getMemberWorkouts = query(idSchema, async (memberId) =>
+	workoutSvc.listMemberWorkouts((await requireOrg()).orgId, memberId)
+);
+
+export const addMemberWorkout = command(workoutInput, async ({ memberId, title, body }) => {
+	const r = await workoutSvc.addWorkout(await requireOrg(), memberId, title, body);
+	void getMemberWorkouts(memberId).refresh();
+	return r;
+});
+
+export const updateMemberWorkout = command(workoutUpdate, async ({ id, title, body }) =>
+	workoutSvc.updateWorkout(await requireOrg(), id, title, body)
+);
+
+export const deleteMemberWorkout = command(idSchema, async (id) =>
+	workoutSvc.deleteWorkout(await requireOrg(), id)
+);
+
+/** Remaining classes on one pack membership — the transfer dialog's ceiling. */
+export const getPackRemaining = query(idSchema, async (membershipId) =>
+	svc.packRemaining((await requireOrg()).orgId, membershipId)
+);
+
+/** Staff: move pack credits to another member ("gift a friend 5 classes"). */
+export const transferPackCredits = command(
+	creditTransferInput,
+	async ({ membershipId, toMemberId, credits }) => {
+		const r = await svc.transferPackCredits(
+			await requireOrg(),
+			membershipId,
+			{ memberId: toMemberId },
+			credits
+		);
+		void getPackRemaining(membershipId).refresh();
+		return r;
+	}
+);
+
+/** PR wall: latest records for the lobby display, auto-refreshed by the page. */
+export const getPrWall = query(async () => svc.prWall((await requireOrg()).orgId));

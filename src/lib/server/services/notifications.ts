@@ -1189,6 +1189,43 @@ export async function notifyPackLowCredit(
 }
 
 /**
+ * "X gave you N classes" to the recipient of a pack-credit transfer.
+ * `transferId` is unique per transfer, so re-sends on retries still log once.
+ */
+export async function notifyCreditsGifted(
+	orgId: string,
+	transferId: string,
+	toMemberId: string,
+	fromName: string,
+	credits: number
+) {
+	const [m] = await db
+		.select({ email: gymMember.email, name: gymMember.name })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, toMemberId)));
+	if (!m?.email || !(await logOnce(orgId, 'credits-gifted', transferId, m.email))) return;
+	const name = await orgBrand(orgId);
+	const first = m.name.split(' ')[0] ?? m.name;
+	const heading = `${fromName} gave you ${credits} class${credits === 1 ? '' : 'es'}`;
+	const { text, html } = renderEmail({
+		...name,
+		heading,
+		lines: [
+			`Hi ${first},`,
+			`${fromName} passed ${credits} of their class-pack credits to you at ${name.orgName}.`,
+			'Book your next class from the member portal.'
+		],
+		action: { label: 'Book a class', url: `${appOrigin()}/portal` }
+	});
+	await sendMemberEmail(toMemberId, {
+		to: m.email,
+		subject: `${name.orgName}: ${heading}`,
+		text,
+		html
+	});
+}
+
+/**
  * Referral bounty: when a member referred via a ?ref= link records their first
  * non-refunded payment, the referrer earns `gymSettings.referralCredits` bonus
  * credits on their active membership. Called after every recordPayment; returns

@@ -1290,3 +1290,29 @@ export const expense = pgTable(
 	},
 	(t) => [index('expense_org_date_idx').on(t.organizationId, t.expenseOn)]
 );
+
+/** A workout routine a coach assigns to a member — shown in the member's portal. */
+export const memberWorkout = pgTable(
+	'member_workout',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		/** The routine as the coach wrote it — freeform text. */
+		body: text('body').notNull(),
+		/** Staff user who wrote it. */
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [
+		index('member_workout_member_idx').on(t.memberId),
+		index('member_workout_org_idx').on(t.organizationId)
+	]
+);

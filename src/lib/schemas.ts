@@ -725,3 +725,30 @@ export const slotGenInput = v.object({
 		1
 	)
 });
+
+/** Staff-assigned workout routine on the member page / in the portal. */
+export const workoutInput = v.object({
+	memberId: idSchema,
+	title: v.pipe(requiredText('Title'), v.maxLength(80)),
+	body: v.pipe(requiredText('Workout'), v.maxLength(4000))
+});
+
+export const workoutUpdate = v.object({
+	id: idSchema,
+	title: v.pipe(requiredText('Title'), v.maxLength(80)),
+	body: v.pipe(requiredText('Workout'), v.maxLength(4000))
+});
+
+/** Staff: move pack credits from one member's pack membership to another member. */
+export const creditTransferInput = v.object({
+	membershipId: idSchema,
+	toMemberId: idSchema,
+	credits: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))
+});
+
+/** Portal: member gifts pack credits to another member by email. */
+export const giftCreditsInput = v.object({
+	memberId: idSchema,
+	email: v.pipe(requiredText('Email'), v.email('Must be an email')),
+	credits: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(500))
+});

@@ -316,6 +316,7 @@
 					/ {settings.occupancyCap}{/if}{#if settings.occupancyCap != null && inside >= settings.occupancyCap}
 					— at capacity{/if}
 			</Badge>
+			<Button variant="ghost" size="sm" href="/wall">PR board</Button>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
 	</header>
