@@ -57,6 +57,7 @@ import {
 	waiver,
 	outer
 } from '#lib/server/db/schema.ts';
+import { weekStreakLeaders } from './members.ts';
 
 /** Daily check-in counts for the last 30 days (includes zero days). */
 async function checkInsByDay(orgId: string) {
@@ -682,6 +683,31 @@ async function guestStats(orgId: string) {
 }
 
 /** Sessions in the next 14 days with people still on the waitlist. */
+/** MRR lost this month — plan price of recurring memberships cancelled this month. */
+async function lostMrr(orgId: string) {
+	const monthStart = new Date();
+	monthStart.setUTCDate(1);
+	monthStart.setUTCHours(0, 0, 0, 0);
+	const [row] = await db
+		.select({
+			lost: sql<number>`coalesce(sum(coalesce(${membership.price}, ${plan.amount})), 0)`.mapWith(
+				Number
+			),
+			n: count().mapWith(Number)
+		})
+		.from(membership)
+		.innerJoin(plan, eq(plan.id, membership.planId))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				isNotNull(membership.cancelledAt),
+				gte(membership.cancelledAt, monthStart),
+				eq(plan.isPack, false)
+			)
+		);
+	return { lost: row?.lost ?? 0, n: row?.n ?? 0 };
+}
+
 /** This month's collected revenue per active member (ARPU). */
 async function arpu(orgId: string) {
 	const monthStart = new Date();
@@ -1598,7 +1624,9 @@ export async function getReports(orgId: string) {
 		nvr,
 		wl,
 		tenure,
-		arpuNow
+		arpuNow,
+		lost,
+		streaks
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1667,7 +1695,9 @@ export async function getReports(orgId: string) {
 		newVsReturning(orgId),
 		waitlistedNow(orgId),
 		tenureAtCancel(orgId),
-		arpu(orgId)
+		arpu(orgId),
+		lostMrr(orgId),
+		weekStreakLeaders(orgId, 8)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1748,7 +1778,9 @@ export async function getReports(orgId: string) {
 		newVsReturning: nvr,
 		waitlistedNow: wl,
 		tenureAtCancel: tenure,
-		arpu: arpuNow
+		arpu: arpuNow,
+		lostMrr: lost,
+		streakLeaders: streaks
 	};
 }
 

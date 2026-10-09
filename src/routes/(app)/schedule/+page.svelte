@@ -1242,6 +1242,11 @@
 								{#if r.firstTimer}
 									<Badge variant="secondary" class="ml-1">1st visit</Badge>
 								{/if}
+								{#if r.openBalance > 0}
+									<Badge variant="destructive" class="ml-1"
+										>owes {formatMoney(r.openBalance, currency)}</Badge
+									>
+								{/if}
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
 								{/if}
