@@ -709,11 +709,39 @@ export async function giveSpot(
 	try {
 		await memberBook(orgId, userId, b.sessionId, r.id, { skipDailyLimit: true });
 	} catch (err) {
-		// Put the giver's seat back rather than lose it.
-		await memberBook(orgId, userId, b.sessionId, memberId, {
-			notify: false,
-			skipDailyLimit: true
-		}).catch(() => {});
+		// Put the giver's seat back rather than lose it — un-cancel the original
+		// row directly. Rebooking via memberBook would re-run level/credit checks
+		// the original booking may predate and silently drop the seat. If the
+		// freed seat already went to a waitlister, the giver rejoins the queue at
+		// the front (createdAt unchanged) instead of vanishing entirely.
+		const [[gb], [cap], [{ spots }]] = await Promise.all([
+			db
+				.select({ guestCount: booking.guestCount, chargeId: booking.chargeId })
+				.from(booking)
+				.where(eq(booking.id, bookingId)),
+			db
+				.select({ capacity: classSession.capacity })
+				.from(classSession)
+				.where(eq(classSession.id, b.sessionId)),
+			db
+				.select({
+					spots:
+						sql<number>`count(*) + coalesce(sum(${booking.guestCount}), 0)`.mapWith(Number)
+				})
+				.from(booking)
+				.where(and(eq(booking.sessionId, b.sessionId), eq(booking.status, 'booked')))
+		]);
+		const free = (cap?.capacity ?? 0) - (spots ?? 0);
+		await db
+			.update(booking)
+			.set({ status: free >= 1 + (gb?.guestCount ?? 0) ? 'booked' : 'waitlisted', cancelledAt: null })
+			.where(eq(booking.id, bookingId));
+		// A voided drop-in charge comes back open with the restored booking.
+		if (gb?.chargeId)
+			await db
+				.update(charge)
+				.set({ status: 'open', updatedAt: new Date() })
+				.where(and(eq(charge.id, gb.chargeId), eq(charge.status, 'void')));
 		throw err;
 	}
 	await emit({

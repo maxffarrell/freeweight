@@ -69,10 +69,12 @@ export const memberGiveSpot = command(
 	async ({ memberId, bookingId, email }) => {
 		const m = await myMember(memberId);
 		const { user } = requireUser();
-		const r = await svc.giveSpot(m.organizationId, user.id, m.id, bookingId, email);
-		void getPortalOverview(memberId).refresh();
-		void getBookable(memberId).refresh();
-		return r;
+		try {
+			return await svc.giveSpot(m.organizationId, user.id, m.id, bookingId, email);
+		} finally {
+			void getPortalOverview(memberId).refresh();
+			void getBookable(memberId).refresh();
+		}
 	}
 );
 
