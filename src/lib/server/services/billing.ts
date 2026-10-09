@@ -63,6 +63,10 @@ export async function listPlans(orgId: string) {
 			endingSoon:
 				sql<number>`(select count(*) from ${membership} m where m.plan_id = ${outer(plan.id)} and m.status = 'active' and m.ends_at is not null and m.ends_at <= now() + interval '30 days')`.mapWith(
 					Number
+				),
+			comped:
+				sql<number>`(select count(*) from ${membership} m where m.plan_id = ${outer(plan.id)} and m.status = 'active' and m.no_bill)`.mapWith(
+					Number
 				)
 		})
 		.from(plan)

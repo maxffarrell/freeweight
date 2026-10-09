@@ -706,6 +706,34 @@ async function walkInStats(orgId: string) {
 	return { total: r?.total ?? 0, walkIn: r?.walkIn ?? 0 };
 }
 
+/** Average hours members book ahead of class, per class — last 30 days of bookings. */
+async function bookingLeadTimes(orgId: string) {
+	const cutoff = new Date(Date.now() - 30 * 24 * 3600_000);
+	return db
+		.select({
+			name: classType.name,
+			avgHours:
+				sql<number>`round(avg(extract(epoch from (${classSession.startsAt} - ${booking.createdAt})) / 3600))`.mapWith(
+					Number
+				),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				gte(booking.createdAt, cutoff),
+				sql`${booking.status} != 'cancelled'`,
+				gt(classSession.startsAt, booking.createdAt)
+			)
+		)
+		.groupBy(classType.name)
+		.orderBy(desc(sql`count(*)`))
+		.limit(8);
+}
+
 /** Sessions in the next 14 days with people still on the waitlist. */
 /** MRR lost this month — plan price of recurring memberships cancelled this month. */
 async function lostMrr(orgId: string) {
@@ -1654,7 +1682,8 @@ export async function getReports(orgId: string) {
 		rel,
 		shopTop,
 		statusBreakdown,
-		walkIns
+		walkIns,
+		leadTimes
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1729,7 +1758,8 @@ export async function getReports(orgId: string) {
 		instructorReliability(orgId),
 		shopSales30d(orgId),
 		memberStatusBreakdown(orgId),
-		walkInStats(orgId)
+		walkInStats(orgId),
+		bookingLeadTimes(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1816,7 +1846,8 @@ export async function getReports(orgId: string) {
 		instructorReliability: rel,
 		shopTop,
 		statusBreakdown,
-		walkIns
+		walkIns,
+		leadTimes
 	};
 }
 
