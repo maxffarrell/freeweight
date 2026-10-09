@@ -680,6 +680,33 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Member age distribution from stored birthdays (date-mode strings). */
+async function ageDistribution(orgId: string) {
+	const rows = await db
+		.select({ birthday: gymMember.birthday })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				sql`${gymMember.birthday} is not null`
+			)
+		);
+	const thisYear = new Date().getFullYear();
+	const b = { u18: 0, y18_25: 0, y26_35: 0, y36_50: 0, over50: 0 };
+	for (const r of rows) {
+		const y = Number((r.birthday ?? '').slice(0, 4));
+		if (!y) continue;
+		const age = thisYear - y;
+		if (age < 18) b.u18++;
+		else if (age <= 25) b.y18_25++;
+		else if (age <= 35) b.y26_35++;
+		else if (age <= 50) b.y36_50++;
+		else b.over50++;
+	}
+	return { known: rows.length, buckets: b };
+}
+
 /** Locker bank occupancy — assigned vs total, plus the members holding one. */
 async function lockerStats(orgId: string) {
 	const rows = await db
@@ -1407,7 +1434,8 @@ export async function getReports(orgId: string) {
 		challengeList,
 		saveOffers,
 		visitFreq,
-		lockers
+		lockers,
+		ages
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1468,7 +1496,8 @@ export async function getReports(orgId: string) {
 		listChallenges(orgId),
 		saveOfferStats(orgId),
 		visitFrequency(orgId),
-		lockerStats(orgId)
+		lockerStats(orgId),
+		ageDistribution(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1541,7 +1570,8 @@ export async function getReports(orgId: string) {
 		challenges: challengeList,
 		saveOffers,
 		visitFrequency: visitFreq,
-		lockers
+		lockers,
+		ages
 	};
 }
 

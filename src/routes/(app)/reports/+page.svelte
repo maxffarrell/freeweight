@@ -571,6 +571,42 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.ages.known}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Age distribution</Card.Title>
+				<Card.Description>{r.ages.known} active members with a birthday on file</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-1.5 text-sm">
+				<div class="flex items-center justify-between">
+					<span>Under 18</span><span class="text-muted-foreground tabular-nums"
+						>{r.ages.buckets.u18}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>18–25</span><span class="text-muted-foreground tabular-nums"
+						>{r.ages.buckets.y18_25}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>26–35</span><span class="text-muted-foreground tabular-nums"
+						>{r.ages.buckets.y26_35}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>36–50</span><span class="text-muted-foreground tabular-nums"
+						>{r.ages.buckets.y36_50}</span
+					>
+				</div>
+				<div class="flex items-center justify-between">
+					<span>50+</span><span class="text-muted-foreground tabular-nums"
+						>{r.ages.buckets.over50}</span
+					>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
