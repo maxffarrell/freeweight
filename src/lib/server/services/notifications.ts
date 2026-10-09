@@ -1724,7 +1724,8 @@ export async function sendAnnouncement(
 	message: string,
 	memberIds?: string[],
 	tag?: string,
-	planId?: string
+	planId?: string,
+	locationId?: string
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const members = await db
@@ -1739,6 +1740,7 @@ export async function sendAnnouncement(
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
+				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1810,7 +1812,12 @@ const membersOnPlan = (orgId: string, planId: string) =>
 	sql`exists (select 1 from ${membership} mm where mm.member_id = ${gymMember.id} and mm.organization_id = ${orgId} and mm.status = 'active' and mm.plan_id = ${planId})`;
 
 /** Recipients an announcement would reach — same filter as sendAnnouncement, count only. */
-export async function countAnnouncementAudience(orgId: string, tag?: string, planId?: string) {
+export async function countAnnouncementAudience(
+	orgId: string,
+	tag?: string,
+	planId?: string,
+	locationId?: string
+) {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(gymMember)
@@ -1822,6 +1829,7 @@ export async function countAnnouncementAudience(orgId: string, tag?: string, pla
 					? sql`exists (select 1 from ${memberTag} t where t.member_id = ${gymMember.id} and t.organization_id = ${orgId} and t.tag = ${tag})`
 					: undefined,
 				planId ? membersOnPlan(orgId, planId) : undefined,
+				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1839,6 +1847,7 @@ export async function scheduleAnnouncement(
 		sendAt: Date;
 		tag?: string;
 		planId?: string;
+		locationId?: string;
 		atRisk?: boolean;
 	}
 ) {
@@ -1859,6 +1868,7 @@ export async function scheduleAnnouncement(
 			sendAt: opts.sendAt.toISOString(),
 			tag: opts.tag ?? null,
 			planId: opts.planId ?? null,
+			locationId: opts.locationId ?? null,
 			atRisk: opts.atRisk ?? null
 		}
 	});
@@ -1878,6 +1888,7 @@ export async function sendDueAnnouncements(orgId: string) {
 			message: sql<string>`${activity.data}->>'message'`,
 			tag: sql<string | null>`${activity.data}->>'tag'`,
 			planId: sql<string | null>`${activity.data}->>'planId'`,
+			locationId: sql<string | null>`${activity.data}->>'locationId'`,
 			atRisk: sql<string | null>`${activity.data}->>'atRisk'`
 		})
 		.from(activity)
@@ -1899,7 +1910,8 @@ export async function sendDueAnnouncements(orgId: string) {
 			a.message,
 			memberIds,
 			a.tag ?? undefined,
-			a.planId ?? undefined
+			a.planId ?? undefined,
+			a.locationId ?? undefined
 		);
 		await db.delete(activity).where(eq(activity.id, a.id));
 		sent++;

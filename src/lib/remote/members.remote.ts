@@ -271,12 +271,18 @@ export const getAnnouncementAudience = query(
 	v.object({
 		tag: v.optional(v.string()),
 		planId: v.optional(v.string()),
+		locationId: v.optional(v.string()),
 		atRisk: v.optional(v.boolean())
 	}),
-	async ({ tag, planId, atRisk }) =>
+	async ({ tag, planId, locationId, atRisk }) =>
 		atRisk
 			? (await atRiskMembers((await requireOrg()).orgId)).length
-			: countAnnouncementAudience((await requireOrg()).orgId, tag || undefined, planId || undefined)
+			: countAnnouncementAudience(
+					(await requireOrg()).orgId,
+					tag || undefined,
+					planId || undefined,
+					locationId || undefined
+				)
 );
 
 /** Sends the draft to the staff user's own inbox — a render preview before blasting. */
@@ -296,7 +302,8 @@ export const emailAllMembers = command(announcementInput, async (input) => {
 		input.message,
 		memberIds,
 		input.tag,
-		input.planId
+		input.planId,
+		input.locationId
 	);
 	void getRecentAnnouncements().refresh();
 	return r;
@@ -311,6 +318,7 @@ export const scheduleEmail = command(scheduledAnnouncementInput, async (input) =
 		sendAt: new Date(input.sendAt),
 		tag: input.tag,
 		planId: input.planId,
+		locationId: input.locationId,
 		atRisk: input.atRisk
 	});
 	void getRecentAnnouncements().refresh();

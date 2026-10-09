@@ -39,6 +39,7 @@
 		saveAnnouncementTemplate,
 		deleteAnnouncementTemplate
 	} from '#lib/remote/members.remote.ts';
+	import { getLocations } from '#lib/remote/workspace.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import {
 		getChallenges,
@@ -363,6 +364,11 @@
 	let emailPending = $state(false);
 	const audTag = $derived(emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined);
 	const audPlan = $derived(emailAudience.startsWith('plan:') ? emailAudience.slice(5) : undefined);
+	const audLoc = $derived(emailAudience.startsWith('loc:') ? emailAudience.slice(4) : undefined);
+	const audienceLocs = $derived((await getLocations()).filter((l) => !l.archivedAt));
+	const audLocName = $derived(
+		audLoc ? (audienceLocs.find((l) => l.id === audLoc)?.name ?? 'location') : ''
+	);
 	const audPlanName = $derived(
 		audPlan ? (audiencePlans.find((p) => p.id === audPlan)?.name ?? 'plan') : ''
 	);
@@ -375,7 +381,9 @@
 					? 'All active members'
 					: audTag
 						? `Tag: ${audTag}`
-						: `Plan: ${audPlanName}`
+						: audLoc
+							? `Location: ${audLocName}`
+							: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -384,6 +392,7 @@
 				? await getAnnouncementAudience({
 						tag: audTag,
 						planId: audPlan,
+						locationId: audLoc,
 						atRisk: emailAudience === '__risk'
 					})
 				: null
@@ -398,6 +407,7 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
 					sendAt: new Date(emailSendAt).toISOString()
 				});
@@ -408,6 +418,7 @@
 					message: emailBody,
 					tag: audTag,
 					planId: audPlan,
+					locationId: audLoc,
 					atRisk: emailAudience === '__risk',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
@@ -430,6 +441,10 @@
 			return toast.error('Write the subject and message first');
 		emailPending = true;
 		try {
+			if (audLoc) {
+				emailPending = false;
+				return toast.error("Weekly repeats can't target a location — send it one-off instead");
+			}
 			await createRecurringEmail({
 				subject: emailSubject,
 				message: emailBody,
@@ -968,6 +983,9 @@
 							{/each}
 							{#each audiencePlans as p (p.id)}
 								<Select.Item value="plan:{p.id}">Plan: {p.name}</Select.Item>
+							{/each}
+							{#each audienceLocs as l (l.id)}
+								<Select.Item value="loc:{l.id}">Location: {l.name}</Select.Item>
 							{/each}
 						</Select.Content>
 					</Select.Root>

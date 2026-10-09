@@ -4,6 +4,7 @@ import { CRON_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
+import { syncAtRiskTags } from '#lib/server/services/reports.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import {
 	sendAnniversaryGreetings,
@@ -87,6 +88,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let autoCheckouts = 0;
 	let shiftCloses = 0;
 	let recurringPosted = 0;
+	let riskTagged = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -95,6 +97,13 @@ export const GET: RequestHandler = async ({ request }) => {
 		} catch (err) {
 			failed++;
 			console.error(`billing cron failed for ${o.id}`, err);
+		}
+		try {
+			const r = await syncAtRiskTags(o.id);
+			riskTagged += r.added + r.removed;
+		} catch (err) {
+			failed++;
+			console.error(`at-risk tag sync failed for ${o.id}`, err);
 		}
 		try {
 			reminders += await sendClassReminders(o.id);
@@ -272,6 +281,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	await purgeExpiredDemos();
 	return json({
 		workspaces: orgs.length,
+		riskTagChanges: riskTagged,
 		failed,
 		reminders,
 		eventReminders,
