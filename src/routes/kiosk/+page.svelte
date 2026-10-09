@@ -346,7 +346,8 @@
 					? 'border-amber-500 text-amber-600'
 					: ''}
 			>
-				{checkIns.length} today · {inside} inside{#if settings.occupancyCap != null}
+				{checkIns.length} today · {inside} inside{#if checkIns.some((c) => c.checkIn.guestName)}
+					· {checkIns.filter((c) => c.checkIn.guestName).length} guests{/if}{#if settings.occupancyCap != null}
 					/ {settings.occupancyCap}{/if}{#if settings.occupancyCap != null && inside >= settings.occupancyCap}
 					— at capacity{/if}
 			</Badge>

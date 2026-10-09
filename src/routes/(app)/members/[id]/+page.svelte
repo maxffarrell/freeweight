@@ -2070,11 +2070,13 @@
 							disabled={!m.bookings.length}
 							onclick={() => {
 								const csv = toCsv([
-									['Class', 'When', 'Status'],
+									['Class', 'When', 'Status', 'Member note', 'Coach note'],
 									...m.bookings.map((b) => [
 										b.className,
 										new Date(b.startsAt).toISOString(),
-										b.booking.status
+										b.booking.status,
+										b.booking.memberNote ?? '',
+										b.booking.coachNote ?? ''
 									])
 								]);
 								const a = document.createElement('a');
