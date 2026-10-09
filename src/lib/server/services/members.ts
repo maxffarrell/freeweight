@@ -94,7 +94,8 @@ export async function listMembers(
 	recent?: boolean,
 	risk?: boolean,
 	family?: boolean,
-	birthday?: boolean
+	birthday?: boolean,
+	noContact?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -107,6 +108,7 @@ export async function listMembers(
 			joinedAt: gymMember.joinedAt,
 			photoDocumentId: gymMember.photoDocumentId,
 			deskNote: gymMember.deskNote,
+			referralSource: gymMember.referralSource,
 			locationName: location.name,
 			tags: sql<
 				string[]
@@ -161,6 +163,7 @@ export async function listMembers(
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
 					: undefined,
+				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,
@@ -286,7 +289,12 @@ export async function removeMemberTag(ctx: OrgContext, memberId: string, tag: st
 
 export async function getMember(orgId: string, id: string) {
 	const [row] = await db
-		.select({ member: gymMember, locationName: location.name, orgName: organization.name })
+		.select({
+			member: gymMember,
+			locationName: location.name,
+			orgName: organization.name,
+			orgSlug: organization.slug
+		})
 		.from(gymMember)
 		.leftJoin(location, eq(gymMember.locationId, location.id))
 		.innerJoin(organization, eq(gymMember.organizationId, organization.id))

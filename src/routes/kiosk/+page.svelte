@@ -36,6 +36,11 @@
 
 	let checkIns = $state(await getTodayCheckIns());
 	const inside = $derived(checkIns.filter((c) => !c.checkIn.checkedOutAt).length);
+	const insideRows = $derived(
+		checkIns
+			.filter((c) => !c.checkIn.checkedOutAt)
+			.sort((a, b) => +new Date(a.checkIn.checkedAt) - +new Date(b.checkIn.checkedAt))
+	);
 	let upNext = $state(await getUpNext());
 	let code = $state('');
 	let locationId = $state(liveLocations[0]?.id ?? '');
@@ -346,6 +351,22 @@
 			<Button variant="ghost" size="sm" href="/wall">PR board</Button>
 			<Button variant="ghost" size="sm" href="/checkins"><LogOut /> Exit kiosk</Button>
 		</div>
+		{#if insideRows.length}
+			<div class="flex items-center gap-1.5 overflow-x-auto px-4 pb-3">
+				<span class="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+					>Inside</span
+				>
+				{#each insideRows.slice(0, 12) as c (c.checkIn.id)}
+					<Badge variant="outline" class="shrink-0">
+						{c.checkIn.guestName ?? c.memberName}
+						<span class="text-muted-foreground">· in {localTime(c.checkIn.checkedAt, tz)}</span>
+					</Badge>
+				{/each}
+				{#if insideRows.length > 12}
+					<span class="shrink-0 text-xs text-muted-foreground">+{insideRows.length - 12} more</span>
+				{/if}
+			</div>
+		{/if}
 	</header>
 
 	<main class="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 p-6">

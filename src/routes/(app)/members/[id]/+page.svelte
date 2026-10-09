@@ -1022,6 +1022,18 @@
 						</span>
 					</div>
 				{/if}
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Referral link</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() =>
+							navigator.clipboard
+								.writeText(`${location.origin}/j/${m.orgSlug}?ref=${m.member.id}`)
+								.then(() => toast.success('Referral link copied'))
+								.catch(() => toast.error('Could not copy'))}>Copy</Button
+					>
+				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Birthday</span><span
 						>{m.member.birthday ? formatDate(m.member.birthday) : '—'}</span

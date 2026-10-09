@@ -143,7 +143,8 @@
 			recent: owesFilter === '__new' || undefined,
 			risk: owesFilter === '__risk' || undefined,
 			family: owesFilter === '__family' || undefined,
-			birthday: owesFilter === '__bday' || undefined
+			birthday: owesFilter === '__bday' || undefined,
+			noContact: owesFilter === '__nocontact' || undefined
 		});
 	}
 	function search() {
@@ -254,7 +255,8 @@
 				'Open balance',
 				'Joined',
 				'Last visit',
-				'Visits (30d)'
+				'Visits (30d)',
+				'Referral source'
 			],
 			...members.map((m) => [
 				m.name,
@@ -267,7 +269,8 @@
 				(m.openBalance / 100).toFixed(2),
 				m.joinedAt ? formatDate(m.joinedAt) : '',
 				m.lastVisit ? formatDate(m.lastVisit) : '',
-				m.visits30
+				m.visits30,
+				m.referralSource ?? ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -629,7 +632,9 @@
 									? 'Has family'
 									: owesFilter === '__bday'
 										? 'Birthday month'
-										: 'Any balance'}</Select.Trigger
+										: owesFilter === '__nocontact'
+											? 'No contact info'
+											: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -639,6 +644,7 @@
 				<Select.Item value="__risk">At-risk 30d+</Select.Item>
 				<Select.Item value="__family">Has family</Select.Item>
 				<Select.Item value="__bday">Birthday month</Select.Item>
+				<Select.Item value="__nocontact">No contact info</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>
