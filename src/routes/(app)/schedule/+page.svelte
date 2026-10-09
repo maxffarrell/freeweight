@@ -9,9 +9,11 @@
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { toast } from 'svelte-sonner';
 	import {
 		getSessions,
@@ -78,6 +80,7 @@
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import Flame from '@lucide/svelte/icons/flame';
 	import Wrench from '@lucide/svelte/icons/wrench';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
@@ -884,28 +887,37 @@
 
 <PageHeader title="Schedule">
 	{#snippet actions()}
-		<Button variant="outline" size="sm" onclick={() => (hoOpen = true)}
-			><ArrowRightLeft /> Handoff</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (tplOpen = true)}
-			><Repeat /> Recurring</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (typeOpen = true)}
-			><Plus /> Class type</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (resOpen = true)}>Amenities</Button>
-		<Button variant="outline" size="sm" onclick={() => (eqOpen = true)}><Wrench /> Equipment</Button
-		>
 		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}
 			><Flame /> Demand{#if hints.length}
 				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
 					>{hints.length}</span
 				>{/if}</Button
 		>
-		<Button variant="outline" size="sm" onclick={() => (evOpen = true)}>Events</Button>
-		<Button variant="outline" size="sm" onclick={() => (coursesOpen = true)}>Courses</Button>
-		<Button variant="outline" size="sm" onclick={() => (slotsOpen = true)}>Slots</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" size="sm" {...props} aria-label="More actions">
+						<Ellipsis class="h-4 w-4" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-48">
+				<DropdownMenu.Item onclick={() => (tplOpen = true)}
+					><Repeat /> Recurring templates</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={() => (typeOpen = true)}><Plus /> Class type</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (hoOpen = true)}
+					><ArrowRightLeft /> Instructor handoff</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={() => (slotsOpen = true)}>Open slots</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={() => (resOpen = true)}>Amenities</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (eqOpen = true)}><Wrench /> Equipment</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (evOpen = true)}>Events</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => (coursesOpen = true)}>Courses</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </PageHeader>
 
@@ -952,21 +964,21 @@
 			}}><Copy /> Copy week</Button
 		>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
-			<select bind:value={fType} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			<NativeSelect bind:value={fType}>
 				<option value="">All classes</option>
 				{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-			</select>
-			<select bind:value={fInstructor} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			</NativeSelect>
+			<NativeSelect bind:value={fInstructor}>
 				<option value="">All instructors</option>
 				{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-			</select>
+			</NativeSelect>
 			{#if locations.filter((l) => !l.archivedAt).length > 1}
-				<select bind:value={fLocation} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+				<NativeSelect bind:value={fLocation}>
 					<option value="">All locations</option>
 					{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 						<option value={l.id}>{l.name}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 			{/if}
 		</div>
 	</div>
@@ -1523,7 +1535,7 @@
 					bind:value={tDescription}
 				/></Field.Field
 			>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="t-color">Color</Field.Label>
 					<Input id="t-color" type="color" bind:value={tColor} class="h-9 p-1" />
@@ -1817,52 +1829,34 @@
 		<form class="space-y-4" onsubmit={submitHandoff}>
 			<Field.Field>
 				<Field.Label for="ho-from">Instructor</Field.Label>
-				<select
-					id="ho-from"
-					required
-					bind:value={hoFrom}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-from" required bind:value={hoFrom}>
 					<option value="" disabled>Pick an instructor</option>
 					{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="ho-type">Only this class (optional)</Field.Label>
-				<select
-					id="ho-type"
-					bind:value={hoType}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-type" bind:value={hoType}>
 					<option value="">All classes</option>
 					{#each classTypes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label for="ho-action">Do what with them</Field.Label>
-				<select
-					id="ho-action"
-					bind:value={hoAction}
-					class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect id="ho-action" bind:value={hoAction}>
 					<option value="reassign">Reassign to another instructor</option>
 					<option value="cancel">Cancel them all</option>
-				</select>
+				</NativeSelect>
 			</Field.Field>
 			{#if hoAction === 'reassign'}
 				<Field.Field>
 					<Field.Label for="ho-to">Taken over by</Field.Label>
-					<select
-						id="ho-to"
-						required
-						bind:value={hoTo}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="ho-to" required bind:value={hoTo}>
 						<option value="" disabled>Pick the new instructor</option>
 						{#each instructors.filter((i) => i.id !== hoFrom) as i (i.id)}<option value={i.id}
 								>{i.name}</option
 							>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			{#if hoCounts && (hoCounts.sessions || hoCounts.templates)}
@@ -1923,8 +1917,8 @@
 							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-2">
-							<select
-								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+							<NativeSelect
+								size="sm"
 								value={r.resource.status}
 								onchange={(e) =>
 									setResourceStatus(
@@ -1935,7 +1929,7 @@
 								<option value="open">Open</option>
 								<option value="maintenance">Maintenance</option>
 								<option value="closed">Closed</option>
-							</select>
+							</NativeSelect>
 							<Switch
 								checked={r.resource.active}
 								onCheckedChange={(v) => toggleResource(r.resource.id, v)}
@@ -1948,26 +1942,18 @@
 		{#if resources.some((r) => r.resource.active && r.resource.status === 'open')}
 			<p class="mb-1 text-xs font-medium text-muted-foreground">Book for a member</p>
 			<form class="mb-4 grid grid-cols-2 items-end gap-2" onsubmit={submitAmenityBooking}>
-				<select
-					bind:value={abMember}
-					required
-					class="h-9 rounded-md border bg-transparent px-2 text-sm"
-				>
+				<NativeSelect bind:value={abMember} required>
 					<option value="" disabled>Member…</option>
 					{#each memberList.filter((m) => m.status === 'active') as m (m.id)}
 						<option value={m.id}>{m.name}</option>
 					{/each}
-				</select>
-				<select
-					bind:value={abResource}
-					required
-					class="h-9 rounded-md border bg-transparent px-2 text-sm"
-				>
+				</NativeSelect>
+				<NativeSelect bind:value={abResource} required>
 					<option value="" disabled>Amenity…</option>
 					{#each resources.filter((r) => r.resource.active && r.resource.status === 'open') as r (r.resource.id)}
 						<option value={r.resource.id}>{r.resource.name}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 				<Input type="date" required bind:value={abDay} />
 				<Input type="time" required bind:value={abTime} />
 				<Button type="submit" class="col-span-2" disabled={pending}>Book slot</Button>
@@ -2036,15 +2022,12 @@
 			{#if locations.filter((l) => !l.archivedAt).length}
 				<Field.Field>
 					<Field.Label>Location (optional)</Field.Label>
-					<select
-						bind:value={rLoc}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect bind:value={rLoc}>
 						<option value="">Any location</option>
 						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 							<option value={l.id}>{l.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			<Dialog.Footer>
@@ -2179,7 +2162,7 @@
 				<Field.Label for="e-desc">Description (optional)</Field.Label>
 				<Input id="e-desc" bind:value={eDesc} maxlength={500} />
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="e-date">Date</Field.Label>
 					<Input id="e-date" type="date" required bind:value={eDate} />
@@ -2193,7 +2176,7 @@
 					<Input id="e-dur" type="number" min={15} bind:value={eDur} />
 				</Field.Field>
 			</div>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="e-cap">Capacity</Field.Label>
 					<Input id="e-cap" type="number" min={1} bind:value={eCap} />
@@ -2205,15 +2188,12 @@
 				{#if locations.filter((l) => !l.archivedAt).length}
 					<Field.Field>
 						<Field.Label>Location</Field.Label>
-						<select
-							bind:value={eLoc}
-							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-						>
+						<NativeSelect bind:value={eLoc}>
 							<option value="">—</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
 							{/each}
-						</select>
+						</NativeSelect>
 					</Field.Field>
 				{/if}
 			</div>
@@ -2237,30 +2217,20 @@
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label for="s-type">Class type</Field.Label>
-					<select
-						id="s-type"
-						required
-						bind:value={sType}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="s-type" required bind:value={sType}>
 						<option value="" disabled>Pick…</option>
 						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="s-instr">Instructor</Field.Label>
-					<select
-						id="s-instr"
-						required
-						bind:value={sInstr}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="s-instr" required bind:value={sInstr}>
 						<option value="" disabled>Pick…</option>
 						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			</div>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="s-from">From</Field.Label>
 					<Input id="s-from" type="date" required bind:value={sFrom} />
@@ -2384,22 +2354,17 @@
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="c-type">Class type</Field.Label>
-					<select
-						id="c-type"
-						required
-						bind:value={cType}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="c-type" required bind:value={cType}>
 						<option value="" disabled>Pick…</option>
 						{#each classTypes as ct (ct.id)}<option value={ct.id}>{ct.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			</div>
 			<Field.Field>
 				<Field.Label for="c-desc">Description (optional)</Field.Label>
 				<Input id="c-desc" bind:value={cDesc} maxlength={500} />
 			</Field.Field>
-			<div class="grid grid-cols-4 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
 				<Field.Field>
 					<Field.Label for="c-start">Starts</Field.Label>
 					<Input id="c-start" type="date" required bind:value={cStart} />
@@ -2452,35 +2417,27 @@
 					{/each}
 				</div>
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-time">Start time</Field.Label>
 					<Input id="c-time" type="time" required bind:value={cTime} />
 				</Field.Field>
 				<Field.Field>
 					<Field.Label for="c-instr">Instructor</Field.Label>
-					<select
-						id="c-instr"
-						bind:value={cInstr}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect id="c-instr" bind:value={cInstr}>
 						<option value="">Class default</option>
 						{#each instructors as i (i.id)}<option value={i.id}>{i.name}</option>{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 				{#if locations.filter((l) => !l.archivedAt).length}
 					<Field.Field>
 						<Field.Label for="c-loc">Location</Field.Label>
-						<select
-							id="c-loc"
-							bind:value={cLoc}
-							class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-						>
+						<NativeSelect id="c-loc" bind:value={cLoc}>
 							<option value="">Class default</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
 							{/each}
-						</select>
+						</NativeSelect>
 					</Field.Field>
 				{/if}
 			</div>
@@ -2580,8 +2537,8 @@
 									>service due</span
 								>
 							{/if}
-							<select
-								class="h-8 rounded-md border bg-transparent px-1.5 text-xs"
+							<NativeSelect
+								size="sm"
 								value={eq.status}
 								onchange={(e) =>
 									setEquipment(eq.id, {
@@ -2591,7 +2548,7 @@
 								<option value="operational">Operational</option>
 								<option value="maintenance">Maintenance</option>
 								<option value="out_of_order">Out of order</option>
-							</select>
+							</NativeSelect>
 							<Button
 								size="xs"
 								variant="ghost"
@@ -2644,15 +2601,12 @@
 			{#if locations.filter((l) => !l.archivedAt).length}
 				<Field.Field>
 					<Field.Label>Location</Field.Label>
-					<select
-						bind:value={eqLoc}
-						class="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
-					>
+					<NativeSelect bind:value={eqLoc}>
 						<option value="">—</option>
 						{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 							<option value={l.id}>{l.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</Field.Field>
 			{/if}
 			<Field.Field>

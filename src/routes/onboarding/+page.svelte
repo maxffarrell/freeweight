@@ -210,13 +210,7 @@
 			<form class="space-y-4" onsubmit={next}>
 				<Field.Field>
 					<Field.Label for="cname">Class name</Field.Label>
-					<Input
-						id="cname"
-						placeholder="Strength Foundations"
-						required
-						bind:value={className}
-						autofocus
-					/>
+					<Input id="cname" placeholder="Strength Foundations" bind:value={className} autofocus />
 				</Field.Field>
 				<div class="grid grid-cols-3 gap-3">
 					<Field.Field>

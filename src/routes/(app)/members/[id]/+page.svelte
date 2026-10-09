@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -10,9 +11,11 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -69,6 +72,7 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import FilePen from '@lucide/svelte/icons/file-pen';
 	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
@@ -651,19 +655,31 @@
 <PageHeader title={m.member.name} crumbs={[{ label: 'Members', href: '/members' }]}>
 	{#snippet actions()}
 		<Button variant="outline" size="sm" onclick={manualCheckIn}><ScanLine /> Check in</Button>
-		<Button variant="outline" size="sm" onclick={openCard}><Printer /> Card</Button>
-		<Button variant="outline" size="sm" href="/members/{m.member.id}/statement"
-			><FileText /> Statement</Button
-		>
-		<Button variant="outline" size="sm" onclick={copyPortalLink}><Link /> Portal link</Button>
 		{#if m.member.email}
 			<Button variant="outline" size="sm" onclick={() => (emailOpen = true)}><Mail /> Email</Button>
 		{/if}
-		<Button variant="outline" size="sm" onclick={() => (guestOpen = true)}
-			><UserPlus /> Guest</Button
-		>
 		<Button size="sm" variant="outline" onclick={() => (editOpen = true)}>Edit</Button>
-		<Button size="sm" variant="ghost" onclick={openMerge}>Merge…</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" size="sm" {...props} aria-label="More actions">
+						<Ellipsis class="h-4 w-4" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="min-w-48">
+				<DropdownMenu.Item onclick={() => (guestOpen = true)}
+					><UserPlus /> Book a guest</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={openCard}><Printer /> Print member card</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => goto(`/members/${m.member.id}/statement`)}
+					><FileText /> Statement</DropdownMenu.Item
+				>
+				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </PageHeader>
 
@@ -863,7 +879,7 @@
 				{#each m.memberships as mm (mm.membership.id)}
 					<div class="flex items-center justify-between gap-2 text-sm">
 						<div class="min-w-0">
-							<p class="truncate font-medium">{mm.planName}</p>
+							<p class="truncate font-medium" title={mm.planName}>{mm.planName}</p>
 							<p class="text-xs text-muted-foreground">
 								{formatMoney(mm.membership.price ?? mm.amount, currency)}{mm.isPack
 									? ' pack'
@@ -1835,11 +1851,11 @@
 		</Dialog.Header>
 		<label class="flex items-center gap-2 pb-2 text-sm">
 			<span class="text-muted-foreground">Bringing guests</span>
-			<select bind:value={bookGuests} class="h-8 rounded-md border bg-transparent px-2 text-sm">
+			<NativeSelect bind:value={bookGuests}>
 				{#each [0, 1, 2, 3] as n (n)}
 					<option value={n}>{n === 0 ? 'None' : `+${n} guest${n > 1 ? 's' : ''}`}</option>
 				{/each}
-			</select>
+			</NativeSelect>
 			{#if bookGuests > 0}
 				<span class="text-xs text-muted-foreground">guest passes first, then drop-in price</span>
 			{/if}

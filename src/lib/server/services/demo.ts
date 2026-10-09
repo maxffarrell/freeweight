@@ -226,9 +226,10 @@ export async function loadDemoData(ctx: OrgContext) {
 	}
 
 	// ------- newer surfaces: waiver, tags, shop, expenses, promo, gift card -------
+	const gymName = ctx.org.name;
 	const waiverText =
-		'I understand that training at Iron Works Gym involves physical exertion and I ' +
-		'assume all risks. I release Iron Works Gym and its staff from liability for ' +
+		`I understand that training at ${gymName} involves physical exertion and I ` +
+		`assume all risks. I release ${gymName} and its staff from liability for ` +
 		'injuries sustained on the premises or during classes.';
 	await db
 		.update(gymSettings)

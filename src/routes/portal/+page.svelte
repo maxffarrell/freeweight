@@ -91,6 +91,7 @@
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -911,14 +912,13 @@
 
 <div class="mb-4 flex items-center gap-3">
 	{#if data.options.length > 1}
-		<select
-			class="h-9 rounded-md border bg-background px-3 text-sm"
+		<NativeSelect
 			onchange={(e) => goto(`/portal?m=${e.currentTarget.value}`, { invalidateAll: true })}
 		>
 			{#each data.options as o (o.memberId)}
 				<option value={o.memberId} selected={o.memberId === memberId}>{o.label}</option>
 			{/each}
-		</select>
+		</NativeSelect>
 	{/if}
 	{#if !data.options.find((o) => o.memberId === memberId)?.dependent}
 		<button
@@ -1140,13 +1140,10 @@
 										class="h-7 w-auto text-xs"
 										bind:value={pauseResumeOn}
 									/>
-									<select
-										bind:value={requestReason}
-										class="h-7 rounded-md border bg-transparent px-1 text-xs"
-									>
+									<NativeSelect bind:value={requestReason} size="sm">
 										<option value="">Reason (optional)</option>
 										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-									</select>
+									</NativeSelect>
 									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 										>Request pause</Button
 									>
@@ -1160,13 +1157,10 @@
 										void requestCancel(mm.membership.id);
 									}}
 								>
-									<select
-										bind:value={requestReason}
-										class="h-7 rounded-md border bg-transparent px-1 text-xs"
-									>
+									<NativeSelect bind:value={requestReason} size="sm">
 										<option value="">Reason (optional)</option>
 										{#each CANCEL_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-									</select>
+									</NativeSelect>
 									<Button size="sm" variant="outline" class="h-7 px-2 text-xs" type="submit"
 										>Confirm cancellation request</Button
 									>
@@ -1254,11 +1248,7 @@
 									{amenity!.resource.name}
 								</p>
 							{:else}
-								<select
-									id="am-res"
-									bind:value={amenityId}
-									class="h-9 rounded-md border bg-transparent px-2 text-sm"
-								>
+								<NativeSelect id="am-res" bind:value={amenityId}>
 									{#each amenities as a (a.resource.id)}
 										<option value={a.resource.id}
 											>{a.resource.name}{a.resource.status !== 'open'
@@ -1266,7 +1256,7 @@
 												: ''}</option
 										>
 									{/each}
-								</select>
+								</NativeSelect>
 							{/if}
 						</div>
 						<div class="space-y-1">
@@ -2008,11 +1998,11 @@
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<form class="flex flex-wrap items-center gap-2" onsubmit={logStat}>
-				<select bind:value={msKind} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+				<NativeSelect bind:value={msKind} size="sm">
 					{#each Object.entries(KIND_LABELS) as [k, label] (k)}
 						<option value={k}>{label}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 				<Input
 					type="number"
 					step="0.1"
@@ -2022,10 +2012,10 @@
 					placeholder="Value"
 					class="h-8 w-24"
 				/>
-				<select bind:value={msUnit} class="h-8 rounded-md border bg-transparent px-1.5 text-xs">
+				<NativeSelect bind:value={msUnit} size="sm">
 					{#each UNITS as u (u)}<option value={u}>{u}</option>{/each}
-				</select>
-				<Input type="date" bind:value={msDate} class="h-8 w-auto text-xs" aria-label="Date" />
+				</NativeSelect>
+				<Input type="date" bind:value={msDate} class="h-7" aria-label="Date" />
 				<Button size="sm" class="h-8" type="submit" disabled={msPending}>Log</Button>
 			</form>
 			{#if measurements.length}
@@ -2252,8 +2242,8 @@
 											>Series</Button
 										>
 									{/if}
-									<select
-										class="h-8 rounded-md border bg-transparent px-1 text-xs"
+									<NativeSelect
+										size="sm"
 										title="Bring guests — uses guest passes first, then drop-in price"
 										bind:value={guestPick[b.session.id]}
 									>
@@ -2261,7 +2251,7 @@
 										{#each [1, 2, 3] as n (n)}
 											<option value={String(n)}>+{n} guest{n > 1 ? 's' : ''}</option>
 										{/each}
-									</select>
+									</NativeSelect>
 									<Button
 										size="sm"
 										variant="outline"

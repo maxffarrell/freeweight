@@ -389,7 +389,7 @@
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-6">
-	<div class="flex max-w-xl gap-2">
+	<div class="flex max-w-xl flex-wrap gap-2">
 		<div class="relative flex-1">
 			<Search class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
@@ -898,7 +898,7 @@
 				<Field.Label for="c-prize">Prize (optional)</Field.Label>
 				<Input id="c-prize" bind:value={cPrize} placeholder="A free month, gym hoodie…" />
 			</Field.Field>
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-goal">Goal (check-ins)</Field.Label>
 					<Input id="c-goal" type="number" min={1} max={1000} required bind:value={cGoal} />
