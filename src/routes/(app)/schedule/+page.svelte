@@ -381,6 +381,13 @@
 	let sessNote = $state('');
 	let pending = $state(false);
 	const noConflicts: { id: string; startsAt: Date; endsAt: Date; className: string }[] = [];
+	/** Name of the picked instructor when the type has quals and they're not in the list. */
+	function unqualWarn(typeId: string | null | undefined, instructorId: string | null | undefined) {
+		if (!typeId || !instructorId) return null;
+		const quals = cQualsByType[typeId];
+		if (!quals?.length || quals.includes(instructorId)) return null;
+		return instructors.find((i) => i.id === instructorId)?.name ?? 'Instructor';
+	}
 	let sessConflicts = $derived(
 		await (sessInstructorId && sessStart && sessStartTime
 			? getInstructorConflicts({
@@ -1444,6 +1451,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if focus && unqualWarn(focus.session.classTypeId, editInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(focus.session.classTypeId, editInstructorId)} isn't marked qualified for
+						{focus.session.className}.
+					</p>
+				{/if}
 				{#if editConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{editConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:
@@ -1548,6 +1561,12 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
+				{#if unqualWarn(sessTypeId, sessInstructorId)}
+					<p class="mt-1.5 text-xs text-amber-600">
+						{unqualWarn(sessTypeId, sessInstructorId)} isn't marked qualified for
+						{classTypes.find((c) => c.id === sessTypeId)?.name ?? 'this class'}.
+					</p>
+				{/if}
 				{#if sessConflicts.length}
 					<p class="mt-1.5 text-xs text-amber-600">
 						{sessConflicts.length > 1 ? 'Conflicts' : 'Conflict'}:

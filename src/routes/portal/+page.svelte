@@ -215,6 +215,15 @@
 	let npsComment = $state('');
 	let npsPending = $state(false);
 	let npsSent = $state(false);
+	let npsFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== npsFor) {
+			npsFor = memberId;
+			npsSent = false;
+			npsScore = null;
+			npsComment = '';
+		}
+	});
 	async function sendNps() {
 		if (npsScore == null) return;
 		npsPending = true;
