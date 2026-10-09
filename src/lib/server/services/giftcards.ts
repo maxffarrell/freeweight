@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { aliasedTable } from 'drizzle-orm';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type * as v from 'valibot';
 import { db } from '#lib/server/db/index.ts';
 import { charge, giftCard, gymMember, payment } from '#lib/server/db/schema.ts';
@@ -67,6 +67,21 @@ export async function sellGiftCard(ctx: OrgContext, input: v.InferOutput<typeof 
 		data: { memberId: m.id, amount: input.amount }
 	});
 	return card;
+}
+
+/** Cards a member bought or redeemed — for the member detail page. */
+export async function listMemberGiftCards(orgId: string, memberId: string) {
+	return db
+		.select({ card: giftCard })
+		.from(giftCard)
+		.where(
+			and(
+				eq(giftCard.organizationId, orgId),
+				or(eq(giftCard.purchaserMemberId, memberId), eq(giftCard.redeemedByMemberId, memberId))
+			)
+		)
+		.orderBy(desc(giftCard.createdAt))
+		.limit(20);
 }
 
 export async function listGiftCards(orgId: string) {

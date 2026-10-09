@@ -631,6 +631,39 @@ export async function grantCredits(ctx: OrgContext, membershipId: string, count:
 	return row;
 }
 
+/** Grants comp classes to every selected member's active membership (skips members with none). */
+export async function bulkGrantCredits(ctx: OrgContext, memberIds: string[], count: number) {
+	if (!memberIds.length) return { granted: 0, skipped: 0 };
+	const active = await db
+		.select({ id: membership.id, memberId: membership.memberId })
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				inArray(membership.memberId, memberIds),
+				eq(membership.status, 'active')
+			)
+		);
+	const perMember = new Map<string, string>();
+	for (const m of active) if (!perMember.has(m.memberId)) perMember.set(m.memberId, m.id);
+	for (const membershipId of perMember.values())
+		await db
+			.update(membership)
+			.set({ bonusCredits: sql`${membership.bonusCredits} + ${count}` })
+			.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, membershipId)));
+	if (perMember.size)
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'membership',
+			entityId: [...perMember.values()][0]!,
+			action: 'updated',
+			summary: `Granted ${count} comp class${count === 1 ? '' : 'es'} to ${perMember.size} member${perMember.size === 1 ? '' : 's'}`,
+			data: { memberIds: [...perMember.keys()], count }
+		});
+	return { granted: perMember.size, skipped: memberIds.length - perMember.size };
+}
+
 /**
  * Posts membership charges that have come due and rolls `nextChargeAt` forward.
  * Runs from /api/cron and opportunistically when staff open the app.
