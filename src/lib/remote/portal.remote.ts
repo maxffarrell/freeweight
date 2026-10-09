@@ -8,6 +8,7 @@ import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
+import * as woSvc from '#lib/server/services/workouts.ts';
 import * as resSvc from '#lib/server/services/resources.ts';
 import * as evtSvc from '#lib/server/services/gym-events.ts';
 import * as checkinSvc from '#lib/server/services/checkins.ts';
@@ -21,7 +22,8 @@ import {
 	measurementInput,
 	prInput,
 	resourceBookInput,
-	sessionFeedbackInput
+	sessionFeedbackInput,
+	giftCreditsInput
 } from '#lib/schemas.ts';
 import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
@@ -713,3 +715,18 @@ export const setPackAutoRenew = command(
 		await getPortalOverview(memberId).refresh();
 	}
 );
+
+/** Portal: the member's assigned workouts. */
+export const getMyWorkouts = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return woSvc.listMyWorkouts(m.organizationId, m.id);
+});
+
+/** Portal: gift classes off the member's own pack to another member by email. */
+export const giftPackCredits = command(giftCreditsInput, async ({ memberId, email, credits }) => {
+	const m = await myMember(memberId);
+	const { user } = requireUser();
+	const r = await memberSvc.giftPackCredits(m.organizationId, m.id, email, credits, user.id);
+	void getPortalOverview(memberId).refresh();
+	return r;
+});

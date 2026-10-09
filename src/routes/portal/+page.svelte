@@ -75,7 +75,9 @@
 		getSignRequests,
 		signDocument,
 		getMovementVideos,
-		setPackAutoRenew
+		setPackAutoRenew,
+		getMyWorkouts,
+		giftPackCredits
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -85,6 +87,7 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Flame from '@lucide/svelte/icons/flame';
 	import TrendingUp from '@lucide/svelte/icons/trending-up';
+	import Dumbbell from '@lucide/svelte/icons/dumbbell';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
@@ -96,6 +99,29 @@
 
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
+
+	// ------- gift pack classes -------
+	let giftOpen = $state(false);
+	let giftEmail = $state('');
+	let giftCredits = $state('1');
+	let giftPending = $state(false);
+	async function sendGift(e: SubmitEvent) {
+		e.preventDefault();
+		giftPending = true;
+		try {
+			const r = await giftPackCredits({
+				memberId,
+				email: giftEmail.trim(),
+				credits: parseInt(giftCredits) || 0
+			});
+			const n = parseInt(giftCredits) || 0;
+			toast.success(`${n} class${n === 1 ? '' : 'es'} sent to ${r.toName}`);
+			giftOpen = false;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not gift classes'));
+		}
+		giftPending = false;
+	}
 
 	let rateFor = $state<{ sessionId: string; className: string } | null>(null);
 	let rateValue = $state(0);
@@ -458,6 +484,7 @@
 				...(prDate ? { recordedOn: prDate } : {})
 			});
 			prLabel = prValue = prDate = '';
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 			toast.success('PR logged');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not save'));
@@ -467,6 +494,7 @@
 	async function delPr(prId: string) {
 		try {
 			await deletePersonalRecord({ memberId, prId });
+			await Promise.all([getPersonalRecords(memberId).refresh(), getPrBoard(memberId).refresh()]);
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete'));
 		}
@@ -541,6 +569,8 @@
 	}
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
 	const hasPlan = $derived(d.memberships.some((mm) => mm.membership.status === 'active'));
+	const myWorkouts = $derived(await getMyWorkouts(memberId));
+
 	const buyablePacks = $derived(
 		joinablePlans.filter(
 			(p) =>
@@ -996,6 +1026,13 @@
 									? ` ${d.credits.className}`
 									: ''} classes used</Badge
 							>
+							{#if d.credits.limit - d.credits.used > 0}
+								<button
+									class="text-xs text-muted-foreground underline"
+									onclick={() => ((giftEmail = ''), (giftCredits = '1'), (giftOpen = true))}
+									>Gift classes</button
+								>
+							{/if}
 						{/if}
 					</div>
 					<p class="mt-1 text-xs">
@@ -1992,6 +2029,24 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if myWorkouts.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-base"><Dumbbell /> Your workouts</Card.Title
+				>
+				<Card.Description>From your coach</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-3">
+				{#each myWorkouts as w (w.id)}
+					<div class="rounded-md border p-3 text-sm">
+						<p class="font-medium">{w.title}</p>
+						<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{w.body}</p>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex items-center gap-2 text-base"><TrendingUp /> Progress</Card.Title>
@@ -2480,5 +2535,35 @@
 				{signBusy ? 'Signing…' : 'Sign document'}
 			</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={giftOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Gift classes to a friend</Dialog.Title>
+			<Dialog.Description>
+				Move classes off your pack to another member. They need an account at your gym already.
+			</Dialog.Description>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendGift}>
+			<Field.Field>
+				<Field.Label for="gift-email">Their email</Field.Label>
+				<Input
+					id="gift-email"
+					type="email"
+					placeholder="friend@email.com"
+					bind:value={giftEmail}
+					required
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="gift-n">Classes</Field.Label>
+				<Input id="gift-n" type="number" min="1" bind:value={giftCredits} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={giftPending}>
+				{giftPending ? 'Sending…' : 'Gift classes'}
+			</Button>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

@@ -659,6 +659,13 @@
       "when": 1791432169452,
       "tag": "0093_revenue-target",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1791517614828,
+      "tag": "0094_member-workouts",
+      "breakpoints": true
     }
   ]
 }

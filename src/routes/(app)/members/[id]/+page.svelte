@@ -38,7 +38,13 @@
 		logIncident,
 		updateIncidentEntry,
 		sendSignRequest,
-		voidSignRequest
+		voidSignRequest,
+		getMemberWorkouts,
+		addMemberWorkout,
+		updateMemberWorkout,
+		deleteMemberWorkout,
+		getPackRemaining,
+		transferPackCredits
 	} from '#lib/remote/members.remote.ts';
 	import {
 		getPlans,
@@ -79,6 +85,7 @@
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
+	const workouts = $derived(await getMemberWorkouts(id));
 	const mSignReqs = $derived(m.signRequests);
 	const mIncidents = $derived(m.incidents);
 	const memberNotes = $derived(await getMemberNotes(id));
@@ -434,6 +441,74 @@
 			memOpen = false;
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not start membership'));
+		}
+		pending = false;
+	}
+
+	// ------- assigned workouts -------
+	let woOpen = $state(false);
+	let woId = $state<string | null>(null);
+	let woTitle = $state('');
+	let woBody = $state('');
+	function openWorkout(w?: { id: string; title: string; body: string }) {
+		woId = w?.id ?? null;
+		woTitle = w?.title ?? '';
+		woBody = w?.body ?? '';
+		woOpen = true;
+	}
+	async function saveWorkout(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			if (woId) await updateMemberWorkout({ id: woId, title: woTitle.trim(), body: woBody.trim() });
+			else await addMemberWorkout({ memberId: id, title: woTitle.trim(), body: woBody.trim() });
+			toast.success(woId ? 'Workout updated' : 'Workout assigned');
+			woOpen = false;
+			await getMemberWorkouts(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save workout'));
+		}
+		pending = false;
+	}
+	async function removeWorkout(wid: string) {
+		try {
+			await deleteMemberWorkout(wid);
+			toast.success('Workout removed');
+			await getMemberWorkouts(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not remove'));
+		}
+	}
+
+	// ------- pack credit transfer -------
+	let trOpen = $state(false);
+	let trMsId = $state('');
+	let trTo = $state('');
+	let trCredits = $state('1');
+	let trRemaining = $state(0);
+	async function openTransfer(membershipId: string) {
+		trMsId = membershipId;
+		trTo = '';
+		trCredits = '1';
+		trOpen = true;
+		const r = await getPackRemaining(membershipId);
+		trRemaining = r?.remaining ?? 0;
+	}
+	async function sendTransfer(e: SubmitEvent) {
+		e.preventDefault();
+		pending = true;
+		try {
+			const r = await transferPackCredits({
+				membershipId: trMsId,
+				toMemberId: trTo,
+				credits: parseInt(trCredits) || 0
+			});
+			const n = parseInt(trCredits) || 0;
+			toast.success(`${r.toName} got ${n} class${n === 1 ? '' : 'es'}`);
+			trOpen = false;
+			await getMember(id).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not transfer'));
 		}
 		pending = false;
 	}
@@ -909,7 +984,7 @@
 								<p class="text-xs text-muted-foreground">“{mm.membership.endReason}”</p>
 							{/if}
 						</div>
-						<div class="flex items-center gap-2">
+						<div class="flex flex-wrap items-center justify-end gap-2">
 							<StatusBadge status={mm.membership.status} />
 							{#if mm.membership.status === 'active'}
 								{#if mm.isPack}
@@ -930,6 +1005,13 @@
 												)
 												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
 										>{mm.membership.autoRenew ? 'Auto-renew ✓' : 'Auto-renew'}</Button
+									>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs"
+										title="Move pack classes to another member"
+										onclick={() => void openTransfer(mm.membership.id)}>Gift</Button
 									>
 								{:else}
 									<Button
@@ -1259,6 +1341,42 @@
 				</Card.Content>
 			</Card.Root>
 		{/if}
+
+		<Card.Root>
+			<Card.Header class="flex-row items-center justify-between">
+				<div>
+					<Card.Title class="text-base">Assigned workouts</Card.Title>
+					<Card.Description>Routines the member sees in their portal</Card.Description>
+				</div>
+				<Button size="sm" variant="outline" onclick={() => openWorkout()}><Plus /> Assign</Button>
+			</Card.Header>
+			<Card.Content class="space-y-3 px-4">
+				{#each workouts as w (w.id)}
+					<div class="rounded-md border p-3 text-sm">
+						<div class="flex items-center justify-between gap-2">
+							<span class="font-medium">{w.title}</span>
+							<span class="flex shrink-0 gap-1">
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs"
+									onclick={() => openWorkout(w)}>Edit</Button
+								>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-destructive"
+									onclick={() => void removeWorkout(w.id)}>Remove</Button
+								>
+							</span>
+						</div>
+						<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{w.body}</p>
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No workouts assigned yet.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
 
 		<Card.Root>
 			<Card.Header>
@@ -2001,6 +2119,59 @@
 					{srPending ? 'Sending…' : 'Send for signature'}
 				</Button>
 			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+<Dialog.Root bind:open={woOpen}>
+	<Dialog.Content>
+		<Dialog.Header
+			><Dialog.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Dialog.Title></Dialog.Header
+		>
+		<form class="space-y-4" onsubmit={saveWorkout}>
+			<Field.Field>
+				<Field.Label for="wo-title">Title</Field.Label>
+				<Input id="wo-title" bind:value={woTitle} placeholder="Leg day" required />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="wo-body">Workout</Field.Label>
+				<Textarea
+					id="wo-body"
+					bind:value={woBody}
+					rows={8}
+					placeholder="3×10 back squats&#10;3×12 lunges&#10;10-min bike cooldown"
+					required
+				/>
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={pending}
+				>{pending ? 'Saving…' : woId ? 'Save' : 'Assign'}</Button
+			>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={trOpen}>
+	<Dialog.Content>
+		<Dialog.Header
+			><Dialog.Title>Gift pack classes</Dialog.Title>
+			<Dialog.Description
+				>Move classes off this pack to another member. {trRemaining} left to give.</Dialog.Description
+			>
+		</Dialog.Header>
+		<form class="space-y-4" onsubmit={sendTransfer}>
+			<Field.Field>
+				<Field.Label>To member</Field.Label>
+				<NativeSelect bind:value={trTo} required>
+					<option value="" disabled>Pick a member…</option>
+					{#each m.memberOptions as o (o.id)}<option value={o.id}>{o.name}</option>{/each}
+				</NativeSelect>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="tr-n">Classes</Field.Label>
+				<Input id="tr-n" type="number" min="1" max={trRemaining} bind:value={trCredits} required />
+			</Field.Field>
+			<Button type="submit" class="w-full" disabled={pending || !trTo}
+				>{pending ? 'Moving…' : 'Gift classes'}</Button
+			>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>

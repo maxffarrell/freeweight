@@ -30,8 +30,8 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { todayISO } from '#lib/format.ts';
 import { emit } from './events.ts';
-import { creditUsage } from './schedule.ts';
-import { notifySignRequest } from './notifications.ts';
+import { creditUsage, creditsUsedIn } from './schedule.ts';
+import { notifyCreditsGifted, notifySignRequest } from './notifications.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
 
@@ -1037,4 +1037,217 @@ export async function voidSignRequest(ctx: OrgContext, id: string) {
 		.returning();
 	if (!row) error(404, 'Request not found or already handled');
 	return row;
+}
+
+/**
+ * Moves N class-pack credits from one member's active pack to another member.
+ * Effective pack credits are `plan.classCredits + membership.bonusCredits`, so
+ * the donor's bonusCredits drops by N and the recipient either gets +N on an
+ * existing pack on the same plan or a fresh pack membership whose bonusCredits
+ * nets out to exactly N. No money moves — the original charge stays with the
+ * donor. Returns the donor's remaining credits.
+ */
+export async function transferPackCredits(
+	ctx: { orgId: string; userId?: string | null },
+	fromMembershipId: string,
+	to: { memberId?: string; email?: string },
+	credits: number
+) {
+	if (!Number.isInteger(credits) || credits < 1) error(400, 'Give at least 1 class');
+	const [donor] = await db
+		.select({
+			ms: membership,
+			classCredits: plan.classCredits,
+			classTypeId: plan.classTypeId,
+			planName: plan.name
+		})
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.id, fromMembershipId),
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	if (!donor) error(404, 'Active pack membership not found');
+	const [recipient] = to.memberId
+		? await db
+				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+				.from(gymMember)
+				.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, to.memberId)))
+		: await db
+				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+				.from(gymMember)
+				.where(
+					and(
+						eq(gymMember.organizationId, ctx.orgId),
+						eq(sql`lower(${gymMember.email})`, (to.email ?? '').trim().toLowerCase())
+					)
+				);
+	if (!recipient) error(404, 'No member with that email at this gym');
+	if (recipient.id === donor.ms.memberId) error(400, 'That is already their pack');
+	const window = {
+		start: donor.ms.startsAt.toISOString().slice(0, 10),
+		end: (donor.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+	};
+	const used = await creditsUsedIn(
+		ctx.orgId,
+		donor.ms.memberId,
+		donor.ms.id,
+		window,
+		donor.classTypeId
+	);
+	const remaining = donor.classCredits! + donor.ms.bonusCredits - used;
+	if (credits > remaining)
+		error(400, `Only ${remaining} class${remaining === 1 ? '' : 'es'} left on this pack`);
+	const [donorMember] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(eq(gymMember.id, donor.ms.memberId));
+	await db.transaction(async (tx) => {
+		await tx
+			.update(membership)
+			.set({ bonusCredits: sql`${membership.bonusCredits} - ${credits}` })
+			.where(eq(membership.id, donor.ms.id));
+		const [existing] = await tx
+			.select({ id: membership.id })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, ctx.orgId),
+					eq(membership.memberId, recipient.id),
+					eq(membership.planId, donor.ms.planId),
+					eq(membership.status, 'active')
+				)
+			)
+			.limit(1);
+		if (existing)
+			await tx
+				.update(membership)
+				.set({ bonusCredits: sql`${membership.bonusCredits} + ${credits}` })
+				.where(eq(membership.id, existing.id));
+		else
+			await tx.insert(membership).values({
+				organizationId: ctx.orgId,
+				memberId: recipient.id,
+				planId: donor.ms.planId,
+				startsAt: new Date(),
+				// The gifted classes live and die with the donor pack's window.
+				endsAt: donor.ms.endsAt,
+				// Effective credits = plan.classCredits + bonusCredits = exactly `credits`.
+				bonusCredits: credits - donor.classCredits!
+			});
+	});
+	const fromName = donorMember?.name ?? 'A member';
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId,
+		entityType: 'member',
+		entityId: recipient.id,
+		action: 'credits.transferred',
+		summary: `${credits} pack class${credits === 1 ? '' : 'es'} from ${fromName}`
+	});
+	await notifyCreditsGifted(
+		ctx.orgId,
+		`${donor.ms.id}:${crypto.randomUUID()}`,
+		recipient.id,
+		fromName,
+		credits
+	);
+	return { remaining: remaining - credits, toName: recipient.name };
+}
+
+/** Remaining classes on one pack membership — for the transfer dialog. */
+export async function packRemaining(orgId: string, membershipId: string) {
+	const [row] = await db
+		.select({ ms: membership, classCredits: plan.classCredits, classTypeId: plan.classTypeId })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.id, membershipId),
+				eq(membership.organizationId, orgId),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	if (!row) return null;
+	const used = await creditsUsedIn(
+		orgId,
+		row.ms.memberId,
+		row.ms.id,
+		{
+			start: row.ms.startsAt.toISOString().slice(0, 10),
+			end: (row.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+		},
+		row.classTypeId
+	);
+	const limit = row.classCredits! + row.ms.bonusCredits;
+	return { used, limit, remaining: Math.max(0, limit - used) };
+}
+
+/**
+ * Portal-side gift: the member gives N credits off their own pack to another
+ * member by email. Picks their pack with the most remaining credits.
+ */
+export async function giftPackCredits(
+	orgId: string,
+	fromMemberId: string,
+	email: string,
+	credits: number,
+	userId?: string | null
+) {
+	const packs = await db
+		.select({ ms: membership, classCredits: plan.classCredits, classTypeId: plan.classTypeId })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.memberId, fromMemberId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, true),
+				isNotNull(plan.classCredits)
+			)
+		);
+	let best: { id: string; remaining: number } | null = null;
+	for (const p of packs) {
+		const used = await creditsUsedIn(
+			orgId,
+			fromMemberId,
+			p.ms.id,
+			{
+				start: p.ms.startsAt.toISOString().slice(0, 10),
+				end: (p.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+			},
+			p.classTypeId
+		);
+		const remaining = p.classCredits! + p.ms.bonusCredits - used;
+		if (!best || remaining > best.remaining) best = { id: p.ms.id, remaining };
+	}
+	if (!best) error(400, 'You have no active class pack');
+	if (credits > best!.remaining)
+		error(
+			400,
+			`Only ${best!.remaining} class${best!.remaining === 1 ? '' : 'es'} left on your pack`
+		);
+	return transferPackCredits({ orgId, userId }, best!.id, { email }, credits);
+}
+
+/** Latest personal records across the gym — the lobby PR wall. */
+export async function prWall(orgId: string) {
+	return db
+		.select({
+			pr: personalRecord,
+			memberName: gymMember.name,
+			photoDocumentId: gymMember.photoDocumentId
+		})
+		.from(personalRecord)
+		.innerJoin(gymMember, eq(personalRecord.memberId, gymMember.id))
+		.where(eq(personalRecord.organizationId, orgId))
+		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+		.limit(40);
 }
