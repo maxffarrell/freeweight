@@ -1565,6 +1565,17 @@ export async function cancelBooking(
 					)
 				);
 			if ((used ?? 0) < st.lateCancelFreebies) {
+				// $0 void marker keeps the forgiven cancel countable for the
+				// budget without touching the member's balance or revenue sums.
+				await tx.insert(charge).values({
+					organizationId: ctx.orgId,
+					memberId: b.memberId,
+					kind: 'other',
+					description: `Late-cancel fee — forgiven — ${sess.className} ${localDate(sess.startsAt, st.timezone ?? 'UTC')}`,
+					amount: 0,
+					status: 'void',
+					dueDate: todayISO()
+				});
 				lateCancel = null;
 				lateFeeForgiven = true;
 			}
