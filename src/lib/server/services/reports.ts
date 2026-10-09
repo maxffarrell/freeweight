@@ -684,6 +684,28 @@ async function guestStats(orgId: string) {
 	};
 }
 
+/** Member check-ins last 30d split by whether they had a booking that day — the walk-in rate. */
+async function walkInStats(orgId: string) {
+	const cutoff = new Date(Date.now() - 30 * 24 * 3600_000);
+	const [r] = await db
+		.select({
+			total: sql<number>`count(*)`.mapWith(Number),
+			walkIn:
+				sql<number>`count(*) filter (where not exists (select 1 from booking b join class_session s on s.id = b.session_id where b.member_id = ${checkIn.memberId} and b.status <> 'cancelled' and s.starts_at::date = ${checkIn.checkedAt}::date))`.mapWith(
+					Number
+				)
+		})
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				gte(checkIn.checkedAt, cutoff),
+				isNull(checkIn.guestName)
+			)
+		);
+	return { total: r?.total ?? 0, walkIn: r?.walkIn ?? 0 };
+}
+
 /** Sessions in the next 14 days with people still on the waitlist. */
 /** MRR lost this month — plan price of recurring memberships cancelled this month. */
 async function lostMrr(orgId: string) {
@@ -1631,7 +1653,8 @@ export async function getReports(orgId: string) {
 		streaks,
 		rel,
 		shopTop,
-		statusBreakdown
+		statusBreakdown,
+		walkIns
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1705,7 +1728,8 @@ export async function getReports(orgId: string) {
 		weekStreakLeaders(orgId, 8),
 		instructorReliability(orgId),
 		shopSales30d(orgId),
-		memberStatusBreakdown(orgId)
+		memberStatusBreakdown(orgId),
+		walkInStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1791,7 +1815,8 @@ export async function getReports(orgId: string) {
 		streakLeaders: streaks,
 		instructorReliability: rel,
 		shopTop,
-		statusBreakdown
+		statusBreakdown,
+		walkIns
 	};
 }
 

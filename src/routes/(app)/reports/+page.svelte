@@ -552,6 +552,29 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header class="pb-2">
+			<Card.Title class="text-base">Walk-ins</Card.Title>
+			<Card.Description>Check-ins without a class booking — last 30 days</Card.Description>
+		</Card.Header>
+		<Card.Content class="text-sm">
+			{#if r.walkIns.total === 0}
+				<p class="text-muted-foreground">No member check-ins in the last 30 days.</p>
+			{:else}
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Walked in (no booking)</span>
+					<span class="font-medium tabular-nums">
+						{r.walkIns.walkIn} · {Math.round((r.walkIns.walkIn / r.walkIns.total) * 100)}%
+					</span>
+				</div>
+				<div class="flex items-center justify-between">
+					<span class="text-muted-foreground">Booked a class</span>
+					<span class="font-medium tabular-nums">{r.walkIns.total - r.walkIns.walkIn}</span>
+				</div>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
 	{#if r.lockers.total}
 		<Card.Root>
 			<Card.Header class="pb-2">

@@ -112,7 +112,9 @@ export async function listMembers(
 	/** Members with a paused membership. */
 	paused?: boolean,
 	/** Members with no upcoming booked sessions. */
-	noUpcoming?: boolean
+	noUpcoming?: boolean,
+	/** Members on a comp'd (no-bill) membership. */
+	comped?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -210,6 +212,9 @@ export async function listMembers(
 					: undefined,
 				noUpcoming
 					? sql`not exists (select 1 from booking b7 join class_session s7 on s7.id = b7.session_id where b7.member_id = ${gymMember.id} and b7.status = 'booked' and s7.starts_at > now())`
+					: undefined,
+				comped
+					? sql`exists (select 1 from membership m9 where m9.member_id = ${gymMember.id} and m9.status = 'active' and m9.no_bill)`
 					: undefined,
 				recent
 					? gte(
@@ -487,6 +492,10 @@ export async function getMember(orgId: string, id: string) {
 				thisMonth:
 					sql<number>`count(*) filter (where ${booking.status} != 'cancelled' and ${classSession.startsAt} >= date_trunc('month', now()))`.mapWith(
 						Number
+					),
+				waitlisted:
+					sql<number>`count(*) filter (where ${booking.status} = 'waitlisted' and ${classSession.startsAt} > now())`.mapWith(
+						Number
 					)
 			})
 			.from(booking)
@@ -682,6 +691,7 @@ export async function getMember(orgId: string, id: string) {
 			lastVisit: att?.lastVisit ?? null,
 			noShows: bs?.noShows ?? 0,
 			bookedMonth: bs?.thisMonth ?? 0,
+			waitlisted: bs?.waitlisted ?? 0,
 			/** % of attended+no-show bookings the member showed up for; null when no history. */
 			showRate:
 				(bs?.attended ?? 0) + (bs?.noShows ?? 0) > 0
