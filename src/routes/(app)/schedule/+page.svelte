@@ -1146,7 +1146,7 @@
 						{#each memberList.filter((mm) => mm.status === 'active') as mm (mm.id)}
 							<Select.Item value={mm.id}
 								>{mm.name}{#if !mm.planName}
-									(drop-in){/if}</Select.Item
+									({mm.guardianPlanName ? 'family' : 'drop-in'}){/if}</Select.Item
 							>
 						{/each}
 					</Select.Content>
