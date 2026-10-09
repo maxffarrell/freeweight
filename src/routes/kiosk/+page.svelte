@@ -132,7 +132,11 @@
 					visitNote(r.visits) +
 					(r.creditsLeft != null ? ` — ${r.creditsLeft} ${r.creditsClass ?? 'class'} left` : ''),
 				r.member.photoDocumentId,
-				[r.waiverMissing ? 'waiver unsigned' : '', r.suspended ? 'membership suspended' : '']
+				[
+					r.waiverMissing ? 'waiver unsigned' : '',
+					r.suspended ? 'membership suspended' : '',
+					r.creditsLeft === 0 ? 'pack empty' : ''
+				]
 					.filter(Boolean)
 					.join(' · ') || null
 			);

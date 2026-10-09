@@ -367,7 +367,7 @@ export async function sessionsNeedingCover(ctx: OrgContext) {
 				isNotNull(classSession.coverRequestedAt),
 				isNull(classSession.cancelledAt),
 				gt(classSession.startsAt, new Date()),
-				me ? ne(classSession.instructorId, me.id) : undefined
+				me ? or(ne(classSession.instructorId, me.id), isNull(classSession.instructorId)) : undefined
 			)
 		)
 		.orderBy(asc(classSession.startsAt))
