@@ -136,7 +136,8 @@
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
-					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : ''
+					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
+					r.nextClass ? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}` : ''
 				]
 					.filter(Boolean)
 					.join(' · ') || null
@@ -263,6 +264,9 @@
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					!r.checkedOut && r.guestPassesLeft != null
 						? `${r.guestPassesLeft} guest passes left this month`
+						: '',
+					!r.checkedOut && r.nextClass
+						? `next: ${r.nextClass.className} at ${localTime(r.nextClass.startsAt, tz)}`
 						: '',
 					r.member.deskNote
 				]

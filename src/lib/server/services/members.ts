@@ -82,7 +82,8 @@ export async function listMembers(
 	owes?: boolean,
 	suspended?: boolean,
 	recent?: boolean,
-	risk?: boolean
+	risk?: boolean,
+	family?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -150,6 +151,10 @@ export async function listMembers(
 				// At-risk: active member with no check-in in the last 30 days (or ever).
 				risk
 					? sql`${gymMember.status} = 'active' and not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`
+					: undefined,
+				// In a household: has a guardian payer, or is the guardian of someone.
+				family
+					? sql`(${gymMember.guardianId} is not null or exists (select 1 from ${gymMember} g2 where g2.guardian_id = ${outer(gymMember.id)}))`
 					: undefined
 			)
 		)

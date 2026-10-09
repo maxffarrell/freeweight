@@ -86,8 +86,8 @@ export const grantCredits = command(grantCreditsInput, async ({ membershipId, co
 });
 
 export const getCharges = query(
-	v.optional(v.object({ status: v.optional(v.string()) })),
-	async (opts) => svc.listCharges((await requireOrg()).orgId, opts?.status)
+	v.optional(v.object({ status: v.optional(v.string()), kind: v.optional(v.string()) })),
+	async (opts) => svc.listCharges((await requireOrg()).orgId, opts?.status, opts?.kind)
 );
 export const addCharge = command(chargeInput, async (input) => {
 	const c = await svc.addCharge(await requireOrg(), input);

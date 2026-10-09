@@ -730,7 +730,7 @@ async function resumeFrozenMemberships(orgId: string) {
 
 // ---------- Charges & payments ----------
 
-export async function listCharges(orgId: string, status?: string) {
+export async function listCharges(orgId: string, status?: string, kind?: string) {
 	return db
 		.select({
 			charge,
@@ -742,7 +742,11 @@ export async function listCharges(orgId: string, status?: string) {
 		.from(charge)
 		.innerJoin(gymMember, eq(charge.memberId, gymMember.id))
 		.where(
-			and(eq(charge.organizationId, orgId), status ? eq(charge.status, status as never) : undefined)
+			and(
+				eq(charge.organizationId, orgId),
+				status ? eq(charge.status, status as never) : undefined,
+				kind ? eq(charge.kind, kind as never) : undefined
+			)
 		)
 		.orderBy(desc(charge.dueDate));
 }

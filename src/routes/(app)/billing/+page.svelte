@@ -99,6 +99,7 @@
 	}
 	let openCharges = $state(await getCharges({ status: 'open' }));
 	let chargeFilter = $state(page.url.searchParams.get('status') ?? '');
+	let kindFilter = $state('');
 
 	const aging = $derived.by(() => {
 		const today = todayISO();
@@ -122,11 +123,17 @@
 	});
 
 	async function filterCharges() {
-		charges = await getCharges({ status: chargeFilter || undefined });
+		charges = await getCharges({
+			status: chargeFilter || undefined,
+			kind: kindFilter || undefined
+		});
 	}
 
 	async function refreshCharges() {
-		charges = await getCharges({ status: chargeFilter || undefined });
+		charges = await getCharges({
+			status: chargeFilter || undefined,
+			kind: kindFilter || undefined
+		});
 		openCharges = await getCharges({ status: 'open' });
 	}
 
@@ -546,6 +553,12 @@
 					<option value="open">Open</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
+				</NativeSelect>
+				<NativeSelect bind:value={kindFilter} onchange={filterCharges}>
+					<option value="">All kinds</option>
+					{#each chargeKinds as k (k)}
+						<option value={k} class="capitalize">{k}</option>
+					{/each}
 				</NativeSelect>
 				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>

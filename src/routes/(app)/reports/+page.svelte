@@ -1129,6 +1129,41 @@
 		</Card.Root>
 	{/if}
 
+	{#if r.never?.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Never visited</Card.Title>
+				<Card.Description>
+					{r.never.length} active member{r.never.length === 1 ? '' : 's'} with zero check-ins —
+					signed up but never showed
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="p-0">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Member</Table.Head>
+							<Table.Head class="text-right">Joined</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.never as m (m.memberId)}
+							<Table.Row>
+								<Table.Cell>
+									<a
+										class="font-medium underline-offset-2 hover:underline"
+										href="/members/{m.memberId}">{m.name}</a
+									>
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{m.joinedAt ?? '—'}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
