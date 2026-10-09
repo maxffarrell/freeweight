@@ -1129,7 +1129,9 @@
 		<span class="ml-2 text-sm text-muted-foreground"
 			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
 				(s) => !s.session.instructorId && !s.session.cancelledAt
-			).length} unstaffed · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked · {Math.round(
+			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
+				? ` · ${sessions.filter((r) => r.session.cancelledAt).length} cancelled`
+				: ''} · {sessions.reduce((a, r) => a + (r.booked ?? 0), 0)} booked · {Math.round(
 				(sessions.reduce((a, r) => a + (r.booked ?? 0), 0) /
 					Math.max(
 						1,

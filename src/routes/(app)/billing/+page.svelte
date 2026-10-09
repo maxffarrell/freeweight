@@ -173,17 +173,25 @@
 	});
 
 	async function filterCharges() {
-		charges = await getCharges({
-			status: chargeFilter || undefined,
-			kind: kindFilter || undefined
-		});
+		charges = applyChargeFilter(
+			await getCharges({
+				status: chargeFilter === '__overdue' ? 'open' : chargeFilter || undefined,
+				kind: kindFilter || undefined
+			})
+		);
+	}
+
+	function applyChargeFilter(rows: Awaited<ReturnType<typeof getCharges>>) {
+		return chargeFilter === '__overdue' ? rows.filter((c) => c.charge.dueDate < todayISO()) : rows;
 	}
 
 	async function refreshCharges() {
-		charges = await getCharges({
-			status: chargeFilter || undefined,
-			kind: kindFilter || undefined
-		});
+		charges = applyChargeFilter(
+			await getCharges({
+				status: chargeFilter === '__overdue' ? 'open' : chargeFilter || undefined,
+				kind: kindFilter || undefined
+			})
+		);
 		openCharges = await getCharges({ status: 'open' });
 	}
 
@@ -610,6 +618,7 @@
 				<NativeSelect bind:value={chargeFilter} onchange={filterCharges}>
 					<option value="">All</option>
 					<option value="open">Open</option>
+					<option value="__overdue">Overdue</option>
 					<option value="paid">Paid</option>
 					<option value="void">Void</option>
 					<option value="written_off">Written off</option>

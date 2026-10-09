@@ -202,7 +202,10 @@
 			label: 'Open balance',
 			value: formatMoney(d.openTotal, d.currency),
 			icon: Wallet,
-			href: '/billing'
+			href: '/billing',
+			sub: d.dueWeekTotal
+				? `due this week ${formatMoney(d.dueWeekTotal, d.currency, true)}`
+				: undefined
 		},
 		{
 			label: 'Overdue',
