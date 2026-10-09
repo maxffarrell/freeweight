@@ -713,6 +713,7 @@
 				<Select.Item value="__nocontact">No contact info</Select.Item>
 				<Select.Item value="__unsub">Unsubscribed</Select.Item>
 				<Select.Item value="__ending">Ending soon</Select.Item>
+				<Select.Item value="__nowaiver">No waiver</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>

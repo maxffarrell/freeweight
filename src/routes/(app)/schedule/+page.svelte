@@ -188,6 +188,16 @@
 	const roster = $derived(focusId ? await getRoster(focusId) : []);
 	const recentFill = $derived(focusId ? await recentClassSessions(focusId) : []);
 	const rosterGuests = $derived(roster.reduce((a, r) => a + (r.booking.guestCount ?? 0), 0));
+	/** Outcome tallies for a finished session (attended / no-show / cancelled). */
+	const rosterOutcome = $derived.by(() => {
+		if (!focus || focus.session.endsAt.getTime() > Date.now()) return null;
+		const c = { attended: 0, no_show: 0, booked: 0, cancelled: 0, waitlisted: 0 } as Record<
+			string,
+			number
+		>;
+		for (const r of roster) c[r.booking.status] = (c[r.booking.status] ?? 0) + 1;
+		return c;
+	});
 	const focus = $derived(sessions.find((s) => s.session.id === focusId) ?? null);
 	const printBooked = $derived(
 		roster.filter((r) => r.booking.status === 'booked' || r.booking.status === 'attended')
@@ -1236,7 +1246,13 @@
 					></span>{focus.className}
 					· {focus ? localTime(focus.session.startsAt, tz) : ''}{/if}
 			</Sheet.Title>
-			<Sheet.Description>Roster — booked first, waitlist below.</Sheet.Description>
+			<Sheet.Description
+				>Roster — booked first, waitlist below.{#if rosterOutcome}
+					<span class="tabular-nums"
+						>· {rosterOutcome.attended} attended · {rosterOutcome.no_show} no-show · {rosterOutcome.cancelled}
+						cancelled</span
+					>{/if}</Sheet.Description
+			>
 		</Sheet.Header>
 		{#if recentFill.length}
 			<div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2">
