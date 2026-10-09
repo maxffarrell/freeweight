@@ -21,6 +21,7 @@ jobs:
           npm install -g pnpm@12.4.1
           pnpm install --frozen-lockfile
           pnpm exec prettier --write src/lib/server/auth.ts 'src/routes/(auth)/login/+page.svelte'
+          pnpm exec prettier --write 'src/routes/(app)/+layout.svelte' 'src/routes/(app)/+layout.server.ts' src/lib/components/app/demo-banner.svelte
           pnpm check
           pnpm lint
           # Seeded-database integration tests run separately from this unit suite.
