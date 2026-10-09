@@ -99,7 +99,11 @@ export async function dashboard(orgId: string) {
 			),
 			prev: sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk14.toISOString()}::timestamptz and ${checkIn.checkedAt} < ${wk7.toISOString()}::timestamptz)`.mapWith(
 				Number
-			)
+			),
+			guests:
+				sql<number>`count(*) filter (where ${checkIn.checkedAt} >= ${wk7.toISOString()}::timestamptz and ${checkIn.guestName} is not null)`.mapWith(
+					Number
+				)
 		})
 		.from(checkIn)
 		.where(eq(checkIn.organizationId, orgId));
@@ -594,6 +598,7 @@ export async function dashboard(orgId: string) {
 		checkInsToday: checkInStats?.today ?? 0,
 		checkInsWeek: checkInsWk?.week ?? 0,
 		checkInsPrevWeek: checkInsWk?.prev ?? 0,
+		guestsWeek: checkInsWk?.guests ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
 		insideNames: insideNow.map((r) => r.name),
 		mrr,
