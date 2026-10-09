@@ -816,7 +816,8 @@ export async function listActivity(
 	orgId: string,
 	entityType?: string,
 	before?: string,
-	actorId?: string
+	actorId?: string,
+	action?: string
 ) {
 	return db
 		.select({
@@ -835,11 +836,22 @@ export async function listActivity(
 				eq(activity.organizationId, orgId),
 				entityType ? eq(activity.entityType, entityType) : undefined,
 				actorId ? eq(activity.actorId, actorId) : undefined,
+				action ? eq(activity.action, action) : undefined,
 				before ? lt(activity.createdAt, new Date(before)) : undefined
 			)
 		)
 		.orderBy(desc(activity.createdAt))
 		.limit(51);
+}
+
+/** Distinct action verbs in the org's log — feeds the page's action filter. */
+export async function listActivityActions(orgId: string) {
+	return db
+		.selectDistinct({ action: activity.action })
+		.from(activity)
+		.where(eq(activity.organizationId, orgId))
+		.orderBy(asc(activity.action))
+		.then((rows) => rows.map((r) => r.action));
 }
 
 /** Staff who appear as actors in the org's activity — feeds the page's person filter. */
