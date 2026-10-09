@@ -880,9 +880,9 @@
 										>cancel</button
 									>
 								{:else}
-									{formatDate(a.createdAt)} · {a.sent} sent{a.tag ? ` · tag: ${a.tag}` : ''}{a.plan
-										? ` · plan: ${a.plan}`
-										: ''}
+									{formatDate(a.createdAt)} · {a.sent} sent{a.read ? ` · ${a.read} read` : ''}{a.tag
+										? ` · tag: ${a.tag}`
+										: ''}{a.plan ? ` · plan: ${a.plan}` : ''}
 								{/if}
 							</span>
 						</li>

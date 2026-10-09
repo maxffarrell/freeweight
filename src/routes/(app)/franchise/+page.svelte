@@ -9,10 +9,20 @@
 	import { authClient } from '#lib/auth-client.ts';
 	import { getFranchise } from '#lib/remote/franchise.remote.ts';
 	import { formatMoney } from '#lib/format.ts';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const f = await getFranchise();
 	const multiCurrency = new Set(f.gyms.map((g) => g.currency)).size > 1;
 	let switching = $state<string | null>(null);
+	const expanded = new SvelteSet<string>();
+
+	function toggle(g: { id: string }) {
+		if (expanded.has(g.id)) {
+			expanded.delete(g.id);
+		} else {
+			expanded.add(g.id);
+		}
+	}
 
 	async function switchTo(orgId: string, name: string) {
 		switching = orgId;
@@ -87,8 +97,11 @@
 					</Table.Header>
 					<Table.Body>
 						{#each f.gyms as g (g.id)}
-							<Table.Row>
+							<Table.Row class="cursor-pointer" onclick={() => toggle(g)}>
 								<Table.Cell class="font-medium">
+									<span class="mr-1 inline-block w-3 text-muted-foreground"
+										>{expanded.has(g.id) ? '▾' : '▸'}</span
+									>
 									{g.name}
 									<span class="ml-1 text-xs font-normal text-muted-foreground">{g.role}</span>
 								</Table.Cell>
@@ -129,6 +142,30 @@
 									{/if}
 								</Table.Cell>
 							</Table.Row>
+							{#if expanded.has(g.id)}
+								<Table.Row class="bg-muted/40 hover:bg-muted/40">
+									<Table.Cell colspan={9} class="py-3">
+										<div class="flex flex-wrap gap-x-8 gap-y-1 text-sm">
+											<span
+												><span class="text-muted-foreground">Seats booked (7d):</span>
+												{g.seatsBooked7}</span
+											>
+											<span
+												><span class="text-muted-foreground">Members owing:</span>
+												{g.debtors}</span
+											>
+											<span>
+												<span class="text-muted-foreground">Plans:</span>
+												{#if g.planMix.length}
+													{g.planMix.map((p) => `${p.name} (${p.members})`).join(' · ')}
+												{:else}
+													none
+												{/if}
+											</span>
+										</div>
+									</Table.Cell>
+								</Table.Row>
+							{/if}
 						{/each}
 					</Table.Body>
 				</Table.Root>

@@ -1,8 +1,12 @@
 import { and, asc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	booking,
+	charge,
 	checkIn,
 	classSession,
+	membership,
+	plan,
 	gymMember,
 	gymSettings,
 	member,
@@ -109,6 +113,46 @@ export async function franchiseOverview(userId: string) {
 					.where(eq(gymSettings.organizationId, o.id)),
 				monthlyRecurring(o.id)
 			]);
+
+			// Drill-down detail: seats booked for next-7d sessions, members
+			// holding open (unpaid) charges, and the plan mix by membership.
+			const [seats] = await db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(booking)
+				.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+				.where(
+					and(
+						eq(classSession.organizationId, o.id),
+						isNull(classSession.cancelledAt),
+						eq(booking.status, 'booked'),
+						gte(classSession.startsAt, now),
+						lt(classSession.startsAt, weekEnd)
+					)
+				);
+			const [debtors] = await db
+				.select({
+					n: sql<number>`count(distinct ${charge.memberId})`.mapWith(Number)
+				})
+				.from(charge)
+				.where(and(eq(charge.organizationId, o.id), eq(charge.status, 'open')));
+			const planMix = await db
+				.select({
+					name: plan.name,
+					members: sql<number>`count(*)`.mapWith(Number)
+				})
+				.from(membership)
+				.innerJoin(plan, eq(membership.planId, plan.id))
+				.where(
+					and(
+						eq(membership.organizationId, o.id),
+						eq(membership.status, 'active'),
+						eq(plan.isPack, false)
+					)
+				)
+				.groupBy(plan.id, plan.name)
+				.orderBy(sql`count(*) desc`, asc(plan.name))
+				.limit(5);
+
 			return {
 				...o,
 				currency: settings?.currency ?? 'usd',
@@ -118,7 +162,10 @@ export async function franchiseOverview(userId: string) {
 				prevMonthRevenue: prevRevenue?.total ?? 0,
 				newMembers30: newMembers?.n ?? 0,
 				monthCheckIns: checkIns?.n ?? 0,
-				sessionsNext7: sessions?.n ?? 0
+				sessionsNext7: sessions?.n ?? 0,
+				seatsBooked7: seats?.n ?? 0,
+				debtors: debtors?.n ?? 0,
+				planMix
 			};
 		})
 	);
