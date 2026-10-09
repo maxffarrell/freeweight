@@ -1252,7 +1252,9 @@
 				>Roster — booked first, waitlist below.{#if rosterOutcome}
 					<span class="tabular-nums"
 						>· {rosterOutcome.attended} attended · {rosterOutcome.no_show} no-show · {rosterOutcome.cancelled}
-						cancelled</span
+						cancelled{rosterOutcome.waitlisted
+							? ` · ${rosterOutcome.waitlisted} waitlisted`
+							: ''}</span
 					>{/if}</Sheet.Description
 			>
 		</Sheet.Header>

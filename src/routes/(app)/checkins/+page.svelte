@@ -15,7 +15,7 @@
 	import ScanLine from '@lucide/svelte/icons/scan-line';
 	import QrCode from '@lucide/svelte/icons/qr-code';
 	import Download from '@lucide/svelte/icons/download';
-	import { errMsg } from '#lib/format.ts';
+	import { errMsg, todayISO } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
 
@@ -212,6 +212,15 @@
 		<Card.Content class="px-4">
 			<div class="mb-3 flex gap-2">
 				<Input type="date" class="w-40" bind:value={viewDate} onchange={() => void refilter()} />
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={viewDate === todayISO()}
+					onclick={() => {
+						viewDate = todayISO();
+						void refilter();
+					}}>Today</Button
+				>
 				<Input
 					placeholder="Search member or guest…"
 					class="flex-1"
