@@ -131,7 +131,7 @@
 					name: '',
 					weeks: 4,
 					note: '',
-					days: [{ dayNo: 1, title: 'Day 1', body: '' }]
+					days: [{ dayNo: 1, title: '', body: '' }]
 				};
 	}
 	const mSignReqs = $derived(m.signRequests);
@@ -2502,7 +2502,7 @@
 								<Input
 									class="h-8 flex-1"
 									bind:value={day.title}
-									placeholder="Day {day.dayNo} title"
+									placeholder="Day {day.dayNo} — e.g. Heavy day"
 									required
 								/>
 								<Button
@@ -2532,7 +2532,7 @@
 						onclick={() =>
 							libEditing!.days.push({
 								dayNo: libEditing!.days.length + 1,
-								title: `Day ${libEditing!.days.length + 1}`,
+								title: '',
 								body: ''
 							})}>Add day</Button
 					>
