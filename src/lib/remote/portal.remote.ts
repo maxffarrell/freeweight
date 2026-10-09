@@ -3,7 +3,7 @@ import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
-import { classType, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
+import { classType, classWatch, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as billingSvc from '#lib/server/services/billing.ts';
@@ -903,3 +903,32 @@ export const getMyPrograms = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return progSvc.portalPrograms(m.organizationId, m.id);
 });
+
+/** Watch/unwatch a class type — watchers get emailed when a new session is published. */
+export const setClassWatch = command(
+	v.object({
+		memberId: v.pipe(v.string(), v.uuid()),
+		classTypeId: v.pipe(v.string(), v.uuid()),
+		on: v.boolean()
+	}),
+	async ({ memberId, classTypeId, on }) => {
+		const m = await myMember(memberId);
+		if (on) {
+			await db
+				.insert(classWatch)
+				.values({ organizationId: m.organizationId, memberId: m.id, classTypeId })
+				.onConflictDoNothing();
+		} else {
+			await db
+				.delete(classWatch)
+				.where(
+					and(
+						eq(classWatch.organizationId, m.organizationId),
+						eq(classWatch.memberId, m.id),
+						eq(classWatch.classTypeId, classTypeId)
+					)
+				);
+		}
+		await getPortalOverview(m.id).refresh();
+	}
+);

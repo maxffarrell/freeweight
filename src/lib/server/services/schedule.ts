@@ -65,6 +65,8 @@ import {
 	notifySeriesBooked,
 	notifyWaitlistPromoted,
 	sendCoverRequests
+,
+	notifyClassWatchers
 } from './notifications.ts';
 import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { formatMoney, todayISO } from '#lib/format.ts';
@@ -547,6 +549,10 @@ export async function createSession(
 			}))
 		)
 		.returning();
+	notifyClassWatchers(
+		ctx.orgId,
+		rows.map((r) => r.id)
+	).catch(() => {});
 	await emit({
 		orgId: ctx.orgId,
 		actorId: ctx.userId,

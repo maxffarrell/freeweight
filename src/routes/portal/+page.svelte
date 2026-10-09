@@ -8,7 +8,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
-	import Trophy from '@lucide/svelte/icons/trophy';
+	import Bell from '@lucide/svelte/icons/bell';
+import Trophy from '@lucide/svelte/icons/trophy';
 	import Star from '@lucide/svelte/icons/star';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
@@ -94,7 +95,8 @@
 		giftPackCredits,
 		getMyDataExport,
 		getNpsStatus,
-		submitNps
+		submitNps,
+		setClassWatch
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -1197,6 +1199,9 @@
 									></span>{/if}
 								{d.level.name}
 							</Badge>
+						{/if}
+						{#if d.loyalty}
+							<Badge variant="secondary" class={d.loyalty.className}>{d.loyalty.name} member</Badge>
 						{/if}
 						{#each d.memberships as mm (mm.membership.id)}
 							{#if mm.membership.status === 'active'}
@@ -2515,6 +2520,56 @@
 							: 's'}
 					</p>
 				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if d.year.visits || d.year.prs}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Your {new Date().getFullYear()}</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<div class="grid grid-cols-3 gap-2 text-center">
+					<div>
+						<p class="text-2xl font-semibold tabular-nums">{d.year.visits}</p>
+						<p class="text-xs text-muted-foreground">visits</p>
+					</div>
+					<div>
+						<p class="truncate text-2xl font-semibold">{d.year.topClass ?? '—'}</p>
+						<p class="text-xs text-muted-foreground">
+							favorite{d.year.topCount ? ` (${d.year.topCount})` : ''}
+						</p>
+					</div>
+					<div>
+						<p class="text-2xl font-semibold tabular-nums">{d.year.prs}</p>
+						<p class="text-xs text-muted-foreground">records</p>
+					</div>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if d.watchList.length}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Class alerts</Card.Title>
+				<Card.Description>Email me when a new session is published</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<div class="flex flex-wrap gap-1.5">
+					{#each d.watchList as w (w.id)}
+						<Button
+							variant={w.watching ? 'default' : 'outline'}
+							size="sm"
+							class="gap-1.5"
+							onclick={() => setClassWatch({ memberId, classTypeId: w.id, on: !w.watching })}
+						>
+							<Bell class={w.watching ? '' : 'text-muted-foreground'} />
+							{w.name}
+						</Button>
+					{/each}
+				</div>
 			</Card.Content>
 		</Card.Root>
 	{/if}

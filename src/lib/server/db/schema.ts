@@ -1288,6 +1288,25 @@ export const memberTag = pgTable(
 	]
 );
 
+export const classWatch = pgTable(
+	'class_watch',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		classTypeId: text('class_type_id')
+			.notNull()
+			.references(() => classType.id, { onDelete: 'cascade' }),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('class_watch_class_idx').on(t.classTypeId),
+		uniqueIndex('class_watch_unique').on(t.memberId, t.classTypeId)
+	]
+);
+
 /** Staff notes on a member — injuries, preferences, front-desk flags. */
 export const memberNote = pgTable(
 	'member_note',

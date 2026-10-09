@@ -22,6 +22,7 @@ import {
 	charge,
 	checkIn,
 	classSession,
+	classWatch,
 	classType,
 	document,
 	sessionFeedback,
@@ -71,7 +72,7 @@ import {
 	notifyPlanChanged
 } from './notifications.ts';
 import { addDays, localDate } from '#lib/tz.ts';
-import { formatMoney, todayISO } from '#lib/format.ts';
+import { formatMoney, loyaltyTier, todayISO } from '#lib/format.ts';
 
 const TTL_MS = 14 * 86400_000;
 
@@ -424,7 +425,10 @@ export async function portalOverview(memberId: string) {
 		signedWaiver,
 		waiverStale: !!settings?.waiver && !!signedWaiver && signedWaiver.text !== settings.waiver,
 		attendance: await attendanceStats(orgId, memberId, settings?.timezone ?? 'UTC'),
-		leaderboard: await membersLeaderboard(orgId, memberId, settings?.timezone ?? 'UTC')
+		leaderboard: await membersLeaderboard(orgId, memberId, settings?.timezone ?? 'UTC'),
+		loyalty: loyaltyTier(await lifetimeVisits(orgId, memberId)),
+		year: await yearRecap(orgId, memberId),
+		watchList: await watchList(orgId, memberId)
 	};
 }
 
@@ -1653,4 +1657,87 @@ export async function submitNps(
 		summary: `Left feedback — ${score}/10`
 	});
 	return row;
+}
+
+/** All-time check-ins (guest visits excluded) — feeds the loyalty tier. */
+async function lifetimeVisits(orgId: string, memberId: string) {
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName)
+			)
+		);
+	return n;
+}
+
+/** "Your year" card: visits YTD, the member's most-attended class, PRs logged this year. */
+async function yearRecap(orgId: string, memberId: string) {
+	const yearStart = new Date(`${new Date().getFullYear()}-01-01T00:00:00Z`);
+	const [visits, prs, top] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(checkIn)
+			.where(
+				and(
+					eq(checkIn.organizationId, orgId),
+					eq(checkIn.memberId, memberId),
+					isNull(checkIn.guestName),
+					gte(checkIn.checkedAt, yearStart)
+				)
+			),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(personalRecord)
+			.where(
+				and(
+					eq(personalRecord.organizationId, orgId),
+					eq(personalRecord.memberId, memberId),
+					gte(personalRecord.createdAt, yearStart)
+				)
+			),
+		db
+			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(booking.organizationId, orgId),
+					eq(booking.memberId, memberId),
+					eq(booking.status, 'attended'),
+					gte(classSession.startsAt, yearStart)
+				)
+			)
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`))
+			.limit(1)
+	]);
+	return { visits: visits[0]?.n ?? 0, prs: prs[0]?.n ?? 0, topClass: top[0]?.name ?? null, topCount: top[0]?.n ?? 0 };
+}
+
+/** Class-alert toggles: every member-bookable class type + whether this member watches it. */
+async function watchList(orgId: string, memberId: string) {
+	const [types, watches] = await Promise.all([
+		db
+			.select({ id: classType.id, name: classType.name })
+			.from(classType)
+			.where(
+				and(
+					eq(classType.organizationId, orgId),
+					eq(classType.active, true),
+					eq(classType.memberBookable, true)
+				)
+			)
+			.orderBy(asc(classType.name)),
+		db
+			.select({ classTypeId: classWatch.classTypeId })
+			.from(classWatch)
+			.where(and(eq(classWatch.organizationId, orgId), eq(classWatch.memberId, memberId)))
+	]);
+	const watching = new Set(watches.map((w) => w.classTypeId));
+	return types.map((t) => ({ ...t, watching: watching.has(t.id) }));
 }

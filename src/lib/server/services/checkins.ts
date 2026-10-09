@@ -470,9 +470,23 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		)
 		.orderBy(asc(classSession.startsAt))
 		.limit(1);
+	const [prevVisit] = await db
+		.select({ at: checkIn.checkedAt })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName),
+				ne(checkIn.id, row!.id)
+			)
+		)
+		.orderBy(desc(checkIn.checkedAt))
+		.limit(1);
 	return {
 		checkIn: row!,
 		member: m,
+		welcomeBack: !!prevVisit && Date.now() - prevVisit.at.getTime() > 30 * 86400_000,
 		attended: attended.length,
 		birthday,
 		visits: n,
