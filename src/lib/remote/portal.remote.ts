@@ -6,6 +6,7 @@ import { db } from '#lib/server/db/index.ts';
 import { classType, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
+import * as billingSvc from '#lib/server/services/billing.ts';
 import * as progSvc from '#lib/server/services/programs.ts';
 import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
@@ -53,6 +54,26 @@ export const getPortalOverview = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	return svc.portalOverview(m.id);
 });
+
+/**
+ * Member freezes their own active membership for `days` days, capped by the
+ * gym's selfFreezeDays-per-year setting. Pauses billing until frozenUntil.
+ */
+export const selfFreezeMembership = command(
+	v.object({
+		memberId: idSchema,
+		membershipId: idSchema,
+		days: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365))
+	}),
+	async ({ memberId, membershipId, days }) => {
+		const m = await myMember(memberId);
+		try {
+			return await billingSvc.selfFreezeMembership(m.organizationId, m.id, membershipId, days);
+		} finally {
+			void getPortalOverview(memberId).refresh();
+		}
+	}
+);
 
 export const getBookable = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);

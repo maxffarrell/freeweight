@@ -520,6 +520,14 @@ export const settingsInput = v.object({
 	),
 	/** Monthly revenue goal in minor units for the Reports progress bar; null = off. */
 	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Comp classes granted on each member's birthday; null/0 = off. */
+	birthdayCompCredits: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))
+	),
+	/** Days per year members may pause their own membership in the portal; null/0 = off. */
+	selfFreezeDays: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)))
+	),
 	/** Weekly opening hours {weekday: 'HH:MM-HH:MM'}; '' = closed that day. */
 	openHours: v.optional(v.record(v.string(), v.pipe(v.string(), v.trim(), v.maxLength(11))))
 });

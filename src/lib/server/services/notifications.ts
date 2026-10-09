@@ -817,6 +817,10 @@ export async function sendTrialEndingNotices(orgId: string) {
  */
 export async function sendBirthdayGreetings(orgId: string) {
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const [gs] = await db
+		.select({ birthdayCompCredits: gymSettings.birthdayCompCredits })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
 	const today = localDate(new Date(), tz);
 	const mmdd = today.slice(5);
 	const year = today.slice(0, 4);
@@ -835,6 +839,15 @@ export async function sendBirthdayGreetings(orgId: string) {
 	for (const r of rows) {
 		if (!r.email) continue;
 		if (!(await logOnce(orgId, 'birthday', `${r.memberId}:${year}`, r.email))) continue;
+		// Birthday treat: comp classes banked on the member's active memberships.
+		let comped = 0;
+		if (gs?.birthdayCompCredits) {
+			await db
+				.update(membership)
+				.set({ bonusCredits: sql`${membership.bonusCredits} + ${gs.birthdayCompCredits}` })
+				.where(and(eq(membership.memberId, r.memberId), eq(membership.status, 'active')));
+			comped = gs.birthdayCompCredits;
+		}
 		await sendMemberEmail(r.memberId, {
 			to: r.email,
 			subject: `Happy birthday, ${r.memberName.split(' ')[0]}!`,
@@ -843,6 +856,9 @@ export async function sendBirthdayGreetings(orgId: string) {
 				heading: 'Happy birthday!',
 				lines: [
 					`Hi ${r.memberName} — everyone at ${name.orgName} is wishing you a great birthday.`,
+					...(comped
+						? [`We've banked ${comped} free class${comped > 1 ? 'es' : ''} on your membership — enjoy.`]
+						: []),
 					'See you at the gym — first workout of the year is on you.'
 				],
 				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
@@ -3831,6 +3847,42 @@ export async function notifyDeletionRequested(orgId: string, memberId: string) {
 					`${row.memberName} requested deletion of their personal data from the member portal.`,
 					'Open their member page to anonymize the record — booking and payment history is kept for accounting, but name, contact and profile fields are scrubbed.'
 				]
+			})
+		});
+	}
+}
+
+/**
+ * Staff heads-up the moment a booking fills a session to capacity. Once per
+ * session (logOnce 'class_full'); skipped when nobody owns/admin's the org.
+ */
+export async function notifyClassFull(orgId: string, sessionId: string) {
+	const [row] = await db
+		.select({ className: classType.name, startsAt: classSession.startsAt, capacity: classSession.capacity })
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(eq(classSession.id, sessionId));
+	if (!row) return;
+	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	for (const s of staff) {
+		if (!s.email) continue;
+		if (!(await logOnce(orgId, 'class_full', sessionId, s.email))) continue;
+		await sendEmail({
+			to: s.email,
+			subject: `${row.className} just sold out — ${localDate(row.startsAt, tz)}`,
+			...renderEmail({
+				...name,
+				heading: `${row.className} is full`,
+				lines: [
+					`The ${localDate(row.startsAt, tz)} ${localTime(row.startsAt, tz)} session just hit its ${row.capacity}-seat cap — later bookings go to the waitlist.`,
+					'Consider raising capacity or adding another session.'
+				],
+				action: { label: 'Open the schedule', url: `${appOrigin()}/schedule` }
 			})
 		});
 	}

@@ -55,6 +55,7 @@ export function sessionCode() {
 import {
 	notifyBookingCancelled,
 	notifyBookingConfirmed,
+	notifyClassFull,
 	notifyChargePosted,
 	notifyInstructorChanged,
 	notifyNoShow,
@@ -1486,6 +1487,17 @@ export async function bookSession(
 		data: { sessionId: input.sessionId, memberId: input.memberId }
 	});
 	if (opts?.notify !== false) notifyBookingConfirmed(ctx.orgId, row.id).catch(() => {});
+	// Staff heads-up when this booking fills the session (once per session).
+	if (row.status === 'booked') {
+		const [fill] = await db
+			.select({
+				cap: classSession.capacity,
+				n: sql<number>`(select count(*) + coalesce(sum(b.guest_count), 0) from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`.mapWith(Number)
+			})
+			.from(classSession)
+			.where(eq(classSession.id, input.sessionId));
+		if (fill && fill.n >= fill.cap) notifyClassFull(ctx.orgId, input.sessionId).catch(() => {});
+	}
 	return row;
 }
 

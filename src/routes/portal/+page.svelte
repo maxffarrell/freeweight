@@ -25,6 +25,7 @@
 		memberMove,
 		requestMembershipCancel,
 		requestMembershipPause,
+		selfFreezeMembership,
 		withdrawMembershipPause,
 		withdrawMembershipCancel,
 		getProviders,
@@ -987,6 +988,27 @@
 		}
 		offerBusy = false;
 	}
+	let freezeId = $state('');
+	let freezeDays = $state(7);
+	let freezeBusy = $state(false);
+	const thisYear = new Date().getUTCFullYear();
+	function freezeRemaining(ms: { selfFreezeYear: number | null; selfFreezeUsedDays: number }) {
+		const cap = d.settings.selfFreezeDays ?? 0;
+		return Math.max(0, cap - (ms.selfFreezeYear === thisYear ? ms.selfFreezeUsedDays : 0));
+	}
+	async function selfFreeze(membershipId: string) {
+		freezeBusy = true;
+		try {
+			const r = await selfFreezeMembership({ memberId, membershipId, days: freezeDays });
+			toast.success(
+				`Frozen until ${formatDate(r.until)} — ${r.remaining} freeze day${r.remaining === 1 ? '' : 's'} left this year`
+			);
+			freezeId = '';
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not freeze'));
+		}
+		freezeBusy = false;
+	}
 	async function withdrawCancel(membershipId: string) {
 		try {
 			await withdrawMembershipCancel({ memberId, membershipId });
@@ -1351,6 +1373,18 @@
 										>
 										·
 									{/if}
+									{#if !mm.plan.isPack && d.settings.selfFreezeDays}
+										<button
+											class="underline"
+											disabled={freezeRemaining(mm.membership) === 0}
+											onclick={() => {
+												freezeDays = Math.min(7, freezeRemaining(mm.membership));
+												freezeId = freezeId === mm.membership.id ? '' : mm.membership.id;
+											}}
+											>Freeze</button
+										>
+										·
+									{/if}
 									{#if mm.plan.isPack}
 										<button
 											class="underline"
@@ -1367,6 +1401,36 @@
 									>
 								{/if}
 							</p>
+							{#if freezeId === mm.membership.id}
+								<form
+									class="mt-1 flex flex-wrap items-center gap-2"
+									onsubmit={(e) => {
+										e.preventDefault();
+										void selfFreeze(mm.membership.id);
+									}}
+								>
+									<label class="text-xs text-muted-foreground" for="freeze-days">Days</label>
+									<Input
+										id="freeze-days"
+										type="number"
+										min={1}
+										max={freezeRemaining(mm.membership)}
+										required
+										class="h-7 w-20 text-xs"
+										bind:value={freezeDays}
+									/>
+									<span class="text-xs text-muted-foreground"
+										>{freezeRemaining(mm.membership)} left this year</span
+									>
+									<Button
+										size="sm"
+										variant="outline"
+										class="h-7 px-2 text-xs"
+										type="submit"
+										disabled={freezeBusy}>{freezeBusy ? 'Freezing…' : 'Freeze'}</Button
+									>
+								</form>
+							{/if}
 							{#if pauseReqId === mm.membership.id}
 								<form class="mt-1 flex flex-wrap items-center gap-2" onsubmit={requestPause}>
 									<label class="text-xs text-muted-foreground" for="pause-date">Resume on</label>
