@@ -81,7 +81,8 @@ export async function listMembers(
 	sort: MemberSort = 'name',
 	owes?: boolean,
 	suspended?: boolean,
-	recent?: boolean
+	recent?: boolean,
+	risk?: boolean
 ) {
 	const term = q?.trim();
 	return db
@@ -143,7 +144,13 @@ export async function listMembers(
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
 					: undefined,
-				recent ? gte(gymMember.joinedAt, new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)) : undefined
+				recent
+					? gte(gymMember.joinedAt, new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10))
+					: undefined,
+				// At-risk: active member with no check-in in the last 30 days (or ever).
+				risk
+					? sql`${gymMember.status} = 'active' and not exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 30 * 86_400_000).toISOString()})`
+					: undefined
 			)
 		)
 		.orderBy(MEMBER_ORDER[sort]);

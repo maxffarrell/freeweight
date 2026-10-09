@@ -2768,3 +2768,81 @@ export async function setClassTypeQuals(ctx: OrgContext, classTypeId: string, me
 	});
 	return { ok: true };
 }
+
+/**
+ * Printable front-desk day sheet: every session on one local day (org tz) with
+ * its booked/attended/waitlisted roster in one grouped read.
+ */
+export async function daySheet(orgId: string, date: string) {
+	const [st] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const tz = st?.timezone ?? 'UTC';
+	const rows = await db
+		.select({
+			sessionId: classSession.id,
+			className: classType.name,
+			startsAt: classSession.startsAt,
+			endsAt: classSession.endsAt,
+			instructor: user.name,
+			location: location.name,
+			cancelled: classSession.cancelledAt,
+			memberName: gymMember.name,
+			status: booking.status,
+			guests: booking.guestCount
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.leftJoin(location, eq(classSession.locationId, location.id))
+		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.leftJoin(user, eq(member.userId, user.id))
+		.leftJoin(
+			booking,
+			and(
+				eq(booking.sessionId, classSession.id),
+				inArray(booking.status, ['booked', 'attended', 'waitlisted', 'no_show'])
+			)
+		)
+		.leftJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				gte(classSession.startsAt, zonedToUtc(`${date}T00:00`, tz)),
+				lt(classSession.startsAt, zonedToUtc(`${addDays(date, 1)}T00:00`, tz))
+			)
+		)
+		.orderBy(asc(classSession.startsAt), asc(gymMember.name));
+
+	const sessions: {
+		id: string;
+		className: string;
+		startsAt: Date;
+		endsAt: Date;
+		instructor: string | null;
+		location: string | null;
+		cancelled: boolean;
+		roster: { name: string; status: string; guests: number }[];
+	}[] = [];
+	const byId = new Map<string, (typeof sessions)[number]>();
+	for (const r of rows) {
+		let e = byId.get(r.sessionId);
+		if (!e) {
+			e = {
+				id: r.sessionId,
+				className: r.className,
+				startsAt: r.startsAt,
+				endsAt: r.endsAt,
+				instructor: r.instructor,
+				location: r.location,
+				cancelled: !!r.cancelled,
+				roster: []
+			};
+			byId.set(r.sessionId, e);
+			sessions.push(e);
+		}
+		if (r.memberName) e.roster.push({ name: r.memberName, status: r.status!, guests: r.guests ?? 0 });
+	}
+	return { tz, date, sessions };
+}

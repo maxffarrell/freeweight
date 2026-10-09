@@ -137,7 +137,8 @@
 			sort,
 			owes: owesFilter === 'owes' || undefined,
 			suspended: owesFilter === 'suspended' || undefined,
-			recent: owesFilter === '__new' || undefined
+			recent: owesFilter === '__new' || undefined,
+			risk: owesFilter === '__risk' || undefined
 		});
 	}
 	function search() {
@@ -572,13 +573,16 @@
 						? 'Suspended'
 						: owesFilter === '__new'
 							? 'New this week'
-							: 'Any balance'}</Select.Trigger
+							: owesFilter === '__risk'
+								? 'At-risk 30d+'
+								: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
 				<Select.Item value="owes">Owes money</Select.Item>
 				<Select.Item value="suspended">Suspended</Select.Item>
 				<Select.Item value="__new">New this week</Select.Item>
+				<Select.Item value="__risk">At-risk 30d+</Select.Item>
 			</Select.Content>
 		</Select.Root>
 		<Select.Root type="single" bind:value={sort} onValueChange={() => void refilter()}>

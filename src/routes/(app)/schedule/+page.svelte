@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
@@ -983,6 +984,9 @@
 				<DropdownMenu.Item onclick={() => (coursesOpen = true)}>Courses</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={() => (bulkOpen = true)}>Bulk cancel…</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => goto('/schedule/day-sheet')}
+					><Printer /> Day sheet</DropdownMenu.Item
+				>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}

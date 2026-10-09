@@ -89,6 +89,11 @@ export const getSessions = query(
 		return svc.listSessions(orgId, from, to);
 	}
 );
+/** Everything on one local day for the printable day sheet. */
+export const getDaySheet = query(v.string(), async (date) =>
+	svc.daySheet((await requireOrg()).orgId, date)
+);
+
 export const getSession = query(idSchema, async (id) =>
 	svc.getSession((await requireOrg()).orgId, id)
 );

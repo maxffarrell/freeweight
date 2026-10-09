@@ -35,6 +35,7 @@ import {
 	gymSettings,
 	location,
 	member,
+	memberTag,
 	membership,
 	payment,
 	plan,
@@ -1088,7 +1089,8 @@ export async function getReports(orgId: string) {
 		courses,
 		nps,
 		paused,
-		covers
+		covers,
+		tags
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1133,7 +1135,8 @@ export async function getReports(orgId: string) {
 		courseStats(orgId),
 		npsStats(orgId),
 		pausedMemberships(orgId),
-		coverScorecard(orgId)
+		coverScorecard(orgId),
+		tagBreakdown(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1190,7 +1193,8 @@ export async function getReports(orgId: string) {
 		courses,
 		nps,
 		paused,
-		covers
+		covers,
+		tags
 	};
 }
 
@@ -1413,4 +1417,21 @@ async function pausedMemberships(orgId: string) {
 		.where(and(eq(membership.organizationId, orgId), eq(membership.status, 'paused')))
 		.orderBy(asc(membership.frozenUntil), asc(gymMember.name))
 		.limit(50);
+}
+
+/**
+ * Member counts per tag (active members) — how the desk's labels distribute.
+ */
+async function tagBreakdown(orgId: string) {
+	return db
+		.select({
+			tag: memberTag.tag,
+			n: sql<number>`count(distinct ${memberTag.memberId})`.mapWith(Number)
+		})
+		.from(memberTag)
+		.innerJoin(gymMember, eq(memberTag.memberId, gymMember.id))
+		.where(and(eq(memberTag.organizationId, orgId), eq(gymMember.status, 'active')))
+		.groupBy(memberTag.tag)
+		.orderBy(desc(sql`count(distinct ${memberTag.memberId})`))
+		.limit(20);
 }
