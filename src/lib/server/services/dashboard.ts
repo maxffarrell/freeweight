@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, ne, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
 	signRequest,
@@ -18,6 +18,7 @@ import {
 	member,
 	memberIssue,
 	instructorTimeOff,
+	equipment,
 	membership,
 	payment,
 	paymentProvider,
@@ -334,6 +335,18 @@ export async function dashboard(orgId: string) {
 		.orderBy(desc(memberIssue.createdAt))
 		.limit(50);
 
+	// Equipment flagged maintenance/out-of-order — front desk should know.
+	const equipmentDown = await db
+		.select({
+			id: equipment.id,
+			name: equipment.name,
+			status: equipment.status,
+			nextServiceOn: equipment.nextServiceOn
+		})
+		.from(equipment)
+		.where(and(eq(equipment.organizationId, orgId), ne(equipment.status, 'operational')))
+		.limit(20);
+
 	// Instructors/staff with time off starting in the next 14 days (or underway).
 	const offSoon = await db
 		.select({
@@ -634,6 +647,15 @@ export async function dashboard(orgId: string) {
 				requestedAt: d.requestedAt as Date,
 				pauseUntil: null,
 				requestReason: null
+			})),
+			...equipmentDown.map((e) => ({
+				memberId: '',
+				memberName: e.name,
+				planName: `equipment ${e.status}`,
+				kind: 'equipment' as const,
+				requestedAt: new Date(),
+				pauseUntil: null,
+				requestReason: e.nextServiceOn ? `service due ${e.nextServiceOn}` : null
 			}))
 		],
 		fullSessions,

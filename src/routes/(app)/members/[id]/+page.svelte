@@ -980,9 +980,21 @@
 					<span class="text-muted-foreground">Status</span><StatusBadge status={m.member.status} />
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground">Email</span><span class="truncate"
-						>{m.member.email ?? '—'}</span
-					>
+					<span class="text-muted-foreground">Email</span>
+					<span class="flex items-center gap-1 truncate">
+						<span class="truncate">{m.member.email ?? '—'}</span>
+						{#if m.member.email}
+							<Button
+								variant="ghost"
+								class="h-6 px-1.5"
+								onclick={() =>
+									navigator.clipboard
+										.writeText(m.member.email!)
+										.then(() => toast.success('Email copied'))
+										.catch(() => toast.error('Could not copy'))}>Copy</Button
+							>
+						{/if}
+					</span>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Phone</span><span>{m.member.phone ?? '—'}</span>
@@ -1282,6 +1294,10 @@
 								)}{mm.membership.endsAt ? ` · expires ${formatDate(mm.membership.endsAt)}` : ''}{mm
 									.membership.frozenUntil
 									? ` · paused until ${formatDate(mm.membership.frozenUntil)}`
+									: ''}{mm.membership.status === 'active' &&
+								!mm.membership.noBill &&
+								mm.membership.nextChargeAt
+									? ` · next bill ${formatDate(mm.membership.nextChargeAt)}`
 									: ''}
 							</p>
 							{#if mm.membership.noBill}
