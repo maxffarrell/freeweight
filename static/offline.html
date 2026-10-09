@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Offline — Freeweight</title>
+		<style>
+			body {
+				margin: 0;
+				min-height: 100dvh;
+				display: grid;
+				place-items: center;
+				background: #09090b;
+				color: #fafafa;
+				font-family:
+					ui-sans-serif,
+					system-ui,
+					sans-serif;
+				text-align: center;
+			}
+			img {
+				width: 64px;
+				height: 64px;
+				border-radius: 14px;
+			}
+			h1 {
+				font-size: 1.25rem;
+				margin: 1rem 0 0.25rem;
+			}
+			p {
+				color: #a1a1aa;
+				margin: 0;
+				font-size: 0.9rem;
+			}
+			button {
+				margin-top: 1.25rem;
+				padding: 0.6rem 1.2rem;
+				border-radius: 8px;
+				border: 1px solid #3f3f46;
+				background: #18181b;
+				color: #fafafa;
+				font: inherit;
+				cursor: pointer;
+			}
+		</style>
+	</head>
+	<body>
+		<div>
+			<img src="/icon-192.png" alt="Freeweight" />
+			<h1>You're offline</h1>
+			<p>The gym's connection dropped — try again when you're back online.</p>
+			<button onclick="location.reload()">Retry</button>
+		</div>
+	</body>
+</html>
