@@ -263,6 +263,33 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.tags?.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Member tags</Card.Title>
+				<Card.Description>Active members per tag — how your labels distribute</Card.Description>
+			</Card.Header>
+			<Card.Content class="p-0">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Tag</Table.Head>
+							<Table.Head class="text-right">Members</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.tags as t (t.tag)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{t.tag}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{t.n}</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Churn by plan</Card.Title>

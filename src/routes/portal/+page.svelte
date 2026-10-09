@@ -1879,11 +1879,24 @@
 							: 's'} for each one that pays.{/if}
 				</Card.Description>
 			</Card.Header>
-			<Card.Content class="flex items-center gap-2 px-6">
-				<code class="flex-1 truncate rounded-md border bg-muted/40 px-3 py-2 text-xs"
-					>{refLink}</code
-				>
-				<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
+			<Card.Content class="px-6">
+				<div class="flex items-center gap-2">
+					<code class="flex-1 truncate rounded-md border bg-muted/40 px-3 py-2 text-xs"
+						>{refLink}</code
+					>
+					<Button size="sm" variant="outline" onclick={copyRefLink}><Copy /> Copy</Button>
+				</div>
+				{#if d.referrals?.length}
+					<div class="mt-3 space-y-1">
+						{#each d.referrals as r (r.name)}
+							<p class="flex items-center justify-between text-xs">
+								<span>{r.name}</span>
+								{#if r.paying}<Badge variant="secondary" class="text-[10px]">paying</Badge
+									>{:else}<span class="text-muted-foreground">joined</span>{/if}
+							</p>
+						{/each}
+					</div>
+				{/if}
 			</Card.Content>
 		</Card.Root>
 	{/if}

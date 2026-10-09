@@ -227,13 +227,35 @@ export async function portalOverview(memberId: string) {
 		.where(and(eq(recurringCharge.memberId, memberId), eq(recurringCharge.organizationId, orgId)))
 		.orderBy(asc(recurringCharge.nextDue));
 
-	const [[org], [referred]] = await Promise.all([
+	const [[org], [referred], referralRows] = await Promise.all([
 		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
 		db
 			.select({ n: sql<number>`count(*)`.mapWith(Number) })
 			.from(gymMember)
+			.where(eq(gymMember.referredByMemberId, memberId)),
+		db
+			.select({ id: gymMember.id, name: gymMember.name })
+			.from(gymMember)
 			.where(eq(gymMember.referredByMemberId, memberId))
+			.orderBy(desc(gymMember.createdAt))
+			.limit(20)
 	]);
+	let referrals: { name: string; paying: boolean }[] = [];
+	if (referralRows.length) {
+		const paid = await db
+			.select({ memberId: payment.memberId })
+			.from(payment)
+			.where(
+				and(
+					eq(payment.organizationId, orgId),
+					inArray(payment.memberId, referralRows.map((r) => r.id)),
+					isNull(payment.refundedAt)
+				)
+			)
+			.groupBy(payment.memberId);
+		const paidSet = new Set(paid.map((p) => p.memberId));
+		referrals = referralRows.map((r) => ({ name: r.name, paying: paidSet.has(r.id) }));
+	}
 
 	// Recent payments for the portal's billing history (most recent first).
 	const payments = await db
@@ -388,6 +410,7 @@ export async function portalOverview(memberId: string) {
 		calendarToken: calendarToken(memberId),
 		orgSlug: org?.slug ?? '',
 		referralCount: referred?.n ?? 0,
+		referrals,
 		dropInFree: !!settings?.firstClassFree && !priorBooking,
 		onboarding: {
 			waiver: !settings?.waiver || !!signedWaiver,
