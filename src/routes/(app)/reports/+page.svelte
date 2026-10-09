@@ -78,13 +78,14 @@
 	}
 	function exportPnl() {
 		const csv = toCsv([
-			['Month', 'Revenue', 'Expenses', 'Shop COGS', 'Net'],
+			['Month', 'Revenue', 'Expenses', 'Shop COGS', 'Net', 'Margin %'],
 			...r.pnl.months.map((m) => [
 				m.month,
 				(m.revenue / 100).toFixed(2),
 				(m.expenses / 100).toFixed(2),
 				(m.cogs / 100).toFixed(2),
-				(m.net / 100).toFixed(2)
+				(m.net / 100).toFixed(2),
+				m.revenue > 0 ? Math.round((100 * m.net) / m.revenue) : ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -1065,6 +1066,7 @@
 								<Table.Head class="text-right">Expenses</Table.Head>
 								<Table.Head class="text-right">Shop COGS</Table.Head>
 								<Table.Head class="text-right">Net</Table.Head>
+								<Table.Head class="text-right">Margin</Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
@@ -1084,6 +1086,9 @@
 										class="text-right font-medium tabular-nums {m.net < 0
 											? 'text-destructive'
 											: ''}">{formatMoney(m.net, currency)}</Table.Cell
+									>
+									<Table.Cell class="text-right text-muted-foreground tabular-nums"
+										>{m.revenue > 0 ? `${Math.round((100 * m.net) / m.revenue)}%` : '—'}</Table.Cell
 									>
 								</Table.Row>
 							{/each}

@@ -65,6 +65,8 @@
 	);
 	let memberships = $state(await getMemberships());
 	let payments = $state(await getPayments());
+	let payMethodFilter = $state('');
+	const payMethods = $derived([...new Set(payments.map((p) => p.payment.method))].sort());
 	let giftCards = $state(await getGiftCards());
 	let recurring = $state(await getRecurring());
 	let expenses = $state(await getExpenses());
@@ -770,8 +772,28 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="payments">
-			<div class="mb-3 flex justify-end">
-				<Button size="sm" variant="outline" onclick={exportPayments}><Download /> Export</Button>
+			<div class="mb-3 flex items-center gap-2">
+				<NativeSelect bind:value={payMethodFilter}>
+					<option value="">All methods</option>
+					{#each payMethods as m (m)}
+						<option value={m} class="capitalize">{m}</option>
+					{/each}
+				</NativeSelect>
+				<span class="text-xs text-muted-foreground"
+					>{formatMoney(
+						payments
+							.filter(
+								(p) =>
+									!p.payment.refundedAt &&
+									(!payMethodFilter || p.payment.method === payMethodFilter)
+							)
+							.reduce((a, p) => a + p.payment.amount, 0),
+						currency
+					)} collected</span
+				>
+				<Button size="sm" variant="outline" class="ml-auto" onclick={exportPayments}
+					><Download /> Export</Button
+				>
 			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
@@ -786,7 +808,7 @@
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each payments as p (p.payment.id)}
+							{#each payments.filter((p) => !payMethodFilter || p.payment.method === payMethodFilter) as p (p.payment.id)}
 								<Table.Row class={p.payment.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>
 										<a class="font-medium hover:underline" href="/members/{p.payment.memberId}"
