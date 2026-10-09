@@ -66,7 +66,7 @@
 		if (!code.trim()) return;
 		pending = true;
 		try {
-			const r = await recordCheckIn({ code: code.trim(), locationId: filterLocation || undefined });
+			const r = await recordCheckIn({ code: code.trim(), locationId: locationId || undefined });
 			if ((r.visitsToday ?? 0) >= 3)
 				toast.warning(
 					`${r.member.name} — ${r.visitsToday ?? 0}th visit today. Possible shared card.`
@@ -151,7 +151,7 @@
 				{#if locations.filter((l) => !l.archivedAt).length > 1}
 					<Field.Field>
 						<Field.Label>Location</Field.Label>
-						<NativeSelect bind:value={filterLocation}>
+						<NativeSelect bind:value={locationId}>
 							<option value="">None</option>
 							{#each locations.filter((l) => !l.archivedAt) as l (l.id)}
 								<option value={l.id}>{l.name}</option>
