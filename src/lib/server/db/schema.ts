@@ -1512,3 +1512,67 @@ export const equipmentLoan = pgTable(
 	},
 	(t) => [index('equipment_loan_org_idx').on(t.organizationId)]
 );
+
+/** A reusable workout program template — name + a library of numbered days. */
+export const workoutProgram = pgTable(
+	'workout_program',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		weeks: integer('weeks').notNull().default(1),
+		note: text('note'),
+		createdBy: text('created_by'),
+		...timestamps
+	},
+	(t) => [index('workout_program_org_idx').on(t.organizationId)]
+);
+
+/** One day inside a program — dayNo counts across the whole program (1..weeks*days). */
+export const programDay = pgTable(
+	'program_day',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		programId: text('program_id')
+			.notNull()
+			.references(() => workoutProgram.id, { onDelete: 'cascade' }),
+		dayNo: integer('day_no').notNull(),
+		title: text('title').notNull(),
+		/** Freeform: exercises, sets/reps, notes. */
+		body: text('body').notNull(),
+		...timestamps
+	},
+	(t) => [index('program_day_program_idx').on(t.programId)]
+);
+
+/** A member assigned to a program — start date anchors "day N" on their portal. */
+export const memberProgram = pgTable(
+	'member_program',
+	{
+		id: text('id')
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		organizationId: text('organization_id')
+			.notNull()
+			.references(() => organization.id, { onDelete: 'cascade' }),
+		programId: text('program_id')
+			.notNull()
+			.references(() => workoutProgram.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		startDate: text('start_date').notNull(),
+		status: text('status').notNull().default('active'), // active | done | stopped
+		...timestamps
+	},
+	(t) => [index('member_program_member_idx').on(t.memberId)]
+);

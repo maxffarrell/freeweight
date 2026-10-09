@@ -6,6 +6,7 @@ import { db } from '#lib/server/db/index.ts';
 import { classType, document, gymMember, membership, outer, plan } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
+import * as progSvc from '#lib/server/services/programs.ts';
 import * as crs from '#lib/server/services/courses.ts';
 import * as memberSvc from '#lib/server/services/members.ts';
 import * as woSvc from '#lib/server/services/workouts.ts';
@@ -815,3 +816,8 @@ export const submitNps = command(
 		return r;
 	}
 );
+
+export const getMyPrograms = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return progSvc.portalPrograms(m.organizationId, m.id);
+});

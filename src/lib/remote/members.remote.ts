@@ -49,6 +49,7 @@ import {
 } from '#lib/server/services/notifications.ts';
 import * as levelSvc from '#lib/server/services/levels.ts';
 import * as loanSvc from '#lib/server/services/loans.ts';
+import * as progSvc from '#lib/server/services/programs.ts';
 import * as lockerSvc from '#lib/server/services/lockers.ts';
 import * as settingsSvc from '#lib/server/services/settings.ts';
 import { localDate, zonedToUtc } from '#lib/tz.ts';
@@ -493,6 +494,69 @@ export const returnLoan = command(
 		const ctx = await requireOrg();
 		const r = await loanSvc.returnLoan(ctx, input.loanId);
 		void getMemberLoans(input.memberId).refresh();
+		return r;
+	}
+);
+
+export const getPrograms = query(async () => progSvc.listPrograms((await requireOrg()).orgId));
+
+export const saveProgram = command(
+	v.object({
+		id: v.optional(idSchema),
+		name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+		weeks: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(52)),
+		note: v.optional(v.pipe(v.string(), v.maxLength(500))),
+		days: v.array(
+			v.object({
+				dayNo: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365)),
+				title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+				body: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(4000))
+			})
+		)
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await progSvc.saveProgram(ctx, input);
+		void getPrograms().refresh();
+		return r;
+	}
+);
+
+export const removeProgram = command(idSchema, async (id) => {
+	const ctx = await requireOrg('admin');
+	const r = await progSvc.removeProgram(ctx, id);
+	void getPrograms().refresh();
+	return r;
+});
+
+export const getMemberPrograms = query(idSchema, async (memberId) =>
+	progSvc.memberPrograms((await requireOrg()).orgId, memberId)
+);
+
+export const assignProgram = command(
+	v.object({
+		memberId: idSchema,
+		programId: idSchema,
+		startDate: v.pipe(v.string(), v.nonEmpty())
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await progSvc.assignProgram(ctx, input.memberId, input.programId, input.startDate);
+		void getMemberPrograms(input.memberId).refresh();
+		return r;
+	}
+);
+
+export const setProgramStatus = command(
+	v.object({
+		assignmentId: idSchema,
+		memberId: idSchema,
+		status: v.picklist(['active', 'done', 'stopped'])
+	}),
+	async (input) => {
+		const ctx = await requireOrg();
+		const r = await progSvc.setAssignmentStatus(ctx, input.assignmentId, input.status);
+		void getMemberPrograms(input.memberId).refresh();
 		return r;
 	}
 );

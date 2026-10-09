@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, gt, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
+	loanableItem,
+	equipmentLoan,
 	activity,
 	booking,
 	challenge,
@@ -185,6 +187,27 @@ export async function dashboard(orgId: string) {
 		.innerJoin(gymMember, eq(ptRequest.memberId, gymMember.id))
 		.where(and(eq(ptRequest.organizationId, orgId), eq(ptRequest.status, 'pending')))
 		.orderBy(asc(ptRequest.preferredAt))
+		.limit(50);
+
+	// Kit out longer than a week — chase returns at the desk.
+	const overdueLoans = await db
+		.select({
+			memberId: gymMember.id,
+			memberName: gymMember.name,
+			itemName: loanableItem.name,
+			outAt: equipmentLoan.outAt
+		})
+		.from(equipmentLoan)
+		.innerJoin(gymMember, eq(equipmentLoan.memberId, gymMember.id))
+		.innerJoin(loanableItem, eq(equipmentLoan.itemId, loanableItem.id))
+		.where(
+			and(
+				eq(equipmentLoan.organizationId, orgId),
+				isNull(equipmentLoan.returnedAt),
+				lte(equipmentLoan.outAt, new Date(Date.now() - 7 * 86_400_000))
+			)
+		)
+		.orderBy(asc(equipmentLoan.outAt))
 		.limit(50);
 
 	// Upcoming sessions flagged as needing a substitute instructor.
@@ -398,7 +421,16 @@ export async function dashboard(orgId: string) {
 				memberName: p.memberName,
 				planName: `PT ${p.preferredAt.toISOString().slice(0, 10)}`,
 				kind: 'pt' as const,
-				requestedAt: p.requestedAt as Date,
+				requestedAt: p.preferredAt as Date,
+				pauseUntil: null,
+				requestReason: null
+			})),
+			...overdueLoans.map((l) => ({
+				memberId: l.memberId,
+				memberName: l.memberName,
+				planName: `${l.itemName} out ${Math.floor((Date.now() - l.outAt.getTime()) / 86400000)}d`,
+				kind: 'loan' as const,
+				requestedAt: l.outAt as Date,
 				pauseUntil: null,
 				requestReason: null
 			}))

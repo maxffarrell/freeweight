@@ -76,8 +76,10 @@
 						<Table.Row>
 							<Table.Head>Gym</Table.Head>
 							<Table.Head class="text-right">Members</Table.Head>
+							<Table.Head class="text-right">New (30d)</Table.Head>
 							<Table.Head class="text-right">MRR</Table.Head>
 							<Table.Head class="text-right">Revenue (mo)</Table.Head>
+							<Table.Head class="text-right">vs last mo</Table.Head>
 							<Table.Head class="text-right">Check-ins (mo)</Table.Head>
 							<Table.Head class="text-right">Sessions (7d)</Table.Head>
 							<Table.Head class="w-0"></Table.Head>
@@ -91,12 +93,27 @@
 									<span class="ml-1 text-xs font-normal text-muted-foreground">{g.role}</span>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.members}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{g.newMembers30}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums"
 									>{formatMoney(g.mrr, g.currency, true)}</Table.Cell
 								>
 								<Table.Cell class="text-right tabular-nums"
 									>{formatMoney(g.monthRevenue, g.currency, true)}</Table.Cell
 								>
+								<Table.Cell class="text-right tabular-nums">
+									{#if g.prevMonthRevenue > 0}
+										<span
+											class={g.monthRevenue >= g.prevMonthRevenue
+												? 'text-emerald-600'
+												: 'text-destructive'}
+											>{g.monthRevenue >= g.prevMonthRevenue ? '+' : ''}{Math.round(
+												((g.monthRevenue - g.prevMonthRevenue) / g.prevMonthRevenue) * 100
+											)}%</span
+										>
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.monthCheckIns}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.sessionsNext7}</Table.Cell>
 								<Table.Cell class="text-right">
