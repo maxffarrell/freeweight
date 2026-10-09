@@ -36,7 +36,10 @@ export const API_RESOURCES = [
 	'incidents',
 	'sign_requests',
 	'class_videos',
-	'webhooks'
+	'webhooks',
+	'trial_requests',
+	'lockers',
+	'kit_items'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -81,7 +84,10 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	incidents: 'Incident reports',
 	sign_requests: 'Signature requests',
 	class_videos: 'Movement videos',
-	webhooks: 'Webhooks'
+	webhooks: 'Webhooks',
+	trial_requests: 'Trial requests',
+	lockers: 'Lockers',
+	kit_items: 'Loanable kit'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

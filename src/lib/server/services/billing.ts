@@ -1378,3 +1378,68 @@ export async function listShopSales(orgId: string) {
 		.orderBy(desc(shopSale.createdAt))
 		.limit(200);
 }
+
+/**
+ * Member-initiated freeze — pauses their own active membership for `days` days,
+ * capped by gymSettings.selfFreezeDays per calendar year. The freeze fee is a
+ * staff-side policy and doesn't apply to self-serve freezes. Auto-resume (and
+ * its welcome-back email) is handled by resumeFrozenMemberships.
+ */
+export async function selfFreezeMembership(
+	orgId: string,
+	memberId: string,
+	membershipId: string,
+	days: number
+) {
+	const [gs] = await db
+		.select({ selfFreezeDays: gymSettings.selfFreezeDays })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId));
+	const cap = gs?.selfFreezeDays ?? 0;
+	if (!cap) error(400, 'Self-serve freezes are turned off for this gym');
+	const [ms] = await db
+		.select()
+		.from(membership)
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.id, membershipId),
+				eq(membership.memberId, memberId)
+			)
+		);
+	if (!ms) error(404, 'Membership not found');
+	if (ms.status !== 'active') error(409, 'Only an active membership can be frozen');
+	const year = new Date().getUTCFullYear();
+	const used = ms.selfFreezeYear === year ? ms.selfFreezeUsedDays : 0;
+	const remaining = cap - used;
+	if (days < 1 || days > remaining)
+		error(
+			409,
+			remaining > 0
+				? `You have ${remaining} freeze day${remaining === 1 ? '' : 's'} left this year`
+				: `You've used your ${cap} freeze days for this year`
+		);
+	const until = addDays(todayISO(), days);
+	const [row] = await db
+		.update(membership)
+		.set({
+			status: 'paused',
+			frozenUntil: until,
+			nextChargeAt: null,
+			pauseRequestedAt: null,
+			pauseUntil: null,
+			requestReason: null,
+			selfFreezeUsedDays: used + days,
+			selfFreezeYear: year
+		})
+		.where(eq(membership.id, ms.id))
+		.returning();
+	await emit({
+		orgId,
+		entityType: 'membership',
+		entityId: row!.id,
+		action: 'paused',
+		summary: `Member froze their membership for ${days} day${days > 1 ? 's' : ''} (self-serve)`
+	});
+	return { until, remaining: remaining - days };
+}

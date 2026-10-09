@@ -107,6 +107,10 @@ export const gymSettings = pgTable('gym_settings', {
 	rewardCredits: integer('reward_credits'),
 	/** Comp classes granted at week-streak milestones (4/8/13/26/52); null = off. */
 	streakRewardCredits: integer('streak_reward_credits'),
+	/** Comp classes granted on the member's birthday each year; null/0 = off. */
+	birthdayCompCredits: integer('birthday_comp_credits'),
+	/** Days per calendar year a member may pause their own membership in the portal; null/0 = off. */
+	selfFreezeDays: integer('self_freeze_days'),
 	/** Late cancels forgiven per member per calendar month before the fee applies. Null/0 = no freebies. */
 	lateCancelFreebies: integer('late_cancel_freebies'),
 	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
@@ -313,6 +317,9 @@ export const membership = pgTable(
 		autoRenew: boolean('auto_renew').notNull().default(false),
 		/** Comp'd membership — the billing cron never posts a charge for it. */
 		noBill: boolean('no_bill').notNull().default(false),
+		/** Self-serve freeze days used this calendar year (cap = gymSettings.selfFreezeDays). */
+		selfFreezeUsedDays: integer('self_freeze_used_days').notNull().default(0),
+		selfFreezeYear: integer('self_freeze_year'),
 		...timestamps
 	},
 	(t) => [

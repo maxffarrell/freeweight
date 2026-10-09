@@ -197,6 +197,8 @@
 	let reviewAfterVisits = $state<number | null>(settings.reviewAfterVisits);
 	let rewardCredits = $state<number | null>(settings.rewardCredits);
 	let streakRewardCredits = $state<number | null>(settings.streakRewardCredits);
+	let birthdayCompCredits = $state<number | null>(settings.birthdayCompCredits);
+	let selfFreezeDays = $state<number | null>(settings.selfFreezeDays);
 	let revenueTarget = $state<number | null>(settings.revenueTarget);
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
@@ -251,6 +253,8 @@
 				reviewAfterVisits,
 				rewardCredits,
 				streakRewardCredits,
+				birthdayCompCredits,
+				selfFreezeDays,
 				revenueTarget,
 				publicPage,
 				staffBriefing,
@@ -691,6 +695,36 @@
 							<Field.Description
 								>Comp classes granted at week-streak milestones (4, 8, 13, 26, 52) — each streak
 								pays once.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-bday-comp">Birthday treat — comp classes</Field.Label>
+							<Input
+								id="s-bday-comp"
+								type="number"
+								min={0}
+								bind:value={birthdayCompCredits}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Comp classes banked on each member's birthday — sent with the birthday email.
+								Blank or 0 = off.</Field.Description
+							>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="s-self-freeze">Member self-freeze — days/year</Field.Label>
+							<Input
+								id="s-self-freeze"
+								type="number"
+								min={0}
+								max={365}
+								bind:value={selfFreezeDays}
+								placeholder="Off"
+							/>
+							<Field.Description
+								>Let members pause their own plan in the portal up to this many days per
+								calendar year (no freeze fee, no approval needed). Blank or 0 = staff
+								only.</Field.Description
 							>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">

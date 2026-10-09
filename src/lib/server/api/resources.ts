@@ -18,6 +18,9 @@ import * as giftcards from '#lib/server/services/giftcards.ts';
 import * as recurring from '#lib/server/services/recurring.ts';
 import * as reports from '#lib/server/services/reports.ts';
 import * as settings from '#lib/server/services/settings.ts';
+import * as trials from '#lib/server/services/trials.ts';
+import * as lockers from '#lib/server/services/lockers.ts';
+import * as loans from '#lib/server/services/loans.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import * as s from '#lib/schemas.ts';
 
@@ -409,6 +412,34 @@ export const resources: Record<string, Resource> = {
 			run: (ctx, input) => shifts.createDeskTask(ctx, (input as { label: string }).label)
 		},
 		delete: (ctx, id) => shifts.removeDeskTask(ctx, id)
+	},
+	trial_requests: {
+		description: 'Pending public free-trial requests (confirm/decline in the app)',
+		list: (ctx) => trials.listTrialRequests(ctx.orgId)
+	},
+	lockers: {
+		description: 'Locker bank with current holders. POST {label}; DELETE releases+removes',
+		list: (ctx) => lockers.listLockers(ctx.orgId),
+		create: {
+			schema: s.lockerInput,
+			run: (ctx, input) => lockers.addLocker(ctx.orgId, (input as { label: string }).label)
+		}
+	},
+	kit_items: {
+		description: 'Loanable kit stock. POST {name, quantity}',
+		list: (ctx) => loans.listLoanables(ctx.orgId),
+		create: {
+			schema: v.object({
+				name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+				quantity: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(99))
+			}),
+			run: (ctx, input) =>
+				loans.addLoanable(
+					ctx.orgId,
+					(input as { name: string }).name,
+					(input as { quantity: number }).quantity
+				)
+		}
 	}
 };
 
