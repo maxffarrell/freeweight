@@ -25,6 +25,7 @@ import {
 	charge,
 	checkIn,
 	classSession,
+	classWatch,
 	classTemplate,
 	classType,
 	course,
@@ -3998,4 +3999,54 @@ export async function sendUsualClassNudges(orgId: string) {
 		sent++;
 	}
 	return sent;
+}
+
+/**
+ * "Watch this class" alert — emailed to members watching a class type when a new
+ * session is published. One email per member per createSession call naming the
+ * first new date; logOnce dedupes per member+session so re-saves don't spam.
+ */
+export async function notifyClassWatchers(orgId: string, sessionIds: string[]) {
+	if (!sessionIds.length) return;
+	const sessions = await db
+		.select({ id: classSession.id, startsAt: classSession.startsAt, className: classType.name })
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(classSession.organizationId, orgId), inArray(classSession.id, sessionIds)));
+	if (!sessions.length) return;
+	const ctId = (
+		await db
+			.select({ classTypeId: classSession.classTypeId })
+			.from(classSession)
+			.where(eq(classSession.id, sessions[0]!.id))
+			.limit(1)
+	)[0]?.classTypeId;
+	if (!ctId) return;
+	const watchers = await db
+		.select({ memberId: classWatch.memberId, email: gymMember.email, name: gymMember.name })
+		.from(classWatch)
+		.innerJoin(gymMember, eq(classWatch.memberId, gymMember.id))
+		.where(eq(classWatch.classTypeId, ctId));
+	const first = sessions.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0]!;
+	const brand = await orgBrand(orgId);
+	const when = `${first.startsAt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${first.startsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+	for (const w of watchers) {
+		const email = w.email;
+		if (!email) continue;
+		await sendMemberEmail(w.memberId, {
+			to: email,
+			subject: `New ${first.className} session at ${brand.orgName}`,
+			...renderEmail({
+				...brand,
+				heading: `New ${first.className} session`,
+				lines: [
+					`A new ${first.className} session was just scheduled for ${when}${sessions.length > 1 ? ` (plus ${sessions.length - 1} more)` : ''}.`,
+					'Book it from your member portal — spots go fast.'
+				],
+				action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
+			})
+		}).then(async () => {
+			await logOnce(orgId, 'class_watch', `${w.memberId}:${first.id}`, email);
+		}).catch(() => {});
+	}
 }

@@ -134,6 +134,7 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					r.welcomeBack ? 'welcome back' : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					r.guestPassesLeft != null ? `${r.guestPassesLeft} guest passes left this month` : '',
@@ -260,6 +261,7 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					r.welcomeBack ? 'welcome back' : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
 					!r.checkedOut && r.guestPassesLeft != null

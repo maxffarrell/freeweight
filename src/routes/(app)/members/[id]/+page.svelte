@@ -1062,6 +1062,12 @@
 						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
 					>
 				</div>
+				{#if m.loyalty}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Loyalty</span>
+						<Badge variant="secondary" class={m.loyalty.className}>{m.loyalty.name}</Badge>
+					</div>
+				{/if}
 				{#if m.weekStreak > 0}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Streak</span>

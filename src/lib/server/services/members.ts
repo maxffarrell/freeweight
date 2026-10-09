@@ -43,7 +43,7 @@ import {
 	workoutResult
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
-import { todayISO } from '#lib/format.ts';
+import { loyaltyTier, todayISO } from '#lib/format.ts';
 import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
 import { creditUsage, creditsUsedIn } from './schedule.ts';
@@ -547,6 +547,7 @@ export async function getMember(orgId: string, id: string) {
 		signRequests,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
+		loyalty: loyaltyTier(att?.visits ?? 0),
 		attendance: {
 			visits: att?.visits ?? 0,
 			thisMonth: att?.thisMonth ?? 0,

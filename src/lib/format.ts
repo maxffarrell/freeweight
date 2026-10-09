@@ -112,3 +112,12 @@ export function monthLabel(month: string) {
 		timeZone: 'UTC'
 	});
 }
+
+/** Loyalty tier from lifetime check-ins — badge on member page + portal. */
+export function loyaltyTier(visits: number): { name: string; className: string } | null {
+	if (visits >= 250) return { name: 'Platinum', className: 'bg-violet-100 text-violet-800' };
+	if (visits >= 100) return { name: 'Gold', className: 'bg-amber-100 text-amber-800' };
+	if (visits >= 50) return { name: 'Silver', className: 'bg-slate-200 text-slate-700' };
+	if (visits >= 25) return { name: 'Bronze', className: 'bg-orange-100 text-orange-800' };
+	return null;
+}
