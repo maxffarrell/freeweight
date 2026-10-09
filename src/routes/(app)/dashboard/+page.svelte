@@ -182,7 +182,7 @@
 			value: formatMoney(d.collectedToday, d.currency, true),
 			icon: Wallet,
 			href: '/billing',
-			sub: `yesterday ${formatMoney(d.collectedYesterday, d.currency, true)}`
+			sub: `yesterday ${formatMoney(d.collectedYesterday, d.currency, true)} · 7d ${formatMoney(d.collectedWeek, d.currency, true)} vs ${formatMoney(d.collectedPrevWeek, d.currency, true)}`
 		},
 		{
 			label: 'Monthly recurring',

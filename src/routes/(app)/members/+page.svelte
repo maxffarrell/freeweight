@@ -206,6 +206,7 @@
 	let cPrize = $state('');
 	let cStart = $state(new Date().toISOString().slice(0, 10));
 	let cEnd = $state('');
+	let cTeamMode = $state(false);
 	let cPending = $state(false);
 
 	async function submitChallenge(e: SubmitEvent) {
@@ -218,10 +219,12 @@
 				prize: cPrize.trim() || undefined,
 				goal: cGoal,
 				startDate: cStart,
-				endDate: cEnd
+				endDate: cEnd,
+				teamMode: cTeamMode || undefined
 			});
 			toast.success('Challenge created — members can join in the portal');
 			cName = cDesc = cPrize = '';
+			cTeamMode = false;
 			await getChallenges().refresh();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not create challenge'));
@@ -1123,7 +1126,8 @@
 								>
 								<p class="text-xs text-muted-foreground">
 									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
-									{c.challenge.goal} check-ins · {c.joined} joined · {c.finished}
+									{c.challenge.goal} check-ins{c.challenge.teamMode ? ' · team mode' : ''} · {c.joined}
+									joined · {c.finished}
 									finished{c.challenge.prize ? ` · prize: ${c.challenge.prize}` : ''}
 								</p>
 							</div>
@@ -1132,12 +1136,25 @@
 								onCheckedChange={(v) => toggleChallenge(c.challenge.id, v)}
 							/>
 						</div>
+						{#if c.teams.length}
+							<div class="mt-2 space-y-0.5 rounded-md bg-muted/40 p-2 text-sm">
+								{#each c.teams as t (t.team)}
+									<div class="flex justify-between gap-2">
+										<span class="truncate font-medium">Team {t.team}</span>
+										<span class="tabular-nums">
+											{t.count} check-ins · {t.members}
+											{t.members === 1 ? 'member' : 'members'}
+										</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
 						{#if c.entries.length}
 							<div class="mt-2 space-y-0.5 text-sm">
 								{#each c.entries.slice(0, 5) as e, i (e.entry.id)}
 									<div class="flex justify-between gap-2">
 										<span class="truncate text-muted-foreground">
-											{i + 1}. {e.memberName}
+											{i + 1}. {e.memberName}{e.entry.team ? ` · ${e.entry.team}` : ''}
 										</span>
 										<span class="tabular-nums">{e.count}/{c.challenge.goal}</span>
 									</div>
@@ -1161,6 +1178,15 @@
 				<Field.Label for="c-prize">Prize (optional)</Field.Label>
 				<Input id="c-prize" bind:value={cPrize} placeholder="A free month, gym hoodie…" />
 			</Field.Field>
+			<div class="flex items-center justify-between rounded-lg border px-3 py-2">
+				<div>
+					<p class="text-sm font-medium">Team mode</p>
+					<p class="text-xs text-muted-foreground">
+						Entrants pick a team name — teams compete on combined check-ins.
+					</p>
+				</div>
+				<Switch bind:checked={cTeamMode} />
+			</div>
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="c-goal">Goal (check-ins)</Field.Label>

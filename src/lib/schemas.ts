@@ -238,6 +238,8 @@ export const challengeInput = v.object({
 	goal: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000)),
 	startDate: isoDate,
 	endDate: isoDate,
+	/** Team mode: entrants pick a team name; leaderboard sums per team. */
+	teamMode: v.optional(v.boolean()),
 	active: v.optional(v.boolean(), true)
 });
 export const challengeUpdate = v.object({

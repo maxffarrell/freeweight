@@ -88,6 +88,8 @@ export async function dashboard(orgId: string) {
 
 	// Payments collected in the org-local today vs yesterday (refunds excluded).
 	const yesterday = new Date(dayStart.getTime() - 86400_000);
+	const weekAgo = new Date(dayStart.getTime() - 7 * 86400_000);
+	const fortnightAgo = new Date(dayStart.getTime() - 14 * 86400_000);
 	const [collected] = await db
 		.select({
 			today:
@@ -96,6 +98,13 @@ export async function dashboard(orgId: string) {
 				),
 			yesterday:
 				sql<number>`coalesce(sum(${payment.amount}) filter (where ${payment.createdAt} < ${dayStart.toISOString()}::timestamptz), 0)`.mapWith(
+					Number
+				),
+			week: sql<number>`coalesce(sum(${payment.amount}) filter (where ${payment.createdAt} >= ${weekAgo.toISOString()}::timestamptz), 0)`.mapWith(
+				Number
+			),
+			prevWeek:
+				sql<number>`coalesce(sum(${payment.amount}) filter (where ${payment.createdAt} < ${weekAgo.toISOString()}::timestamptz and ${payment.createdAt} >= ${fortnightAgo.toISOString()}::timestamptz), 0)`.mapWith(
 					Number
 				)
 		})
@@ -107,7 +116,7 @@ export async function dashboard(orgId: string) {
 				gte(payment.createdAt, yesterday)
 			)
 		);
-	const collectedToday = collected ?? { today: 0, yesterday: 0 };
+	const collectedToday = collected ?? { today: 0, yesterday: 0, week: 0, prevWeek: 0 };
 
 	const todaySessions = await db
 		.select({
@@ -516,6 +525,8 @@ export async function dashboard(orgId: string) {
 		overdueTotal: openStats?.overdueTotal ?? 0,
 		collectedToday: collectedToday.today,
 		collectedYesterday: collectedToday.yesterday,
+		collectedWeek: collectedToday.week,
+		collectedPrevWeek: collectedToday.prevWeek,
 		checkInsToday: checkInStats?.today ?? 0,
 		inGymNow: checkInStats?.inNow ?? 0,
 		insideNames: insideNow.map((r) => r.name),

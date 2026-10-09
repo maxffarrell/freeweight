@@ -20,10 +20,14 @@ export const updateChallenge = command(challengeUpdate, async (input) => {
 
 /** Staff enroll a member into a challenge. Idempotent. */
 export const joinMemberChallenge = command(
-	v.object({ challengeId: idSchema, memberId: idSchema }),
-	async ({ challengeId, memberId }) => {
+	v.object({
+		challengeId: idSchema,
+		memberId: idSchema,
+		team: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60)))
+	}),
+	async ({ challengeId, memberId, team }) => {
 		const ctx = await requireOrg();
-		const r = await svc.joinChallenge(ctx.orgId, challengeId, memberId, ctx.userId);
+		const r = await svc.joinChallenge(ctx.orgId, challengeId, memberId, ctx.userId, team);
 		void getChallenges().refresh();
 		return r;
 	}

@@ -1395,6 +1395,8 @@ export const challenge = pgTable(
 		description: text('description').notNull().default(''),
 		/** What finishers win — free text ("a free month", "hoodie"). Shown in invites/portal. */
 		prize: text('prize').notNull().default(''),
+		/** Team mode: entrants pick a team name; leaderboard also sums per team. */
+		teamMode: boolean('team_mode').notNull().default(false),
 		/** Check-ins needed to finish the challenge. */
 		goal: integer('goal').notNull(),
 		startDate: date('start_date', { mode: 'string' }).notNull(),
@@ -1416,6 +1418,8 @@ export const challengeEntry = pgTable(
 		memberId: text('member_id')
 			.notNull()
 			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		/** Optional team name when the challenge runs in team mode. */
+		team: text('team'),
 		joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [
