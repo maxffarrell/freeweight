@@ -1682,7 +1682,10 @@
 				{#each m.emails as e (e.id)}
 					<div class="flex items-center justify-between gap-2 py-1 text-sm">
 						<span class="capitalize">{e.kind.replaceAll('_', ' ')}</span>
-						<span class="shrink-0 text-xs text-muted-foreground">{formatRelative(e.createdAt)}</span
+						<span class="shrink-0 text-xs text-muted-foreground"
+							>{#if e.openedAt}
+								<Badge variant="secondary" class="mr-1">opened</Badge>
+							{/if}{formatRelative(e.createdAt)}</span
 						>
 					</div>
 				{:else}

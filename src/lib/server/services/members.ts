@@ -399,6 +399,7 @@ export async function getMember(orgId: string, id: string) {
 					.select({
 						id: notificationLog.id,
 						kind: notificationLog.kind,
+						openedAt: notificationLog.openedAt,
 						createdAt: notificationLog.createdAt
 					})
 					.from(notificationLog)
