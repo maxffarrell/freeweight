@@ -115,6 +115,24 @@ export async function portalOverview(memberId: string) {
 		.where(eq(membership.memberId, memberId))
 		.orderBy(desc(membership.createdAt));
 
+	// Family packs: a dependent books from the guardian's memberships — the
+	// portal's booking gate needs to know one exists.
+	const guardianHasMembership = m.guardianId
+		? !!(
+				await db
+					.select({ id: membership.id })
+					.from(membership)
+					.where(
+						and(
+							eq(membership.organizationId, orgId),
+							eq(membership.memberId, m.guardianId),
+							eq(membership.status, 'active')
+						)
+					)
+					.limit(1)
+			).length
+		: false;
+
 	const now = new Date();
 	const upcoming = await db
 		.select({
@@ -324,6 +342,7 @@ export async function portalOverview(memberId: string) {
 		member: m,
 		settings,
 		memberships,
+		guardianHasMembership,
 		upcoming: upcomingWithPos,
 		balance,
 		openCharges,
@@ -537,7 +556,15 @@ export async function memberBook(
 	const { bookingWindowDays, bookCutoffMin } = await bookingRules(orgId);
 	// Members without an active plan buy the visit as a drop-in — the class's
 	// drop-in charge lands on their balance to pay online or at the desk.
-	const ms = await activeMembership(orgId, memberId);
+	let ms = await activeMembership(orgId, memberId);
+	// Dependents ride on the guardian's plan/pack — check before marking drop-in.
+	if (!ms) {
+		const [me] = await db
+			.select({ guardianId: gymMember.guardianId })
+			.from(gymMember)
+			.where(eq(gymMember.id, memberId));
+		if (me?.guardianId) ms = (await activeMembership(orgId, me.guardianId)) ?? null;
+	}
 	// A plan's own book-ahead window takes precedence over the gym-wide one.
 	const windowDays = ms?.bookAheadDays ?? bookingWindowDays;
 	if (windowDays != null && s.startsAt.getTime() > Date.now() + windowDays * 86400_000)

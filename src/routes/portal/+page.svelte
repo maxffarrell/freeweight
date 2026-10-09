@@ -587,7 +587,9 @@
 		}
 	}
 	/** Packs the member doesn't already hold — buyable alongside a normal plan. */
-	const hasPlan = $derived(d.memberships.some((mm) => mm.membership.status === 'active'));
+	const hasPlan = $derived(
+		d.memberships.some((mm) => mm.membership.status === 'active') || d.guardianHasMembership
+	);
 	const myWorkouts = $derived(await getMyWorkouts(memberId));
 
 	const buyablePacks = $derived(
