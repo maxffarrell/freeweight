@@ -1582,9 +1582,7 @@
 							<p class="truncate font-medium">
 								{mp.program.name}
 								<span class="font-normal text-muted-foreground">
-									· {mp.program.weeks}w · from {formatRelative(
-										new Date(mp.assignment.startDate)
-									)}</span
+									· {mp.program.weeks}w · starts {mp.assignment.startDate}</span
 								>
 							</p>
 						</div>
