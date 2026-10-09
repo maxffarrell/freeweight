@@ -20,6 +20,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
 import { emit } from './events.ts';
 import { shiftHours } from '#lib/server/services/shifts.ts';
+import { listChallenges } from '#lib/server/services/challenges.ts';
 import {
 	notificationLog,
 	memberNps,
@@ -39,6 +40,8 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	rota,
+	shift,
 	member,
 	memberTag,
 	membership,
@@ -1340,7 +1343,9 @@ export async function getReports(orgId: string) {
 		refunds,
 		planMisfits,
 		guests,
-		payrollPaid
+		payrollPaid,
+		staffing,
+		challengeList
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1396,7 +1401,9 @@ export async function getReports(orgId: string) {
 		refundsByMonth(orgId),
 		wrongPlan(orgId),
 		guestStats(orgId),
-		payrollPaidThrough(orgId)
+		payrollPaidThrough(orgId),
+		rotaVsClocked(orgId),
+		listChallenges(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1464,7 +1471,9 @@ export async function getReports(orgId: string) {
 		refunds,
 		wrongPlan: planMisfits,
 		guestStats: guests,
-		payrollPaid
+		payrollPaid,
+		staffing,
+		challenges: challengeList
 	};
 }
 
@@ -1896,4 +1905,68 @@ export async function refundsByMonth(orgId: string) {
 		byMonth.set(r.month, row);
 	}
 	return [...byMonth.entries()].map(([month, v]) => ({ month, ...v }));
+}
+
+/** Desk staffing — rota'd (scheduled) vs clocked (actual) hours this month per staff member. */
+export async function rotaVsClocked(orgId: string) {
+	const month = new Date().toISOString().slice(0, 7);
+	const monthStart = new Date(`${month}-01T00:00:00Z`);
+	const today = new Date().toISOString().slice(0, 10);
+	const [rotaRows, shiftRows] = await Promise.all([
+		db
+			.select({
+				memberId: rota.memberId,
+				weekday: rota.weekday,
+				startTime: rota.startTime,
+				endTime: rota.endTime,
+				name: user.name
+			})
+			.from(rota)
+			.innerJoin(member, eq(rota.memberId, member.id))
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(eq(rota.organizationId, orgId)),
+		db
+			.select({
+				memberId: shift.memberId,
+				clockedInAt: shift.clockedInAt,
+				clockedOutAt: shift.clockedOutAt
+			})
+			.from(shift)
+			.where(and(eq(shift.organizationId, orgId), gte(shift.clockedInAt, monthStart)))
+	]);
+	const days: string[] = [];
+	for (
+		let d = new Date(monthStart);
+		d.toISOString().slice(0, 7) === month && d.toISOString().slice(0, 10) <= today;
+		d.setUTCDate(d.getUTCDate() + 1)
+	) {
+		days.push(d.toISOString().slice(0, 10));
+	}
+	const byMember = new Map<string, { name: string; rotaMin: number; clockedMin: number }>();
+	const mins = (t: string) => {
+		const [h, m2] = t.split(':').map(Number);
+		return h * 60 + (m2 || 0);
+	};
+	for (const r of rotaRows) {
+		const row = byMember.get(r.memberId) ?? { name: r.name, rotaMin: 0, clockedMin: 0 };
+		const span = Math.max(0, mins(r.endTime) - mins(r.startTime));
+		for (const d of days) {
+			if (new Date(`${d}T12:00:00Z`).getUTCDay() === r.weekday) row.rotaMin += span;
+		}
+		byMember.set(r.memberId, row);
+	}
+	for (const s2 of shiftRows) {
+		const row = byMember.get(s2.memberId) ?? { name: '(removed)', rotaMin: 0, clockedMin: 0 };
+		const end = s2.clockedOutAt ?? new Date();
+		row.clockedMin += Math.max(0, (end.getTime() - s2.clockedInAt.getTime()) / 60000);
+		byMember.set(s2.memberId, row);
+	}
+	return [...byMember.values()]
+		.map((v) => ({
+			name: v.name,
+			rotaHrs: Math.round(v.rotaMin / 6) / 10,
+			clockedHrs: Math.round(v.clockedMin / 6) / 10,
+			deltaHrs: Math.round((v.clockedMin - v.rotaMin) / 6) / 10
+		}))
+		.sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -557,10 +557,16 @@
 		}
 	});
 	let chalBusy = $state('');
-	async function joinChal(challengeId: string) {
+	async function joinChal(challengeId: string, teamMode = false) {
+		let team: string | undefined;
+		if (teamMode) {
+			const t = window.prompt('Team name? Leave empty to play solo');
+			if (t === null) return;
+			team = t.trim() || undefined;
+		}
 		chalBusy = challengeId;
 		try {
-			await joinChallenge({ memberId, challengeId });
+			await joinChallenge({ memberId, challengeId, team });
 			toast.success("You're in — every check-in counts");
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not join'));
@@ -1883,7 +1889,7 @@
 								</div>
 								<p class="text-sm text-muted-foreground">
 									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
-									{c.challenge.goal} check-ins · {c.joined}
+									{c.challenge.goal} check-ins{c.challenge.teamMode ? ' · teams' : ''} · {c.joined}
 									in{c.challenge.prize ? ` · win ${c.challenge.prize}` : ''}
 								</p>
 								{#if c.challenge.description}
@@ -1903,7 +1909,7 @@
 								<Button
 									size="sm"
 									disabled={chalBusy === c.challenge.id}
-									onclick={() => joinChal(c.challenge.id)}>Join</Button
+									onclick={() => joinChal(c.challenge.id, c.challenge.teamMode)}>Join</Button
 								>
 							{/if}
 						</div>
@@ -1918,6 +1924,11 @@
 									>{c.mine.count}/{c.challenge.goal}</span
 								>
 							</div>
+						{/if}
+						{#if c.teams.length}
+							<p class="mt-1.5 truncate text-xs font-medium">
+								Teams: {c.teams.map((t, i) => `${i + 1}. ${t.team} (${t.count})`).join(' · ')}
+							</p>
 						{/if}
 						{#if c.leaders.length}
 							<p class="mt-1.5 truncate text-xs text-muted-foreground">

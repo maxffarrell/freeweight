@@ -1218,6 +1218,83 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.staffing.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Desk staffing — this month</Card.Title>
+				<Card.Description
+					>Rota'd (scheduled) vs clocked (actual) hours per staff member</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Staff</Table.Head>
+							<Table.Head class="text-right">Rota'd</Table.Head>
+							<Table.Head class="text-right">Clocked</Table.Head>
+							<Table.Head class="text-right">Δ</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.staffing as st (st.name)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{st.name}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{st.rotaHrs.toFixed(1)}h</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{st.clockedHrs.toFixed(1)}h</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									<Badge variant={st.deltaHrs >= 0 ? 'secondary' : 'destructive'}>
+										{st.deltaHrs >= 0 ? '+' : ''}{st.deltaHrs.toFixed(1)}h
+									</Badge>
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
+	{#if r.challenges.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Challenges</Card.Title>
+				<Card.Description>Participation and finish rate per challenge</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Challenge</Table.Head>
+							<Table.Head class="text-right">Goal</Table.Head>
+							<Table.Head class="text-right">Joined</Table.Head>
+							<Table.Head class="text-right">Finished</Table.Head>
+							<Table.Head class="text-right">Rate</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each r.challenges as c (c.challenge.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">
+									{c.challenge.name}
+									{#if c.challenge.teamMode}
+										<Badge variant="outline" class="ml-1">teams</Badge>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.challenge.goal}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.joined}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">{c.finished}</Table.Cell>
+								<Table.Cell class="text-right tabular-nums"
+									>{c.joined ? Math.round((c.finished / c.joined) * 100) : 0}%</Table.Cell
+								>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if r.locations.length}
 		<Card.Root>
 			<Card.Header>

@@ -622,10 +622,14 @@ export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 });
 
 export const joinChallenge = command(
-	v.object({ memberId: idSchema, challengeId: idSchema }),
-	async ({ memberId, challengeId }) => {
+	v.object({
+		memberId: idSchema,
+		challengeId: idSchema,
+		team: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60)))
+	}),
+	async ({ memberId, challengeId, team }) => {
 		const m = await myMember(memberId);
-		const r = await chalSvc.joinChallenge(m.organizationId, challengeId, m.id);
+		const r = await chalSvc.joinChallenge(m.organizationId, challengeId, m.id, undefined, team);
 		void getPortalChallenges(memberId).refresh();
 		return r;
 	}

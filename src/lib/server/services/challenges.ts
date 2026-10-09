@@ -42,6 +42,22 @@ export async function entryProgress(orgId: string, challengeId: string, start: D
 		.orderBy(desc(sql`count(${checkIn.id})`), asc(gymMember.name));
 }
 
+/** Per-team rollup of entryProgress — used when a challenge runs in team mode. */
+function teamRollup(entries: Awaited<ReturnType<typeof entryProgress>>) {
+	const teams = new Map<string, { count: number; members: number }>();
+	for (const e of entries) {
+		const t = e.entry.team?.trim();
+		if (!t) continue;
+		const cur = teams.get(t) ?? { count: 0, members: 0 };
+		cur.count += e.count;
+		cur.members += 1;
+		teams.set(t, cur);
+	}
+	return [...teams.entries()]
+		.map(([team, v]) => ({ team, count: v.count, members: v.members }))
+		.sort((a, b) => b.count - a.count || a.team.localeCompare(b.team));
+}
+
 /** All challenges with joined counts + per-entry progress (staff view). */
 export async function listChallenges(orgId: string) {
 	const [settings, rows] = await Promise.all([
@@ -71,7 +87,8 @@ export async function listChallenges(orgId: string) {
 				state: today < c.startDate ? 'upcoming' : today > c.endDate ? 'ended' : 'live',
 				joined: entries.length,
 				finished: entries.filter((e) => e.count >= c.goal).length,
-				entries
+				entries,
+				teams: c.teamMode ? teamRollup(entries) : []
 			};
 		})
 	);
@@ -90,6 +107,7 @@ export async function portalChallenges(orgId: string, memberId: string) {
 				joined: c.joined,
 				finished: c.finished,
 				leaders: c.entries.slice(0, 5).map((e) => ({ name: e.memberName, count: e.count })),
+				teams: c.teams.slice(0, 5),
 				mine
 			};
 		});
@@ -109,7 +127,8 @@ export async function createChallenge(
 			prize: input.prize ?? '',
 			goal: input.goal,
 			startDate: input.startDate,
-			endDate: input.endDate
+			endDate: input.endDate,
+			teamMode: input.teamMode ?? false
 		})
 		.returning();
 	await emit({
@@ -142,7 +161,8 @@ export async function joinChallenge(
 	orgId: string,
 	challengeId: string,
 	memberId: string,
-	actorId?: string
+	actorId?: string,
+	team?: string
 ) {
 	const [c] = await db
 		.select()
@@ -156,7 +176,7 @@ export async function joinChallenge(
 	if (!m) error(404, 'Member not found');
 	const [row] = await db
 		.insert(challengeEntry)
-		.values({ organizationId: orgId, challengeId, memberId })
+		.values({ organizationId: orgId, challengeId, memberId, team: team?.trim() || null })
 		.onConflictDoNothing()
 		.returning();
 	if (row) {
@@ -166,7 +186,7 @@ export async function joinChallenge(
 			entityType: 'challenge',
 			entityId: challengeId,
 			action: 'joined',
-			summary: `${m.name} joined "${c.name}"`
+			summary: `${m.name} joined "${c.name}"${team ? ` (team ${team.trim()})` : ''}`
 		});
 	}
 	return row ?? null;
