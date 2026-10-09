@@ -730,3 +730,9 @@ export const giftPackCredits = command(giftCreditsInput, async ({ memberId, emai
 	void getPortalOverview(memberId).refresh();
 	return r;
 });
+
+/** Portal: one-shot JSON export of everything we hold on the member. */
+export const getMyDataExport = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	return svc.exportMemberData(m.organizationId, m.id);
+});

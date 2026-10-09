@@ -77,7 +77,8 @@
 		getMovementVideos,
 		setPackAutoRenew,
 		getMyWorkouts,
-		giftPackCredits
+		giftPackCredits,
+		getMyDataExport
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -99,6 +100,24 @@
 
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
+
+	// ------- data export -------
+	let exportPending = $state(false);
+	async function downloadMyData() {
+		exportPending = true;
+		try {
+			const data = await getMyDataExport(memberId);
+			const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = `freeweight-data-${new Date().toISOString().slice(0, 10)}.json`;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not export'));
+		}
+		exportPending = false;
+	}
 
 	// ------- gift pack classes -------
 	let giftOpen = $state(false);
@@ -1038,6 +1057,12 @@
 					<p class="mt-1 text-xs">
 						<button class="text-muted-foreground underline" onclick={openProfile}
 							>Edit profile</button
+						>
+						·
+						<button
+							class="text-muted-foreground underline"
+							disabled={exportPending}
+							onclick={downloadMyData}>{exportPending ? 'Exporting…' : 'Download my data'}</button
 						>
 						·
 						<button

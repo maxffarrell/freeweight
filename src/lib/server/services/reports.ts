@@ -967,6 +967,28 @@ async function expensesByMonth(orgId: string) {
 		.orderBy(asc(sql`to_char(${expense.expenseOn}::date, 'YYYY-MM')`));
 }
 
+/** Shop cost-of-goods by month (YYYY-MM) — cogsCents snapshotted on sales. */
+async function cogsByMonth(orgId: string) {
+	const since = new Date();
+	since.setUTCMonth(since.getUTCMonth() - 12);
+	return db
+		.select({
+			month: sql<string>`to_char(${charge.dueDate}::date, 'YYYY-MM')`,
+			total: sql<number>`sum(${charge.cogsCents})`.mapWith(Number)
+		})
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				gte(charge.dueDate, since.toISOString().slice(0, 10)),
+				sql`${charge.cogsCents} is not null`,
+				sql`${charge.status} != 'void'`
+			)
+		)
+		.groupBy(sql`to_char(${charge.dueDate}::date, 'YYYY-MM')`)
+		.orderBy(asc(sql`to_char(${charge.dueDate}::date, 'YYYY-MM')`));
+}
+
 /** All-time expense totals by category. */
 async function expensesByCategory(orgId: string) {
 	return db
@@ -1052,6 +1074,7 @@ export async function getReports(orgId: string) {
 		ratings,
 		expenseMonths,
 		expenseCategories,
+		cogsMonths,
 		mrr,
 		giftCards,
 		profitability,
@@ -1091,6 +1114,7 @@ export async function getReports(orgId: string) {
 		classRatings(orgId),
 		expensesByMonth(orgId),
 		expensesByCategory(orgId),
+		cogsByMonth(orgId),
 		monthlyRecurring(orgId),
 		giftCardStats(orgId),
 		classProfitability(orgId),
@@ -1098,12 +1122,18 @@ export async function getReports(orgId: string) {
 		churnByPlan(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
-	const months = new Set([...revenue.map((r) => r.month), ...expenseMonths.map((e) => e.month)]);
+	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
+	const months = new Set([
+		...revenue.map((r) => r.month),
+		...expenseMonths.map((e) => e.month),
+		...cogsMonths.map((e) => e.month)
+	]);
 	const pnl = {
 		months: [...months].sort().map((m) => {
 			const rev = revenue.find((r) => r.month === m)?.total ?? 0;
 			const exp = expByMonth[m] ?? 0;
-			return { month: m, revenue: rev, expenses: exp, net: rev - exp };
+			const cogs = cogsByMonthMap[m] ?? 0;
+			return { month: m, revenue: rev, expenses: exp, cogs, net: rev - exp - cogs };
 		}),
 		byCategory: expenseCategories
 	};

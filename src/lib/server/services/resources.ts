@@ -45,7 +45,8 @@ export async function createResource(
 			locationId: input.locationId ?? null,
 			active: input.active,
 			status: input.status ?? 'open',
-			statusNote: input.statusNote ?? ''
+			statusNote: input.statusNote ?? '',
+			bufferMin: input.bufferMin ?? 0
 		})
 		.returning();
 	return row;
@@ -98,8 +99,8 @@ export async function resourceAvailability(
 		cur = new Date(cur.getTime() + r.slotMin * 60_000);
 	}
 	if (!slots.length) return { resource: r, slots };
-	const taken = await db
-		.select({ startsAt: resourceBooking.startsAt, count: sql<number>`count(*)`.mapWith(Number) })
+	const booked = await db
+		.select({ startsAt: resourceBooking.startsAt, endsAt: resourceBooking.endsAt })
 		.from(resourceBooking)
 		.where(
 			and(
@@ -109,10 +110,16 @@ export async function resourceAvailability(
 				lt(resourceBooking.startsAt, slots[slots.length - 1].endsAt),
 				gt(resourceBooking.endsAt, slots[0].startsAt)
 			)
-		)
-		.groupBy(resourceBooking.startsAt);
-	const byStart = new Map(taken.map((t) => [t.startsAt.getTime(), t.count]));
-	for (const slot of slots) slot.taken = byStart.get(slot.startsAt.getTime()) ?? 0;
+		);
+	// A booking occupies its slot plus `bufferMin` afterwards (cleaning/reset).
+	const ranges = booked.map((b) => ({
+		start: b.startsAt.getTime(),
+		end: b.endsAt.getTime() + r.bufferMin * 60_000
+	}));
+	for (const slot of slots)
+		slot.taken = ranges.filter(
+			(b) => b.start < slot.endsAt.getTime() && b.end > slot.startsAt.getTime()
+		).length;
 	return { resource: r, slots };
 }
 
@@ -165,7 +172,7 @@ export async function bookResource(
 					eq(resourceBooking.resourceId, resourceId),
 					eq(resourceBooking.status, 'booked'),
 					lt(resourceBooking.startsAt, endsAt),
-					gt(resourceBooking.endsAt, startsAt)
+					gt(sql`${resourceBooking.endsAt} + (${r.bufferMin} * interval '1 minute')`, startsAt)
 				)
 			);
 		if (taken >= r.capacity) error(409, 'That slot is full');

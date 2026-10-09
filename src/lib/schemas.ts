@@ -158,7 +158,9 @@ export const resourceInput = v.object({
 	/** 'open' | 'maintenance' | 'closed' — non-open blocks every new booking. */
 	status: v.optional(v.picklist(['open', 'maintenance', 'closed']), 'open'),
 	/** Short "why" shown to members while the amenity isn't open. */
-	statusNote: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120)))
+	statusNote: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
+	/** Minutes blocked after each booking for cleaning/reset (0 = back-to-back). */
+	bufferMin: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120)), 0)
 });
 export const resourceUpdate = v.object({ id: idSchema, ...v.partial(resourceInput).entries });
 
@@ -378,7 +380,8 @@ export const chargeInput = v.object({
 	kind: v.optional(v.picklist(chargeKinds), 'other'),
 	description: optionalText,
 	amount: cents,
-	dueDate: isoDate
+	dueDate: isoDate,
+	cogsCents: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0))))
 });
 /** One manual charge posted to every member with an active membership. */
 export const bulkChargeInput = v.object({
@@ -431,7 +434,9 @@ export const shopItemInput = v.object({
 	/** Staff alert when stock drops to this level; null = never. */
 	lowStockAt: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
-	)
+	),
+	/** Unit cost in cents — feeds shop COGS/margin; null = untracked. */
+	cost: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999999))))
 });
 
 export const shopItemUpdate = v.object({
@@ -441,6 +446,9 @@ export const shopItemUpdate = v.object({
 	stock: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))),
 	lowStockAt: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999)))
+	),
+	cost: v.optional(
+		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99999999)))
 	),
 	active: v.optional(v.boolean())
 });

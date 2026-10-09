@@ -711,6 +711,7 @@
 	let rName = $state('');
 	let rKind = $state('');
 	let rSlot = $state(30);
+	let rBuffer = $state(0);
 	let rCap = $state(1);
 	let rFrom = $state('06:00');
 	let rTo = $state('22:00');
@@ -727,6 +728,7 @@
 				capacity: rCap,
 				openFrom: rFrom,
 				openTo: rTo,
+				bufferMin: rBuffer,
 				locationId: rLoc || undefined
 			});
 			toast.success('Amenity added — members can book it in the portal');
@@ -2019,6 +2021,18 @@
 					<Input id="r-to" type="time" required bind:value={rTo} />
 				</Field.Field>
 			</div>
+			<Field.Field>
+				<Field.Label for="r-buffer">Buffer after each booking (min) — optional</Field.Label>
+				<Input
+					id="r-buffer"
+					type="number"
+					min={0}
+					max={120}
+					bind:value={rBuffer}
+					placeholder="0 = back-to-back"
+				/>
+				<Field.Description>Blocks the slot for cleaning/reset between bookings.</Field.Description>
+			</Field.Field>
 			{#if locations.filter((l) => !l.archivedAt).length}
 				<Field.Field>
 					<Field.Label>Location (optional)</Field.Label>

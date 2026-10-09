@@ -18,10 +18,12 @@ import {
 	gymMember,
 	gymSettings,
 	location,
+	memberMeasurement,
 	memberNote,
 	membership,
 	organization,
 	payment,
+	personalRecord,
 	plan,
 	recurringCharge,
 	waiver,
@@ -1241,4 +1243,69 @@ export async function memberSetPackAutoRenew(
 		summary: `Auto-renew ${on ? 'on' : 'off'}`
 	});
 	return row;
+}
+
+/** Everything we hold on one member — portal "download my data" export. */
+export async function exportMemberData(orgId: string, memberId: string) {
+	const [m] = await db
+		.select()
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	const [
+		memberships,
+		charges,
+		payments,
+		checkIns,
+		bookings,
+		prs,
+		measurements,
+		documents,
+		signRequests,
+		waivers
+	] = await Promise.all([
+		db
+			.select({ membership, planName: plan.name })
+			.from(membership)
+			.leftJoin(plan, eq(membership.planId, plan.id))
+			.where(eq(membership.memberId, memberId)),
+		db.select().from(charge).where(eq(charge.memberId, memberId)),
+		db.select().from(payment).where(eq(payment.memberId, memberId)),
+		db.select().from(checkIn).where(eq(checkIn.memberId, memberId)),
+		db.select().from(booking).where(eq(booking.memberId, memberId)),
+		db.select().from(personalRecord).where(eq(personalRecord.memberId, memberId)),
+		db.select().from(memberMeasurement).where(eq(memberMeasurement.memberId, memberId)),
+		db
+			.select({
+				id: document.id,
+				name: document.name,
+				contentType: document.contentType,
+				size: document.size,
+				createdAt: document.createdAt
+			})
+			.from(document)
+			.where(
+				and(
+					eq(document.organizationId, orgId),
+					eq(document.entityType, 'member'),
+					eq(document.entityId, memberId)
+				)
+			),
+		db.select().from(signRequest).where(eq(signRequest.memberId, memberId)),
+		db.select().from(waiver).where(eq(waiver.memberId, memberId))
+	]);
+	return {
+		exportedAt: new Date().toISOString(),
+		member: m,
+		memberships,
+		charges,
+		payments,
+		checkIns,
+		bookings,
+		personalRecords: prs,
+		measurements,
+		documents,
+		signRequests,
+		waivers
+	};
 }
