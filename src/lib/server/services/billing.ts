@@ -370,6 +370,47 @@ export async function createMembership(
 }
 
 /** Rejects joining a capped plan that's already at its member limit. Packs are never capped. */
+/**
+ * Move every active/paused membership off one plan onto another (retire a plan).
+ * nextChargeAt and any staff price override are preserved.
+ */
+export async function migratePlan(ctx: OrgContext, fromPlanId: string, toPlanId: string) {
+	if (fromPlanId === toPlanId) error(400, 'Pick a different plan');
+	const [[from], [to]] = await Promise.all([
+		db
+			.select({ name: plan.name })
+			.from(plan)
+			.where(and(eq(plan.organizationId, ctx.orgId), eq(plan.id, fromPlanId)))
+			.limit(1),
+		db
+			.select({ name: plan.name })
+			.from(plan)
+			.where(and(eq(plan.organizationId, ctx.orgId), eq(plan.id, toPlanId)))
+			.limit(1)
+	]);
+	if (!from || !to) error(404, 'Plan not found');
+	const moved = await db
+		.update(membership)
+		.set({ planId: toPlanId, updatedAt: new Date() })
+		.where(
+			and(
+				eq(membership.organizationId, ctx.orgId),
+				eq(membership.planId, fromPlanId),
+				inArray(membership.status, ['active', 'paused'])
+			)
+		)
+		.returning({ id: membership.id });
+	await emit({
+		orgId: ctx.orgId,
+		actorId: ctx.userId ?? null,
+		entityType: 'plan',
+		entityId: fromPlanId,
+		action: 'migrated',
+		summary: `Moved ${moved.length} membership${moved.length === 1 ? '' : 's'} from ${from.name} to ${to.name}`
+	});
+	return { moved: moved.length };
+}
+
 export async function assertPlanCapacity(orgId: string, p: typeof plan.$inferSelect) {
 	if (p.isPack || p.memberLimit === null) return;
 	const [{ n }] = await db

@@ -23,6 +23,7 @@ import {
 	signRequest,
 	classVideo,
 	workoutResult,
+	memberIssue,
 	workoutLog,
 	gymMember,
 	gymSettings,
@@ -154,7 +155,8 @@ export async function portalOverview(memberId: string) {
 			className: classType.name,
 			locationName: location.name,
 			workout: classSession.workout,
-			streamUrl: classSession.streamUrl
+			streamUrl: classSession.streamUrl,
+			bringNote: classType.bringNote
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
@@ -231,6 +233,12 @@ export async function portalOverview(memberId: string) {
 		.where(eq(workoutLog.memberId, memberId))
 		.orderBy(desc(workoutLog.day), desc(workoutLog.createdAt))
 		.limit(10);
+	const issues = await db
+		.select()
+		.from(memberIssue)
+		.where(eq(memberIssue.memberId, memberId))
+		.orderBy(desc(memberIssue.createdAt))
+		.limit(5);
 
 	const [[org], [referred], referralRows] = await Promise.all([
 		db.select({ slug: organization.slug }).from(organization).where(eq(organization.id, orgId)),
@@ -419,6 +427,7 @@ export async function portalOverview(memberId: string) {
 		addOns,
 		nextBill,
 		workouts,
+		issues,
 		history,
 		feedback,
 		results,
@@ -876,6 +885,17 @@ export async function giveSpot(
  * and hasn't replaced yet, each with the free candidate sessions of the same
  * class coming up in the next 14 days.
  */
+/** Portal: member reports a problem ("locker 12 hinge is broken") → staff Needs-attention. */
+export async function reportIssue(orgId: string, memberId: string, text: string) {
+	const t = text.trim().slice(0, 300);
+	if (!t) error(400, 'Describe the issue first');
+	const [row] = await db
+		.insert(memberIssue)
+		.values({ organizationId: orgId, memberId, text: t })
+		.returning();
+	return row!;
+}
+
 /** Portal: member logs a free-form workout entry ("Ran 5k — 24:30"). */
 export async function logWorkout(orgId: string, memberId: string, day: string, text: string) {
 	const t = text.trim().slice(0, 500);

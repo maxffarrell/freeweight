@@ -106,6 +106,17 @@ export const logWorkout = command(
 	}
 );
 
+export const reportIssue = command(
+	v.object({
+		memberId: idSchema,
+		text: v.pipe(v.string(), v.minLength(1), v.maxLength(300))
+	}),
+	async ({ memberId, text }) => {
+		const m = await myMember(memberId);
+		return await svc.reportIssue(m.organizationId, m.id, text);
+	}
+);
+
 export const memberGiveSpot = command(
 	v.object({
 		memberId: idSchema,

@@ -361,6 +361,8 @@ export const classType = pgTable(
 		minLevelId: text('min_level_id'),
 		/** Minimum member age (years) to book — for kids/adults-only classes; null = all ages. */
 		minAge: integer('min_age'),
+		/** "What to bring" note shown in the portal under this class's bookings (mat, gloves…). */
+		bringNote: text('bring_note').notNull().default(''),
 		active: boolean('active').notNull().default(true),
 		...timestamps
 	},
@@ -654,6 +656,27 @@ export const workoutLog = pgTable(
 		...timestamps
 	},
 	(t) => [index('workout_log_member_idx').on(t.memberId)]
+);
+
+/** Something a member flagged in the portal ("locker 12 hinge is broken") — Needs attention. */
+export const memberIssue = pgTable(
+	'member_issue',
+	{
+		id: id(),
+		organizationId: orgId(),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		text: text('text').notNull(),
+		/** 'open' | 'resolved' */
+		status: text('status').notNull().default('open'),
+		resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+		...timestamps
+	},
+	(t) => [
+		index('member_issue_member_idx').on(t.memberId),
+		index('member_issue_org_idx').on(t.organizationId)
+	]
 );
 
 /** Movement/video links attached to a class type — the coaching library shown in the portal. */

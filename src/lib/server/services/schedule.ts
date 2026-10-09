@@ -155,6 +155,7 @@ export async function createClassType(
 			memberBookable: input.memberBookable,
 			minLevelId: input.minLevelId ?? null,
 			minAge: input.minAge ?? null,
+			bringNote: input.bringNote ?? '',
 			active: input.active
 		})
 		.returning();

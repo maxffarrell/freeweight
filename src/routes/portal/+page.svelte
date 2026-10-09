@@ -100,7 +100,8 @@
 		getNpsStatus,
 		submitNps,
 		setClassWatch,
-		logWorkout
+		logWorkout,
+		reportIssue
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -287,6 +288,29 @@
 			toast.error(errMsg(err, 'Could not log'));
 		}
 		wlogBusy = false;
+	}
+	let issueText = $state('');
+	let issueBusy = $state(false);
+	let issueFor = $state(memberId);
+	$effect(() => {
+		if (memberId !== issueFor) {
+			issueFor = memberId;
+			issueText = '';
+		}
+	});
+	async function sendIssue() {
+		const t = issueText.trim();
+		if (!t) return;
+		issueBusy = true;
+		try {
+			await reportIssue({ memberId, text: t });
+			issueText = '';
+			toast.success('Sent — the front desk will take a look');
+			await getPortalOverview(memberId).refresh();
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not send'));
+		}
+		issueBusy = false;
 	}
 	let avatarInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -2494,6 +2518,31 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Report an issue</Card.Title>
+			<Card.Description
+				>Broken equipment, a locker problem — let the front desk know</Card.Description
+			>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="flex gap-2">
+				<Input bind:value={issueText} placeholder="Locker 12's door is broken" maxlength={300} />
+				<Button size="sm" disabled={!issueText.trim() || issueBusy} onclick={sendIssue}>
+					{issueBusy ? '…' : 'Send'}
+				</Button>
+			</div>
+			{#each d.issues as i (i.id)}
+				<div class="flex items-baseline gap-2 text-sm">
+					<Badge variant={i.status === 'resolved' ? 'secondary' : 'outline'} class="shrink-0"
+						>{i.status}</Badge
+					>
+					<span class="min-w-0 break-words">{i.text}</span>
+				</div>
+			{/each}
+		</Card.Content>
+	</Card.Root>
+
 	{#if docs.length}
 		<Card.Root>
 			<Card.Header>
@@ -2869,6 +2918,9 @@
 							{localDate(u.startsAt, tz)}
 							{localTime(u.startsAt, tz)}
 						</p>
+						{#if u.bringNote}
+							<p class="mt-0.5 text-xs text-muted-foreground">Bring: {u.bringNote}</p>
+						{/if}
 						{#if u.booking.coachNote}
 							<p class="mt-0.5 text-xs text-primary">Coach: {u.booking.coachNote}</p>
 						{/if}
