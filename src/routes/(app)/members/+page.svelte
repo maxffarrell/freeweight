@@ -178,7 +178,8 @@
 			noWaiver: owesFilter === '__nowaiver' || undefined,
 			onWaitlist: owesFilter === '__waitlist' || undefined,
 			paused: owesFilter === '__paused' || undefined,
-			noUpcoming: owesFilter === '__noupcoming' || undefined
+			noUpcoming: owesFilter === '__noupcoming' || undefined,
+			comped: owesFilter === '__comped' || undefined
 		});
 	}
 	function search() {
@@ -710,7 +711,9 @@
 																	? 'Paused'
 																	: owesFilter === '__noupcoming'
 																		? 'No upcoming'
-																		: 'Any balance'}</Select.Trigger
+																		: owesFilter === '__comped'
+																			? "Comp'd"
+																			: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -727,6 +730,7 @@
 				<Select.Item value="__waitlist">On a waitlist</Select.Item>
 				<Select.Item value="__paused">Paused</Select.Item>
 				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
+				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>

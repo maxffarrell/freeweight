@@ -87,7 +87,8 @@ export const getMembers = query(
 			noWaiver: v.optional(v.boolean()),
 			onWaitlist: v.optional(v.boolean()),
 			paused: v.optional(v.boolean()),
-			noUpcoming: v.optional(v.boolean())
+			noUpcoming: v.optional(v.boolean()),
+			comped: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -112,7 +113,8 @@ export const getMembers = query(
 			opts?.noWaiver,
 			opts?.onWaitlist,
 			opts?.paused,
-			opts?.noUpcoming
+			opts?.noUpcoming,
+			opts?.comped
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

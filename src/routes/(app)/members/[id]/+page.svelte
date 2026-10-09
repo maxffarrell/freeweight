@@ -1114,6 +1114,12 @@
 					<span class="text-muted-foreground">Classes booked</span>
 					<span class="tabular-nums">{m.attendance.bookedMonth} this month</span>
 				</div>
+				{#if m.attendance.waitlisted > 0}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Waitlisted</span>
+						<span class="tabular-nums">{m.attendance.waitlisted} upcoming</span>
+					</div>
+				{/if}
 				{#if m.attendance.firstVisit}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">First visit</span>
