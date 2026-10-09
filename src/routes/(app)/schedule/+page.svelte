@@ -1236,6 +1236,12 @@
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
 								{/if}
+								{#if r.booking.memberNote}
+									<span
+										class="ml-1 text-xs font-normal text-muted-foreground italic"
+										title="Member's own note">· “{r.booking.memberNote}”</span
+									>
+								{/if}
 								{#if r.resultScore}
 									<span class="ml-1 text-xs font-normal text-muted-foreground"
 										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span

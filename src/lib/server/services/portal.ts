@@ -885,6 +885,29 @@ export async function giveSpot(
  * and hasn't replaced yet, each with the free candidate sessions of the same
  * class coming up in the next 14 days.
  */
+/** Portal: member writes a note on their own upcoming booking — staff see it on the roster. */
+export async function setMemberNote(
+	orgId: string,
+	memberId: string,
+	bookingId: string,
+	note: string
+) {
+	const t = note.trim().slice(0, 120) || null;
+	const [row] = await db
+		.update(booking)
+		.set({ memberNote: t })
+		.where(
+			and(
+				eq(booking.id, bookingId),
+				eq(booking.memberId, memberId),
+				eq(booking.organizationId, orgId)
+			)
+		)
+		.returning();
+	if (!row) error(404, 'Booking not found');
+	return row;
+}
+
 /** Portal: member reports a problem ("locker 12 hinge is broken") → staff Needs-attention. */
 export async function reportIssue(orgId: string, memberId: string, text: string) {
 	const t = text.trim().slice(0, 300);

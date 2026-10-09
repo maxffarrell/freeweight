@@ -556,6 +556,23 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
+			{#if d.offSoon.length}
+				<Card.Root>
+					<Card.Header><Card.Title class="text-base">Off soon</Card.Title></Card.Header>
+					<Card.Content class="px-4">
+						<ul class="space-y-2">
+							{#each d.offSoon as o (o.name + o.startDate)}
+								<li class="flex items-center justify-between gap-2 text-sm">
+									<span class="truncate font-medium">{o.name}</span>
+									<Badge variant="outline" class="shrink-0">
+										{o.startDate === o.endDate ? o.startDate : `${o.startDate} → ${o.endDate}`}
+									</Badge>
+								</li>
+							{/each}
+						</ul>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if d.liveChallenges.length}
 				<Card.Root>
 					<Card.Header><Card.Title class="text-base">Live challenges</Card.Title></Card.Header>

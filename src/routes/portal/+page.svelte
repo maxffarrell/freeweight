@@ -101,7 +101,8 @@
 		submitNps,
 		setClassWatch,
 		logWorkout,
-		reportIssue
+		reportIssue,
+		setMyBookingNote
 	} from '#lib/remote/portal.remote.ts';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
@@ -2924,6 +2925,25 @@
 						{#if u.booking.coachNote}
 							<p class="mt-0.5 text-xs text-primary">Coach: {u.booking.coachNote}</p>
 						{/if}
+						<input
+							class="mt-0.5 w-32 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground"
+							placeholder="+ note for staff"
+							title="Only staff see this on the roster"
+							value={u.booking.memberNote ?? ''}
+							onchange={async (e) => {
+								const v2 = (e.target as HTMLInputElement).value;
+								try {
+									await setMyBookingNote({
+										memberId,
+										bookingId: u.booking.id,
+										note: v2 || undefined
+									});
+									toast.success('Note saved');
+								} catch (err) {
+									toast.error(errMsg(err, 'Could not save'));
+								}
+							}}
+						/>
 						{#if u.workout}
 							<p class="mt-0.5 text-xs whitespace-pre-line text-muted-foreground">
 								{u.workout}
