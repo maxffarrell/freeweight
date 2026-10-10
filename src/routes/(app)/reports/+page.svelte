@@ -1401,6 +1401,34 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Chronically underfilled — last 60 days</Card.Title>
+		</Card.Header>
+		<Card.Content>
+			{#if r.underfilled.length}
+				<p class="mb-2 text-xs text-muted-foreground">
+					Class types averaging under 30% booked — consolidate or drop?
+				</p>
+				<ul class="space-y-1.5">
+					{#each r.underfilled as u (u.className)}
+						<li class="flex items-center justify-between gap-2 text-sm">
+							<span class="flex items-center gap-2 truncate">
+								<span class="size-2 shrink-0 rounded-full" style:background={u.color}></span>
+								<span class="truncate">{u.className}</span>
+							</span>
+							<span class="shrink-0 text-muted-foreground tabular-nums"
+								>{u.fill}% · {u.sessions} sessions</span
+							>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-sm text-muted-foreground">Every class fills to at least 30% — healthy.</p>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
 	<Card.Root class="lg:col-span-2">
 		<Card.Header>
 			<Card.Title class="text-base">Class economics — last 30 days</Card.Title>
