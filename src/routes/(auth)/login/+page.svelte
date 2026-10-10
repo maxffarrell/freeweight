@@ -50,7 +50,10 @@
 				sign-up. Sessions end after 8 minutes. Sample workspaces are deleted after 24 hours.
 			</p>
 		</div>
-		<Button type="submit" class="w-full"><Sparkles /> Open demo workspace</Button>
+		<Button type="submit" class="w-full"><Sparkles /> Staff view — open demo workspace</Button>
+		<Button type="submit" formaction="/demo?view=member" variant="outline" class="w-full"
+			>Member view — open the member portal</Button
+		>
 	</form>
 {/if}
 

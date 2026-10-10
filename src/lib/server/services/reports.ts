@@ -892,7 +892,7 @@ async function referralConversion(orgId: string) {
 			paying: sql<number>`count(*) filter (where exists (
 				select 1 from payment p
 				join charge c on p.charge_id = c.id
-				where c.member_id = ${gymMember.id} and c.kind = 'membership'
+				where c.member_id = ${outer(gymMember.id)} and c.kind = 'membership'
 			))`.mapWith(Number)
 		})
 		.from(gymMember)

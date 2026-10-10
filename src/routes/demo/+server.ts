@@ -10,6 +10,7 @@ export const POST: RequestHandler = async (event) => {
 	} catch {
 		// adapter without client IPs
 	}
-	await startDemo(ip);
-	redirect(303, '/dashboard');
+	const view = event.url.searchParams.get('view') === 'member' ? 'member' : 'staff';
+	await startDemo(ip, view);
+	redirect(303, view === 'member' ? '/portal' : '/dashboard');
 };
