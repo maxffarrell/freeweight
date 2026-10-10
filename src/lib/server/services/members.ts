@@ -152,7 +152,9 @@ export async function listMembers(
 	/** Members with an open charge due within the next 7 days. */
 	dueSoon?: boolean,
 	/** Members with at least one upcoming booked session. */
-	hasUpcoming?: boolean
+	hasUpcoming?: boolean,
+	/** Active members whose plan commitment term ends within 30 days — renewal pitch targets. */
+	commitmentEnding?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -302,6 +304,9 @@ export async function listMembers(
 					: undefined,
 				hasUpcoming
 					? sql`exists (select 1 from ${booking} b4 join ${classSession} s4 on s4.id = b4.session_id where b4.member_id = ${gymMember.id} and b4.status = 'booked' and s4.starts_at > now())`
+					: undefined,
+				commitmentEnding
+					? sql`exists (select 1 from membership m16 join plan p16 on p16.id = m16.plan_id where m16.member_id = ${gymMember.id} and m16.status = 'active' and p16.commitment_months > 0 and m16.created_at + (p16.commitment_months || ' months')::interval > now() and m16.created_at + (p16.commitment_months || ' months')::interval <= ${new Date(Date.now() + 30 * 86_400_000).toISOString()})`
 					: undefined,
 				recent
 					? gte(
@@ -767,6 +772,24 @@ export async function getMember(orgId: string, id: string) {
 		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
 		.where(and(eq(trialRequest.memberId, id), eq(trialRequest.status, 'pending')));
 
+	const [emailStats] = row.member.email
+		? await db
+				.select({
+					sent: sql<number>`count(*)`.mapWith(Number),
+					opened:
+						sql<number>`count(*) filter (where ${notificationLog.openedAt} is not null)`.mapWith(
+							Number
+						)
+				})
+				.from(notificationLog)
+				.where(
+					and(
+						eq(notificationLog.organizationId, orgId),
+						eq(notificationLog.recipient, row.member.email)
+					)
+				)
+		: [{ sent: 0, opened: 0 }];
+
 	return {
 		...row,
 		memberships,
@@ -792,6 +815,7 @@ export async function getMember(orgId: string, id: string) {
 		signRequests,
 		workoutLogs,
 		issues,
+		emailStats,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),

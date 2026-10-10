@@ -2063,6 +2063,13 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Emails sent</Card.Title>
+				{#if m.emailStats.sent}
+					<Card.Description
+						>{m.emailStats.opened} of {m.emailStats.sent} opened ({Math.round(
+							(m.emailStats.opened / m.emailStats.sent) * 100
+						)}%)</Card.Description
+					>
+				{/if}
 			</Card.Header>
 			<Card.Content class="px-4">
 				{#each m.emails as e (e.id)}
