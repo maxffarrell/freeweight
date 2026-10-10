@@ -40,6 +40,7 @@ import {
 	waiver,
 	plan,
 	outer,
+	signDocTemplate,
 	memberIssue,
 	workoutLog,
 	workoutResult
@@ -1797,4 +1798,36 @@ export async function anonymizeMember(ctx: OrgContext, memberId: string) {
 		actorId: ctx.userId
 	});
 	return { ok: true };
+}
+
+/** Saved sign-request document drafts for the member page. */
+export async function listSignDocTemplates(orgId: string) {
+	return db
+		.select()
+		.from(signDocTemplate)
+		.where(eq(signDocTemplate.organizationId, orgId))
+		.orderBy(asc(signDocTemplate.name));
+}
+
+export async function saveSignDocTemplate(
+	ctx: OrgContext,
+	input: v.InferOutput<typeof s.signDocTemplateInput>
+) {
+	const [row] = await db
+		.insert(signDocTemplate)
+		.values({
+			organizationId: ctx.orgId,
+			name: input.name,
+			title: input.title,
+			body: input.body,
+			createdBy: ctx.userId ?? null
+		})
+		.returning();
+	return row;
+}
+
+export async function deleteSignDocTemplate(orgId: string, id: string) {
+	await db
+		.delete(signDocTemplate)
+		.where(and(eq(signDocTemplate.organizationId, orgId), eq(signDocTemplate.id, id)));
 }
