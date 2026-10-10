@@ -497,6 +497,34 @@
 		</Card.Content>
 	</Card.Root>
 
+	{#if r.promoUsage.length}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Promo codes used</Card.Title>
+				<Card.Description>Redemptions per code — join-page discounts</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				{#each r.promoUsage as p (p.code)}
+					<div class="flex items-center justify-between gap-2 py-1 text-sm">
+						<div class="min-w-0">
+							<p class="truncate font-medium">{p.code}</p>
+							<p class="text-xs text-muted-foreground">
+								{p.percentOff
+									? `${p.percentOff}% off`
+									: p.amountOff
+										? formatMoney(p.amountOff, currency, true) + ' off'
+										: ''}
+								{p.maxUses ? ` · max ${p.maxUses}` : ''}
+								{p.expiresAt ? ` · ends ${formatDate(p.expiresAt)}` : ''}
+							</p>
+						</div>
+						<Badge variant={p.active ? 'secondary' : 'outline'}>{p.timesUsed}×</Badge>
+					</div>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Written off</Card.Title>
