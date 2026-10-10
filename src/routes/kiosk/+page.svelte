@@ -279,6 +279,7 @@
 					r.waiverMissing ? 'waiver unsigned' : '',
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
+					(r.visitsMonth ?? 0) > 1 ? `${r.visitsMonth} visits this month` : '',
 					r.welcomeBack ? 'welcome back' : '',
 					r.suspended ? 'membership suspended' : '',
 					r.creditsLeft === 0 ? 'pack empty' : '',
