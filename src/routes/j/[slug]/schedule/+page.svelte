@@ -23,6 +23,8 @@
 	const focusId = $derived(page.url.searchParams.get('session'));
 	/** Deep link: /j/{slug}/schedule?class=<classTypeId> filters to one class. */
 	const classFilter = $derived(page.url.searchParams.get('class'));
+	/** Deep link: /j/{slug}/schedule?location=<locationId> filters to one branch. */
+	const locFilter = $derived(page.url.searchParams.get('location'));
 	$effect(() => {
 		if (!focusId) return;
 		void tick().then(() =>
@@ -80,7 +82,11 @@
 
 	/** Sessions grouped by local day, in order. */
 	const visible = $derived(
-		classFilter ? sessions.filter((s) => s.session.classTypeId === classFilter) : sessions
+		sessions.filter(
+			(s) =>
+				(!classFilter || s.session.classTypeId === classFilter) &&
+				(!locFilter || s.session.locationId === locFilter)
+		)
 	);
 	const byDay = $derived(
 		[...visible]
@@ -122,7 +128,8 @@
 				<h1 class="text-2xl font-semibold tracking-tight">Class schedule</h1>
 				<p class="text-sm text-muted-foreground">
 					Next 7 days · {tz}{#if classFilter && visible[0]}
-						· {visible[0].className} only{/if}
+						· {visible[0].className} only{/if}{#if locFilter && visible[0]?.locationName}
+						· {visible[0].locationName} only{/if}
 				</p>
 			</div>
 			<Button variant="outline" size="sm" href="/j/{org.slug}">

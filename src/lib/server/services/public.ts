@@ -69,6 +69,7 @@ export async function getPublicGym(slug: string) {
 			className: classType.name,
 			color: classType.color,
 			locationName: location.name,
+			locationId: classSession.locationId,
 			instructorName: user.name,
 			dropInPrice: classType.dropInPrice,
 			booked:
