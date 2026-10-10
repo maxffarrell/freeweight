@@ -179,7 +179,7 @@
 					data={r.checkIns}
 					x="day"
 					series={[{ key: 'count', label: 'Check-ins', color: 'var(--color-count)' }]}
-					props={{ xAxis: { format: (d) => formatDate(d) } }}
+					props={{ xAxis: { format: (d) => formatDate(d), ticks: 7 } }}
 				>
 					{#snippet tooltip()}
 						<Chart.Tooltip />
@@ -200,7 +200,7 @@
 					data={r.hours}
 					x="hour"
 					series={[{ key: 'count', label: 'Check-ins', color: 'var(--color-count)' }]}
-					props={{ xAxis: { format: (d) => hourLabel(d) } }}
+					props={{ xAxis: { format: (d) => hourLabel(d), ticks: 8 } }}
 				>
 					{#snippet tooltip()}
 						<Chart.Tooltip />
