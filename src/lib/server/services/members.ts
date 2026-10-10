@@ -154,7 +154,11 @@ export async function listMembers(
 	/** Members with at least one upcoming booked session. */
 	hasUpcoming?: boolean,
 	/** Active members whose plan commitment term ends within 30 days — renewal pitch targets. */
-	commitmentEnding?: boolean
+	commitmentEnding?: boolean,
+	/** Dependent members (book/bill through a guardian). */
+	isDependent?: boolean,
+	/** Members with no emergency contact on file. */
+	noEmergency?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -194,6 +198,10 @@ export async function listMembers(
 				string | null
 			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
 			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`,
+			/** Guardian member's name (dependents only) — family exports need it. */
+			guardianName: sql<
+				string | null
+			>`(select g3.name from ${gymMember} g3 where g3.id = ${outer(gymMember.guardianId)})`,
 			/** Nearest end date of an active membership (pack expiry or commitment end); null = open-ended. */
 			memberEnds: sql<Date | null>`(select m6.ends_at from ${membership} m6 where m6.member_id = ${outer(gymMember.id)} and m6.status = 'active' and m6.ends_at is not null order by m6.ends_at asc limit 1)`,
 			/** Member's own visits in the trailing 30 days (excludes their guest check-ins). */
@@ -307,6 +315,10 @@ export async function listMembers(
 					: undefined,
 				commitmentEnding
 					? sql`exists (select 1 from membership m16 join plan p16 on p16.id = m16.plan_id where m16.member_id = ${gymMember.id} and m16.status = 'active' and p16.commitment_months > 0 and m16.created_at + (p16.commitment_months || ' months')::interval > now() and m16.created_at + (p16.commitment_months || ' months')::interval <= ${new Date(Date.now() + 30 * 86_400_000).toISOString()})`
+					: undefined,
+				isDependent ? isNotNull(gymMember.guardianId) : undefined,
+				noEmergency
+					? or(isNull(gymMember.emergencyPhone), eq(gymMember.emergencyPhone, ''))
 					: undefined,
 				recent
 					? gte(
