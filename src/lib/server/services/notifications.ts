@@ -1770,7 +1770,8 @@ export async function sendAnnouncement(
 	planId?: string,
 	locationId?: string,
 	inactive?: boolean,
-	recent?: boolean
+	recent?: boolean,
+	noPortal?: boolean
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
 	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
@@ -1788,6 +1789,7 @@ export async function sendAnnouncement(
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
+				noPortal ? isNull(gymMember.portalUserId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1865,7 +1867,8 @@ export async function countAnnouncementAudience(
 	planId?: string,
 	locationId?: string,
 	inactive?: boolean,
-	recent?: boolean
+	recent?: boolean,
+	noPortal?: boolean
 ) {
 	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const [{ n }] = await db
@@ -1881,6 +1884,7 @@ export async function countAnnouncementAudience(
 				planId ? membersOnPlan(orgId, planId) : undefined,
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
+				noPortal ? isNull(gymMember.portalUserId) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)

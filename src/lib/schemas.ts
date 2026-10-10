@@ -665,7 +665,9 @@ export const announcementInput = v.object({
 	/** Target inactive members instead of actives (win-back mail). */
 	inactive: v.optional(v.boolean()),
 	/** Restrict the batch to members who joined in the last 7 days. */
-	recent: v.optional(v.boolean())
+	recent: v.optional(v.boolean()),
+	/** Restrict the batch to members who never claimed a portal login. */
+	noPortal: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({

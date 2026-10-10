@@ -309,7 +309,8 @@
 				'Last visit',
 				'Membership ends',
 				'Visits (30d)',
-				'Referral source'
+				'Referral source',
+				'Portal'
 			],
 			...rows.map((m) => [
 				m.name,
@@ -324,7 +325,8 @@
 				m.lastVisit ? formatDate(m.lastVisit) : '',
 				m.memberEnds ? formatDate(m.memberEnds) : '',
 				m.visits30,
-				m.referralSource ?? ''
+				m.referralSource ?? '',
+				m.portalUserId ? 'yes' : ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -444,13 +446,15 @@
 					? 'All active members'
 					: emailAudience === '__inactive'
 						? 'Inactive members'
-						: emailAudience === '__recent'
-							? 'New this week'
-							: audTag
-								? `Tag: ${audTag}`
-								: audLoc
-									? `Location: ${audLocName}`
-									: `Plan: ${audPlanName}`
+						: emailAudience === '__noportal'
+							? 'Members without portal access'
+							: emailAudience === '__recent'
+								? 'New this week'
+								: audTag
+									? `Tag: ${audTag}`
+									: audLoc
+										? `Location: ${audLocName}`
+										: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -462,7 +466,8 @@
 						locationId: audLoc,
 						atRisk: emailAudience === '__risk',
 						inactive: emailAudience === '__inactive',
-						recent: emailAudience === '__recent'
+						recent: emailAudience === '__recent',
+						noPortal: emailAudience === '__noportal'
 					})
 				: null
 	);
@@ -470,7 +475,7 @@
 		e.preventDefault();
 		emailPending = true;
 		try {
-			if (emailSendAt && emailAudience !== '__sel') {
+			if (emailSendAt && emailAudience !== '__sel' && emailAudience !== '__noportal') {
 				await scheduleEmail({
 					subject: emailSubject,
 					message: emailBody,
@@ -493,6 +498,7 @@
 					atRisk: emailAudience === '__risk',
 					inactive: emailAudience === '__inactive',
 					recent: emailAudience === '__recent',
+					noPortal: emailAudience === '__noportal',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -1195,6 +1201,7 @@
 							<Select.Item value="__risk">At-risk members (no visit in 30+ days)</Select.Item>
 							<Select.Item value="__inactive">Inactive members</Select.Item>
 							<Select.Item value="__recent">New this week</Select.Item>
+							<Select.Item value="__noportal">No portal access</Select.Item>
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}
