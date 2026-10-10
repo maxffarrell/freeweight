@@ -1711,7 +1711,8 @@ export async function getReports(orgId: string) {
 		compVal,
 		underfilled,
 		chronicNs,
-		addonAttach
+		addonAttach,
+		writtenOff
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1792,7 +1793,8 @@ export async function getReports(orgId: string) {
 		compValue(orgId),
 		underfilledClasses(orgId),
 		chronicNoShows(orgId),
-		addonAttachRate(orgId)
+		addonAttachRate(orgId),
+		writtenOffCharges(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1885,7 +1887,8 @@ export async function getReports(orgId: string) {
 		compValue: compVal,
 		underfilled,
 		chronicNoShows: chronicNs,
-		addonAttach
+		addonAttach,
+		writtenOff
 	};
 }
 
@@ -2620,4 +2623,29 @@ export async function addonAttachRate(orgId: string) {
 		monthly: Math.round(monthly),
 		pct: activeMembers ? Math.round((membersWithAddons / activeMembers) * 100) : 0
 	};
+}
+
+/** Charges staff wrote off — how much receivable was forgiven and how often. */
+export async function writtenOffCharges(orgId: string) {
+	const [row] = await db
+		.select({
+			count: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`coalesce(sum(${charge.amount}), 0)`.mapWith(Number)
+		})
+		.from(charge)
+		.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'written_off')));
+	const [last30] = await db
+		.select({
+			count: sql<number>`count(*)`.mapWith(Number),
+			total: sql<number>`coalesce(sum(${charge.amount}), 0)`.mapWith(Number)
+		})
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.status, 'written_off'),
+				gte(charge.createdAt, new Date(Date.now() - 30 * 86400_000))
+			)
+		);
+	return { count: row.count, total: row.total, count30: last30.count, total30: last30.total };
 }

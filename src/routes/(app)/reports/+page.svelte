@@ -499,6 +499,30 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Written off</Card.Title>
+			<Card.Description>Charges staff forgave — receivables dropped by write-off</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<p class="text-3xl font-semibold tabular-nums">
+				{formatMoney(r.writtenOff.total, currency, true)}
+			</p>
+			<div class="space-y-1 text-sm">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Charges written off</span>
+					<span class="tabular-nums">{r.writtenOff.count}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Last 30 days</span>
+					<span class="tabular-nums">
+						{r.writtenOff.count30} · {formatMoney(r.writtenOff.total30, currency, true)}
+					</span>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Add-on attach rate</Card.Title>
 			<Card.Description>Members carrying a recurring add-on (PT, towels, lockers)</Card.Description>
 		</Card.Header>
