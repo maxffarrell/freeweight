@@ -497,6 +497,30 @@
 		</Card.Content>
 	</Card.Root>
 
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-base">Signature requests</Card.Title>
+			<Card.Description>Release/consent documents sent for signing</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<p class="text-3xl font-semibold tabular-nums">{r.signRequests.rate}%</p>
+			<div class="space-y-1 text-sm">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Signed</span>
+					<span class="tabular-nums">{r.signRequests.signed}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Waiting on member</span>
+					<span class="tabular-nums">{r.signRequests.pending}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Voided</span>
+					<span class="tabular-nums">{r.signRequests.voided}</span>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	{#if r.promoUsage.length}
 		<Card.Root>
 			<Card.Header>

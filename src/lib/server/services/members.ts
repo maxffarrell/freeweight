@@ -150,7 +150,9 @@ export async function listMembers(
 	/** Members enrolled in a course ending today or later. */
 	inCourse?: boolean,
 	/** Members with an open charge due within the next 7 days. */
-	dueSoon?: boolean
+	dueSoon?: boolean,
+	/** Members with at least one upcoming booked session. */
+	hasUpcoming?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -297,6 +299,9 @@ export async function listMembers(
 					: undefined,
 				dueSoon
 					? sql`exists (select 1 from charge c3 where c3.member_id = ${gymMember.id} and c3.status = 'open' and c3.due_date <= ${new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)})`
+					: undefined,
+				hasUpcoming
+					? sql`exists (select 1 from ${booking} b4 join ${classSession} s4 on s4.id = b4.session_id where b4.member_id = ${gymMember.id} and b4.status = 'booked' and s4.starts_at > now())`
 					: undefined,
 				recent
 					? gte(

@@ -52,6 +52,7 @@ import {
 	payment,
 	plan,
 	promoCode,
+	signRequest,
 	giftCard,
 	recurringCharge,
 	resourceBooking,
@@ -1714,7 +1715,8 @@ export async function getReports(orgId: string) {
 		chronicNs,
 		addonAttach,
 		writtenOff,
-		promos
+		promos,
+		signReqs
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1797,7 +1799,8 @@ export async function getReports(orgId: string) {
 		chronicNoShows(orgId),
 		addonAttachRate(orgId),
 		writtenOffCharges(orgId),
-		promoUsage(orgId)
+		promoUsage(orgId),
+		signRequestStats(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1892,7 +1895,8 @@ export async function getReports(orgId: string) {
 		chronicNoShows: chronicNs,
 		addonAttach,
 		writtenOff,
-		promoUsage: promos
+		promoUsage: promos,
+		signRequests: signReqs
 	};
 }
 
@@ -2670,4 +2674,23 @@ export async function promoUsage(orgId: string) {
 		.where(and(eq(promoCode.organizationId, orgId), gt(promoCode.timesUsed, 0)))
 		.orderBy(desc(promoCode.timesUsed))
 		.limit(10);
+}
+
+/** Signature-request throughput — how many release/consent docs are signed vs still waiting. */
+export async function signRequestStats(orgId: string) {
+	const [row] = await db
+		.select({
+			pending: sql<number>`count(*) filter (where ${signRequest.status} = 'pending')`.mapWith(
+				Number
+			),
+			signed: sql<number>`count(*) filter (where ${signRequest.status} = 'signed')`.mapWith(Number),
+			voided: sql<number>`count(*) filter (where ${signRequest.status} = 'voided')`.mapWith(Number)
+		})
+		.from(signRequest)
+		.where(eq(signRequest.organizationId, orgId));
+	const done = row.signed + row.voided;
+	return {
+		...row,
+		rate: done ? Math.round((row.signed / done) * 100) : 0
+	};
 }
