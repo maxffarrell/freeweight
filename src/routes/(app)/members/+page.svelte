@@ -203,7 +203,8 @@
 			isDependent: owesFilter === '__dependent' || undefined,
 			noEmergency: owesFilter === '__noemergency' || undefined,
 			hasProgram: owesFilter === '__program' || undefined,
-			hasGiftBalance: owesFilter === '__giftbalance' || undefined
+			hasGiftBalance: owesFilter === '__giftbalance' || undefined,
+			trialEnding: owesFilter === '__trialending' || undefined
 		});
 	}
 	function search() {
@@ -782,6 +783,7 @@
 				<Select.Item value="__noemergency">No emergency contact</Select.Item>
 				<Select.Item value="__program">On a program</Select.Item>
 				<Select.Item value="__giftbalance">Has gift card balance</Select.Item>
+				<Select.Item value="__trialending">Trial ending soon</Select.Item>
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
