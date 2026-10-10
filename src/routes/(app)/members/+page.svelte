@@ -194,7 +194,9 @@
 			hasCompCredits: owesFilter === '__compcredits' || undefined,
 			inChallenge: owesFilter === '__inchallenge' || undefined,
 			hasDependents: owesFilter === '__dependents' || undefined,
-			visitedThisWeek: owesFilter === '__visitedweek' || undefined
+			visitedThisWeek: owesFilter === '__visitedweek' || undefined,
+			isReferrer: owesFilter === '__referrer' || undefined,
+			inCourse: owesFilter === '__incourse' || undefined
 		});
 	}
 	function search() {
@@ -780,6 +782,8 @@
 				<Select.Item value="__inchallenge">In a challenge</Select.Item>
 				<Select.Item value="__dependents">Has dependents</Select.Item>
 				<Select.Item value="__visitedweek">Visited this week</Select.Item>
+				<Select.Item value="__referrer">Has referred members</Select.Item>
+				<Select.Item value="__incourse">Enrolled in a course</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>

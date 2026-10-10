@@ -102,7 +102,9 @@ export const getMembers = query(
 			hasCompCredits: v.optional(v.boolean()),
 			inChallenge: v.optional(v.boolean()),
 			hasDependents: v.optional(v.boolean()),
-			visitedThisWeek: v.optional(v.boolean())
+			visitedThisWeek: v.optional(v.boolean()),
+			isReferrer: v.optional(v.boolean()),
+			inCourse: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -142,7 +144,9 @@ export const getMembers = query(
 			opts?.hasCompCredits,
 			opts?.inChallenge,
 			opts?.hasDependents,
-			opts?.visitedThisWeek
+			opts?.visitedThisWeek,
+			opts?.isReferrer,
+			opts?.inCourse
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
