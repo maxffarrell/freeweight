@@ -143,7 +143,11 @@ export async function listMembers(
 	/** Members who are a guardian of at least one dependent. */
 	hasDependents?: boolean,
 	/** Members with a check-in in the last 7 days. */
-	visitedThisWeek?: boolean
+	visitedThisWeek?: boolean,
+	/** Members who have referred at least one other member. */
+	isReferrer?: boolean,
+	/** Members enrolled in a course ending today or later. */
+	inCourse?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -281,6 +285,12 @@ export async function listMembers(
 					: undefined,
 				visitedThisWeek
 					? sql`exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 7 * 86_400_000).toISOString()})`
+					: undefined,
+				isReferrer
+					? sql`exists (select 1 from gym_member r where r.referred_by_member_id = ${gymMember.id})`
+					: undefined,
+				inCourse
+					? sql`exists (select 1 from course_enrollment ce join course c2 on c2.id = ce.course_id where ce.member_id = ${gymMember.id} and ce.waitlisted = false and c2.ends_on >= ${new Date().toISOString().slice(0, 10)})`
 					: undefined,
 				recent
 					? gte(
