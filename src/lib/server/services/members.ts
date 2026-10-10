@@ -133,7 +133,11 @@ export async function listMembers(
 	/** Members who have never claimed a portal login. */
 	noPortal?: boolean,
 	/** Members with no birthday on file — gaps in the birthday-marketing list. */
-	noBirthday?: boolean
+	noBirthday?: boolean,
+	/** Members with no staff photo on file. */
+	noPhoto?: boolean,
+	/** Members whose membership still holds comp/bonus class credits. */
+	hasCompCredits?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -259,6 +263,10 @@ export async function listMembers(
 					: undefined,
 				noPortal ? isNull(gymMember.portalUserId) : undefined,
 				noBirthday ? isNull(gymMember.birthday) : undefined,
+				noPhoto ? isNull(gymMember.photoDocumentId) : undefined,
+				hasCompCredits
+					? sql`exists (select 1 from membership m15 where m15.member_id = ${gymMember.id} and m15.status = 'active' and m15.bonus_credits > 0)`
+					: undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

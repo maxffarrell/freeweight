@@ -97,7 +97,9 @@ export const getMembers = query(
 			cancelRequested: v.optional(v.boolean()),
 			pauseRequested: v.optional(v.boolean()),
 			noPortal: v.optional(v.boolean()),
-			noBirthday: v.optional(v.boolean())
+			noBirthday: v.optional(v.boolean()),
+			noPhoto: v.optional(v.boolean()),
+			hasCompCredits: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -132,7 +134,9 @@ export const getMembers = query(
 			opts?.cancelRequested,
 			opts?.pauseRequested,
 			opts?.noPortal,
-			opts?.noBirthday
+			opts?.noBirthday,
+			opts?.noPhoto,
+			opts?.hasCompCredits
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
