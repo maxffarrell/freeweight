@@ -1134,6 +1134,19 @@
 						<span class="tabular-nums">{formatDate(m.attendance.lastVisit)}</span>
 					</div>
 				{/if}
+				{#if m.attendance.usualTimes.length}
+					<div class="flex justify-between gap-2">
+						<span class="text-muted-foreground">Usually visits</span>
+						<span class="text-right tabular-nums"
+							>{m.attendance.usualTimes
+								.map(
+									(t) =>
+										`${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][t.dow]} ${t.hour % 12 || 12}${t.hour < 12 ? 'a' : 'p'}`
+								)
+								.join(' · ')}</span
+						>
+					</div>
+				{/if}
 				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
 				{#if nextMile}
 					<div class="flex justify-between">

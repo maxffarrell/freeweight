@@ -1708,7 +1708,8 @@ export async function getReports(orgId: string) {
 		walkIns,
 		leadTimes,
 		sessCancels,
-		compVal
+		compVal,
+		underfilled
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1786,7 +1787,8 @@ export async function getReports(orgId: string) {
 		walkInStats(orgId),
 		bookingLeadTimes(orgId),
 		sessionCancels(orgId),
-		compValue(orgId)
+		compValue(orgId),
+		underfilledClasses(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1876,7 +1878,8 @@ export async function getReports(orgId: string) {
 		walkIns,
 		leadTimes,
 		sessionCancels: sessCancels,
-		compValue: compVal
+		compValue: compVal,
+		underfilled
 	};
 }
 
@@ -2498,4 +2501,36 @@ export async function saveOfferStats(orgId: string) {
 		.groupBy(sql`to_char(${membership.saveOfferAt}, 'YYYY-MM')`)
 		.orderBy(desc(sql`to_char(${membership.saveOfferAt}, 'YYYY-MM')`));
 	return rows;
+}
+
+/** Classes with avg fill under 30% over the last 60 days (>=4 sessions run) —
+ * candidates to consolidate or drop. */
+export async function underfilledClasses(orgId: string) {
+	const rows = await db
+		.select({
+			className: classType.name,
+			color: classType.color,
+			sessions: sql<number>`count(distinct ${classSession.id})`.mapWith(Number),
+			booked:
+				sql<number>`coalesce(sum((select count(*) from ${booking} b where b.session_id = ${outer(classSession.id)} and b.status in ('booked','attended','no_show'))), 0)`.mapWith(
+					Number
+				),
+			capacity: sql<number>`coalesce(sum(${classSession.capacity}), 0)`.mapWith(Number)
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(classSession.organizationId, orgId),
+				isNull(classSession.cancelledAt),
+				gte(classSession.startsAt, new Date(Date.now() - 60 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.groupBy(classType.name, classType.color)
+		.having(sql`count(distinct ${classSession.id}) >= 4`)
+		.orderBy(asc(sql`coalesce(sum(${classSession.capacity}), 0)`));
+	return rows
+		.map((r) => ({ ...r, fill: r.capacity > 0 ? Math.round((r.booked / r.capacity) * 100) : 0 }))
+		.filter((r) => r.fill < 30);
 }

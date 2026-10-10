@@ -413,9 +413,65 @@ export async function portalOverview(memberId: string) {
 		? { date: nb.membership.nextChargeAt!, amount: nb.membership.price ?? nb.plan.amount }
 		: null;
 
+	// Upsell hint: a pack-only member visiting often enough that the cheapest
+	// plan would cost less than their effective drop-in spend per month.
+	let upsell: { plan: string; monthly: number; spend: number } | null = null;
+	{
+		const hasPlan = memberships.some((r) => r.membership.status === 'active' && !r.plan.isPack);
+		const hasPack = memberships.some((r) => r.membership.status === 'active' && r.plan.isPack);
+		if (!hasPlan && hasPack) {
+			const [{ n: visits60 }] = await db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(checkIn)
+				.where(
+					and(
+						eq(checkIn.organizationId, orgId),
+						eq(checkIn.memberId, memberId),
+						isNull(checkIn.guestName),
+						gte(checkIn.checkedAt, new Date(Date.now() - 60 * 86400_000))
+					)
+				);
+			const [di] = await db
+				.select({
+					min: sql<number | null>`min(${classType.dropInPrice})`.mapWith((v) =>
+						v ? Number(v) : null
+					)
+				})
+				.from(classType)
+				.where(
+					and(eq(plan.organizationId, orgId), eq(plan.active, true), gt(classType.dropInPrice, 0))
+				);
+			const [cheapest] = await db
+				.select({ name: plan.name, amount: plan.amount, interval: plan.interval })
+				.from(plan)
+				.where(
+					and(
+						eq(plan.organizationId, orgId),
+						eq(plan.active, true),
+						eq(plan.isPack, false),
+						gt(plan.amount, 0)
+					)
+				)
+				.orderBy(asc(plan.amount))
+				.limit(1);
+			if (di?.min && cheapest) {
+				const monthly =
+					(cheapest.interval === 'year'
+						? cheapest.amount / 12
+						: cheapest.interval === 'week'
+							? cheapest.amount * 4.33
+							: cheapest.amount) / 100;
+				const spend = (visits60 / 2) * (di.min / 100);
+				if (spend > monthly * 1.1)
+					upsell = { plan: cheapest.name, monthly: Math.round(monthly), spend: Math.round(spend) };
+			}
+		}
+	}
+
 	return {
 		member: m,
 		lockerLabel: lk?.label ?? null,
+		upsell,
 		level: level ?? null,
 		settings,
 		memberships,

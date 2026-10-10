@@ -684,6 +684,27 @@ export async function getMember(orgId: string, id: string) {
 		mw = prev.toISOString().slice(0, 10);
 	}
 
+	// "Usually visits" — top dow/hour combos from the member's check-in history
+	// (org timezone so 6pm means 6pm at the gym).
+	const tzLit = sql.raw(`'${(stz?.tz ?? 'UTC').replace(/'/g, "''")}'`);
+	const usualTimes = await db
+		.select({
+			dow: sql<number>`extract(dow from ${checkIn.checkedAt} at time zone ${tzLit})`.mapWith(
+				Number
+			),
+			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})`.mapWith(
+				Number
+			),
+			n: sql<number>`count(*)`.mapWith(Number)
+		})
+		.from(checkIn)
+		.where(
+			and(eq(checkIn.organizationId, orgId), eq(checkIn.memberId, id), isNull(checkIn.guestName))
+		)
+		.groupBy(sql`1`, sql`2`)
+		.orderBy(desc(sql`3`))
+		.limit(3);
+
 	const trialRequests = await db
 		.select({
 			request: trialRequest,
@@ -729,6 +750,7 @@ export async function getMember(orgId: string, id: string) {
 			thisMonth: att?.thisMonth ?? 0,
 			firstVisit: att?.firstVisit ?? null,
 			lastVisit: att?.lastVisit ?? null,
+			usualTimes,
 			noShows: bs?.noShows ?? 0,
 			bookedMonth: bs?.thisMonth ?? 0,
 			bookedWeek: bs?.thisWeek ?? 0,

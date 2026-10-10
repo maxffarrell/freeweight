@@ -2434,6 +2434,20 @@
 		</Card.Root>
 	{/if}
 
+	{#if d.upsell}
+		<Card.Root class="border-primary/30 bg-primary/5">
+			<Card.Content class="py-4">
+				<p class="text-sm">
+					You spend ~{formatMoney(d.upsell.spend * 100, currency)}/mo on drop-ins — the
+					<strong>{d.upsell.plan}</strong> plan is {formatMoney(
+						d.upsell.monthly * 100,
+						currency
+					)}/mo. Ask at the desk to switch.
+				</p>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex items-center gap-2 text-base"><CreditCard /> Balance</Card.Title>
