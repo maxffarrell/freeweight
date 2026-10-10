@@ -100,7 +100,8 @@ export const getMembers = query(
 			noBirthday: v.optional(v.boolean()),
 			noPhoto: v.optional(v.boolean()),
 			hasCompCredits: v.optional(v.boolean()),
-			inChallenge: v.optional(v.boolean())
+			inChallenge: v.optional(v.boolean()),
+			hasDependents: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -138,7 +139,8 @@ export const getMembers = query(
 			opts?.noBirthday,
 			opts?.noPhoto,
 			opts?.hasCompCredits,
-			opts?.inChallenge
+			opts?.inChallenge,
+			opts?.hasDependents
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

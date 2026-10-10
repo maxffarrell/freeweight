@@ -51,6 +51,7 @@ import {
 	membership,
 	payment,
 	plan,
+	promoCode,
 	giftCard,
 	recurringCharge,
 	resourceBooking,
@@ -1712,7 +1713,8 @@ export async function getReports(orgId: string) {
 		underfilled,
 		chronicNs,
 		addonAttach,
-		writtenOff
+		writtenOff,
+		promos
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1794,7 +1796,8 @@ export async function getReports(orgId: string) {
 		underfilledClasses(orgId),
 		chronicNoShows(orgId),
 		addonAttachRate(orgId),
-		writtenOffCharges(orgId)
+		writtenOffCharges(orgId),
+		promoUsage(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1888,7 +1891,8 @@ export async function getReports(orgId: string) {
 		underfilled,
 		chronicNoShows: chronicNs,
 		addonAttach,
-		writtenOff
+		writtenOff,
+		promoUsage: promos
 	};
 }
 
@@ -2648,4 +2652,22 @@ export async function writtenOffCharges(orgId: string) {
 			)
 		);
 	return { count: row.count, total: row.total, count30: last30.count, total30: last30.total };
+}
+
+/** Promo code usage — redemptions per code, most-used first. */
+export async function promoUsage(orgId: string) {
+	return db
+		.select({
+			code: promoCode.code,
+			timesUsed: promoCode.timesUsed,
+			maxUses: promoCode.maxUses,
+			active: promoCode.active,
+			expiresAt: promoCode.expiresAt,
+			percentOff: promoCode.percentOff,
+			amountOff: promoCode.amountOff
+		})
+		.from(promoCode)
+		.where(and(eq(promoCode.organizationId, orgId), gt(promoCode.timesUsed, 0)))
+		.orderBy(desc(promoCode.timesUsed))
+		.limit(10);
 }

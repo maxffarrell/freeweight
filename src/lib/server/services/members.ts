@@ -139,7 +139,9 @@ export async function listMembers(
 	/** Members whose membership still holds comp/bonus class credits. */
 	hasCompCredits?: boolean,
 	/** Members entered in a currently-active challenge. */
-	inChallenge?: boolean
+	inChallenge?: boolean,
+	/** Members who are a guardian of at least one dependent. */
+	hasDependents?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -271,6 +273,9 @@ export async function listMembers(
 					: undefined,
 				inChallenge
 					? sql`exists (select 1 from challenge_entry ce join challenge ch on ch.id = ce.challenge_id where ce.member_id = ${gymMember.id} and ch.active)`
+					: undefined,
+				hasDependents
+					? sql`exists (select 1 from gym_member d where d.guardian_id = ${gymMember.id})`
 					: undefined,
 				recent
 					? gte(

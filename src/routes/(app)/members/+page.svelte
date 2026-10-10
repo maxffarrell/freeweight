@@ -192,7 +192,8 @@
 			noBirthday: owesFilter === '__nobday' || undefined,
 			noPhoto: owesFilter === '__nophoto' || undefined,
 			hasCompCredits: owesFilter === '__compcredits' || undefined,
-			inChallenge: owesFilter === '__inchallenge' || undefined
+			inChallenge: owesFilter === '__inchallenge' || undefined,
+			hasDependents: owesFilter === '__dependents' || undefined
 		});
 	}
 	function search() {
@@ -776,6 +777,7 @@
 				<Select.Item value="__nophoto">No photo</Select.Item>
 				<Select.Item value="__compcredits">Has comp credits</Select.Item>
 				<Select.Item value="__inchallenge">In a challenge</Select.Item>
+				<Select.Item value="__dependents">Has dependents</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
