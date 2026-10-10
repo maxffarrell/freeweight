@@ -131,7 +131,9 @@ export async function listMembers(
 	/** Members with a pending portal pause request. */
 	pauseRequested?: boolean,
 	/** Members who have never claimed a portal login. */
-	noPortal?: boolean
+	noPortal?: boolean,
+	/** Members with no birthday on file — gaps in the birthday-marketing list. */
+	noBirthday?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -256,6 +258,7 @@ export async function listMembers(
 					? sql`exists (select 1 from membership m14 where m14.member_id = ${gymMember.id} and m14.status = 'active' and m14.pause_requested_at is not null)`
 					: undefined,
 				noPortal ? isNull(gymMember.portalUserId) : undefined,
+				noBirthday ? isNull(gymMember.birthday) : undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

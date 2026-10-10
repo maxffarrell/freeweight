@@ -1710,7 +1710,8 @@ export async function getReports(orgId: string) {
 		sessCancels,
 		compVal,
 		underfilled,
-		chronicNs
+		chronicNs,
+		addonAttach
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1790,7 +1791,8 @@ export async function getReports(orgId: string) {
 		sessionCancels(orgId),
 		compValue(orgId),
 		underfilledClasses(orgId),
-		chronicNoShows(orgId)
+		chronicNoShows(orgId),
+		addonAttachRate(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1882,7 +1884,8 @@ export async function getReports(orgId: string) {
 		sessionCancels: sessCancels,
 		compValue: compVal,
 		underfilled,
-		chronicNoShows: chronicNs
+		chronicNoShows: chronicNs,
+		addonAttach
 	};
 }
 
@@ -2578,4 +2581,43 @@ export async function chronicNoShows(orgId: string) {
 		.map(([memberId, v]) => ({ memberId, memberName: v.name, streak: v.streak }))
 		.sort((a, b) => b.streak - a.streak)
 		.slice(0, 15);
+}
+
+/** Add-on attach rate — how many active members carry a recurring add-on (PT,
+ * towel service, locker) and the monthly-equivalent revenue those add-ons bring. */
+export async function addonAttachRate(orgId: string) {
+	const rows = await db
+		.select({
+			memberId: recurringCharge.memberId,
+			amount: recurringCharge.amount,
+			interval: recurringCharge.interval
+		})
+		.from(recurringCharge)
+		.where(and(eq(recurringCharge.organizationId, orgId), eq(recurringCharge.active, true)));
+	const [{ n: activeMembers }] = await db
+		.select({ n: sql<number>`count(distinct ${membership.memberId})`.mapWith(Number) })
+		.from(membership)
+		.innerJoin(plan, eq(membership.planId, plan.id))
+		.where(
+			and(
+				eq(membership.organizationId, orgId),
+				eq(membership.status, 'active'),
+				eq(plan.isPack, false)
+			)
+		);
+	const membersWithAddons = new Set(rows.map((r) => r.memberId)).size;
+	let monthly = 0;
+	for (const r of rows)
+		monthly +=
+			r.interval === 'week'
+				? r.amount * (52 / 12)
+				: r.interval === 'year'
+					? r.amount / 12
+					: r.amount;
+	return {
+		membersWithAddons,
+		totalAddons: rows.length,
+		monthly: Math.round(monthly),
+		pct: activeMembers ? Math.round((membersWithAddons / activeMembers) * 100) : 0
+	};
 }

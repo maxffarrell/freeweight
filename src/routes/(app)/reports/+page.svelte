@@ -499,6 +499,30 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Add-on attach rate</Card.Title>
+			<Card.Description>Members carrying a recurring add-on (PT, towels, lockers)</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<p class="text-3xl font-semibold tabular-nums">{r.addonAttach.pct}%</p>
+			<div class="space-y-1 text-sm">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Members with add-ons</span>
+					<span class="tabular-nums">{r.addonAttach.membersWithAddons}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Active add-ons</span>
+					<span class="tabular-nums">{r.addonAttach.totalAddons}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Monthly add-on revenue</span>
+					<span class="tabular-nums">{formatMoney(r.addonAttach.monthly, currency, true)}</span>
+				</div>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">Top spenders</Card.Title>
 			<Card.Description>
 				Highest lifetime payments · avg {formatMoney(r.spenders.avg, currency, true)} across {r
