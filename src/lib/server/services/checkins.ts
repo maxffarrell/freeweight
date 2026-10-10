@@ -507,6 +507,17 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				isNull(checkIn.guestName)
 			)
 		);
+	const [{ n: visitsMonth }] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, ctx.orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
+			)
+		);
 	return {
 		checkIn: row!,
 		member: m,
@@ -515,6 +526,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		birthday,
 		anniversary,
 		visits: n,
+		visitsMonth,
 		visitsToday,
 		waiverMissing,
 		suspended,

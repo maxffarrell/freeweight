@@ -1709,7 +1709,8 @@ export async function getReports(orgId: string) {
 		leadTimes,
 		sessCancels,
 		compVal,
-		underfilled
+		underfilled,
+		chronicNs
 	] = await Promise.all([
 		checkInsByDay(orgId),
 		memberGrowthByMonth(orgId),
@@ -1788,7 +1789,8 @@ export async function getReports(orgId: string) {
 		bookingLeadTimes(orgId),
 		sessionCancels(orgId),
 		compValue(orgId),
-		underfilledClasses(orgId)
+		underfilledClasses(orgId),
+		chronicNoShows(orgId)
 	]);
 	const expByMonth = Object.fromEntries(expenseMonths.map((e) => [e.month, e.total]));
 	const cogsByMonthMap = Object.fromEntries(cogsMonths.map((e) => [e.month, e.total]));
@@ -1879,7 +1881,8 @@ export async function getReports(orgId: string) {
 		leadTimes,
 		sessionCancels: sessCancels,
 		compValue: compVal,
-		underfilled
+		underfilled,
+		chronicNoShows: chronicNs
 	};
 }
 
@@ -2533,4 +2536,46 @@ export async function underfilledClasses(orgId: string) {
 	return rows
 		.map((r) => ({ ...r, fill: r.capacity > 0 ? Math.round((r.booked / r.capacity) * 100) : 0 }))
 		.filter((r) => r.fill < 30);
+}
+
+/** Members whose 2+ most recent concluded bookings are all no-shows — the
+ * chronic flakes worth a personal follow-up before they churn. */
+export async function chronicNoShows(orgId: string) {
+	const rows = await db
+		.select({
+			memberId: booking.memberId,
+			memberName: gymMember.name,
+			status: booking.status,
+			startsAt: classSession.startsAt
+		})
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				inArray(booking.status, ['attended', 'no_show']),
+				gte(classSession.startsAt, new Date(Date.now() - 90 * 86400_000)),
+				lt(classSession.startsAt, new Date())
+			)
+		)
+		.orderBy(desc(classSession.startsAt));
+	const streaks = new Map<string, { name: string; streak: number }>();
+	for (const r of rows) {
+		const cur = streaks.get(r.memberId);
+		if (cur && cur.streak === -1) continue; // streak already broken
+		if (r.status === 'no_show') {
+			if (!cur) streaks.set(r.memberId, { name: r.memberName, streak: 1 });
+			else cur.streak++;
+		} else if (cur) {
+			cur.streak = -1;
+		} else {
+			streaks.set(r.memberId, { name: r.memberName, streak: -1 });
+		}
+	}
+	return [...streaks.entries()]
+		.filter(([, v]) => v.streak >= 2)
+		.map(([memberId, v]) => ({ memberId, memberName: v.name, streak: v.streak }))
+		.sort((a, b) => b.streak - a.streak)
+		.slice(0, 15);
 }

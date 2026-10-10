@@ -1366,6 +1366,32 @@
 
 	<Card.Root>
 		<Card.Header>
+			<Card.Title class="text-base">Chronic no-shows — 90 days</Card.Title>
+		</Card.Header>
+		<Card.Content>
+			{#if r.chronicNoShows.length}
+				<p class="mb-2 text-xs text-muted-foreground">
+					Members whose recent bookings are all no-shows — worth a personal follow-up.
+				</p>
+				<ul class="space-y-1.5">
+					{#each r.chronicNoShows as m (m.memberId)}
+						<li class="flex items-center justify-between gap-2 text-sm">
+							<a
+								href="/members/{m.memberId}"
+								class="truncate font-medium underline-offset-2 hover:underline">{m.memberName}</a
+							>
+							<Badge variant="destructive">{m.streak} in a row</Badge>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-sm text-muted-foreground">No members on a no-show streak.</p>
+			{/if}
+		</Card.Content>
+	</Card.Root>
+
+	<Card.Root>
+		<Card.Header>
 			<Card.Title class="text-base">No-show rate by class</Card.Title>
 			<Card.Description>Bookings that flaked, sessions in the last 90 days</Card.Description>
 		</Card.Header>
