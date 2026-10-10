@@ -198,7 +198,8 @@
 			isReferrer: owesFilter === '__referrer' || undefined,
 			inCourse: owesFilter === '__incourse' || undefined,
 			dueSoon: owesFilter === '__duesoon' || undefined,
-			hasUpcoming: owesFilter === '__hasupcoming' || undefined
+			hasUpcoming: owesFilter === '__hasupcoming' || undefined,
+			commitmentEnding: owesFilter === '__commitment' || undefined
 		});
 	}
 	function search() {
@@ -770,6 +771,7 @@
 				<Select.Item value="__paused">Paused</Select.Item>
 				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
 				<Select.Item value="__hasupcoming">Has upcoming bookings</Select.Item>
+				<Select.Item value="__commitment">Commitment ending soon</Select.Item>
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
