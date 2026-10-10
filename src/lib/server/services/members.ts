@@ -158,7 +158,11 @@ export async function listMembers(
 	/** Dependent members (book/bill through a guardian). */
 	isDependent?: boolean,
 	/** Members with no emergency contact on file. */
-	noEmergency?: boolean
+	noEmergency?: boolean,
+	/** Members with an active workout-program assignment. */
+	hasProgram?: boolean,
+	/** Members who redeemed a gift card that still has a balance — unused account credit. */
+	hasGiftBalance?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -319,6 +323,12 @@ export async function listMembers(
 				isDependent ? isNotNull(gymMember.guardianId) : undefined,
 				noEmergency
 					? or(isNull(gymMember.emergencyPhone), eq(gymMember.emergencyPhone, ''))
+					: undefined,
+				hasProgram
+					? sql`exists (select 1 from member_program mp where mp.member_id = ${gymMember.id} and mp.status = 'active')`
+					: undefined,
+				hasGiftBalance
+					? sql`exists (select 1 from gift_card gc where gc.redeemed_by_member_id = ${gymMember.id} and gc.balance > 0)`
 					: undefined,
 				recent
 					? gte(
