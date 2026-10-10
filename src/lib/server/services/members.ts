@@ -137,7 +137,9 @@ export async function listMembers(
 	/** Members with no staff photo on file. */
 	noPhoto?: boolean,
 	/** Members whose membership still holds comp/bonus class credits. */
-	hasCompCredits?: boolean
+	hasCompCredits?: boolean,
+	/** Members entered in a currently-active challenge. */
+	inChallenge?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -266,6 +268,9 @@ export async function listMembers(
 				noPhoto ? isNull(gymMember.photoDocumentId) : undefined,
 				hasCompCredits
 					? sql`exists (select 1 from membership m15 where m15.member_id = ${gymMember.id} and m15.status = 'active' and m15.bonus_credits > 0)`
+					: undefined,
+				inChallenge
+					? sql`exists (select 1 from challenge_entry ce join challenge ch on ch.id = ce.challenge_id where ce.member_id = ${gymMember.id} and ch.active)`
 					: undefined,
 				recent
 					? gte(

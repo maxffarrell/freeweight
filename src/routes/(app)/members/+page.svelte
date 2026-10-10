@@ -191,7 +191,8 @@
 			noPortal: owesFilter === '__noportal' || undefined,
 			noBirthday: owesFilter === '__nobday' || undefined,
 			noPhoto: owesFilter === '__nophoto' || undefined,
-			hasCompCredits: owesFilter === '__compcredits' || undefined
+			hasCompCredits: owesFilter === '__compcredits' || undefined,
+			inChallenge: owesFilter === '__inchallenge' || undefined
 		});
 	}
 	function search() {
@@ -774,6 +775,7 @@
 				<Select.Item value="__nobday">No birthday on file</Select.Item>
 				<Select.Item value="__nophoto">No photo</Select.Item>
 				<Select.Item value="__compcredits">Has comp credits</Select.Item>
+				<Select.Item value="__inchallenge">In a challenge</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
