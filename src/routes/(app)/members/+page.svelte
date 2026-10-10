@@ -197,7 +197,8 @@
 			visitedThisWeek: owesFilter === '__visitedweek' || undefined,
 			isReferrer: owesFilter === '__referrer' || undefined,
 			inCourse: owesFilter === '__incourse' || undefined,
-			dueSoon: owesFilter === '__duesoon' || undefined
+			dueSoon: owesFilter === '__duesoon' || undefined,
+			hasUpcoming: owesFilter === '__hasupcoming' || undefined
 		});
 	}
 	function search() {
@@ -768,6 +769,7 @@
 				<Select.Item value="__waitlist">On a waitlist</Select.Item>
 				<Select.Item value="__paused">Paused</Select.Item>
 				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
+				<Select.Item value="__hasupcoming">Has upcoming bookings</Select.Item>
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
