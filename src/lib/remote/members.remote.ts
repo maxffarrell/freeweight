@@ -96,7 +96,8 @@ export const getMembers = query(
 			autoRenew: v.optional(v.boolean()),
 			cancelRequested: v.optional(v.boolean()),
 			pauseRequested: v.optional(v.boolean()),
-			noPortal: v.optional(v.boolean())
+			noPortal: v.optional(v.boolean()),
+			noBirthday: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -130,7 +131,8 @@ export const getMembers = query(
 			opts?.autoRenew,
 			opts?.cancelRequested,
 			opts?.pauseRequested,
-			opts?.noPortal
+			opts?.noPortal,
+			opts?.noBirthday
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

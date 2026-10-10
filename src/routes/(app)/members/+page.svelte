@@ -188,7 +188,8 @@
 			autoRenew: owesFilter === '__autorenew' || undefined,
 			cancelRequested: owesFilter === '__cancelreq' || undefined,
 			pauseRequested: owesFilter === '__pausereq' || undefined,
-			noPortal: owesFilter === '__noportal' || undefined
+			noPortal: owesFilter === '__noportal' || undefined,
+			noBirthday: owesFilter === '__nobday' || undefined
 		});
 	}
 	function search() {
@@ -768,6 +769,7 @@
 				<Select.Item value="__cancelreq">Cancel requested</Select.Item>
 				<Select.Item value="__pausereq">Pause requested</Select.Item>
 				<Select.Item value="__noportal">No portal access</Select.Item>
+				<Select.Item value="__nobday">No birthday on file</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
