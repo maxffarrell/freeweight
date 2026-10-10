@@ -104,7 +104,8 @@ export const getMembers = query(
 			hasDependents: v.optional(v.boolean()),
 			visitedThisWeek: v.optional(v.boolean()),
 			isReferrer: v.optional(v.boolean()),
-			inCourse: v.optional(v.boolean())
+			inCourse: v.optional(v.boolean()),
+			dueSoon: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -146,7 +147,8 @@ export const getMembers = query(
 			opts?.hasDependents,
 			opts?.visitedThisWeek,
 			opts?.isReferrer,
-			opts?.inCourse
+			opts?.inCourse,
+			opts?.dueSoon
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

@@ -196,7 +196,8 @@
 			hasDependents: owesFilter === '__dependents' || undefined,
 			visitedThisWeek: owesFilter === '__visitedweek' || undefined,
 			isReferrer: owesFilter === '__referrer' || undefined,
-			inCourse: owesFilter === '__incourse' || undefined
+			inCourse: owesFilter === '__incourse' || undefined,
+			dueSoon: owesFilter === '__duesoon' || undefined
 		});
 	}
 	function search() {
@@ -784,6 +785,7 @@
 				<Select.Item value="__visitedweek">Visited this week</Select.Item>
 				<Select.Item value="__referrer">Has referred members</Select.Item>
 				<Select.Item value="__incourse">Enrolled in a course</Select.Item>
+				<Select.Item value="__duesoon">Charge due within 7d</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
@@ -1269,7 +1271,7 @@
 					placeholder={"Hi {first_name} — we're closed this Thursday for maintenance…"}
 				/>
 				<Field.Description>
-					Personalize with {'{name}'} or {'{first_name}'}.
+					Personalize with {'{name}'}, {'{first_name}'}, {'{gym}'} or {'{date}'}.
 				</Field.Description>
 			</Field.Field>
 			{#if emailPreview != null}

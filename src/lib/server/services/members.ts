@@ -147,7 +147,9 @@ export async function listMembers(
 	/** Members who have referred at least one other member. */
 	isReferrer?: boolean,
 	/** Members enrolled in a course ending today or later. */
-	inCourse?: boolean
+	inCourse?: boolean,
+	/** Members with an open charge due within the next 7 days. */
+	dueSoon?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -291,6 +293,9 @@ export async function listMembers(
 					: undefined,
 				inCourse
 					? sql`exists (select 1 from course_enrollment ce join course c2 on c2.id = ce.course_id where ce.member_id = ${gymMember.id} and ce.waitlisted = false and c2.ends_on >= ${new Date().toISOString().slice(0, 10)})`
+					: undefined,
+				dueSoon
+					? sql`exists (select 1 from charge c3 where c3.member_id = ${gymMember.id} and c3.status = 'open' and c3.due_date <= ${new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)})`
 					: undefined,
 				recent
 					? gte(

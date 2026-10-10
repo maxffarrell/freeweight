@@ -1720,10 +1720,14 @@ export async function requestAllPaymentNotices(orgId: string) {
 	return { debtors: debtors.length, sent };
 }
 
-/** Replaces {name} and {first_name} merge tags in an announcement draft. */
-export function mergeTags(t: string, memberName: string) {
+/** Replaces {name}, {first_name}, {gym} and {date} merge tags in an announcement draft. */
+export function mergeTags(t: string, memberName: string, orgName = '', today = '') {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;
-	return t.replaceAll('{first_name}', first).replaceAll('{name}', memberName);
+	return t
+		.replaceAll('{first_name}', first)
+		.replaceAll('{name}', memberName)
+		.replaceAll('{gym}', orgName)
+		.replaceAll('{date}', today);
 }
 
 /** Sends one preview of the draft announcement to the staff user composing it. */
@@ -1742,13 +1746,15 @@ export async function sendAnnouncementTest(
 	const name = await orgBrand(orgId);
 	const { text, html } = renderEmail({
 		...name,
-		heading: mergeTags(subject, u.name),
-		lines: mergeTags(message, u.name).split(/\n+/).filter(Boolean),
+		heading: mergeTags(subject, u.name, name.orgName, new Date().toISOString().slice(0, 10)),
+		lines: mergeTags(message, u.name, name.orgName, new Date().toISOString().slice(0, 10))
+			.split(/\n+/)
+			.filter(Boolean),
 		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 	});
 	await sendEmail({
 		to: u.email,
-		subject: `[Test] ${name.orgName}: ${mergeTags(subject, u.name)}`,
+		subject: `[Test] ${name.orgName}: ${mergeTags(subject, u.name, name.orgName, new Date().toISOString().slice(0, 10))}`,
 		text,
 		html
 	});
@@ -1808,11 +1814,12 @@ export async function sendAnnouncement(
 	// {name} / {first_name} merge tags personalize per member; without them
 	// the body renders once and is shared.
 	const personalized = subject.includes('{') || message.includes('{');
+	const today2 = new Date().toISOString().slice(0, 10);
 	const render = (memberName: string) =>
 		renderEmail({
 			...name,
-			heading: mergeTags(subject, memberName),
-			lines: mergeTags(message, memberName).split(/\n+/).filter(Boolean),
+			heading: mergeTags(subject, memberName, name.orgName, today2),
+			lines: mergeTags(message, memberName, name.orgName, today2).split(/\n+/).filter(Boolean),
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		});
 	const shared = personalized ? null : render('');
@@ -1824,7 +1831,7 @@ export async function sendAnnouncement(
 		const { text, html } = personalized ? render(m.name) : shared!;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `${name.orgName}: ${mergeTags(subject, m.name)}`,
+			subject: `${name.orgName}: ${mergeTags(subject, m.name, name.orgName, today2)}`,
 			text,
 			html: html + openPixel(logId)
 		});
@@ -1848,8 +1855,18 @@ export async function previewAnnouncement(orgId: string, subject: string, messag
 	const name = await orgBrand(orgId);
 	return renderEmail({
 		...name,
-		heading: mergeTags(subject || '(no subject)', 'Casey Rivera'),
-		lines: mergeTags(message || '(empty message)', 'Casey Rivera')
+		heading: mergeTags(
+			subject || '(no subject)',
+			'Casey Rivera',
+			name.orgName,
+			new Date().toISOString().slice(0, 10)
+		),
+		lines: mergeTags(
+			message || '(empty message)',
+			'Casey Rivera',
+			name.orgName,
+			new Date().toISOString().slice(0, 10)
+		)
 			.split(/\n+/)
 			.filter(Boolean),
 		action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
