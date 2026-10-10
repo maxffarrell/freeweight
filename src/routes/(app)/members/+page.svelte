@@ -187,7 +187,8 @@
 			lowCredits: owesFilter === '__lowcredits' || undefined,
 			autoRenew: owesFilter === '__autorenew' || undefined,
 			cancelRequested: owesFilter === '__cancelreq' || undefined,
-			pauseRequested: owesFilter === '__pausereq' || undefined
+			pauseRequested: owesFilter === '__pausereq' || undefined,
+			noPortal: owesFilter === '__noportal' || undefined
 		});
 	}
 	function search() {
@@ -760,6 +761,7 @@
 				<Select.Item value="__autorenew">Auto-renewing pack</Select.Item>
 				<Select.Item value="__cancelreq">Cancel requested</Select.Item>
 				<Select.Item value="__pausereq">Pause requested</Select.Item>
+				<Select.Item value="__noportal">No portal access</Select.Item>
 				<Select.Item value="__referred">Referred</Select.Item>
 				<Select.Item value="__neverbooked">Never booked</Select.Item>
 			</Select.Content>
