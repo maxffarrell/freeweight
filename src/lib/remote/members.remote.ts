@@ -95,7 +95,8 @@ export const getMembers = query(
 			lowCredits: v.optional(v.boolean()),
 			autoRenew: v.optional(v.boolean()),
 			cancelRequested: v.optional(v.boolean()),
-			pauseRequested: v.optional(v.boolean())
+			pauseRequested: v.optional(v.boolean()),
+			noPortal: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -128,7 +129,8 @@ export const getMembers = query(
 			opts?.lowCredits,
 			opts?.autoRenew,
 			opts?.cancelRequested,
-			opts?.pauseRequested
+			opts?.pauseRequested,
+			opts?.noPortal
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

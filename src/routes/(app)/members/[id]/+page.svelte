@@ -1134,6 +1134,17 @@
 						<span class="tabular-nums">{formatDate(m.attendance.lastVisit)}</span>
 					</div>
 				{/if}
+				{@const nextSess = m.bookings
+					.filter((b) => b.booking.status === 'booked' && new Date(b.startsAt) > new Date())
+					.at(-1)}
+				{#if nextSess}
+					<div class="flex justify-between gap-2">
+						<span class="text-muted-foreground">Next session</span>
+						<span class="text-right tabular-nums"
+							>{nextSess.className} — {formatDate(nextSess.startsAt)}</span
+						>
+					</div>
+				{/if}
 				{#if m.attendance.usualTimes.length}
 					<div class="flex justify-between gap-2">
 						<span class="text-muted-foreground">Usually visits</span>

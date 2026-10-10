@@ -349,7 +349,19 @@
 											)}</span
 										>
 									{:else}
-										<Badge variant="default">In {dur(c.checkIn.checkedAt, new Date())}</Badge>
+										{@const insideMs = Date.now() - c.checkIn.checkedAt.getTime()}
+										<Badge
+											variant={insideMs > 4 * 3600_000 ? 'outline' : 'default'}
+											class={insideMs > 4 * 3600_000
+												? 'border-amber-500/60 text-amber-600 dark:text-amber-400'
+												: ''}
+											title={insideMs > 4 * 3600_000
+												? 'Still inside after 4h — probably forgot to check out'
+												: ''}
+											>In {dur(c.checkIn.checkedAt, new Date())}{insideMs > 4 * 3600_000
+												? ' — long stay?'
+												: ''}</Badge
+										>
 										<Button
 											variant="ghost"
 											size="sm"
