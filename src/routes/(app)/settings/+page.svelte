@@ -512,6 +512,29 @@
 								placeholder="Shown at the top of every member's portal — 'Closed Thanksgiving', 'Parking lot closed'. Blank hides it."
 							/>
 						</Field.Field>
+						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
+							<div>
+								<p class="font-medium">Public join page</p>
+								<p class="text-xs text-muted-foreground">
+									Show plans and the weekly schedule on your public join page.
+								</p>
+							</div>
+							<Switch bind:checked={publicPage} />
+						</div>
+						<Button type="submit" disabled={pending}>Save</Button>
+					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Booking policies</Card.Title>
+					<Card.Description
+						>How far ahead members can book, cancel and join waitlists.</Card.Description
+					>
+				</Card.Header>
+				<Card.Content>
+					<form class="space-y-4" onsubmit={saveSettings}>
 						<div class="grid gap-4 sm:grid-cols-2">
 							<Field.Field>
 								<Field.Label for="bwindow">Booking window (days)</Field.Label>
@@ -577,6 +600,18 @@
 								>
 							</Field.Field>
 						</div>
+						<Button type="submit" disabled={pending}>Save</Button>
+					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Fees &amp; billing</Card.Title>
+					<Card.Description>No-show and late-cancel fees, day passes and dunning.</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<form class="space-y-4" onsubmit={saveSettings}>
 						<Field.Field>
 							<Field.Label>No-show fee</Field.Label>
 							<MoneyInput bind:value={noShowFee} />
@@ -648,6 +683,20 @@
 								>One-time charge posted when a membership is paused. Leave empty to freeze free.</Field.Description
 							>
 						</Field.Field>
+						<Button type="submit" disabled={pending}>Save</Button>
+					</form>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="mt-4 max-w-2xl">
+				<Card.Header>
+					<Card.Title class="text-base">Rewards &amp; retention</Card.Title>
+					<Card.Description
+						>Win-back offers, milestone rewards, review nudges and member self-freeze.</Card.Description
+					>
+				</Card.Header>
+				<Card.Content>
+					<form class="space-y-4" onsubmit={saveSettings}>
 						<Field.Field>
 							<Field.Label for="s-save">Stay offer (% off next bill)</Field.Label>
 							<Input
@@ -759,7 +808,7 @@
 							<div>
 								<p class="font-medium">Public join page</p>
 								<p class="text-xs text-muted-foreground">
-									Show plans and the weekly schedule at /j/{'{slug}'}.
+									Show plans and the weekly schedule on your public join page.
 								</p>
 							</div>
 							<Switch bind:checked={publicPage} />

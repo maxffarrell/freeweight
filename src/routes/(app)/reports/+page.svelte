@@ -18,6 +18,9 @@
 	import { formatDate, formatMoney } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import Download from '@lucide/svelte/icons/download';
+	import { BarChart } from 'layerchart';
+	import * as Chart from '#lib/components/ui/chart/index.js';
+	import type { ChartConfig } from '#lib/components/ui/chart/index.js';
 
 	const r = await getReportsQuery();
 	const currency = await getCurrency();
@@ -25,14 +28,6 @@
 	const thisMonthRevenue =
 		r.revenue.find((m) => m.month === new Date().toISOString().slice(0, 7))?.total ?? 0;
 
-	const maxCheckIns = Math.max(1, ...r.checkIns.map((d) => d.count));
-	const maxMembers = Math.max(1, ...r.members.map((m) => m.joined));
-	const maxRevenue = Math.max(1, ...r.revenue.map((m) => m.total));
-	const maxMembersByPlan = Math.max(1, ...r.plans.map((p) => p.count));
-	const maxMethodTotal = Math.max(1, ...r.methods.map((m) => m.total));
-	const maxKindTotal = Math.max(1, ...r.kinds.map((k) => k.total));
-	const maxSourceJoins = Math.max(1, ...r.sources.map((s) => s.joins));
-	const maxLeadMonth = Math.max(1, ...r.leads.byMonth.map((x) => x.leads));
 	const KIND_LABELS: Record<string, string> = {
 		membership: 'Membership',
 		signup: 'Signup fee',
@@ -40,9 +35,53 @@
 		other: 'Other / shop',
 		unapplied: 'Unapplied'
 	};
-	const maxHours = Math.max(1, ...r.hours.map((h) => h.count));
 	const hourLabel = (h: number) =>
 		h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
+
+	const checkInCfg = {
+		count: { label: 'Check-ins', color: 'var(--chart-1)' }
+	} satisfies ChartConfig;
+	const hoursCfg = {
+		count: { label: 'Check-ins', color: 'var(--chart-1)' }
+	} satisfies ChartConfig;
+	const growthCfg = {
+		joined: { label: 'Joined', color: 'var(--chart-2)' },
+		cancelled: { label: 'Cancelled', color: 'var(--destructive)' }
+	} satisfies ChartConfig;
+	const retentionCfg = {
+		pct: { label: 'Still active %', color: 'var(--chart-1)' }
+	} satisfies ChartConfig;
+	const revenueCfg = {
+		total: { label: 'Revenue', color: 'var(--chart-2)' }
+	} satisfies ChartConfig;
+	const fillCfg = {
+		fill: { label: 'Fill %', color: 'var(--chart-1)' }
+	} satisfies ChartConfig;
+	const planCfg = {
+		count: { label: 'Members', color: 'var(--chart-1)' }
+	} satisfies ChartConfig;
+	const methodCfg = {
+		total: { label: 'Collected', color: 'var(--chart-2)' }
+	} satisfies ChartConfig;
+	const kindCfg = {
+		total: { label: 'Collected', color: 'var(--chart-2)' }
+	} satisfies ChartConfig;
+	const sourceCfg = {
+		joins: { label: 'Signups', color: 'var(--chart-3)' }
+	} satisfies ChartConfig;
+	const leadCfg = {
+		leads: { label: 'Leads', color: 'var(--chart-4)' }
+	} satisfies ChartConfig;
+	const fillWeekday = r.weekdays.map((w) => ({
+		day: w.day,
+		fill: w.capacity > 0 ? Math.round((w.booked / w.capacity) * 100) : 0
+	}));
+	const retentionPct = r.retention.map((m) => ({
+		month: m.month,
+		pct: m.joined ? Math.round((m.active / m.joined) * 100) : 0,
+		active: m.active,
+		joined: m.joined
+	}));
 
 	let payrollPending = $state(false);
 	const thisMonth = new Date().toISOString().slice(0, 7);
@@ -135,19 +174,18 @@
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<div class="flex h-32 items-end gap-px">
-				{#each r.checkIns as d (d.day)}
-					<div
-						class="flex-1 rounded-t bg-primary/80"
-						style="height: {Math.max(2, (d.count / maxCheckIns) * 100)}%"
-						title="{formatDate(d.day)} — {d.count}"
-					></div>
-				{/each}
-			</div>
-			<div class="mt-1 flex justify-between text-xs text-muted-foreground">
-				<span>{formatDate(r.checkIns[0]!.day)}</span>
-				<span>{formatDate(r.checkIns.at(-1)!.day)}</span>
-			</div>
+			<Chart.Container config={checkInCfg} class="h-40 w-full">
+				<BarChart
+					data={r.checkIns}
+					x="day"
+					series={[{ key: 'count', label: 'Check-ins', color: 'var(--color-count)' }]}
+					props={{ xAxis: { format: (d) => formatDate(d) } }}
+				>
+					{#snippet tooltip()}
+						<Chart.Tooltip />
+					{/snippet}
+				</BarChart>
+			</Chart.Container>
 		</Card.Content>
 	</Card.Root>
 
@@ -157,22 +195,18 @@
 			<Card.Description>Member check-ins by hour, gym timezone</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<div class="flex h-24 items-end gap-px">
-				{#each r.hours as h (h.hour)}
-					<div
-						class="flex-1 rounded-t bg-primary/80"
-						style="height: {Math.max(2, (h.count / maxHours) * 100)}%"
-						title="{hourLabel(h.hour)} — {h.count}"
-					></div>
-				{/each}
-			</div>
-			<div class="mt-1 flex justify-between text-xs text-muted-foreground">
-				<span>12a</span>
-				<span>6a</span>
-				<span>12p</span>
-				<span>6p</span>
-				<span>11p</span>
-			</div>
+			<Chart.Container config={hoursCfg} class="h-36 w-full">
+				<BarChart
+					data={r.hours}
+					x="hour"
+					series={[{ key: 'count', label: 'Check-ins', color: 'var(--color-count)' }]}
+					props={{ xAxis: { format: (d) => hourLabel(d) } }}
+				>
+					{#snippet tooltip()}
+						<Chart.Tooltip />
+					{/snippet}
+				</BarChart>
+			</Chart.Container>
 		</Card.Content>
 	</Card.Root>
 
@@ -219,24 +253,26 @@
 			<Card.Title class="text-base">Member growth</Card.Title>
 			<Card.Description>Joined vs cancelled per month, last 12 months</Card.Description>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.members as m (m.month)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
-					<div class="relative h-4 flex-1">
-						<div
-							class="absolute inset-y-0 left-0 rounded bg-primary/70"
-							style="width: {(m.joined / maxMembers) * 70}%"
-						></div>
-					</div>
-					<span class="w-14 shrink-0 text-right tabular-nums">
-						{m.joined}
-						{#if m.cancelled > 0}<span class="text-destructive"> −{m.cancelled}</span>{/if}
-					</span>
-				</div>
+		<Card.Content>
+			{#if r.members.length}
+				<Chart.Container config={growthCfg} class="h-48 w-full">
+					<BarChart
+						data={r.members}
+						x="month"
+						series={[
+							{ key: 'joined', label: 'Joined', color: 'var(--color-joined)' },
+							{ key: 'cancelled', label: 'Cancelled', color: 'var(--color-cancelled)' }
+						]}
+						props={{ xAxis: { format: (d) => monthLabel(d) } }}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No members yet.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -247,24 +283,26 @@
 				>Members who joined each month and are still active — newest month first</Card.Description
 			>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.retention as m (m.month)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
-					<div class="relative h-4 flex-1">
-						<div
-							class="absolute inset-y-0 left-0 rounded bg-primary/70"
-							style="width: {(m.active / m.joined) * 70}%"
-						></div>
-					</div>
-					<span class="w-28 shrink-0 text-right tabular-nums">
-						{m.active}/{m.joined}
-						<span class="text-muted-foreground">({Math.round((m.active / m.joined) * 100)}%)</span>
-					</span>
-				</div>
+		<Card.Content>
+			{#if retentionPct.length}
+				<Chart.Container config={retentionCfg} class="h-48 w-full">
+					<BarChart
+						data={retentionPct}
+						x="month"
+						series={[{ key: 'pct', label: 'Still active %', color: 'var(--color-pct)' }]}
+						props={{
+							xAxis: { format: (d) => monthLabel(d) },
+							yAxis: { ticks: [0, 25, 50, 75, 100] }
+						}}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No members joined in the last 12 months.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -1083,18 +1121,25 @@
 					</div>
 				</div>
 			{/if}
-			{#each r.revenue as m (m.month)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-14 shrink-0 text-muted-foreground">{monthLabel(m.month)}</span>
-					<div
-						class="h-4 rounded bg-green-500/70"
-						style="width: {(m.total / maxRevenue) * 70}%"
-					></div>
-					<span class="tabular-nums">{formatMoney(m.total, currency, true)}</span>
-				</div>
+			{#if r.revenue.length}
+				<Chart.Container config={revenueCfg} class="h-48 w-full">
+					<BarChart
+						data={r.revenue}
+						x="month"
+						series={[{ key: 'total', label: 'Revenue', color: 'var(--color-total)' }]}
+						props={{
+							xAxis: { format: (d) => monthLabel(d) },
+							yAxis: { format: (v) => formatMoney(v, currency, true) }
+						}}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No payments yet.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -1209,19 +1254,23 @@
 			<Card.Title class="text-base">Memberships by plan</Card.Title>
 			<Card.Description>Active memberships right now</Card.Description>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.plans as p (p.planName)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-32 shrink-0 truncate">{p.planName}</span>
-					<div
-						class="h-4 rounded bg-primary/70"
-						style="width: {(p.count / maxMembersByPlan) * 70}%"
-					></div>
-					<span class="tabular-nums">{p.count}</span>
-				</div>
+		<Card.Content>
+			{#if r.plans.length}
+				<Chart.Container config={planCfg} class="h-44 w-full">
+					<BarChart
+						data={r.plans}
+						x="planName"
+						series={[{ key: 'count', label: 'Members', color: 'var(--color-count)' }]}
+						props={{ xAxis: { format: (d) => (d.length > 10 ? d.slice(0, 9) + '…' : d) } }}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No active memberships.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -1230,22 +1279,23 @@
 			<Card.Title class="text-base">Payments by method</Card.Title>
 			<Card.Description>Collected (excl. refunds), last 90 days</Card.Description>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.methods as m (m.method)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-16 shrink-0 capitalize">{m.method}</span>
-					<div
-						class="h-4 rounded bg-green-500/70"
-						style="width: {(m.total / maxMethodTotal) * 70}%"
-					></div>
-					<span class="tabular-nums"
-						>{formatMoney(m.total, currency, true)}
-						<span class="text-xs text-muted-foreground">· {m.count}</span></span
+		<Card.Content>
+			{#if r.methods.length}
+				<Chart.Container config={methodCfg} class="h-44 w-full">
+					<BarChart
+						data={r.methods}
+						x="method"
+						series={[{ key: 'total', label: 'Collected', color: 'var(--color-total)' }]}
+						props={{ yAxis: { format: (v) => formatMoney(v, currency, true) } }}
 					>
-				</div>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No payments in the last 90 days.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -1254,22 +1304,26 @@
 			<Card.Title class="text-base">Revenue by kind</Card.Title>
 			<Card.Description>Collected (excl. refunds), last 90 days</Card.Description>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.kinds as k (k.kind)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-24 shrink-0">{KIND_LABELS[k.kind] ?? k.kind}</span>
-					<div
-						class="h-4 rounded bg-green-500/70"
-						style="width: {(k.total / maxKindTotal) * 70}%"
-					></div>
-					<span class="tabular-nums"
-						>{formatMoney(k.total, currency, true)}
-						<span class="text-xs text-muted-foreground">· {k.count}</span></span
+		<Card.Content>
+			{#if r.kinds.length}
+				<Chart.Container config={kindCfg} class="h-44 w-full">
+					<BarChart
+						data={r.kinds}
+						x="kind"
+						series={[{ key: 'total', label: 'Collected', color: 'var(--color-total)' }]}
+						props={{
+							xAxis: { format: (d) => KIND_LABELS[d] ?? d },
+							yAxis: { format: (v) => formatMoney(v, currency, true) }
+						}}
 					>
-				</div>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No payments in the last 90 days.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -1490,22 +1544,17 @@
 			<Card.Description>Booked vs capacity per day, sessions in the last 90 days</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<div class="flex h-24 items-end gap-1.5">
-				{#each r.weekdays as w (w.day)}
-					<div
-						class="flex-1 rounded-t bg-primary/80"
-						style="height: {w.capacity > 0 ? Math.max(2, (w.booked / w.capacity) * 100) : 0}%"
-						title="{w.day} — {w.capacity > 0
-							? Math.round((w.booked / w.capacity) * 100)
-							: 0}% ({w.booked}/{w.capacity})"
-					></div>
-				{/each}
-			</div>
-			<div class="mt-1 flex justify-between gap-1.5 text-center text-xs text-muted-foreground">
-				{#each r.weekdays as w (w.day)}
-					<span class="flex-1">{w.day}</span>
-				{/each}
-			</div>
+			<Chart.Container config={fillCfg} class="h-36 w-full">
+				<BarChart
+					data={fillWeekday}
+					x="day"
+					series={[{ key: 'fill', label: 'Fill %', color: 'var(--color-fill)' }]}
+				>
+					{#snippet tooltip()}
+						<Chart.Tooltip />
+					{/snippet}
+				</BarChart>
+			</Chart.Container>
 		</Card.Content>
 	</Card.Root>
 
@@ -2018,19 +2067,23 @@
 			<Card.Title class="text-base">Lead sources</Card.Title>
 			<Card.Description>Signups by "How did you hear about us?" — all time</Card.Description>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.sources as s (s.source)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-24 shrink-0 truncate">{s.source}</span>
-					<div
-						class="h-4 rounded bg-indigo-500/70"
-						style="width: {(s.joins / maxSourceJoins) * 70}%"
-					></div>
-					<span class="tabular-nums">{s.joins}</span>
-				</div>
+		<Card.Content>
+			{#if r.sources.length}
+				<Chart.Container config={sourceCfg} class="h-44 w-full">
+					<BarChart
+						data={r.sources}
+						x="source"
+						series={[{ key: 'joins', label: 'Signups', color: 'var(--color-joins)' }]}
+						props={{ xAxis: { format: (d) => (d.length > 10 ? d.slice(0, 9) + '…' : d) } }}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">No signups yet.</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 
@@ -2044,21 +2097,24 @@
 					: 0}%)</Card.Description
 			>
 		</Card.Header>
-		<Card.Content class="space-y-1.5">
-			{#each r.leads.byMonth as m (m.month)}
-				<div class="flex items-center gap-2 text-sm">
-					<span class="w-20 shrink-0">{m.month}</span>
-					<div
-						class="h-4 rounded bg-emerald-500/70"
-						style="width: {(m.leads / maxLeadMonth) * 70}%"
-					></div>
-					<span class="tabular-nums">{m.leads}</span>
-				</div>
+		<Card.Content>
+			{#if r.leads.byMonth.length}
+				<Chart.Container config={leadCfg} class="h-44 w-full">
+					<BarChart
+						data={r.leads.byMonth}
+						x="month"
+						series={[{ key: 'leads', label: 'Leads', color: 'var(--color-leads)' }]}
+					>
+						{#snippet tooltip()}
+							<Chart.Tooltip />
+						{/snippet}
+					</BarChart>
+				</Chart.Container>
 			{:else}
 				<p class="text-sm text-muted-foreground">
 					No leads captured yet — the "leave your info" form lives on the join page.
 				</p>
-			{/each}
+			{/if}
 		</Card.Content>
 	</Card.Root>
 

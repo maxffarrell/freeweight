@@ -6,6 +6,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Empty from '#lib/components/ui/empty/index.js';
+	import Store from '@lucide/svelte/icons/store';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { errMsg } from '#lib/format.ts';
@@ -84,32 +86,50 @@
 
 <div class="mx-auto w-full max-w-5xl space-y-4">
 	{#if f.gyms.length === 0}
-		<Card.Root>
-			<Card.Content class="py-10 text-center text-sm text-muted-foreground">
-				No gyms yet — this view rolls up every gym you own or administer.
-			</Card.Content>
-		</Card.Root>
+		<Empty.Root class="border">
+			<Empty.Header>
+				<Empty.Media variant="icon"><Store /></Empty.Media>
+				<Empty.Title>No gyms yet</Empty.Title>
+				<Empty.Description>
+					This view rolls up every gym you own or administer — members, revenue and check-ins side
+					by side.
+				</Empty.Description>
+			</Empty.Header>
+		</Empty.Root>
 	{:else}
-		<div class="grid gap-4 sm:grid-cols-3">
-			<Card.Root>
-				<Card.Header class="pb-2">
-					<Card.Description>Active members</Card.Description>
-					<Card.Title class="text-3xl tabular-nums">{f.totals.members}</Card.Title>
+		<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+			<Card.Root class="gap-0 py-4">
+				<Card.Header class="px-4 pb-1">
+					<Card.Description class="text-xs">Active members</Card.Description>
+					<Card.Title class="text-2xl tabular-nums">{f.totals.members}</Card.Title>
 				</Card.Header>
-				<Card.Content class="text-xs text-muted-foreground">
+				<Card.Content class="px-4 text-xs text-muted-foreground">
 					across {f.gyms.length} gym{f.gyms.length === 1 ? '' : 's'}
 				</Card.Content>
 			</Card.Root>
-			<Card.Root>
-				<Card.Header class="pb-2">
-					<Card.Description>Check-ins this month</Card.Description>
-					<Card.Title class="text-3xl tabular-nums">{f.totals.monthCheckIns}</Card.Title>
+			{#if !multiCurrency}
+				<Card.Root class="gap-0 py-4">
+					<Card.Header class="px-4 pb-1">
+						<Card.Description class="text-xs">Revenue this month</Card.Description>
+						<Card.Title class="text-2xl tabular-nums"
+							>{formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}</Card.Title
+						>
+					</Card.Header>
+					<Card.Content class="px-4 text-xs text-muted-foreground">
+						MRR {formatMoney(totals.mrr, f.gyms[0].currency, true)}
+					</Card.Content>
+				</Card.Root>
+			{/if}
+			<Card.Root class="gap-0 py-4">
+				<Card.Header class="px-4 pb-1">
+					<Card.Description class="text-xs">Check-ins this month</Card.Description>
+					<Card.Title class="text-2xl tabular-nums">{f.totals.monthCheckIns}</Card.Title>
 				</Card.Header>
 			</Card.Root>
-			<Card.Root>
-				<Card.Header class="pb-2">
-					<Card.Description>Sessions next 7 days</Card.Description>
-					<Card.Title class="text-3xl tabular-nums">{f.totals.sessionsNext7}</Card.Title>
+			<Card.Root class="gap-0 py-4">
+				<Card.Header class="px-4 pb-1">
+					<Card.Description class="text-xs">Sessions next 7 days</Card.Description>
+					<Card.Title class="text-2xl tabular-nums">{f.totals.sessionsNext7}</Card.Title>
 				</Card.Header>
 			</Card.Root>
 		</div>
@@ -195,8 +215,8 @@
 					Headline numbers per gym. {#if multiCurrency}Amounts are in each gym's own currency.{/if}
 				</Card.Description>
 			</Card.Header>
-			<Card.Content class="p-0">
-				<Table.Root>
+			<Card.Content class="overflow-x-auto p-0">
+				<Table.Root class="min-w-3xl">
 					<Table.Header>
 						<Table.Row>
 							<Table.Head>Gym</Table.Head>

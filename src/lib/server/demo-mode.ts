@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
-import { and, inArray, like, lt } from 'drizzle-orm';
+import { and, eq, inArray, like, lt } from 'drizzle-orm';
 import { FREEWEIGHT_DEMO } from '$app/env/private';
 import { auth } from '#lib/server/auth.ts';
 import { db } from '#lib/server/db/index.ts';
-import { member, organization, user } from '#lib/server/db/schema.ts';
+import { gymMember, member, organization, user } from '#lib/server/db/schema.ts';
 import { loadDemoData } from '#lib/server/services/demo.ts';
 
 const DEMO_EMAIL_DOMAIN = '@demo.freeweight.invalid';
@@ -73,7 +73,7 @@ export async function purgeExpiredDemos() {
 }
 
 /** Signs the visitor into a fresh, private workspace filled with sample data. */
-export async function startDemo(ip: string) {
+export async function startDemo(ip: string, view: 'staff' | 'member' = 'staff') {
 	if (!FREEWEIGHT_DEMO) error(404, 'Not found');
 	rateLimit(ip);
 	await purgeExpiredDemos();
@@ -81,7 +81,7 @@ export async function startDemo(ip: string) {
 	const id = randomBytes(6).toString('hex');
 	const { user: demoUser } = await auth.api.signUpEmail({
 		body: {
-			name: 'Demo Manager',
+			name: view === 'member' ? 'Demo Member' : 'Demo Manager',
 			email: `demo-${id}${DEMO_EMAIL_DOMAIN}`,
 			password: randomBytes(24).toString('base64url')
 		}
@@ -96,4 +96,15 @@ export async function startDemo(ip: string) {
 		role: 'owner',
 		org: { id: org.id, name: org.name, slug: org.slug, logo: null }
 	});
+	if (view === 'member') {
+		// The portal resolves members by portalUserId — point the first seeded
+		// member at this visitor so /portal opens straight into it.
+		const [m] = await db
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(eq(gymMember.organizationId, org.id))
+			.limit(1);
+		if (m)
+			await db.update(gymMember).set({ portalUserId: demoUser.id }).where(eq(gymMember.id, m.id));
+	}
 }
