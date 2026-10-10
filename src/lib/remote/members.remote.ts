@@ -32,6 +32,7 @@ import {
 	setLevelInput,
 	announcementTemplateInput,
 	scheduledAnnouncementInput,
+	signDocTemplateInput,
 	signRequestInput,
 	workoutInput,
 	workoutUpdate
@@ -660,6 +661,21 @@ export const deleteAnnouncementTemplate = command(idSchema, async (id) => {
 	const r = await deleteAnnouncementTemplateSvc(ctx.orgId, id);
 	void getAnnouncementTemplates().refresh();
 	return r;
+});
+
+export const getSignDocTemplates = query(async () =>
+	svc.listSignDocTemplates((await requireOrg()).orgId)
+);
+
+export const saveSignDocTemplate = command(signDocTemplateInput, async (input) => {
+	const r = await svc.saveSignDocTemplate(await requireOrg(), input);
+	void getSignDocTemplates().refresh();
+	return r;
+});
+
+export const deleteSignDocTemplate = command(idSchema, async (id) => {
+	await svc.deleteSignDocTemplate((await requireOrg()).orgId, id);
+	void getSignDocTemplates().refresh();
 });
 
 export const getLoanables = query(async () => loanSvc.listLoanables((await requireOrg()).orgId));

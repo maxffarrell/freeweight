@@ -42,6 +42,9 @@
 		resolveMemberIssue,
 		sendSignRequest,
 		voidSignRequest,
+		getSignDocTemplates,
+		saveSignDocTemplate,
+		deleteSignDocTemplate,
 		getMemberWorkouts,
 		getMemberPrograms,
 		getPrograms,
@@ -245,6 +248,38 @@
 	let srTitle = $state('');
 	let srBody = $state('');
 	let srPending = $state(false);
+	const signTemplates = $derived(await getSignDocTemplates());
+	let srTemplatePick = $state('');
+	const srTemplateApplied = $derived(signTemplates.find((t) => t.id === srTemplatePick) ?? null);
+	$effect(() => {
+		if (srTemplatePick) {
+			const t = signTemplates.find((x) => x.id === srTemplatePick);
+			if (t) {
+				srTitle = t.title;
+				srBody = t.body;
+			}
+		}
+	});
+	async function saveSrTemplate() {
+		const name = window.prompt('Template name', srTitle.slice(0, 40));
+		if (!name?.trim()) return;
+		try {
+			await saveSignDocTemplate({ name: name.trim(), title: srTitle.trim(), body: srBody.trim() });
+			toast.success('Template saved');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not save template'));
+		}
+	}
+	async function removeSrTemplate() {
+		if (!srTemplateApplied) return;
+		try {
+			await deleteSignDocTemplate(srTemplateApplied.id);
+			srTemplatePick = '';
+			toast.success('Template deleted');
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not delete'));
+		}
+	}
 	async function sendRequest(e: SubmitEvent) {
 		e.preventDefault();
 		if (!srTitle.trim() || !srBody.trim()) return;
@@ -2788,6 +2823,23 @@
 				agreements.
 			</Dialog.Description>
 		</Dialog.Header>
+		{#if signTemplates.length}
+			<div class="flex items-center gap-2">
+				<NativeSelect size="sm" class="w-auto" bind:value={srTemplatePick}>
+					<option value="">Load template…</option>
+					{#each signTemplates as t (t.id)}
+						<option value={t.id}>{t.name}</option>
+					{/each}
+				</NativeSelect>
+				{#if srTemplateApplied}
+					<button
+						type="button"
+						class="text-xs text-muted-foreground hover:underline"
+						onclick={removeSrTemplate}>Delete "{srTemplateApplied.name}"</button
+					>
+				{/if}
+			</div>
+		{/if}
 		<form class="space-y-4" onsubmit={sendRequest}>
 			<Field.Field>
 				<Field.Label for="sr-title">Title</Field.Label>
@@ -2798,6 +2850,13 @@
 				<Textarea id="sr-body" rows={8} placeholder="I agree to…" bind:value={srBody} />
 			</Field.Field>
 			<Dialog.Footer>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onclick={saveSrTemplate}
+					disabled={!srTitle.trim() || !srBody.trim()}>Save template</Button
+				>
 				<Button type="submit" disabled={srPending || !srTitle.trim() || !srBody.trim()}>
 					{srPending ? 'Sending…' : 'Send for signature'}
 				</Button>

@@ -1624,6 +1624,21 @@ export const announcementTemplate = pgTable(
 	(t) => [index('announcement_template_org_idx').on(t.organizationId)]
 );
 
+/** Saved document drafts staff reuse when sending sign requests. */
+export const signDocTemplate = pgTable(
+	'sign_doc_template',
+	{
+		id: id(),
+		organizationId: orgId(),
+		name: text('name').notNull(),
+		title: text('title').notNull(),
+		body: text('body').notNull(),
+		createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+		...timestamps
+	},
+	(t) => [index('sign_doc_template_org_idx').on(t.organizationId)]
+);
+
 /** Which staff may teach which class type — empty per class = anyone. */
 export const instructorQual = pgTable(
 	'instructor_qual',

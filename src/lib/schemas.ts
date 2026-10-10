@@ -874,6 +874,12 @@ export const setLevelInput = v.object({
 	levelId: v.nullable(idSchema)
 });
 
+export const signDocTemplateInput = v.object({
+	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+	title: requiredText('Title'),
+	body: v.pipe(requiredText('Document text'), v.maxLength(20000))
+});
+
 export const announcementTemplateInput = v.object({
 	name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
 	subject: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(150)),
