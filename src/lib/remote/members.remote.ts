@@ -115,7 +115,8 @@ export const getMembers = query(
 			hasGiftBalance: v.optional(v.boolean()),
 			trialEnding: v.optional(v.boolean()),
 			bookedToday: v.optional(v.boolean()),
-			hasIssue: v.optional(v.boolean())
+			hasIssue: v.optional(v.boolean()),
+			inEvent: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -167,7 +168,8 @@ export const getMembers = query(
 			opts?.hasGiftBalance,
 			opts?.trialEnding,
 			opts?.bookedToday,
-			opts?.hasIssue
+			opts?.hasIssue,
+			opts?.inEvent
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
