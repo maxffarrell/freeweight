@@ -168,7 +168,9 @@ export async function listMembers(
 	/** Members with a booked session today — who's coming in. */
 	bookedToday?: boolean,
 	/** Members with an unresolved issue report. */
-	hasIssue?: boolean
+	hasIssue?: boolean,
+	/** Members registered for an upcoming event. */
+	inEvent?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -344,6 +346,9 @@ export async function listMembers(
 					: undefined,
 				hasIssue
 					? sql`exists (select 1 from member_issue mi where mi.member_id = ${gymMember.id} and mi.resolved_at is null)`
+					: undefined,
+				inEvent
+					? sql`exists (select 1 from event_registration er join gym_event ge on ge.id = er.event_id where er.member_id = ${gymMember.id} and er.status = 'registered' and er.waitlisted = false and ge.starts_at > now())`
 					: undefined,
 				recent
 					? gte(

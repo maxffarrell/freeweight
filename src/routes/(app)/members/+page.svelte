@@ -206,7 +206,8 @@
 			hasGiftBalance: owesFilter === '__giftbalance' || undefined,
 			trialEnding: owesFilter === '__trialending' || undefined,
 			bookedToday: owesFilter === '__bookedtoday' || undefined,
-			hasIssue: owesFilter === '__hasissue' || undefined
+			hasIssue: owesFilter === '__hasissue' || undefined,
+			inEvent: owesFilter === '__inevent' || undefined
 		});
 	}
 	function search() {
@@ -788,6 +789,7 @@
 				<Select.Item value="__trialending">Trial ending soon</Select.Item>
 				<Select.Item value="__bookedtoday">Booked today</Select.Item>
 				<Select.Item value="__hasissue">Open issue report</Select.Item>
+				<Select.Item value="__inevent">Booked an event</Select.Item>
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
