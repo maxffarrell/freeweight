@@ -164,7 +164,11 @@ export async function listMembers(
 	/** Members who redeemed a gift card that still has a balance — unused account credit. */
 	hasGiftBalance?: boolean,
 	/** Members whose free-trial first bill lands within 3 days and who haven't been charged yet. */
-	trialEnding?: boolean
+	trialEnding?: boolean,
+	/** Members with a booked session today — who's coming in. */
+	bookedToday?: boolean,
+	/** Members with an unresolved issue report. */
+	hasIssue?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -334,6 +338,12 @@ export async function listMembers(
 					: undefined,
 				trialEnding
 					? sql`exists (select 1 from membership m17 join plan p17 on p17.id = m17.plan_id where m17.member_id = ${gymMember.id} and m17.status = 'active' and p17.trial_days > 0 and m17.next_charge_at <= ${new Date(Date.now() + 3 * 86_400_000).toISOString()} and not exists (select 1 from charge c4 where c4.membership_id = m17.id))`
+					: undefined,
+				bookedToday
+					? sql`exists (select 1 from booking b5 join class_session s5 on s5.id = b5.session_id where b5.member_id = ${gymMember.id} and b5.status = 'booked' and s5.starts_at >= date_trunc('day', now()) and s5.starts_at < date_trunc('day', now()) + interval '1 day')`
+					: undefined,
+				hasIssue
+					? sql`exists (select 1 from member_issue mi where mi.member_id = ${gymMember.id} and mi.resolved_at is null)`
 					: undefined,
 				recent
 					? gte(
