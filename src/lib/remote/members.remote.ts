@@ -108,7 +108,9 @@ export const getMembers = query(
 			inCourse: v.optional(v.boolean()),
 			dueSoon: v.optional(v.boolean()),
 			hasUpcoming: v.optional(v.boolean()),
-			commitmentEnding: v.optional(v.boolean())
+			commitmentEnding: v.optional(v.boolean()),
+			isDependent: v.optional(v.boolean()),
+			noEmergency: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -153,7 +155,9 @@ export const getMembers = query(
 			opts?.inCourse,
 			opts?.dueSoon,
 			opts?.hasUpcoming,
-			opts?.commitmentEnding
+			opts?.commitmentEnding,
+			opts?.isDependent,
+			opts?.noEmergency
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

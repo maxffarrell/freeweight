@@ -199,7 +199,9 @@
 			inCourse: owesFilter === '__incourse' || undefined,
 			dueSoon: owesFilter === '__duesoon' || undefined,
 			hasUpcoming: owesFilter === '__hasupcoming' || undefined,
-			commitmentEnding: owesFilter === '__commitment' || undefined
+			commitmentEnding: owesFilter === '__commitment' || undefined,
+			isDependent: owesFilter === '__dependent' || undefined,
+			noEmergency: owesFilter === '__noemergency' || undefined
 		});
 	}
 	function search() {
@@ -321,7 +323,8 @@
 				'Membership ends',
 				'Visits (30d)',
 				'Referral source',
-				'Portal'
+				'Portal',
+				'Guardian'
 			],
 			...rows.map((m) => [
 				m.name,
@@ -337,7 +340,8 @@
 				m.memberEnds ? formatDate(m.memberEnds) : '',
 				m.visits30,
 				m.referralSource ?? '',
-				m.portalUserId ? 'yes' : ''
+				m.portalUserId ? 'yes' : '',
+				m.guardianName ?? ''
 			])
 		]);
 		const a = document.createElement('a');
@@ -772,6 +776,8 @@
 				<Select.Item value="__noupcoming">No upcoming bookings</Select.Item>
 				<Select.Item value="__hasupcoming">Has upcoming bookings</Select.Item>
 				<Select.Item value="__commitment">Commitment ending soon</Select.Item>
+				<Select.Item value="__dependent">Is a dependent</Select.Item>
+				<Select.Item value="__noemergency">No emergency contact</Select.Item>
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>
