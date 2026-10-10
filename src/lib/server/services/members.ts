@@ -150,6 +150,7 @@ export async function listMembers(
 			status: gymMember.status,
 			joinedAt: gymMember.joinedAt,
 			photoDocumentId: gymMember.photoDocumentId,
+			portalUserId: gymMember.portalUserId,
 			deskNote: gymMember.deskNote,
 			referralSource: gymMember.referralSource,
 			guardianId: gymMember.guardianId,
