@@ -162,7 +162,9 @@ export async function listMembers(
 	/** Members with an active workout-program assignment. */
 	hasProgram?: boolean,
 	/** Members who redeemed a gift card that still has a balance — unused account credit. */
-	hasGiftBalance?: boolean
+	hasGiftBalance?: boolean,
+	/** Members whose free-trial first bill lands within 3 days and who haven't been charged yet. */
+	trialEnding?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -329,6 +331,9 @@ export async function listMembers(
 					: undefined,
 				hasGiftBalance
 					? sql`exists (select 1 from gift_card gc where gc.redeemed_by_member_id = ${gymMember.id} and gc.balance > 0)`
+					: undefined,
+				trialEnding
+					? sql`exists (select 1 from membership m17 join plan p17 on p17.id = m17.plan_id where m17.member_id = ${gymMember.id} and m17.status = 'active' and p17.trial_days > 0 and m17.next_charge_at <= ${new Date(Date.now() + 3 * 86_400_000).toISOString()} and not exists (select 1 from charge c4 where c4.membership_id = m17.id))`
 					: undefined,
 				recent
 					? gte(

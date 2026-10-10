@@ -112,7 +112,8 @@ export const getMembers = query(
 			isDependent: v.optional(v.boolean()),
 			noEmergency: v.optional(v.boolean()),
 			hasProgram: v.optional(v.boolean()),
-			hasGiftBalance: v.optional(v.boolean())
+			hasGiftBalance: v.optional(v.boolean()),
+			trialEnding: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -161,7 +162,8 @@ export const getMembers = query(
 			opts?.isDependent,
 			opts?.noEmergency,
 			opts?.hasProgram,
-			opts?.hasGiftBalance
+			opts?.hasGiftBalance,
+			opts?.trialEnding
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
