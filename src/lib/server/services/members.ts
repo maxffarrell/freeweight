@@ -141,7 +141,9 @@ export async function listMembers(
 	/** Members entered in a currently-active challenge. */
 	inChallenge?: boolean,
 	/** Members who are a guardian of at least one dependent. */
-	hasDependents?: boolean
+	hasDependents?: boolean,
+	/** Members with a check-in in the last 7 days. */
+	visitedThisWeek?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -276,6 +278,9 @@ export async function listMembers(
 					: undefined,
 				hasDependents
 					? sql`exists (select 1 from gym_member d where d.guardian_id = ${gymMember.id})`
+					: undefined,
+				visitedThisWeek
+					? sql`exists (select 1 from ${checkIn} c where c.member_id = ${gymMember.id} and c.checked_at > ${new Date(Date.now() - 7 * 86_400_000).toISOString()})`
 					: undefined,
 				recent
 					? gte(
