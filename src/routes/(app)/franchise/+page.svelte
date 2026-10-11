@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
@@ -78,9 +79,11 @@
 		await goto('/dashboard');
 		toast.success(`Switched to ${name}`);
 	}
+	const __brand = getContext<{ whiteLabel?: boolean; orgName?: string } | undefined>('orgBrand');
+	const appName = __brand?.whiteLabel && __brand?.orgName ? __brand.orgName : 'Freeweight';
 </script>
 
-<svelte:head><title>Franchise · Freeweight</title></svelte:head>
+<svelte:head><title>Franchise · {appName}</title></svelte:head>
 
 <PageHeader title="Franchise" />
 

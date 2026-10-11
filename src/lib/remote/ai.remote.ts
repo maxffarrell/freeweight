@@ -6,8 +6,11 @@ import { idSchema } from '#lib/schemas.ts';
 import { db } from '#lib/server/db/index.ts';
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import {
+	booking,
 	charge,
 	checkIn,
+	classSession,
+	classType,
 	gymMember,
 	memberIssue,
 	memberNote,
@@ -16,6 +19,7 @@ import {
 	personalRecord,
 	plan
 } from '#lib/server/db/schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
 import { aiAvailable, aiComplete, aiConfig, requireAi } from '#lib/server/ee/ai.ts';
 import {
@@ -24,7 +28,8 @@ import {
 	draftIssueReply,
 	draftWinBack,
 	generateProgram,
-	gymInsights
+	gymInsights,
+	rosterBrief
 } from '#lib/server/ee/ai-features.ts';
 
 /**
@@ -365,4 +370,64 @@ export const aiImproveDraft = command(v.object({ body: v.string() }), async ({ b
 		1000
 	);
 	return { improved: text.trim() };
+});
+
+/** Pre-class brief for the instructor — first-timers + health flags named (ai tier). */
+export const aiRosterBrief = command(v.object({ sessionId: v.string() }), async ({ sessionId }) => {
+	const { org, orgId } = await requireOrg();
+	requireAi();
+	if (!aiAvailable()) error(400, 'No AI provider configured');
+	const [sess] = await db
+		.select({
+			className: classType.name,
+			capacity: classSession.capacity,
+			startsAt: classSession.startsAt,
+			instructorMemberId: classSession.instructorId
+		})
+		.from(classSession)
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(and(eq(classSession.id, sessionId), eq(classSession.organizationId, orgId)))
+		.limit(1);
+	if (!sess) error(404, 'Session not found');
+	const rows = await db
+		.select({
+			status: booking.status,
+			name: gymMember.name,
+			parqAnswers: gymMember.parqAnswers,
+			firstTimer:
+				sql<boolean>`not exists (select 1 from ${checkIn} ci where ci.member_id = ${gymMember.id} and ci.organization_id = ${orgId})`.mapWith(
+					Boolean
+				)
+		})
+		.from(booking)
+		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
+		.where(and(eq(booking.organizationId, orgId), eq(booking.sessionId, sessionId)));
+	const bookedRows = rows.filter((b) => b.status === 'booked' || b.status === 'attended');
+	const instructor = sess.instructorMemberId
+		? (
+				await db
+					.select({ name: user.name })
+					.from(member)
+					.innerJoin(user, eq(member.userId, user.id))
+					.where(eq(member.id, sess.instructorMemberId))
+					.limit(1)
+			)[0]?.name
+		: null;
+	const text = await rosterBrief(org.name, {
+		className: sess.className,
+		when: sess.startsAt.toLocaleString('en-US', {
+			weekday: 'long',
+			hour: 'numeric',
+			minute: '2-digit'
+		}),
+		instructor: instructor ?? null,
+		booked: bookedRows.length,
+		capacity: sess.capacity,
+		waitlisted: rows.filter((b) => b.status === 'waitlisted').length,
+		firstTimers: bookedRows.filter((b) => b.firstTimer).map((b) => b.name),
+		medicalFlags: bookedRows
+			.filter((b) => b.parqAnswers && Object.values(b.parqAnswers).some(Boolean))
+			.map((b) => b.name)
+	});
+	return { brief: text };
 });

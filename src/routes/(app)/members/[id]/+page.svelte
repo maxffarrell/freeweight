@@ -112,7 +112,8 @@
 		getEntitlements,
 		getMemberDataExport,
 		pushMemberDoor,
-		setRetentionExempt
+		setRetentionExempt,
+		requestParqResign
 	} from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -1007,6 +1008,7 @@
 	}
 
 	let parqOpen = $state(false);
+	let parqReqBusy = $state(false);
 	const parqExpired = $derived(
 		!!m?.member?.parqSignedAt &&
 			(m?.parqMonths ?? 0) > 0 &&
@@ -1294,6 +1296,20 @@
 								>{/if}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
 									class="underline"
 									onclick={() => (parqOpen = !parqOpen)}>{parqOpen ? 'hide' : 'view'}</button
+								>{/if}{#if m.member.email}&nbsp;<button
+									class="underline"
+									disabled={parqReqBusy}
+									onclick={async () => {
+										parqReqBusy = true;
+										try {
+											await requestParqResign({ memberId: m.member.id });
+											toast.success(`Re-sign request sent to ${m.member.name}`);
+										} catch (err) {
+											toast.error(errMsg(err, 'Failed'));
+										} finally {
+											parqReqBusy = false;
+										}
+									}}>re-sign</button
 								>{/if}</span
 						>
 					</div>

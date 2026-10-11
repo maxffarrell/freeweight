@@ -77,7 +77,12 @@
 		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
-	import { aiDraftClassDescription, aiGenerateWod, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import {
+		aiDraftClassDescription,
+		aiGenerateWod,
+		aiRosterBrief,
+		getAiStatus
+	} from '#lib/remote/ai.remote.ts';
 	import { getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { getJoinInfo, getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -186,6 +191,9 @@
 
 	// ------- roster sheet -------
 	let rosterOpen = $state(page.url.searchParams.get('focus') != null);
+	let aiRosterOpen = $state(false);
+	let aiRosterBusy = $state(false);
+	let aiRosterText = $state('');
 	let focusId = $state(page.url.searchParams.get('focus') ?? '');
 	let copyDayOpen = $state(false);
 	let copyFrom = $state('');
@@ -1299,6 +1307,26 @@
 							: ''}</span
 					>{/if}</Sheet.Description
 			>
+			{#if entitlements.ai && focus}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-7 w-fit px-2 text-xs"
+					disabled={aiRosterBusy}
+					onclick={async () => {
+						aiRosterBusy = true;
+						try {
+							const r = await aiRosterBrief({ sessionId: focus.session.id });
+							aiRosterText = r?.brief ?? '';
+							aiRosterOpen = true;
+						} catch (err) {
+							toast.error(errMsg(err, 'AI brief failed'));
+						} finally {
+							aiRosterBusy = false;
+						}
+					}}>{aiRosterBusy ? 'Writing…' : 'AI brief'}</Button
+				>
+			{/if}
 		</Sheet.Header>
 		{#if recentFill.length}
 			<div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2">
@@ -1666,6 +1694,16 @@
 		</div>
 	</Sheet.Content>
 </Sheet.Root>
+
+<Dialog.Root bind:open={aiRosterOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Class brief</Dialog.Title>
+			<Dialog.Description>Who is coming — first-timers and health flags.</Dialog.Description>
+		</Dialog.Header>
+		<p class="text-sm leading-6 whitespace-pre-wrap">{aiRosterText}</p>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={copyDayOpen}>
 	<Dialog.Content class="sm:max-w-xs">
