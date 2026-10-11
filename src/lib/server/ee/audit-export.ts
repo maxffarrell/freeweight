@@ -150,14 +150,23 @@ async function postExport(orgId: string, url: string): Promise<number> {
 	try {
 		const body = JSON.stringify(await exportOrgData(orgId));
 		const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(body).digest('hex');
-		await fetch(url, {
+		const res = await fetch(url, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', 'x-freeweight-signature': signature },
 			body,
 			signal: AbortSignal.timeout(15_000)
 		});
+		await db
+			.update(gymSettings)
+			.set({ exportLastStatus: res.status, exportLastAt: new Date() })
+			.where(eq(gymSettings.organizationId, orgId));
 		return 1;
 	} catch (err) {
+		await db
+			.update(gymSettings)
+			.set({ exportLastStatus: 0, exportLastAt: new Date() })
+			.where(eq(gymSettings.organizationId, orgId))
+			.catch(() => {});
 		console.error(`export webhook failed for ${orgId}`, err);
 		return 0;
 	}

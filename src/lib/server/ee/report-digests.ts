@@ -8,6 +8,7 @@ import {
 	charge,
 	gymMember,
 	gymSettings,
+	location,
 	notificationLog,
 	payment
 } from '#lib/server/db/schema.ts';
@@ -82,6 +83,28 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 			.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'open')))
 	]);
 	const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+	// Multi-branch gyms: per-location check-in counts for the window.
+	const locationLines: string[] = [];
+	const locs = await db
+		.select({ id: location.id, name: location.name })
+		.from(location)
+		.where(eq(location.organizationId, orgId));
+	if (locs.length > 1) {
+		for (const loc of locs) {
+			const [n] = await db
+				.select({ n: sql<number>`count(*)`.mapWith(Number) })
+				.from(checkIn)
+				.where(
+					and(
+						eq(checkIn.organizationId, orgId),
+						eq(checkIn.locationId, loc.id),
+						gte(checkIn.checkedAt, from),
+						lt(checkIn.checkedAt, to)
+					)
+				);
+			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-ins`);
+		}
+	}
 	return {
 		heading: lookbackDays ? 'The last 7 days' : `${month} in review`,
 		orgName: brand.orgName,
@@ -93,6 +116,7 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 			`New members: ${joined[0]?.n ?? 0}`,
 			`Check-ins: ${visits[0]?.n ?? 0}`,
 			`Open balances now: ${money(open[0]?.n ?? 0)}`,
+			...locationLines,
 			'Full detail is on the Reports page.'
 		]
 	};
