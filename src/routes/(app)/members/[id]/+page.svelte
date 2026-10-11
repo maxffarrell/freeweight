@@ -110,6 +110,7 @@
 	import {
 		getEntitlements,
 		getMemberDataExport,
+		pushMemberDoor,
 		setRetentionExempt
 	} from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
@@ -1060,6 +1061,18 @@
 				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
+				{#if entitlements.doorAccess}
+					<DropdownMenu.Item
+						onclick={async () => {
+							try {
+								const res = await pushMemberDoor({ memberId: m.member.id });
+								toast.success(`${res.name} provisioned at the door`);
+							} catch (err) {
+								toast.error(errMsg(err, 'Could not push to door'));
+							}
+						}}>Push to door</DropdownMenu.Item
+					>
+				{/if}
 				{#if entitlements.dataRetention}
 					<DropdownMenu.Item
 						onclick={async () => {
@@ -1258,6 +1271,11 @@
 								? `PAR-Q signed ${formatDate(m.member.parqSignedAt)}`
 								: 'PAR-Q not signed'}{#if parqExpired}<span class="font-medium text-amber-600">
 									— expired</span
+								>{/if}{#if m.member.parqAnswers && Object.values(m.member.parqAnswers).some(Boolean)}<span
+									class="font-medium text-amber-600"
+									title="Answered yes to a health question"
+								>
+									— medical flag</span
 								>{/if}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
 									class="underline"
 									onclick={() => (parqOpen = !parqOpen)}>{parqOpen ? 'hide' : 'view'}</button

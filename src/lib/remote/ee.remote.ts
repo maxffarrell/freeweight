@@ -26,6 +26,7 @@ import {
 import {
 	doorAccessEnabled,
 	fireDoorWebhook,
+	pushDoorMember,
 	requireDoorAccess,
 	syncDoorRoster
 } from '#lib/server/ee/door-access.ts';
@@ -300,4 +301,10 @@ export const verifyKioskPin = command(v.object({ pin: v.string() }), async ({ pi
 export const syncDoorRosterNow = command(async () => {
 	const { orgId } = await requireOrg('admin');
 	return { members: await syncDoorRoster(orgId) };
+});
+
+/** Provision one member at the door system — "Push to door" on the member page. */
+export const pushMemberDoor = command(v.object({ memberId: v.string() }), async ({ memberId }) => {
+	const { orgId } = await requireOrg('admin');
+	return { name: await pushDoorMember(orgId, memberId) };
 });

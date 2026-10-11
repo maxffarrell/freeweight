@@ -459,6 +459,10 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		(!m.parqSignedAt ||
 			(!!st?.parqMonths &&
 				m.parqSignedAt.getTime() < Date.now() - st.parqMonths * 30.4 * 86400_000));
+	// A "yes" to any PAR-Q question is a medical flag — desk should know before
+	// the member hits the floor (door systems get it on checkin_flagged too).
+	const parqFlagged =
+		healthFormsEnabled() && !!m.parqAnswers && Object.values(m.parqAnswers).some(Boolean);
 	// Desk heads-up: a suspended membership (dunning or staff action) — the
 	// member can still walk in, staff decide whether to chase the balance.
 	const suspended = !!(
@@ -568,12 +572,16 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 	});
 	// Enterprise door-access: a heads-up flag (suspended membership or expired
 	// health form) fires a second event so door systems can log/deny.
-	if (suspended || parqMissing) {
+	if (suspended || parqMissing || parqFlagged) {
 		void fireDoorWebhook(ctx.orgId, 'member.checkin_flagged', {
 			memberId: m.id,
 			memberName: m.name,
 			checkInId: row!.id,
-			flags: [suspended ? 'suspended' : '', parqMissing ? 'health_form' : ''].filter(Boolean),
+			flags: [
+				suspended ? 'suspended' : '',
+				parqMissing ? 'health_form' : '',
+				parqFlagged ? 'medical_flag' : ''
+			].filter(Boolean),
 			locationId: row!.locationId ?? null
 		});
 	}
@@ -589,6 +597,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		visitsToday,
 		waiverMissing,
 		parqMissing,
+		parqFlagged,
 		suspended,
 		pendingSigns,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
