@@ -7,7 +7,8 @@ import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billi
 
 import { syncAtRiskTags } from '#lib/server/services/reports.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
-import { purgeOldData } from '#lib/server/ee/data-retention.ts';
+import { autoAnonymize, purgeOldData } from '#lib/server/ee/data-retention.ts';
+import { sendWeeklyExport } from '#lib/server/ee/audit-export.ts';
 import { sendMonthClose } from '#lib/server/ee/report-digests.ts';
 import {
 	sendAnniversaryGreetings,
@@ -102,6 +103,8 @@ export const GET: RequestHandler = async ({ request }) => {
 	let ownerInsights = 0;
 	let retentionPurged = 0;
 	let monthCloseSent = 0;
+	let anonymizedInactive = 0;
+	let exportsSent = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -111,6 +114,8 @@ export const GET: RequestHandler = async ({ request }) => {
 			try {
 				retentionPurged += await purgeOldData(o.id);
 				monthCloseSent += await sendMonthClose(o.id);
+				anonymizedInactive += await autoAnonymize(o.id);
+				exportsSent += await sendWeeklyExport(o.id);
 			} catch (err) {
 				console.error(`data-retention cron failed for ${o.id}`, err);
 			}
@@ -326,6 +331,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		ownerInsights,
 		retentionPurged,
 		monthCloseSent,
+		anonymizedInactive,
+		exportsSent,
 		failed,
 		reminders,
 		eventReminders,

@@ -108,7 +108,8 @@ export async function getPublicGym(slug: string) {
 		plans,
 		sessions,
 		closures,
-		whiteLabel: settings.whiteLabel && isEnterpriseEnabled()
+		whiteLabel: settings.whiteLabel && isEnterpriseEnabled(),
+		brandColor: settings.whiteLabel && isEnterpriseEnabled() ? settings.brandColor : ''
 	};
 }
 

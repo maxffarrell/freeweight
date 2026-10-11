@@ -1,20 +1,22 @@
 import { query } from '$app/server';
 import { getRequestEvent } from '$app/server';
-import { and, eq, isNotNull, lt, notExists, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
 import { gymSettings } from '#lib/server/db/schema.ts';
 import { requireOrg } from '#lib/server/context.ts';
 import { auditExportEnabled, exportOrgData } from '#lib/server/ee/audit-export.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
-import { dataRetentionEnabled, requireDataRetention } from '#lib/server/ee/data-retention.ts';
+import {
+	anonymizeInactive,
+	dataRetentionEnabled,
+	requireDataRetention
+} from '#lib/server/ee/data-retention.ts';
 import {
 	doorAccessEnabled,
 	fireDoorWebhook,
 	requireDoorAccess
 } from '#lib/server/ee/door-access.ts';
-import { anonymizeMember } from '#lib/server/services/members.ts';
-import { checkIn, gymMember, membership, outer } from '#lib/server/db/schema.ts';
 import { command } from '$app/server';
 import * as v from 'valibot';
 import {
@@ -27,7 +29,16 @@ import { hasFeature } from '#lib/server/ee/license.ts';
 
 /** Feature flags for the current install — drives every gated surface in one round-trip. */
 export const getEntitlements = query(async () => {
-	await requireOrg();
+	const { orgId } = await requireOrg();
+	let brandColor = '';
+	if (hasFeature('white-label')) {
+		const [s] = await db
+			.select({ whiteLabel: gymSettings.whiteLabel, brandColor: gymSettings.brandColor })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, orgId))
+			.limit(1);
+		if (s?.whiteLabel) brandColor = s.brandColor;
+	}
 	return {
 		customFields: customFieldsEnabled(),
 		whiteLabel: hasFeature('white-label'),
@@ -38,6 +49,7 @@ export const getEntitlements = query(async () => {
 		dataRetention: dataRetentionEnabled(),
 		doorAccess: doorAccessEnabled(),
 		reportDigests: hasFeature('report-digests'),
+		brandColor,
 		ai: hasFeature('ai')
 	};
 });
@@ -101,47 +113,6 @@ export const anonymizeInactiveMembers = command(
 	async (input) => {
 		const ctx = await requireOrg('admin');
 		requireDataRetention();
-		const cutoff = new Date(Date.now() - (input.months ?? 24) * 30.4 * 86400_000);
-		const cutoffDay = cutoff.toISOString().slice(0, 10);
-		const stale = await db
-			.select({ id: gymMember.id })
-			.from(gymMember)
-			.where(
-				and(
-					eq(gymMember.organizationId, ctx.orgId),
-					lt(gymMember.joinedAt, cutoffDay),
-					isNotNull(gymMember.email),
-					notExists(
-						db
-							.select({ one: sql`1` })
-							.from(checkIn)
-							.where(
-								and(
-									eq(checkIn.memberId, outer(gymMember.id)),
-									sql`${checkIn.checkedAt} > ${cutoff.toISOString()}`
-								)
-							)
-					),
-					notExists(
-						db
-							.select({ one: sql`1` })
-							.from(membership)
-							.where(
-								and(eq(membership.memberId, outer(gymMember.id)), eq(membership.status, 'active'))
-							)
-					)
-				)
-			)
-			.limit(500);
-		let done = 0;
-		for (const row of stale) {
-			try {
-				await anonymizeMember(ctx, row.id);
-				done++;
-			} catch {
-				// keep going — one bad record shouldn't stop the sweep
-			}
-		}
-		return { anonymized: done };
+		return { anonymized: await anonymizeInactive(ctx.orgId, input.months ?? 24) };
 	}
 );

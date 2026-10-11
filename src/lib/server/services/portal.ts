@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
@@ -478,6 +479,7 @@ export async function portalOverview(memberId: string) {
 		upsell,
 		level: level ?? null,
 		settings,
+		brandColor: settings?.whiteLabel && isEnterpriseEnabled() ? settings.brandColor : '',
 		memberships,
 		guardianHasMembership,
 		upcoming: upcomingWithPos,

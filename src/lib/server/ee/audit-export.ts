@@ -1,5 +1,6 @@
 /* @license Enterprise */
 
+import { createHmac } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { asc, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -18,6 +19,10 @@ import {
 	payment,
 	plan
 } from '#lib/server/db/schema.ts';
+import { BETTER_AUTH_SECRET } from '$app/env/private';
+import { localDate } from '#lib/tz.ts';
+import { notificationLog } from '#lib/server/db/schema.ts';
+import { gymSettings } from '#lib/server/db/schema.ts';
 import { hasFeature } from './license.ts';
 
 export function auditExportEnabled(): boolean {
@@ -94,4 +99,41 @@ export async function exportOrgData(orgId: string) {
 		payments,
 		activity: activityRows
 	};
+}
+
+/**
+ * Weekly auto-export (Mondays, org tz): POST the full org JSON to the
+ * configured export webhook — keeps an external warehouse/backup in sync.
+ * Deduped via notification_log so a re-fired cron never double-posts.
+ */
+export async function sendWeeklyExport(orgId: string): Promise<number> {
+	if (!auditExportEnabled()) return 0;
+	const [s] = await db
+		.select({ url: gymSettings.exportWebhookUrl, timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	if (!s?.url) return 0;
+	const today = localDate(new Date(), s.timezone ?? 'UTC');
+	if (new Date(today + 'T12:00:00Z').getUTCDay() !== 1) return 0;
+	const [row] = await db
+		.insert(notificationLog)
+		.values({ organizationId: orgId, kind: 'auto_export', entityId: today, recipient: s.url })
+		.onConflictDoNothing()
+		.returning({ id: notificationLog.id });
+	if (!row) return 0;
+	try {
+		const body = JSON.stringify(await exportOrgData(orgId));
+		const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(body).digest('hex');
+		await fetch(s.url, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'x-freeweight-signature': signature },
+			body,
+			signal: AbortSignal.timeout(15_000)
+		});
+		return 1;
+	} catch (err) {
+		console.error(`weekly export failed for ${orgId}`, err);
+		return 0;
+	}
 }

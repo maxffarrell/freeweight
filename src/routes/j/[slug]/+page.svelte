@@ -17,7 +17,7 @@
 		joinGymForm
 	} from '#lib/remote/public.remote.ts';
 	import Logo from '#lib/components/app/logo.svelte';
-	import { errMsg, formatMoney } from '#lib/format.ts';
+	import { contrastText, errMsg, formatMoney } from '#lib/format.ts';
 	import { localDate, localTime } from '#lib/tz.ts';
 	import { referralSources } from '#lib/schemas.ts';
 	import MapPin from '@lucide/svelte/icons/map-pin';
@@ -26,7 +26,7 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	const { org, settings, plans, sessions, closures, whiteLabel } = $derived(data);
+	const { org, settings, plans, sessions, closures, whiteLabel, brandColor } = $derived(data);
 	const tz = $derived(settings.timezone);
 	const currency = $derived(settings.currency);
 
@@ -192,7 +192,12 @@
 	/>
 </svelte:head>
 
-<div class="min-h-svh bg-background">
+<div
+	class="min-h-svh bg-background"
+	style={brandColor
+		? `--primary:${brandColor};--primary-foreground:${contrastText(brandColor)}`
+		: ''}
+>
 	<header class="border-b">
 		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
 			{#if settings.logoDocumentId}
