@@ -1,11 +1,14 @@
 /* @license Enterprise */
 
-import { and, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { member, user } from '#lib/server/db/auth.schema.ts';
 import {
+	booking,
 	checkIn,
 	charge,
+	classSession,
+	classType,
 	gymMember,
 	gymSettings,
 	location,
@@ -17,6 +20,7 @@ import { orgBrand } from '../org-brand.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { localDate } from '#lib/tz.ts';
 import { hasFeature } from './license.ts';
+import { aiAvailable, aiComplete } from './ai.ts';
 
 export function reportDigestsEnabled() {
 	return hasFeature('report-digests');
@@ -105,6 +109,42 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-in${(n?.n ?? 0) === 1 ? '' : 's'}`);
 		}
 	}
+	// Most-booked classes in the window — owners skim these first.
+	const topClasses = await db
+		.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+		.from(booking)
+		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.where(
+			and(
+				eq(booking.organizationId, orgId),
+				eq(booking.status, 'booked'),
+				gte(booking.createdAt, from),
+				lt(booking.createdAt, to)
+			)
+		)
+		.groupBy(classType.name)
+		.orderBy(desc(sql`count(*)`))
+		.limit(3);
+	// Licensed AI tier: a two-sentence opener above the numbers.
+	let aiLine: string | null = null;
+	if (hasFeature('ai') && aiAvailable()) {
+		try {
+			aiLine = (
+				await aiComplete(
+					[
+						{
+							role: 'user',
+							content: `You write a two-sentence weekly email opener for a gym's owner digest. Stats for the window: ${money(rev[0]?.n ?? 0)} collected, ${joined[0]?.n ?? 0} new members, ${visits[0]?.n ?? 0} check-ins, ${money(open[0]?.n ?? 0)} open balances, top classes: ${topClasses.map((c) => `${c.name} (${c.n})`).join(', ') || 'none'}. Two plain sentences, encouraging, no numbers beyond these, no emoji, no hype.`
+						}
+					],
+					300
+				)
+			).trim();
+		} catch {
+			aiLine = null; // AI outage must never block the digest
+		}
+	}
 	return {
 		heading: lookbackDays ? 'The last 7 days' : `${month} in review`,
 		orgName: brand.orgName,
@@ -116,7 +156,9 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 			`New members: ${joined[0]?.n ?? 0}`,
 			`Check-ins: ${visits[0]?.n ?? 0}`,
 			`Open balances now: ${money(open[0]?.n ?? 0)}`,
+			...(aiLine ? [aiLine] : []),
 			...locationLines,
+			...topClasses.map((c) => `Top class — ${c.name}: ${c.n} bookings`),
 			'Full detail is on the Reports page.'
 		]
 	};
