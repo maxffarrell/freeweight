@@ -209,3 +209,90 @@ export async function workoutPlan(
 		plan: nl > 0 ? text.slice(nl + 1).trim() : text
 	};
 }
+
+/**
+ * Personalized win-back email for one member — staff review before sending.
+ * Uses only real member facts so the model can't invent personalization.
+ */
+export async function draftWinBack(
+	orgName: string,
+	member: {
+		name: string;
+		planName: string | null;
+		daysAway: number | null;
+		totalVisits: number;
+	}
+): Promise<{ subject: string; body: string }> {
+	const out = await aiJson<{ subject: string; body: string }>([
+		{
+			role: 'user',
+			content: `You write concise, friendly win-back emails for a gym called "${orgName}".
+
+Member facts (use only these — do not invent offers, names, links or numbers):
+- Name: ${member.name} (address them with the merge tag {first_name})
+- Membership plan: ${member.planName ?? 'none on record'}
+- Days since last visit: ${member.daysAway ?? 'never visited'}
+- Lifetime check-ins: ${member.totalVisits}
+
+Write a win-back email nudging them to come back — warm, zero guilt-tripping, one clear ask (book a class or drop in).
+
+Rules:
+- Return JSON {"subject": "...", "body": "..."}.
+- Plain-text body under ~90 words; no markdown, HTML, or emoji.
+- Open with a greeting using {first_name}; end with the gym's name only.
+- No invented discounts, deadlines, sender names, links, phone numbers or unsubscribe text.`
+		}
+	]);
+	return { subject: out.subject.trim(), body: out.body.trim() };
+}
+
+/** One-line public-page description for a class type. */
+export async function draftClassDescription(
+	orgName: string,
+	c: { name: string; durationMin: number; existing?: string }
+): Promise<string> {
+	const text = await aiComplete([
+		{
+			role: 'system',
+			content:
+				'You write one-sentence class descriptions for a gym timetable. Factual, energetic, no hype words like "amazing" or emojis.'
+		},
+		{
+			role: 'user',
+			content: `Gym: "${orgName}". Class: "${c.name}", ${c.durationMin} minutes.${c.existing ? ` Current description: "${c.existing}" — improve it.` : ''}\n\nOne sentence, ~15-20 words, what the class is and who it's for. Plain text only.`
+		}
+	]);
+	return text.trim().replace(/^["']|["']$/g, '');
+}
+
+/** Generates a workout-program skeleton for the staff program library. */
+export async function generateProgram(opts: {
+	goal: string;
+	weeks: number;
+	daysPerWeek: number;
+}): Promise<{ name: string; days: { title: string; body: string }[] }> {
+	const out = await aiJson<{ name: string; days: { title: string; body: string }[] }>(
+		[
+			{
+				role: 'system',
+				content:
+					'You are a personal trainer designing weekly gym programs. Safety first — sensible volume and progressions.'
+			},
+			{
+				role: 'user',
+				content: `Goal: ${opts.goal}
+The program repeats weekly for ${opts.weeks} weeks, ${opts.daysPerWeek} training days per week.
+
+Return JSON {"name": "short program name", "days": [{"title": "Day 1 — focus", "body": "exercises, sets x reps, one per line"}]} with exactly ${opts.daysPerWeek} days. Each day's body is 3-6 exercises as plain lines, no markdown.`
+			}
+		],
+		1500
+	);
+	return {
+		name: out.name.trim() || 'Generated program',
+		days: out.days.map((d, i) => ({
+			title: d.title.trim() || `Day ${i + 1}`,
+			body: d.body.trim()
+		}))
+	};
+}

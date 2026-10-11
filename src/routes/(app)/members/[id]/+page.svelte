@@ -100,6 +100,7 @@
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
+	import { aiDraftWinBack, aiGenerateProgram, getAiStatus } from '#lib/remote/ai.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
@@ -111,12 +112,14 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import FilePen from '@lucide/svelte/icons/file-pen';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
 	const customFields = $derived(await getMemberFieldValues({ memberId: m.member.id }));
+	const ai = $derived(await getAiStatus());
 	let cfBusy = $state<string | null>(null);
 
 	async function saveCf(fieldId: string, value: string) {
@@ -143,6 +146,24 @@
 		note: string;
 		days: { dayNo: number; title: string; body: string }[];
 	}>(null);
+	let aiProgramGoal = $state('');
+	let aiProgramBusy = $state(false);
+	async function generateProgramDays() {
+		if (!libEditing) return;
+		aiProgramBusy = true;
+		try {
+			const r = await aiGenerateProgram({
+				goal: aiProgramGoal,
+				weeks: libEditing.weeks,
+				daysPerWeek: Math.max(1, libEditing.days.length || 3)
+			});
+			if (!libEditing.name) libEditing.name = r.name;
+			libEditing.days = r.days.map((d, i) => ({ dayNo: i + 1, title: d.title, body: d.body }));
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not generate'));
+		}
+		aiProgramBusy = false;
+	}
 	function openProgram(p?: {
 		program: { id: string; name: string; weeks: number; note: string | null };
 		days: { dayNo: number; title: string; body: string }[];
@@ -575,6 +596,20 @@
 	let emailOpen = $state(false);
 	let emailSubject = $state('');
 	let emailMessage = $state('');
+	let aiDraftBusy = $state(false);
+	async function draftWinBackEmail() {
+		aiDraftBusy = true;
+		try {
+			const r = await aiDraftWinBack({ memberId: id });
+			if (r) {
+				emailSubject = r.subject;
+				emailMessage = r.body;
+			}
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not draft'));
+		}
+		aiDraftBusy = false;
+	}
 	async function sendEmailToMember(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
@@ -2617,7 +2652,19 @@
 				/>
 				<Field.Description>Personalize with {'{name}'} or {'{first_name}'}.</Field.Description>
 			</Field.Field>
-			<Dialog.Footer><Button type="submit" disabled={pending}>Send</Button></Dialog.Footer>
+			<Dialog.Footer class="gap-2 sm:justify-between">
+				{#if ai.configured}
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						disabled={aiDraftBusy}
+						onclick={draftWinBackEmail}
+						><Sparkles class="mr-1 h-4 w-4" />{aiDraftBusy ? 'Drafting…' : 'Draft win-back'}</Button
+					>
+				{/if}
+				<Button type="submit" disabled={pending}>Send</Button>
+			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
@@ -3042,6 +3089,26 @@
 					}
 				}}
 			>
+				{#if ai.configured}
+					<div class="flex items-end gap-2 rounded-md border border-dashed p-2">
+						<Field.Field class="flex-1">
+							<Field.Label for="ai-goal">Generate with AI</Field.Label>
+							<Input
+								id="ai-goal"
+								bind:value={aiProgramGoal}
+								placeholder="Goal — e.g. strength, fat loss, beginners"
+							/>
+						</Field.Field>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={aiProgramBusy || !aiProgramGoal.trim()}
+							onclick={generateProgramDays}
+							><Sparkles class="mr-1 h-4 w-4" />{aiProgramBusy ? 'Working…' : 'Generate'}</Button
+						>
+					</div>
+				{/if}
 				<div class="grid grid-cols-[1fr_5rem] gap-2">
 					<Field.Field>
 						<Field.Label>Name</Field.Label>
