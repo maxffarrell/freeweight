@@ -64,8 +64,10 @@
 	} from '#lib/remote/custom-fields.remote.ts';
 	import {
 		anonymizeInactiveMembers,
+		anonymizePreviewCount,
 		getEntitlements,
 		testDoorWebhook,
+		syncDoorRosterNow,
 		getOrgDataExport,
 		sendDigestPreview,
 		sendExportWebhookNow
@@ -363,6 +365,7 @@
 	let healthQuestions = $state(settings.healthQuestions);
 	let healthFormsRequired = $state(settings.healthFormsRequired);
 	let anonBusy = $state(false);
+	let anonPreview = $state<number | null>(null);
 	let doorBusy = $state(false);
 	let digestBusy = $state(false);
 	let exportSendBusy = $state(false);
@@ -1048,23 +1051,48 @@
 										Scrub personal details of members with no visit in 24+ months (GDPR).
 									</p>
 								</div>
-								<Button
-									type="button"
-									variant="outline"
-									disabled={anonBusy}
-									onclick={async () => {
-										if (!confirm('Scrub personal details of long-inactive members?')) return;
-										anonBusy = true;
-										try {
-											const r = await anonymizeInactiveMembers({});
-											toast.success(`Anonymized ${r.anonymized} members`);
-										} catch (err) {
-											toast.error(errMsg(err, 'Failed'));
-										} finally {
-											anonBusy = false;
-										}
-									}}>Anonymize</Button
-								>
+								<div class="flex items-center gap-2">
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										disabled={anonBusy}
+										onclick={async () => {
+											anonBusy = true;
+											try {
+												const r = await anonymizePreviewCount({});
+												anonPreview = r.count;
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												anonBusy = false;
+											}
+										}}>Preview</Button
+									>
+									{#if anonPreview !== null}
+										<span class="text-xs text-muted-foreground"
+											>{anonPreview} member{anonPreview === 1 ? '' : 's'} would be scrubbed</span
+										>
+									{/if}
+									<Button
+										type="button"
+										variant="outline"
+										disabled={anonBusy}
+										onclick={async () => {
+											if (!confirm('Scrub personal details of long-inactive members?')) return;
+											anonBusy = true;
+											try {
+												const r = await anonymizeInactiveMembers({});
+												toast.success(`Anonymized ${r.anonymized} members`);
+												anonPreview = null;
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												anonBusy = false;
+											}
+										}}>Anonymize</Button
+									>
+								</div>
 							</div>
 						{/if}
 						{#if entitlements.healthForms}
@@ -1128,6 +1156,23 @@
 												doorBusy = false;
 											}
 										}}>Test</Button
+									>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={doorBusy}
+										onclick={async () => {
+											doorBusy = true;
+											try {
+												const r = await syncDoorRosterNow();
+												toast.success(`Roster synced — ${r.members} active members sent`);
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												doorBusy = false;
+											}
+										}}>Sync roster</Button
 									>
 								</div>
 							</div>

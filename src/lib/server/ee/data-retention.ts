@@ -114,3 +114,42 @@ export async function autoAnonymize(orgId: string): Promise<number> {
 	if (!s?.months) return 0;
 	return anonymizeInactive(orgId, s.months);
 }
+
+/** Count of members the sweep would scrub — the Settings "preview" before
+ * running anonymizeInactive for real. */
+export async function anonymizePreview(orgId: string, months: number): Promise<number> {
+	const cutoff = new Date(Date.now() - months * 30.4 * 86400_000);
+	const cutoffDay = cutoff.toISOString().slice(0, 10);
+	const rows = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				lt(gymMember.joinedAt, cutoffDay),
+				isNotNull(gymMember.email),
+				eq(gymMember.retentionExempt, false),
+				notExists(
+					db
+						.select({ one: sql`1` })
+						.from(checkIn)
+						.where(
+							and(
+								eq(checkIn.memberId, outer(gymMember.id)),
+								sql`${checkIn.checkedAt} > ${cutoff.toISOString()}`
+							)
+						)
+				),
+				notExists(
+					db
+						.select({ one: sql`1` })
+						.from(membership)
+						.where(
+							and(eq(membership.memberId, outer(gymMember.id)), eq(membership.status, 'active'))
+						)
+				)
+			)
+		)
+		.limit(501);
+	return rows.length;
+}

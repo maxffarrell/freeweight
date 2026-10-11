@@ -19,13 +19,15 @@ import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import { verifyKioskPin as kioskPinVerify } from '#lib/server/ee/kiosk-pin.ts';
 import {
 	anonymizeInactive,
+	anonymizePreview,
 	dataRetentionEnabled,
 	requireDataRetention
 } from '#lib/server/ee/data-retention.ts';
 import {
 	doorAccessEnabled,
 	fireDoorWebhook,
-	requireDoorAccess
+	requireDoorAccess,
+	syncDoorRoster
 } from '#lib/server/ee/door-access.ts';
 import { command } from '$app/server';
 import * as v from 'valibot';
@@ -133,6 +135,16 @@ export const anonymizeInactiveMembers = command(
 		const ctx = await requireOrg('admin');
 		requireDataRetention();
 		return { anonymized: await anonymizeInactive(ctx.orgId, input.months ?? 24) };
+	}
+);
+
+/** How many members the anonymize sweep would scrub — the Settings preview. */
+export const anonymizePreviewCount = query(
+	v.object({ months: v.optional(v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(120))) }),
+	async (input) => {
+		const ctx = await requireOrg('admin');
+		requireDataRetention();
+		return { count: await anonymizePreview(ctx.orgId, input.months ?? 24) };
 	}
 );
 
@@ -280,4 +292,11 @@ export const sendExportWebhookNow = command(async () => {
 export const verifyKioskPin = command(v.object({ pin: v.string() }), async ({ pin }) => {
 	const { orgId } = await requireOrg();
 	return { result: await kioskPinVerify(orgId, pin) };
+});
+
+/** Push the active-member roster to the door system — the provisioning
+ * pattern for access control sync. Returns the member count sent. */
+export const syncDoorRosterNow = command(async () => {
+	const { orgId } = await requireOrg('admin');
+	return { members: await syncDoorRoster(orgId) };
 });
