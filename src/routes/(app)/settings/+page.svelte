@@ -61,6 +61,7 @@
 		saveMemberFieldCmd,
 		deleteMemberFieldCmd
 	} from '#lib/remote/custom-fields.remote.ts';
+	import { getEntitlements, getOrgDataExport } from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -107,6 +108,30 @@
 	const staff = await getStaff();
 	const joinInfo = await getJoinInfo();
 	const memberFields = $derived(await getMemberFields());
+	const entitlements = $derived(await getEntitlements());
+
+	let exportBusy = $state(false);
+	async function exportOrgData() {
+		exportBusy = true;
+		try {
+			const res = await getOrgDataExport();
+			if (!res.licensed || !res.data) {
+				toast.error('Data export is an Enterprise feature');
+				return;
+			}
+			const blob = new Blob([JSON.stringify(res.data, null, 2)], {
+				type: 'application/json'
+			});
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = `freeweight-export-${new Date().toISOString().slice(0, 10)}.json`;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		} catch (e) {
+			toast.error(errMsg(e, 'Export failed'));
+		}
+		exportBusy = false;
+	}
 	let cfOpen = $state(false);
 	let cfEditId = $state<string | null>(null);
 	let cfName = $state('');
@@ -269,6 +294,8 @@
 	let publicPage = $state(settings.publicPage);
 	let staffBriefing = $state(settings.staffBriefing);
 	// svelte-ignore state_referenced_locally
+	let whiteLabel = $state(settings.whiteLabel);
+	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -327,6 +354,7 @@
 				revenueTarget,
 				publicPage,
 				staffBriefing,
+				whiteLabel,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -873,6 +901,17 @@
 							</div>
 							<Switch bind:checked={firstClassFree} />
 						</div>
+						{#if entitlements.whiteLabel}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">White label</p>
+									<p class="text-xs text-muted-foreground">
+										Hide "Powered by Freeweight" on the public join page.
+									</p>
+								</div>
+								<Switch bind:checked={whiteLabel} />
+							</div>
+						{/if}
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>
 				</Card.Content>
@@ -1054,6 +1093,30 @@
 						<Button size="sm" variant="outline" onclick={() => openCfField()}
 							><Plus class="mr-1 h-4 w-4" /> Add field</Button
 						>
+					{/if}
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root class="max-w-2xl">
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<Card.Title class="text-base">Data export</Card.Title>
+						<Badge variant="secondary">Enterprise</Badge>
+					</div>
+					<Card.Description>
+						Full-org JSON dump for compliance and backups — members, plans, memberships, classes,
+						bookings, check-ins, charges, payments and the activity log.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					{#if !entitlements.auditExport}
+						<p class="text-sm text-muted-foreground">
+							Data export is available on Freeweight Cloud and licensed self-hosted installs.
+						</p>
+					{:else}
+						<Button size="sm" variant="outline" disabled={exportBusy} onclick={exportOrgData}>
+							{exportBusy ? 'Exporting…' : 'Download JSON'}
+						</Button>
 					{/if}
 				</Card.Content>
 			</Card.Root>
