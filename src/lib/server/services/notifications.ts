@@ -57,6 +57,7 @@ import {
 	personalRecord
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
+import { orgBrand } from '../org-brand.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
@@ -64,25 +65,6 @@ import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { entryProgress } from './challenges.ts';
-
-async function orgBrand(orgId: string) {
-	const [o, s] = await Promise.all([
-		db
-			.select({ name: organization.name })
-			.from(organization)
-			.where(eq(organization.id, orgId))
-			.limit(1),
-		db
-			.select({ logoDocumentId: gymSettings.logoDocumentId })
-			.from(gymSettings)
-			.where(eq(gymSettings.organizationId, orgId))
-			.limit(1)
-	]);
-	return {
-		orgName: o[0]?.name ?? 'your gym',
-		logoUrl: s[0]?.logoDocumentId ? `${appOrigin()}/api/logo/${s[0].logoDocumentId}` : undefined
-	};
-}
 
 async function orgTimezone(orgId: string) {
 	const [s] = await db

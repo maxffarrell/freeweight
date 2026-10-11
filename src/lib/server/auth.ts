@@ -6,6 +6,7 @@ import { organization } from 'better-auth/plugins';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { apiKey } from '@better-auth/api-key';
 import { db } from '#lib/server/db/index.ts';
+import { orgBrand } from './org-brand.ts';
 import { enterprisePlugins } from '#lib/server/ee/auth.ts';
 import { appOrigin, sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
@@ -30,7 +31,7 @@ export const auth = betterAuth({
 					to: email,
 					subject: `${inviter.user.name} invited you to ${organization.name} on Freeweight`,
 					...renderEmail({
-						orgName: organization.name,
+						...(await orgBrand(organization.id)),
 						heading: `Join ${organization.name} on Freeweight`,
 						lines: [`${inviter.user.name} (${inviter.user.email}) invited you to join as ${role}.`],
 						action: { label: 'Accept invitation', url: `${appOrigin()}/invite/${id}` }

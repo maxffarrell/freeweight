@@ -99,12 +99,13 @@ export const getErrorBranding = query(async () => {
 export const getPayrollExport = query(
 	v.object({
 		from: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
-		to: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
+		to: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+		format: v.optional(v.picklist(['default', 'gusto']))
 	}),
-	async ({ from, to }) => {
+	async ({ from, to, format }) => {
 		const { orgId } = await requireOrg('admin');
 		if (!payrollExportEnabled()) return { licensed: false, data: null };
-		return { licensed: true, data: await exportPayroll(orgId, from, to) };
+		return { licensed: true, data: await exportPayroll(orgId, from, to, format) };
 	}
 );
 
