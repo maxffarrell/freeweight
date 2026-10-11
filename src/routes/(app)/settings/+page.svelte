@@ -66,7 +66,8 @@
 		getEntitlements,
 		testDoorWebhook,
 		getOrgDataExport,
-		sendDigestPreview
+		sendDigestPreview,
+		sendExportWebhookNow
 	} from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
@@ -333,6 +334,7 @@
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
 	let digestBusy = $state(false);
+	let exportSendBusy = $state(false);
 	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
@@ -1095,7 +1097,25 @@
 										POST the full org data export (JSON, signed) here every Monday.
 									</p>
 								</div>
-								<Input class="w-56" placeholder="https://…" bind:value={exportWebhookUrl} />
+								<div class="flex items-center gap-2">
+									<Input class="w-48" placeholder="https://…" bind:value={exportWebhookUrl} />
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={exportSendBusy}
+										onclick={async () => {
+											exportSendBusy = true;
+											try {
+												await sendExportWebhookNow();
+												toast.success('Export posted');
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												exportSendBusy = false;
+											}
+										}}>Send now</Button
+									>
+								</div>
 							</div>
 						{/if}
 						{#if entitlements.reportDigests}

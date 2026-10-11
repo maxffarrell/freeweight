@@ -45,6 +45,7 @@ import {
 	requireHealthForms,
 	submitParq as hfSubmit
 } from '#lib/server/ee/health-forms.ts';
+import { memberFieldValues } from '#lib/server/ee/custom-fields.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
@@ -1076,3 +1077,13 @@ export const submitParq = command(
 		return { ok: true };
 	}
 );
+
+/** Member's custom-field values (custom-fields tier) — read-only in the portal. */
+export const getMyCustomFields = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	const res = await memberFieldValues(m.organizationId, memberId);
+	return {
+		licensed: res.licensed,
+		rows: res.rows.filter((x) => x.value?.trim()).map((x) => ({ name: x.name, value: x.value }))
+	};
+});

@@ -12,7 +12,8 @@ import { requireOrg } from '#lib/server/context.ts';
 import {
 	auditExportEnabled,
 	exportOrgData,
-	requireAuditExport
+	requireAuditExport,
+	sendExportNow
 } from '#lib/server/ee/audit-export.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import {
@@ -262,5 +263,14 @@ export const sendDigestPreview = command(async () => {
 	const [u] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
 	if (!u?.email) error(400, 'No email on your account');
 	await sendMonthClosePreview(orgId, u.email);
+	return { ok: true };
+});
+
+/** On-demand POST of the full org export to the configured webhook (audit-export tier). */
+export const sendExportWebhookNow = command(async () => {
+	const { orgId } = await requireOrg('admin');
+	requireAuditExport();
+	const sent = await sendExportNow(orgId);
+	if (!sent) error(400, 'No export webhook configured (or delivery failed)');
 	return { ok: true };
 });

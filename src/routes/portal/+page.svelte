@@ -21,6 +21,7 @@
 		getPortalOverview,
 		getBookable,
 		getMyParq,
+		getMyCustomFields,
 		submitParq,
 		memberBook,
 		memberGiveSpot,
@@ -252,6 +253,7 @@
 	);
 	const npsStatus = $derived(await getNpsStatus(memberId));
 	const parq = $derived(await getMyParq(memberId));
+	const customFields = $derived(await getMyCustomFields(memberId));
 	let parqAnswers = $state<Record<string, boolean>>({});
 	let parqBusy = $state(false);
 	let parqReopen = $state(false);
@@ -2158,6 +2160,25 @@
 							onclick={signParq}>{parqBusy ? 'Saving…' : 'Sign and save'}</Button
 						>
 					{/if}
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		{#if customFields.licensed && customFields.rows.length}
+			<Card.Root>
+				<Card.Header class="pb-2">
+					<Card.Title class="text-base">Your details</Card.Title>
+					<Card.Description>Extra info the gym keeps on your record.</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<div class="space-y-2 text-sm">
+						{#each customFields.rows as f (f.name)}
+							<div class="flex items-baseline justify-between gap-3">
+								<span class="text-muted-foreground">{f.name}</span>
+								<span class="font-medium">{f.value}</span>
+							</div>
+						{/each}
+					</div>
 				</Card.Content>
 			</Card.Root>
 		{/if}
