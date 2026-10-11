@@ -541,6 +541,8 @@ export const settingsInput = v.object({
 	whiteLabel: v.optional(v.boolean()),
 	/** Enterprise kiosk-pin: 4-digit desk PIN; empty = unlocked. */
 	kioskPin: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(8))),
+	/** Explicitly remove the kiosk PIN (empty kioskPin alone keeps it). */
+	kioskPinClear: v.optional(v.boolean()),
 	retentionDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3650))),
 	doorWebhookUrl: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 	anonymizeMonths: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120))),

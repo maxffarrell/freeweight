@@ -71,7 +71,11 @@ export const searchAll = query(v.pipe(v.string(), v.maxLength(100)), async (q) =
 	search((await requireOrg()).orgId, q)
 );
 
-export const getSettings = query(async () => settingsSvc.getSettings((await requireOrg()).orgId));
+export const getSettings = query(async () => {
+	const s = await settingsSvc.getSettings((await requireOrg()).orgId);
+	// Never ship the (hashed) kiosk PIN to the client — pages get set/len only.
+	return { ...s, kioskPin: '', kioskPinSet: !!s.kioskPin };
+});
 
 /** The gym's public join page — URL, on/off state, and org name for the printable QR poster. */
 export const getJoinInfo = query(async () => {
@@ -82,7 +86,7 @@ export const getJoinInfo = query(async () => {
 export const updateSettings = command(settingsInput, async (input) => {
 	const s = await settingsSvc.updateSettings(await requireOrg('admin'), input);
 	void getSettings().refresh();
-	return s;
+	return { ...s, kioskPin: '', kioskPinSet: !!s.kioskPin };
 });
 /** Logo upload itself goes through POST /api/documents (entityType=org_logo); this just removes it. */
 export const removeLogo = command(async () => {

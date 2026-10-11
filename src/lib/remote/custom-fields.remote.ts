@@ -26,7 +26,8 @@ const fieldInput = v.object({
 	name: v.pipe(v.string(), v.trim(), v.nonEmpty('Name the field'), v.maxLength(60)),
 	kind: v.picklist(['text', 'number', 'date', 'select']),
 	options: v.optional(v.pipe(v.string(), v.maxLength(500))),
-	showOnJoin: v.optional(v.boolean(), false)
+	showOnJoin: v.optional(v.boolean(), false),
+	requireOnJoin: v.optional(v.boolean(), false)
 });
 
 export const saveMemberFieldCmd = command(fieldInput, async (input) => {

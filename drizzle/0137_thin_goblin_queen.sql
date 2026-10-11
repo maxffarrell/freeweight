@@ -1,0 +1,1 @@
+ALTER TABLE "member_field" ADD COLUMN "require_on_join" boolean DEFAULT false NOT NULL;

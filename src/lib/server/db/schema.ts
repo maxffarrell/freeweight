@@ -119,6 +119,8 @@ export const gymSettings = pgTable('gym_settings', {
 	whiteLabel: boolean('white_label').notNull().default(false),
 	/** Enterprise kiosk-pin: 4-digit PIN the kiosk requires before use; empty = unlocked. */
 	kioskPin: text('kiosk_pin').notNull().default(''),
+	/** Digit count of the (hashed) kiosk PIN — drives the PIN pad. */
+	kioskPinLen: integer('kiosk_pin_len').notNull().default(0),
 	/** Enterprise data-retention: purge activity + notification log older than N days. 0 = keep forever. */
 	retentionDays: integer('retention_days').notNull().default(0),
 	/** Enterprise door-access: POST a signed check-in event to this URL (door systems). */
@@ -1667,6 +1669,8 @@ export const memberField = pgTable(
 		options: text('options').notNull().default(''),
 		/** Ask for this on the public join page (custom-fields tier). */
 		showOnJoin: boolean('show_on_join').notNull().default(false),
+		/** Block join-page submit until this field is answered (custom-fields tier). */
+		requireOnJoin: boolean('require_on_join').notNull().default(false),
 		position: integer('position').notNull().default(0),
 		...timestamps
 	},
