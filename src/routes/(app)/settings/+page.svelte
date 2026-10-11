@@ -1251,7 +1251,11 @@
 											const rows = await getDoorLog();
 											const csv = toCsv([
 												['Time', 'Action', 'Summary'],
-												...rows.map((r) => [formatDate(r.createdAt), r.action, r.summary])
+												...rows.map((r) => [
+													new Date(r.createdAt).toISOString(),
+													r.action,
+													r.summary
+												])
 											]);
 											const a = document.createElement('a');
 											a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));

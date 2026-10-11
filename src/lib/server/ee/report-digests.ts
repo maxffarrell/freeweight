@@ -102,7 +102,7 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 						lt(checkIn.checkedAt, to)
 					)
 				);
-			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-ins`);
+			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-in${(n?.n ?? 0) === 1 ? '' : 's'}`);
 		}
 	}
 	return {
