@@ -118,6 +118,7 @@ export const getMembers = query(
 			hasIssue: v.optional(v.boolean()),
 			inEvent: v.optional(v.boolean()),
 			noHealthForm: v.optional(v.boolean()),
+			parqExpiring: v.optional(v.boolean()),
 			customField: v.optional(v.object({ fieldId: v.string(), value: v.string() }))
 		})
 	),
@@ -173,6 +174,7 @@ export const getMembers = query(
 			opts?.hasIssue,
 			opts?.inEvent,
 			opts?.noHealthForm,
+			opts?.parqExpiring,
 			opts?.customField
 		)
 );

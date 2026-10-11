@@ -58,19 +58,25 @@ export async function fireDoorWebhook(
 	}
 }
 
-/** HMAC-signed POST to the door endpoint — shared by events and bulk pushes. */
-async function postDoor(url: string, body: Record<string, unknown>) {
+/** HMAC-signed POST to the door endpoint — shared by events and bulk pushes.
+ * Returns the HTTP status (0 on network/timeout error). */
+async function postDoor(url: string, body: Record<string, unknown>): Promise<number> {
 	const text = JSON.stringify(body);
 	const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(text).digest('hex');
-	await fetch(url, {
-		method: 'POST',
-		headers: {
-			'content-type': 'application/json',
-			'x-freeweight-signature': signature
-		},
-		body: text,
-		signal: AbortSignal.timeout(5_000)
-	});
+	try {
+		const res = await fetch(url, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				'x-freeweight-signature': signature
+			},
+			body: text,
+			signal: AbortSignal.timeout(5_000)
+		});
+		return res.status;
+	} catch {
+		return 0;
+	}
 }
 
 /**
@@ -97,11 +103,15 @@ export async function syncDoorRoster(orgId: string): Promise<number> {
 			)
 		)
 		.limit(2000);
-	await postDoor(s.url, {
+	const rosterStatus = await postDoor(s.url, {
 		event: 'roster.sync',
 		sentAt: new Date().toISOString(),
 		members
 	});
+	await db
+		.update(gymSettings)
+		.set({ doorLastEvent: 'roster.sync', doorLastStatus: rosterStatus, doorLastAt: new Date() })
+		.where(eq(gymSettings.organizationId, orgId));
 	await db.insert(activity).values({
 		organizationId: orgId,
 		entityType: 'door_access',
@@ -129,11 +139,19 @@ export async function pushDoorMember(orgId: string, memberId: string) {
 		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
 		.limit(1);
 	if (!m) throw error(404, 'Member not found');
-	await postDoor(s.url, {
+	const provStatus = await postDoor(s.url, {
 		event: 'member.provisioned',
 		sentAt: new Date().toISOString(),
 		member: m
 	});
+	await db
+		.update(gymSettings)
+		.set({
+			doorLastEvent: 'member.provisioned',
+			doorLastStatus: provStatus,
+			doorLastAt: new Date()
+		})
+		.where(eq(gymSettings.organizationId, orgId));
 	await db.insert(activity).values({
 		organizationId: orgId,
 		entityType: 'door_access',

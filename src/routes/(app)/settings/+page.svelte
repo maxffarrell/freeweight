@@ -1221,6 +1221,15 @@
 									</label>
 								{/each}
 							</div>
+							{#if settings.doorLastEvent}
+								<p class="text-xs text-muted-foreground">
+									Last post: {settings.doorLastEvent} — {settings.doorLastStatus != null
+										? `HTTP ${settings.doorLastStatus}`
+										: 'delivery failed'}{settings.doorLastAt
+										? ` · ${formatDate(settings.doorLastAt)}`
+										: ''}
+								</p>
+							{/if}
 						{/if}
 						{#if entitlements.auditExport}
 							<div class="flex items-center justify-between gap-4">

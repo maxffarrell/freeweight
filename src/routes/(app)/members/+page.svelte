@@ -220,6 +220,7 @@
 			hasIssue: owesFilter === '__hasissue' || undefined,
 			inEvent: owesFilter === '__inevent' || undefined,
 			noHealthForm: owesFilter === '__nohealth' || undefined,
+			parqExpiring: owesFilter === '__parqexp' || undefined,
 			customField:
 				cfFieldId && cfValue.trim() ? { fieldId: cfFieldId, value: cfValue.trim() } : undefined
 		});
@@ -807,7 +808,9 @@
 																										? "Comp'd"
 																										: owesFilter === '__nohealth'
 																											? 'No health form'
-																											: 'Any balance'}</Select.Trigger
+																											: owesFilter === '__parqexp'
+																												? 'Form expiring'
+																												: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -836,6 +839,7 @@
 				<Select.Item value="__inevent">Booked an event</Select.Item>
 				{#if entitlements.healthForms}
 					<Select.Item value="__nohealth">No health form</Select.Item>
+					<Select.Item value="__parqexp">Health form expiring ≤30d</Select.Item>
 				{/if}
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
