@@ -366,6 +366,7 @@
 	let anonymizeMonths = $state(settings.anonymizeMonths);
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
 	let digestRecipients = $state(settings.digestRecipients);
+	let digestWeekly = $state(settings.digestWeekly);
 	let doorEventsCsv = $state(settings.doorEvents);
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
@@ -444,6 +445,7 @@
 				anonymizeMonths,
 				exportWebhookUrl,
 				digestRecipients,
+				digestWeekly,
 				doorEvents: doorEventsCsv,
 				brandColor,
 				parqMonths,
@@ -1316,6 +1318,15 @@
 										}}>Send now</Button
 									>
 								</div>
+							</div>
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="text-sm font-medium">Weekly digest</p>
+									<p class="text-xs text-muted-foreground">
+										Also send the digest every Monday covering the last 7 days.
+									</p>
+								</div>
+								<Switch bind:checked={digestWeekly} />
 							</div>
 						{/if}
 						{#if entitlements.whiteLabel}

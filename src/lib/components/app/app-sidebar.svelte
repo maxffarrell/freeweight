@@ -26,8 +26,9 @@
 		org: { name: string };
 		onsearch: () => void;
 		ontour: () => void;
+		whiteLabel?: boolean;
 	};
-	let { user, org, onsearch, ontour }: Props = $props();
+	let { user, org, onsearch, ontour, whiteLabel = false }: Props = $props();
 
 	const sidebar = Sidebar.useSidebar();
 	$effect(() => {
@@ -67,7 +68,9 @@
 							<Logo />
 							<span class="grid flex-1 text-left leading-tight">
 								<span class="truncate font-semibold">{org.name}</span>
-								<span class="truncate text-xs text-muted-foreground">Freeweight</span>
+								{#if !whiteLabel}<span class="truncate text-xs text-muted-foreground"
+										>Freeweight</span
+									>{/if}
 							</span>
 						</a>
 					{/snippet}

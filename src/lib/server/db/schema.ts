@@ -131,6 +131,8 @@ export const gymSettings = pgTable('gym_settings', {
 	exportWebhookUrl: text('export_webhook_url').notNull().default(''),
 	/** Enterprise report-digests: extra comma-separated recipients beyond owner/admin. */
 	digestRecipients: text('digest_recipients').notNull().default(''),
+	/** Also send the digest every Monday covering the trailing 7 days. */
+	digestWeekly: boolean('digest_weekly').notNull().default(false),
 	/** Enterprise door-access: comma-separated event names to fire; empty = all. */
 	doorEvents: text('door_events').notNull().default(''),
 	/** Door-access ops readout: last webhook post attempt + result. */

@@ -9,7 +9,8 @@ import { syncAtRiskTags } from '#lib/server/services/reports.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { autoAnonymize, purgeOldData } from '#lib/server/ee/data-retention.ts';
 import { sendWeeklyExport } from '#lib/server/ee/audit-export.ts';
-import { sendMonthClose } from '#lib/server/ee/report-digests.ts';
+import { sendMonthClose, sendWeekDigest } from '#lib/server/ee/report-digests.ts';
+import { sendWeeklyInsights } from '#lib/server/ee/ai-features.ts';
 import { sendParqReminders } from '#lib/server/ee/health-forms.ts';
 import {
 	sendAnniversaryGreetings,
@@ -116,6 +117,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			try {
 				retentionPurged += await purgeOldData(o.id);
 				monthCloseSent += await sendMonthClose(o.id);
+				monthCloseSent += await sendWeekDigest(o.id);
 				anonymizedInactive += await autoAnonymize(o.id);
 				exportsSent += await sendWeeklyExport(o.id);
 			} catch (err) {
@@ -127,6 +129,11 @@ export const GET: RequestHandler = async ({ request }) => {
 				parqReminders += await sendParqReminders(o.id);
 			} catch (err) {
 				console.error(`member-drip cron failed for ${o.id}`, err);
+			}
+			try {
+				await sendWeeklyInsights(o.id);
+			} catch (err) {
+				console.error(`ai-insights cron failed for ${o.id}`, err);
 			}
 		} catch (err) {
 			failed++;

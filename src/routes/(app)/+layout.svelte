@@ -15,6 +15,7 @@
 	<AppSidebar
 		user={data.user}
 		org={data.org}
+		whiteLabel={data.whiteLabel}
 		onsearch={() => (searchOpen = true)}
 		ontour={() => (tour.open = true)}
 	/>

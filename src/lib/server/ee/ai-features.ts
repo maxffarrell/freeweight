@@ -8,11 +8,17 @@ import {
 	classSession,
 	classType,
 	gymMember,
+	gymSettings,
 	membership,
+	notificationLog,
 	payment
 } from '#lib/server/db/schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
 import { localDate } from '#lib/tz.ts';
-import { aiComplete, aiJson } from './ai.ts';
+import { sendEmail } from '#lib/server/email.ts';
+import { renderEmail } from '#lib/server/email-template.ts';
+import { orgBrand } from '../org-brand.ts';
+import { aiComplete, aiJson, aiAvailable } from './ai.ts';
 
 /**
  * Drafts an announcement email for staff to review before sending. The member
@@ -295,4 +301,55 @@ Return JSON {"name": "short program name", "days": [{"title": "Day 1 — focus",
 			body: d.body.trim()
 		}))
 	};
+}
+
+/**
+ * Weekly AI insights — Mondays (org tz), owners/admins get the gymInsights
+ * bullets by email. Deduped per week via notification_log 'ai_insights'.
+ */
+export async function sendWeeklyInsights(orgId: string): Promise<number> {
+	if (!aiAvailable()) return 0;
+	const [s] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const tz = s?.timezone ?? 'UTC';
+	const today = localDate(new Date(), tz);
+	if (new Date(`${today}T12:00:00Z`).getDay() !== 1) return 0;
+	const bullets = await gymInsights(orgId, tz);
+	if (bullets.length === 0) return 0;
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	const brand = await orgBrand(orgId);
+	let sent = 0;
+	for (const st of staff) {
+		const [row] = await db
+			.insert(notificationLog)
+			.values({
+				organizationId: orgId,
+				kind: 'ai_insights',
+				entityId: today,
+				recipient: st.email
+			})
+			.onConflictDoNothing()
+			.returning({ id: notificationLog.id });
+		if (!row) continue;
+		await sendEmail({
+			to: st.email,
+			subject: `${brand.orgName} — this week, at a glance`,
+			...renderEmail({
+				orgName: brand.orgName,
+				logoUrl: brand.logoUrl,
+				whiteLabel: brand.whiteLabel,
+				heading: 'This week, at a glance',
+				lines: bullets
+			})
+		});
+		sent++;
+	}
+	return sent;
 }
