@@ -1016,6 +1016,13 @@
       "when": 1791713310460,
       "tag": "0144_clean_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1791715748983,
+      "tag": "0145_far_shocker",
+      "breakpoints": true
     }
   ]
 }

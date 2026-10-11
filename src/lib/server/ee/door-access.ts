@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { activity, gymMember, gymSettings, membership } from '#lib/server/db/schema.ts';
+import { activity, gymMember, gymSettings, location, membership } from '#lib/server/db/schema.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { hasFeature } from './license.ts';
 
@@ -42,7 +42,20 @@ export async function fireDoorWebhook(
 			.from(gymSettings)
 			.where(eq(gymSettings.organizationId, orgId))
 			.limit(1);
-		if (!s?.url) return;
+		// A branch with its own door system overrides the org-wide URL —
+		// e.g. HQ on Kisi, the annex on Brivo.
+		let url = s?.url ?? '';
+		if (payload.locationId) {
+			const [loc] = await db
+				.select({ u: location.doorWebhookUrl })
+				.from(location)
+				.where(
+					and(eq(location.id, payload.locationId as string), eq(location.organizationId, orgId))
+				)
+				.limit(1);
+			if (loc?.u) url = loc.u;
+		}
+		if (!url) return;
 		// Event toggles — empty list means all events fire.
 		if (
 			s.events &&
@@ -52,7 +65,7 @@ export async function fireDoorWebhook(
 				.includes(event)
 		)
 			return;
-		const status = await postDoor(s.url, { event, ...payload });
+		const status = await postDoor(url, { event, ...payload });
 		await db
 			.update(gymSettings)
 			.set({ doorLastEvent: event, doorLastStatus: status, doorLastAt: new Date() })

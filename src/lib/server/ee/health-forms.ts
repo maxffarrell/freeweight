@@ -53,9 +53,22 @@ export async function submitParq(
 	const keyed = Object.fromEntries(
 		Object.entries(answers).map(([k, v]) => [questions[Number(k)] ?? k, v])
 	);
+	// Keep superseded signings — a member re-signing shouldn't erase the
+	// record of what they attested before (compliance trail).
+	const [prior] = await db
+		.select({ a: gymMember.parqAnswers, at: gymMember.parqSignedAt })
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId))
+		.limit(1);
+	const historyEntry =
+		prior?.a && prior.at ? [{ answers: prior.a, signedAt: prior.at.toISOString() }] : [];
 	const [row] = await db
 		.update(gymMember)
-		.set({ parqAnswers: keyed, parqSignedAt: new Date() })
+		.set({
+			parqAnswers: keyed,
+			parqSignedAt: new Date(),
+			parqHistory: sql`coalesce(${gymMember.parqHistory}, '[]'::jsonb) || ${JSON.stringify(historyEntry)}::jsonb`
+		})
 		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
 		.returning({ id: gymMember.id });
 	if (!row) error(404, 'Member not found');

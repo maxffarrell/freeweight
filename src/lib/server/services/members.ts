@@ -40,6 +40,7 @@ import {
 	signRequest,
 	trialRequest,
 	user,
+	member as staffMember,
 	waiver,
 	plan,
 	outer,
@@ -1883,13 +1884,14 @@ export async function anonymizeMember(
 	memberId: string
 ) {
 	const [m] = await db
-		.select({ id: gymMember.id, name: gymMember.name })
+		.select({ id: gymMember.id, name: gymMember.name, portalUserId: gymMember.portalUserId })
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, memberId)));
 	if (!m) error(404, 'Member not found');
 	await db
 		.update(gymMember)
 		.set({
+			portalUserId: null,
 			name: 'Former member',
 			email: null,
 			phone: null,
@@ -1903,6 +1905,7 @@ export async function anonymizeMember(
 			goalVisitsPerMonth: null,
 			parqSignedAt: null,
 			parqAnswers: null,
+			parqHistory: null,
 			deletionRequestedAt: null,
 			updatedAt: new Date()
 		})
@@ -1916,6 +1919,17 @@ export async function anonymizeMember(
 		.where(
 			and(eq(memberMeasurement.organizationId, ctx.orgId), eq(memberMeasurement.memberId, memberId))
 		);
+	// Sever the portal account — an erased member must not keep a working login.
+	// Guard: if the linked user is org staff (e.g. a staffer who claimed a portal
+	// link while logged in), don't delete their login — just unlink.
+	if (m.portalUserId) {
+		const staff = await db
+			.select({ id: staffMember.id })
+			.from(staffMember)
+			.where(eq(staffMember.userId, m.portalUserId))
+			.limit(1);
+		if (staff.length === 0) await db.delete(user).where(eq(user.id, m.portalUserId));
+	}
 	// Health-questionnaire answers and custom-field values are PII too.
 	await db
 		.delete(memberFieldValue)
