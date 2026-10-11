@@ -1867,11 +1867,11 @@
 					<Field.Field>
 						<Field.Label>Options (one per line or comma-separated)</Field.Label>
 						<Textarea bind:value={cfOptions} rows={3} placeholder="S, M, L, XL" />
-						<label class="flex items-center gap-2 text-sm">
-							<input type="checkbox" bind:checked={cfJoin} /> Ask on the join page
-						</label>
 					</Field.Field>
 				{/if}
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={cfJoin} /> Ask on the join page
+				</label>
 			</div>
 			<Dialog.Footer>
 				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
