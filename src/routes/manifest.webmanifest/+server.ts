@@ -1,11 +1,27 @@
+import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import { db } from '#lib/server/db/index.ts';
+import { organization } from '#lib/server/db/auth.schema.ts';
+import { gymSettings } from '#lib/server/db/schema.ts';
+import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
 
 /** PWA manifest — keeps the kiosk/portal installable on desk tablets and phones. */
-export const GET: RequestHandler = () =>
-	new Response(
+export const GET: RequestHandler = async (event) => {
+	let appName = 'Freeweight';
+	const orgId = event.locals.session?.activeOrganizationId;
+	if (orgId) {
+		const [row] = await db
+			.select({ name: organization.name, whiteLabel: gymSettings.whiteLabel })
+			.from(organization)
+			.leftJoin(gymSettings, eq(gymSettings.organizationId, organization.id))
+			.where(eq(organization.id, orgId))
+			.limit(1);
+		if (row?.whiteLabel && isEnterpriseEnabled() && row.name) appName = row.name;
+	}
+	return new Response(
 		JSON.stringify({
-			name: 'Freeweight',
-			short_name: 'Freeweight',
+			name: appName,
+			short_name: appName,
 			description: 'Gym management — schedule, members, billing, kiosk check-in',
 			start_url: '/',
 			scope: '/',
@@ -22,3 +38,4 @@ export const GET: RequestHandler = () =>
 		}),
 		{ headers: { 'content-type': 'application/manifest+json' } }
 	);
+};

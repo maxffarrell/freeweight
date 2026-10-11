@@ -13,6 +13,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { getMemberFields } from '#lib/remote/custom-fields.remote.ts';
+	import { getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
@@ -90,6 +91,7 @@
 	let owesFilter = $state(initOwes ? 'owes' : 'any');
 	let members = $state(await getMembers({ owes: initOwes || undefined }));
 	const memberFields = $derived(await getMemberFields());
+	const entitlements = $derived(await getEntitlements());
 	const dupes = await getDuplicates();
 	const initials = (name: string) =>
 		name
@@ -209,7 +211,8 @@
 			trialEnding: owesFilter === '__trialending' || undefined,
 			bookedToday: owesFilter === '__bookedtoday' || undefined,
 			hasIssue: owesFilter === '__hasissue' || undefined,
-			inEvent: owesFilter === '__inevent' || undefined
+			inEvent: owesFilter === '__inevent' || undefined,
+			noHealthForm: owesFilter === '__nohealth' || undefined
 		});
 	}
 	function search() {
@@ -767,7 +770,9 @@
 																									? 'Pack expiring'
 																									: owesFilter === '__comped'
 																										? "Comp'd"
-																										: 'Any balance'}</Select.Trigger
+																										: owesFilter === '__nohealth'
+																											? 'No health form'
+																											: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -794,6 +799,9 @@
 				<Select.Item value="__bookedtoday">Booked today</Select.Item>
 				<Select.Item value="__hasissue">Open issue report</Select.Item>
 				<Select.Item value="__inevent">Booked an event</Select.Item>
+				{#if entitlements.healthForms}
+					<Select.Item value="__nohealth">No health form</Select.Item>
+				{/if}
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>
 				<Select.Item value="__inside">In gym now</Select.Item>

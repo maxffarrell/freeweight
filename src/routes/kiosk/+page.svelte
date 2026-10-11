@@ -21,6 +21,7 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
+	import { getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatMoney, formatRelative } from '#lib/format.ts';
 	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
@@ -35,6 +36,26 @@
 	const locations = await getLocations().then((l) => l.filter((x) => !x.archivedAt));
 	const tz = settings.timezone;
 	const liveLocations = $derived(locations);
+	const entitlements = $derived(await getEntitlements());
+	const pinRequired = $derived(entitlements.kioskPin && !!settings.kioskPin);
+	let pinInput = $state('');
+	let pinOk = $state(false);
+	let pinError = $state(false);
+	const pinLocked = $derived(pinRequired && !pinOk);
+	function pinKey(k: string) {
+		pinError = false;
+		if (k === 'back') {
+			pinInput = pinInput.slice(0, -1);
+			return;
+		}
+		if (pinInput.length >= 8) return;
+		pinInput += k;
+		if (pinInput === settings.kioskPin) pinOk = true;
+		else if (pinInput.length >= settings.kioskPin.length) {
+			pinError = true;
+			pinInput = '';
+		}
+	}
 
 	let checkIns = $state(await getTodayCheckIns());
 	const inside = $derived(checkIns.filter((c) => !c.checkIn.checkedOutAt).length);
@@ -142,6 +163,7 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					r.parqMissing ? 'no health form' : '',
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					r.welcomeBack ? 'welcome back' : '',
@@ -277,6 +299,7 @@
 				r.member.photoDocumentId,
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
+					r.parqMissing ? 'no health form' : '',
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					(r.visitsMonth ?? 0) > 1 ? `${r.visitsMonth} visits this month` : '',
@@ -392,263 +415,293 @@
 		{/if}
 	</header>
 
-	<main class="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 p-6">
-		{#if flash}
-			<div
-				class="flex items-center gap-4 rounded-xl border-2 px-6 py-5 text-xl font-medium {flash.ok
-					? 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-400'
-					: 'border-destructive bg-destructive/10 text-destructive'}"
-			>
-				{#if flash.photo}
-					<img
-						src="/api/documents/{flash.photo}"
-						alt=""
-						class="size-12 shrink-0 rounded-full object-cover"
-					/>
-				{:else if flash.ok}<CircleCheck class="size-8 shrink-0" />{:else}<TriangleAlert
-						class="size-8 shrink-0"
-					/>{/if}
-				<span>
-					{flash.text}
-					{#if flash.note}
-						<span class="ml-2 rounded-md bg-amber-500/25 px-2 py-0.5 text-base font-semibold"
-							>{flash.note}</span
-						>
-					{/if}
-				</span>
-			</div>
-		{/if}
-
-		<form onsubmit={submit} class="space-y-3">
-			<label class="flex items-center gap-2 text-sm font-medium" for="kiosk-code">
-				<QrCode class="size-4" /> Scan a member QR code, or type their name
-			</label>
-			<Input
-				id="kiosk-code"
-				bind:ref={inputEl}
-				bind:value={code}
-				oninput={onInput}
-				placeholder="fw1… or member name"
-				autocomplete="off"
-				class="h-14 font-mono text-xl"
-			/>
-			{#if suggestions.length}
-				<div class="divide-y rounded-lg border">
-					{#each suggestions as m (m.id)}
-						<div class="flex items-center">
-							<button
-								type="button"
-								class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
-								disabled={pending || m.status !== 'active'}
-								onclick={() => checkIn(m.id)}
+	{#if pinLocked}
+		<main class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 p-6">
+			<div class="space-y-4 rounded-xl border p-6 text-center">
+				<p class="text-lg font-semibold">Staff PIN required</p>
+				<p class="text-sm text-muted-foreground">Enter the desk PIN to open the kiosk.</p>
+				<div class="flex justify-center gap-2">
+					{#each { length: settings.kioskPin.length } as _, i (i)}
+						<div
+							class="size-3 rounded-full border {pinInput.length > i
+								? 'bg-foreground'
+								: 'bg-transparent'}"
+						></div>
+					{/each}
+				</div>
+				{#if pinError}<p class="text-sm text-destructive">Wrong PIN — try again.</p>{/if}
+				<div class="mx-auto grid max-w-56 grid-cols-3 gap-2">
+					{#each ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as k (k)}
+						{#if k === ''}
+							<div></div>
+						{:else}
+							<Button variant="outline" class="h-12 text-lg" onclick={() => pinKey(k)}
+								>{k === 'back' ? '←' : k}</Button
 							>
-								<span class="flex min-w-0 items-center gap-3">
-									{#if m.photoDocumentId}
-										<img
-											src="/api/documents/{m.photoDocumentId}"
-											alt=""
-											class="size-9 shrink-0 rounded-full object-cover"
-										/>
-									{:else}
-										<span
-											class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
-											>{initials(m.name)}</span
-										>
-									{/if}
-									<span class="min-w-0">
-										<span class="block truncate font-medium">
-											{m.name}
-											{#if m.planName}
-												<span class="ml-1.5 text-xs font-normal text-muted-foreground"
-													>{m.planName}</span
-												>
-											{/if}
-											{#each m.tags.slice(0, 3) as t (t)}
-												<Badge variant="secondary" class="ml-1 px-1 py-0 text-[10px]">{t}</Badge>
-											{/each}
-										</span>
-										{#if m.deskNote}
-											<span
-												class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
-												>{m.deskNote}</span
-											>
-										{/if}
-										<span class="block truncate text-xs text-muted-foreground"
-											>{m.lastVisit
-												? `last visit ${formatRelative(m.lastVisit)}`
-												: 'no visits yet'}</span
-										>
-									</span>
-								</span>
-								<span class="flex items-center gap-2">
-									{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
-									{#if m.openBalance > 0}
-										<Badge variant="destructive"
-											>owes {formatMoney(m.openBalance, settings.currency)}</Badge
-										>
-									{/if}
-								</span>
-							</button>
-							{#if m.status === 'active'}
+						{/if}
+					{/each}
+				</div>
+			</div>
+		</main>
+	{:else}
+		<main class="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 p-6">
+			{#if flash}
+				<div
+					class="flex items-center gap-4 rounded-xl border-2 px-6 py-5 text-xl font-medium {flash.ok
+						? 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-400'
+						: 'border-destructive bg-destructive/10 text-destructive'}"
+				>
+					{#if flash.photo}
+						<img
+							src="/api/documents/{flash.photo}"
+							alt=""
+							class="size-12 shrink-0 rounded-full object-cover"
+						/>
+					{:else if flash.ok}<CircleCheck class="size-8 shrink-0" />{:else}<TriangleAlert
+							class="size-8 shrink-0"
+						/>{/if}
+					<span>
+						{flash.text}
+						{#if flash.note}
+							<span class="ml-2 rounded-md bg-amber-500/25 px-2 py-0.5 text-base font-semibold"
+								>{flash.note}</span
+							>
+						{/if}
+					</span>
+				</div>
+			{/if}
+
+			<form onsubmit={submit} class="space-y-3">
+				<label class="flex items-center gap-2 text-sm font-medium" for="kiosk-code">
+					<QrCode class="size-4" /> Scan a member QR code, or type their name
+				</label>
+				<Input
+					id="kiosk-code"
+					bind:ref={inputEl}
+					bind:value={code}
+					oninput={onInput}
+					placeholder="fw1… or member name"
+					autocomplete="off"
+					class="h-14 font-mono text-xl"
+				/>
+				{#if suggestions.length}
+					<div class="divide-y rounded-lg border">
+						{#each suggestions as m (m.id)}
+							<div class="flex items-center">
 								<button
 									type="button"
-									class="shrink-0 border-l px-3 text-xs font-medium text-muted-foreground hover:bg-muted"
-									onclick={() => openGuest(m)}>+ Guest</button
+									class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted disabled:opacity-50"
+									disabled={pending || m.status !== 'active'}
+									onclick={() => checkIn(m.id)}
 								>
-							{/if}
-						</div>
-						{#each families[m.id] ?? [] as dep (dep.id)}
+									<span class="flex min-w-0 items-center gap-3">
+										{#if m.photoDocumentId}
+											<img
+												src="/api/documents/{m.photoDocumentId}"
+												alt=""
+												class="size-9 shrink-0 rounded-full object-cover"
+											/>
+										{:else}
+											<span
+												class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+												>{initials(m.name)}</span
+											>
+										{/if}
+										<span class="min-w-0">
+											<span class="block truncate font-medium">
+												{m.name}
+												{#if m.planName}
+													<span class="ml-1.5 text-xs font-normal text-muted-foreground"
+														>{m.planName}</span
+													>
+												{/if}
+												{#each m.tags.slice(0, 3) as t (t)}
+													<Badge variant="secondary" class="ml-1 px-1 py-0 text-[10px]">{t}</Badge>
+												{/each}
+											</span>
+											{#if m.deskNote}
+												<span
+													class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+													>{m.deskNote}</span
+												>
+											{/if}
+											<span class="block truncate text-xs text-muted-foreground"
+												>{m.lastVisit
+													? `last visit ${formatRelative(m.lastVisit)}`
+													: 'no visits yet'}</span
+											>
+										</span>
+									</span>
+									<span class="flex items-center gap-2">
+										{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
+										{#if m.openBalance > 0}
+											<Badge variant="destructive"
+												>owes {formatMoney(m.openBalance, settings.currency)}</Badge
+											>
+										{/if}
+									</span>
+								</button>
+								{#if m.status === 'active'}
+									<button
+										type="button"
+										class="shrink-0 border-l px-3 text-xs font-medium text-muted-foreground hover:bg-muted"
+										onclick={() => openGuest(m)}>+ Guest</button
+									>
+								{/if}
+							</div>
+							{#each families[m.id] ?? [] as dep (dep.id)}
+								<button
+									type="button"
+									class="flex w-full items-center justify-between gap-3 border-l-2 border-primary/30 bg-muted/30 px-4 py-2 text-left hover:bg-muted disabled:opacity-50"
+									disabled={pending || dep.status !== 'active'}
+									onclick={() => checkIn(dep.id)}
+								>
+									<span class="flex min-w-0 items-center gap-3">
+										{#if dep.photoDocumentId}
+											<img
+												src="/api/documents/{dep.photoDocumentId}"
+												alt=""
+												class="size-7 shrink-0 rounded-full object-cover"
+											/>
+										{:else}
+											<span
+												class="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground"
+												>{initials(dep.name)}</span
+											>
+										{/if}
+										<span class="min-w-0">
+											<span class="block truncate text-sm font-medium">
+												{dep.name}
+												<span class="ml-1.5 text-xs font-normal text-muted-foreground">family</span>
+											</span>
+											{#if dep.deskNote}
+												<span
+													class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
+													>{dep.deskNote}</span
+												>
+											{/if}
+										</span>
+									</span>
+									{#if dep.status !== 'active'}
+										<Badge variant="outline">{dep.status}</Badge>
+									{/if}
+								</button>
+							{/each}
+						{/each}
+					</div>
+				{:else if searched}
+					<button
+						type="button"
+						class="flex w-full items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-left hover:bg-muted"
+						onclick={openWalkIn}
+					>
+						<UserPlus class="size-5 shrink-0 text-muted-foreground" />
+						<span class="text-sm"
+							>No member found — <span class="font-medium">register "{code.trim()}"</span> as a walk-in</span
+						>
+					</button>
+				{/if}
+			</form>
+
+			<Button variant="outline" size="sm" class="self-start" onclick={openWalkIn}
+				><UserPlus class="mr-1 h-4 w-4" /> Register walk-in</Button
+			>
+
+			{#if liveLocations.length > 1}
+				<div class="flex items-center gap-3 text-sm">
+					<span class="text-muted-foreground">Location</span>
+					{#each liveLocations as l (l.id)}
+						<Button
+							variant={locationId === l.id ? 'default' : 'outline'}
+							size="sm"
+							onclick={() => (locationId = l.id)}>{l.name}</Button
+						>
+					{/each}
+				</div>
+			{/if}
+
+			{#if upNext.length}
+				<div>
+					<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						Up next
+					</p>
+					<div class="flex flex-wrap gap-2">
+						{#each upNext as s (s.session.id)}
 							<button
 								type="button"
-								class="flex w-full items-center justify-between gap-3 border-l-2 border-primary/30 bg-muted/30 px-4 py-2 text-left hover:bg-muted disabled:opacity-50"
-								disabled={pending || dep.status !== 'active'}
-								onclick={() => checkIn(dep.id)}
+								class="flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-accent"
+								style="border-left: 4px solid {s.color}"
+								onclick={() => openSessionRoster(s)}
 							>
-								<span class="flex min-w-0 items-center gap-3">
-									{#if dep.photoDocumentId}
+								<span class="font-medium tabular-nums">{localTime(s.session.startsAt, tz)}</span>
+								<span>{s.className}</span>
+								<span class="text-muted-foreground">
+									{s.booked}/{s.session.capacity}{#if s.waitlisted > 0}
+										<span class="text-amber-600"> +{s.waitlisted} wait</span>{/if}{s.locationName
+										? ` · ${s.locationName}`
+										: ''}
+								</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			{#if checkIns.length}
+				<div>
+					<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+						Recent check-ins
+					</p>
+					<div class="divide-y rounded-lg border">
+						{#each checkIns.slice(0, 8) as c (c.checkIn.id)}
+							<div class="flex items-center justify-between gap-2 px-4 py-2 text-sm">
+								<span class="flex min-w-0 items-center gap-2">
+									{#if c.memberPhotoId}
 										<img
-											src="/api/documents/{dep.photoDocumentId}"
+											src="/api/documents/{c.memberPhotoId}"
 											alt=""
 											class="size-7 shrink-0 rounded-full object-cover"
 										/>
+									{/if}
+									<span class="truncate"
+										>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span
+									>
+								</span>
+								<span class="flex items-center gap-2 text-muted-foreground">
+									{c.locationName ?? ''}
+									<Badge variant="outline" class="text-xs">{c.checkIn.method}</Badge>
+									<span class="tabular-nums">{localTime(c.checkIn.checkedAt, tz)}</span>
+									{#if c.checkIn.checkedOutAt}
+										<span class="tabular-nums">out {localTime(c.checkIn.checkedOutAt, tz)}</span>
 									{:else}
-										<span
-											class="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground"
-											>{initials(dep.name)}</span
+										<Button
+											variant="ghost"
+											size="sm"
+											class="h-6 px-2 text-xs"
+											onclick={() => checkOutRow(c.checkIn.id)}>Check out</Button
 										>
 									{/if}
-									<span class="min-w-0">
-										<span class="block truncate text-sm font-medium">
-											{dep.name}
-											<span class="ml-1.5 text-xs font-normal text-muted-foreground">family</span>
-										</span>
-										{#if dep.deskNote}
-											<span
-												class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
-												>{dep.deskNote}</span
-											>
-										{/if}
-									</span>
-								</span>
-								{#if dep.status !== 'active'}
-									<Badge variant="outline">{dep.status}</Badge>
-								{/if}
-							</button>
-						{/each}
-					{/each}
-				</div>
-			{:else if searched}
-				<button
-					type="button"
-					class="flex w-full items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-left hover:bg-muted"
-					onclick={openWalkIn}
-				>
-					<UserPlus class="size-5 shrink-0 text-muted-foreground" />
-					<span class="text-sm"
-						>No member found — <span class="font-medium">register "{code.trim()}"</span> as a walk-in</span
-					>
-				</button>
-			{/if}
-		</form>
-
-		<Button variant="outline" size="sm" class="self-start" onclick={openWalkIn}
-			><UserPlus class="mr-1 h-4 w-4" /> Register walk-in</Button
-		>
-
-		{#if liveLocations.length > 1}
-			<div class="flex items-center gap-3 text-sm">
-				<span class="text-muted-foreground">Location</span>
-				{#each liveLocations as l (l.id)}
-					<Button
-						variant={locationId === l.id ? 'default' : 'outline'}
-						size="sm"
-						onclick={() => (locationId = l.id)}>{l.name}</Button
-					>
-				{/each}
-			</div>
-		{/if}
-
-		{#if upNext.length}
-			<div>
-				<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-					Up next
-				</p>
-				<div class="flex flex-wrap gap-2">
-					{#each upNext as s (s.session.id)}
-						<button
-							type="button"
-							class="flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-accent"
-							style="border-left: 4px solid {s.color}"
-							onclick={() => openSessionRoster(s)}
-						>
-							<span class="font-medium tabular-nums">{localTime(s.session.startsAt, tz)}</span>
-							<span>{s.className}</span>
-							<span class="text-muted-foreground">
-								{s.booked}/{s.session.capacity}{#if s.waitlisted > 0}
-									<span class="text-amber-600"> +{s.waitlisted} wait</span>{/if}{s.locationName
-									? ` · ${s.locationName}`
-									: ''}
-							</span>
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		{#if checkIns.length}
-			<div>
-				<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-					Recent check-ins
-				</p>
-				<div class="divide-y rounded-lg border">
-					{#each checkIns.slice(0, 8) as c (c.checkIn.id)}
-						<div class="flex items-center justify-between gap-2 px-4 py-2 text-sm">
-							<span class="flex min-w-0 items-center gap-2">
-								{#if c.memberPhotoId}
-									<img
-										src="/api/documents/{c.memberPhotoId}"
-										alt=""
-										class="size-7 shrink-0 rounded-full object-cover"
-									/>
-								{/if}
-								<span class="truncate"
-									>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span
-								>
-							</span>
-							<span class="flex items-center gap-2 text-muted-foreground">
-								{c.locationName ?? ''}
-								<Badge variant="outline" class="text-xs">{c.checkIn.method}</Badge>
-								<span class="tabular-nums">{localTime(c.checkIn.checkedAt, tz)}</span>
-								{#if c.checkIn.checkedOutAt}
-									<span class="tabular-nums">out {localTime(c.checkIn.checkedOutAt, tz)}</span>
-								{:else}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs"
-										onclick={() => checkOutRow(c.checkIn.id)}>Check out</Button
+										onclick={() => voidRow(c.checkIn.id)}>Void</Button
 									>
-								{/if}
-								<Button
-									variant="ghost"
-									size="sm"
-									class="h-6 px-2 text-xs"
-									onclick={() => voidRow(c.checkIn.id)}>Void</Button
-								>
-							</span>
-						</div>
-					{/each}
+								</span>
+							</div>
+						{/each}
+					</div>
 				</div>
-			</div>
-		{/if}
-		{#if settings.portalNotice}
-			<p
-				class="mx-auto mt-6 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100"
-			>
-				{settings.portalNotice}
-			</p>
-		{/if}
-	</main>
+			{/if}
+			{#if settings.portalNotice}
+				<p
+					class="mx-auto mt-6 max-w-xl rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100"
+				>
+					{settings.portalNotice}
+				</p>
+			{/if}
+		</main>
+	{/if}
 </div>
 
 <Dialog.Root bind:open={walkInOpen}>

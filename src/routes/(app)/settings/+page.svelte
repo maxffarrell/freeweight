@@ -296,6 +296,8 @@
 	// svelte-ignore state_referenced_locally
 	let whiteLabel = $state(settings.whiteLabel);
 	// svelte-ignore state_referenced_locally
+	let kioskPin = $state(settings.kioskPin);
+	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -355,6 +357,7 @@
 				publicPage,
 				staffBriefing,
 				whiteLabel,
+				kioskPin,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -910,6 +913,22 @@
 									</p>
 								</div>
 								<Switch bind:checked={whiteLabel} />
+							</div>
+						{/if}
+						{#if entitlements.kioskPin}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Kiosk PIN</p>
+									<p class="text-xs text-muted-foreground">
+										Require a staff PIN before the front-desk kiosk opens.
+									</p>
+								</div>
+								<Input
+									class="w-28"
+									inputmode="numeric"
+									placeholder="4 digits"
+									bind:value={kioskPin}
+								/>
 							</div>
 						{/if}
 						<Button type="submit" disabled={pending}>Save</Button>

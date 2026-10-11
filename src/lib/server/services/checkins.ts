@@ -34,6 +34,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { healthFormsEnabled } from '../ee/health-forms.ts';
 import {
 	notifyCheckInMilestone,
 	notifyFirstVisit,
@@ -417,6 +418,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				.where(and(eq(waiver.memberId, memberId), eq(waiver.text, st.waiverText)))
 				.limit(1)
 		).length;
+	// Desk heads-up (Enterprise health-forms): PAR-Q not yet signed.
+	const parqMissing = healthFormsEnabled() && !m.parqSignedAt;
 	// Desk heads-up: a suspended membership (dunning or staff action) — the
 	// member can still walk in, staff decide whether to chase the balance.
 	const suspended = !!(
@@ -529,6 +532,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		visitsMonth,
 		visitsToday,
 		waiverMissing,
+		parqMissing,
 		suspended,
 		pendingSigns,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
