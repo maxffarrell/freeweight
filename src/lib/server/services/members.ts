@@ -173,7 +173,9 @@ export async function listMembers(
 	/** Members registered for an upcoming event. */
 	inEvent?: boolean,
 	/** Enterprise health-forms: members without a signed PAR-Q. */
-	noHealthForm?: boolean
+	noHealthForm?: boolean,
+	/** Enterprise custom-fields: member has a value containing `value` on this field. */
+	customField?: { fieldId: string; value: string }
 ) {
 	const [parqS] = await db
 		.select({ parqMonths: gymSettings.parqMonths })
@@ -269,6 +271,9 @@ export async function listMembers(
 				noContact ? and(isNull(gymMember.email), isNull(gymMember.phone)) : undefined,
 				unsubscribed ? isNotNull(gymMember.unsubscribedAt) : undefined,
 				referred ? isNotNull(gymMember.referredByMemberId) : undefined,
+				customField?.value.trim()
+					? sql`exists (select 1 from member_field_value mfv where mfv.member_id = ${gymMember.id} and mfv.field_id = ${customField.fieldId} and mfv.value ilike ${'%' + customField.value.trim() + '%'})`
+					: undefined,
 				neverBooked
 					? sql`not exists (select 1 from booking b where b.member_id = ${gymMember.id})`
 					: undefined,

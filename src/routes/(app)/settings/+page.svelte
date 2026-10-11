@@ -118,12 +118,37 @@
 	const entitlements = $derived(await getEntitlements());
 	let passkeys = $state<{ id: string; name?: string | null }[]>([]);
 	let passkeyBusy = $state(false);
+	let ssoProviders = $state<{ providerId: string; issuer: string; domain: string }[]>([]);
+	let ssoBusy = $state(false);
+	let ssoForm = $state({ providerId: '', domain: '', issuer: '', clientId: '', clientSecret: '' });
+	async function listSsoProviders() {
+		const r = await authClient.sso.providers();
+		const list = Array.isArray(r.data) ? r.data : (r.data?.providers ?? []);
+		if (!r.error) ssoProviders = list;
+	}
+	async function registerSso() {
+		ssoBusy = true;
+		const r = await authClient.sso.register({
+			providerId: ssoForm.providerId.trim(),
+			domain: ssoForm.domain.trim(),
+			issuer: ssoForm.issuer.trim(),
+			oidcConfig: { clientId: ssoForm.clientId.trim(), clientSecret: ssoForm.clientSecret }
+		});
+		if (r.error) toast.error(r.error.message ?? 'SSO provider not created');
+		else {
+			toast.success('SSO provider added');
+			ssoForm = { providerId: '', domain: '', issuer: '', clientId: '', clientSecret: '' };
+			await listSsoProviders();
+		}
+		ssoBusy = false;
+	}
 	async function listPasskeys() {
 		const r = await authClient.passkey.listUserPasskeys();
 		return r?.data ?? [];
 	}
 	$effect(() => {
 		if (entitlements.passkeys) void listPasskeys().then((k) => (passkeys = k));
+		if (entitlements.sso) void listSsoProviders();
 	});
 
 	let exportBusy = $state(false);
@@ -1577,6 +1602,72 @@
 								passkeyBusy = false;
 							}}>{passkeyBusy ? 'Working…' : 'Add passkey'}</Button
 						>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
+			{#if entitlements.sso}
+				<Card.Root>
+					<Card.Header class="pb-2">
+						<Card.Title class="text-base">Single sign-on (SSO)</Card.Title>
+						<Card.Description>
+							OIDC providers for staff sign-in — members log in on the gym's page, not here.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-3">
+						{#each ssoProviders as p (p.providerId)}
+							<div class="flex items-center justify-between gap-3 text-sm">
+								<div class="min-w-0">
+									<p class="truncate font-medium">{p.domain}</p>
+									<p class="truncate text-xs text-muted-foreground">
+										{p.providerId} — {p.issuer}
+									</p>
+								</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={async () => {
+										const r = await authClient.sso.deleteProvider({
+											providerId: p.providerId
+										});
+										if (r.error) toast.error(r.error.message ?? 'Delete failed');
+										else ssoProviders = ssoProviders.filter((x) => x.providerId !== p.providerId);
+									}}>Remove</Button
+								>
+							</div>
+						{:else}
+							<p class="text-sm text-muted-foreground">No SSO providers configured.</p>
+						{/each}
+						<div class="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+							<Input placeholder="Provider ID (e.g. okta)" bind:value={ssoForm.providerId} />
+							<Input placeholder="Email domain (e.g. acme.com)" bind:value={ssoForm.domain} />
+							<Input
+								class="sm:col-span-2"
+								placeholder="Issuer URL (https://…)"
+								bind:value={ssoForm.issuer}
+							/>
+							<Input placeholder="Client ID" bind:value={ssoForm.clientId} />
+							<Input
+								type="password"
+								placeholder="Client secret"
+								bind:value={ssoForm.clientSecret}
+							/>
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={ssoBusy ||
+								!ssoForm.providerId.trim() ||
+								!ssoForm.domain.trim() ||
+								!ssoForm.issuer.trim() ||
+								!ssoForm.clientId.trim() ||
+								!ssoForm.clientSecret}
+							onclick={registerSso}>{ssoBusy ? 'Adding…' : 'Add provider'}</Button
+						>
+						<p class="text-xs text-muted-foreground">
+							Staff sign in from the login page with their work email — the provider handles
+							passwords and MFA.
+						</p>
 					</Card.Content>
 				</Card.Root>
 			{/if}

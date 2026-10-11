@@ -117,7 +117,8 @@ export const getMembers = query(
 			bookedToday: v.optional(v.boolean()),
 			hasIssue: v.optional(v.boolean()),
 			inEvent: v.optional(v.boolean()),
-			noHealthForm: v.optional(v.boolean())
+			noHealthForm: v.optional(v.boolean()),
+			customField: v.optional(v.object({ fieldId: v.string(), value: v.string() }))
 		})
 	),
 	async (opts) =>
@@ -171,7 +172,8 @@ export const getMembers = query(
 			opts?.bookedToday,
 			opts?.hasIssue,
 			opts?.inEvent,
-			opts?.noHealthForm
+			opts?.noHealthForm,
+			opts?.customField
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
