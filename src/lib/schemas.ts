@@ -547,6 +547,7 @@ export const settingsInput = v.object({
 	doorWebhookUrl: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 	anonymizeMonths: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120))),
 	exportWebhookUrl: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+	digestRecipients: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
 	brandColor: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(9))),
 	parqMonths: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120))),
 	healthQuestions: v.optional(v.pipe(v.string(), v.maxLength(2000))),

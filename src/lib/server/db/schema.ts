@@ -129,6 +129,8 @@ export const gymSettings = pgTable('gym_settings', {
 	anonymizeMonths: integer('anonymize_months').notNull().default(0),
 	/** Enterprise audit-export: POST the full org export JSON to this URL weekly. */
 	exportWebhookUrl: text('export_webhook_url').notNull().default(''),
+	/** Enterprise report-digests: extra comma-separated recipients beyond owner/admin. */
+	digestRecipients: text('digest_recipients').notNull().default(''),
 	/** Enterprise white-label: brand accent color (hex) on public/portal pages. */
 	brandColor: text('brand_color').notNull().default(''),
 	/** Enterprise health-forms: re-screen members after this many months (0 = never expires). */
