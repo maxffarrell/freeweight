@@ -7,6 +7,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { toast } from 'svelte-sonner';
 	import { emailAllMembers } from '#lib/remote/members.remote.ts';
@@ -122,28 +123,51 @@
 	}
 	let payFrom = $state('');
 	let payTo = $state('');
+	let payFormat = $state<'default' | 'gusto'>('default');
 	async function exportFullPayroll() {
 		try {
 			const res = await getPayrollExport({
 				from: payFrom || undefined,
-				to: payTo || undefined
+				to: payTo || undefined,
+				format: payFormat
 			});
 			if (!res.licensed || !res.data) {
 				toast.error('Payroll export is an Enterprise feature');
 				return;
 			}
-			const csv = toCsv([
-				['Employee', 'Email', 'Classes taught', 'Class pay', 'Desk hours', 'Hourly pay', 'Gross'],
-				...res.data.rows.map((d) => [
-					d.employee,
-					d.email,
-					d.classes,
-					(d.classPay / 100).toFixed(2),
-					d.hours,
-					(d.hourlyPay / 100).toFixed(2),
-					(d.gross / 100).toFixed(2)
-				])
-			]);
+			const csv =
+				res.data.format === 'gusto'
+					? toCsv([
+							['first_name', 'last_name', 'email', 'payment_date', 'payment_amount', 'memo'],
+							...res.data.rows.map((d) => [
+								d.first_name,
+								d.last_name,
+								d.email,
+								d.payment_date,
+								d.payment_amount,
+								d.memo
+							])
+						])
+					: toCsv([
+							[
+								'Employee',
+								'Email',
+								'Classes taught',
+								'Class pay',
+								'Desk hours',
+								'Hourly pay',
+								'Gross'
+							],
+							...res.data.rows.map((d) => [
+								d.employee,
+								d.email,
+								d.classes,
+								(d.classPay / 100).toFixed(2),
+								d.hours,
+								(d.hourlyPay / 100).toFixed(2),
+								(d.gross / 100).toFixed(2)
+							])
+						]);
 			const a = document.createElement('a');
 			a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
 			a.download = `payroll-${res.data.month}.csv`;
@@ -1811,6 +1835,10 @@
 				{#if entitlements.payrollExport}
 					<Input type="date" class="h-7 w-32 text-xs" bind:value={payFrom} aria-label="From" />
 					<Input type="date" class="h-7 w-32 text-xs" bind:value={payTo} aria-label="To" />
+					<NativeSelect class="h-7 w-28 text-xs" bind:value={payFormat} aria-label="Format">
+						<option value="default">Standard</option>
+						<option value="gusto">Gusto</option>
+					</NativeSelect>
 					<Button variant="ghost" size="sm" onclick={exportFullPayroll}>
 						<Download class="size-3.5" /> Payroll export
 					</Button>

@@ -57,6 +57,7 @@ import {
 	personalRecord
 } from '#lib/server/db/schema.ts';
 import { emit } from './events.ts';
+import { isEnterpriseEnabled } from '../ee/license.ts';
 import { appOrigin, emailProvider, sendEmail } from '#lib/server/email.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import type { Email } from '#lib/server/email.ts';
@@ -73,14 +74,18 @@ async function orgBrand(orgId: string) {
 			.where(eq(organization.id, orgId))
 			.limit(1),
 		db
-			.select({ logoDocumentId: gymSettings.logoDocumentId })
+			.select({
+				logoDocumentId: gymSettings.logoDocumentId,
+				whiteLabel: gymSettings.whiteLabel
+			})
 			.from(gymSettings)
 			.where(eq(gymSettings.organizationId, orgId))
 			.limit(1)
 	]);
 	return {
 		orgName: o[0]?.name ?? 'your gym',
-		logoUrl: s[0]?.logoDocumentId ? `${appOrigin()}/api/logo/${s[0].logoDocumentId}` : undefined
+		logoUrl: s[0]?.logoDocumentId ? `${appOrigin()}/api/logo/${s[0].logoDocumentId}` : undefined,
+		whiteLabel: !!(s[0]?.whiteLabel && isEnterpriseEnabled())
 	};
 }
 

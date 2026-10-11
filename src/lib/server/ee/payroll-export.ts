@@ -19,7 +19,7 @@ export function requirePayrollExport() {
  * Payroll-provider-style pay run for the current month: instructor per-class
  * pay plus front-desk clocked hours at their hourly rate.
  */
-export async function exportPayroll(orgId: string, from?: string, to?: string) {
+export async function exportPayroll(orgId: string, from?: string, to?: string, format?: string) {
 	const start = new Date(from ?? `${new Date().toISOString().slice(0, 7)}-01T00:00:00Z`);
 	// `to` is an inclusive YYYY-MM-DD pick — bump a day for the exclusive bound.
 	const end = to ? new Date(new Date(`${to}T00:00:00Z`).getTime() + 86400_000) : new Date();
@@ -107,7 +107,26 @@ export async function exportPayroll(orgId: string, from?: string, to?: string) {
 		byMember.set(r.memberId, row);
 	}
 	const rows = [...byMember.values()].map((r) => ({ ...r, gross: r.classPay + r.hourlyPay }));
+	if (format === 'gusto') {
+		// Gusto contractor-payment import: one earnings line per staff member.
+		return {
+			month: from
+				? `${from.slice(0, 10)}_to_${(to ?? new Date().toISOString()).slice(0, 10)}`
+				: new Date().toISOString().slice(0, 7),
+			format: 'gusto' as const,
+			rows: rows.map((r) => ({
+				first_name: r.employee.split(' ')[0] ?? '',
+				last_name: r.employee.split(' ').slice(1).join(' ') || '-',
+				email: r.email,
+				payment_date: (to ?? new Date().toISOString()).slice(0, 10),
+				payment_amount: (r.gross / 100).toFixed(2),
+				memo: `classes ${r.classes} / hours ${r.hours}`
+			})),
+			total: rows.reduce((a, r) => a + r.gross, 0)
+		};
+	}
 	return {
+		format: 'default' as const,
 		month: from
 			? `${from.slice(0, 10)}_to_${(to ?? new Date().toISOString()).slice(0, 10)}`
 			: new Date().toISOString().slice(0, 7),
