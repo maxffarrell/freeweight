@@ -305,6 +305,9 @@
 	// svelte-ignore state_referenced_locally
 	let retentionDays = $state(settings.retentionDays);
 	let doorWebhookUrl = $state(settings.doorWebhookUrl);
+	let anonymizeMonths = $state(settings.anonymizeMonths);
+	let exportWebhookUrl = $state(settings.exportWebhookUrl);
+	let brandColor = $state(settings.brandColor);
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
 	// svelte-ignore state_referenced_locally
@@ -370,6 +373,9 @@
 				kioskPin,
 				retentionDays,
 				doorWebhookUrl,
+				anonymizeMonths,
+				exportWebhookUrl,
+				brandColor,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -953,6 +959,15 @@
 								</div>
 								<Input class="w-28" type="number" min="0" max="3650" bind:value={retentionDays} />
 							</div>
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Auto-anonymize after</p>
+									<p class="text-xs text-muted-foreground">
+										Nightly sweep scrubs members inactive this many months. 0 = manual only.
+									</p>
+								</div>
+								<Input class="w-28" type="number" min="0" max="120" bind:value={anonymizeMonths} />
+							</div>
 						{/if}
 						{#if entitlements.dataRetention}
 							<div class="flex items-center justify-between gap-4">
@@ -1009,6 +1024,28 @@
 										}}>Test</Button
 									>
 								</div>
+							</div>
+						{/if}
+						{#if entitlements.auditExport}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Weekly export webhook</p>
+									<p class="text-xs text-muted-foreground">
+										POST the full org data export (JSON, signed) here every Monday.
+									</p>
+								</div>
+								<Input class="w-56" placeholder="https://…" bind:value={exportWebhookUrl} />
+							</div>
+						{/if}
+						{#if entitlements.whiteLabel}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Brand color</p>
+									<p class="text-xs text-muted-foreground">
+										Accent color on the join page and member portal (hex, blank = default).
+									</p>
+								</div>
+								<Input class="w-28" placeholder="#0ea5e9" bind:value={brandColor} />
 							</div>
 						{/if}
 						<Button type="submit" disabled={pending}>Save</Button>

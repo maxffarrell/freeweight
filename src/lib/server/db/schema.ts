@@ -123,6 +123,12 @@ export const gymSettings = pgTable('gym_settings', {
 	retentionDays: integer('retention_days').notNull().default(0),
 	/** Enterprise door-access: POST a signed check-in event to this URL (door systems). */
 	doorWebhookUrl: text('door_webhook_url').notNull().default(''),
+	/** Enterprise data-retention: auto-anonymize members inactive this many months (0 = manual). */
+	anonymizeMonths: integer('anonymize_months').notNull().default(0),
+	/** Enterprise audit-export: POST the full org export JSON to this URL weekly. */
+	exportWebhookUrl: text('export_webhook_url').notNull().default(''),
+	/** Enterprise white-label: brand accent color (hex) on public/portal pages. */
+	brandColor: text('brand_color').notNull().default(''),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

@@ -1834,7 +1834,10 @@ export async function requestDataDeletion(orgId: string, memberId: string) {
  * manual). Scrubs name/contact/profile fields — bookings, charges and payments
  * keep pointing at the row so financial history stays intact.
  */
-export async function anonymizeMember(ctx: OrgContext, memberId: string) {
+export async function anonymizeMember(
+	ctx: { orgId: string; userId: string | null },
+	memberId: string
+) {
 	const [m] = await db
 		.select({ id: gymMember.id, name: gymMember.name })
 		.from(gymMember)

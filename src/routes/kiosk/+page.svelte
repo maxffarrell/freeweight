@@ -22,7 +22,7 @@
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getEntitlements } from '#lib/remote/ee.remote.ts';
-	import { errMsg, formatMoney, formatRelative } from '#lib/format.ts';
+	import { contrastText, errMsg, formatMoney, formatRelative } from '#lib/format.ts';
 	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
 	import LogOut from '@lucide/svelte/icons/log-out';
@@ -354,7 +354,12 @@
 	}
 </script>
 
-<div class="flex min-h-svh flex-col bg-background">
+<div
+	class="flex min-h-svh flex-col bg-background"
+	style={entitlements?.brandColor
+		? `--primary:${entitlements.brandColor};--primary-foreground:${contrastText(entitlements.brandColor)}`
+		: ''}
+>
 	<header class="flex items-center justify-between gap-4 border-b px-6 py-4">
 		<div class="flex items-center gap-3">
 			{#if settings.logoDocumentId}

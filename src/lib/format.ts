@@ -121,3 +121,12 @@ export function loyaltyTier(visits: number): { name: string; className: string }
 	if (visits >= 25) return { name: 'Bronze', className: 'bg-orange-100 text-orange-800' };
 	return null;
 }
+
+/** Readable text color (near-white or near-black) to sit on a hex accent. */
+export function contrastText(hex: string): string {
+	const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+	if (!m) return '#fff';
+	const n = parseInt(m[1]!, 16);
+	const luma = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+	return luma > 0.55 ? '#1c1917' : '#fafaf9';
+}
