@@ -4,6 +4,8 @@ import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
 import {
+	booking,
+	classSession,
 	classType,
 	classWatch,
 	document,
@@ -11,6 +13,7 @@ import {
 	gymSettings,
 	membership,
 	outer,
+	personalRecord,
 	plan
 } from '#lib/server/db/schema.ts';
 import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
@@ -46,7 +49,7 @@ import {
 	submitParq as hfSubmit
 } from '#lib/server/ee/health-forms.ts';
 import { memberFieldValues, setMyFieldValue } from '#lib/server/ee/custom-fields.ts';
-import { workoutPlan } from '#lib/server/ee/ai-features.ts';
+import { memberMonthSummary, workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -755,6 +758,58 @@ export const aiWorkoutPlan = command(
 		});
 	}
 );
+
+/** Member's AI "your month" recap — visits, top class, streak, PRs → 2-3 sentences. */
+export const aiMonthSummary = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	requireAi();
+	const [s] = await db
+		.select({ tz: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, m.organizationId))
+		.limit(1);
+	const since = new Date(Date.now() - 30 * 86400_000);
+	const [attendance, classes, prs] = await Promise.all([
+		svc.attendanceStats(m.organizationId, memberId, s?.tz ?? 'UTC'),
+		db
+			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(booking.organizationId, m.organizationId),
+					eq(booking.memberId, memberId),
+					eq(booking.status, 'attended'),
+					sql`${classSession.startsAt} >= ${since}`
+				)
+			)
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(personalRecord)
+			.where(
+				and(
+					eq(personalRecord.organizationId, m.organizationId),
+					eq(personalRecord.memberId, memberId),
+					sql`${personalRecord.createdAt} >= ${since}`
+				)
+			)
+	]);
+	const top = classes[0];
+	const summary = await memberMonthSummary(m.organizationId, {
+		memberName: m.name,
+		visits30: attendance.visitsThisMonth,
+		totalVisits: attendance.totalVisits,
+		topClass: top?.name ?? null,
+		topClassCount: top?.n ?? 0,
+		classesBooked30: classes.reduce((a, c) => a + c.n, 0),
+		prs30: prs[0]?.n ?? 0,
+		streakWeeks: attendance.weekStreak
+	});
+	return { summary };
+});
 
 /** Whether the portal workout-plan generator is on (Enterprise + provider configured). */
 export const getPortalAi = query(async () => {

@@ -1,7 +1,7 @@
 /* @license Enterprise */
 
 import { error } from '@sveltejs/kit';
-import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { orgBrand } from '../org-brand.ts';
 import { activity, gymMember, gymSettings, notificationLog } from '#lib/server/db/schema.ts';
@@ -85,12 +85,57 @@ export async function submitParq(
  */
 export async function sendParqReminders(orgId: string): Promise<number> {
 	if (!healthFormsEnabled()) return 0;
+	// Never-signed members get a one-time nudge (runs regardless of the
+	// expiry window) — joined >3 days ago so a same-day signup isn't nagged.
+	const unsigned = await db
+		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				eq(gymMember.status, 'active'),
+				isNotNull(gymMember.email),
+				isNull(gymMember.parqSignedAt),
+				lt(gymMember.joinedAt, new Date(Date.now() - 3 * 86400_000).toISOString())
+			)
+		)
+		.limit(500);
+	let unsignedSent = 0;
+	if (unsigned.length) {
+		const uBrand = await orgBrand(orgId);
+		for (const m of unsigned) {
+			const [row] = await db
+				.insert(notificationLog)
+				.values({
+					organizationId: orgId,
+					kind: 'parq_unsigned',
+					entityId: m.id,
+					recipient: m.email!
+				})
+				.onConflictDoNothing()
+				.returning({ id: notificationLog.id });
+			if (!row) continue;
+			await sendEmail({
+				to: m.email!,
+				subject: `${uBrand.orgName} — quick health questionnaire`,
+				...renderEmail({
+					...uBrand,
+					heading: 'Please sign your health questionnaire',
+					lines: [
+						`Hi ${m.name.split(' ')[0]},`,
+						'Before your first class we need a signed health questionnaire (PAR-Q) on file — it takes about a minute in the member portal.'
+					]
+				})
+			});
+			unsignedSent++;
+		}
+	}
 	const [s] = await db
 		.select({ months: gymSettings.parqMonths })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
-	if (!s?.months) return 0;
+	if (!s?.months) return unsignedSent;
 	const warnFrom = new Date(Date.now() - (s.months * 30.4 - 14) * 86400_000);
 	const members = await db
 		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
@@ -134,7 +179,7 @@ export async function sendParqReminders(orgId: string): Promise<number> {
 		});
 		sent++;
 	}
-	return sent;
+	return sent + unsignedSent;
 }
 
 /** Staff alert when a signed PAR-Q carries a yes-answer. */

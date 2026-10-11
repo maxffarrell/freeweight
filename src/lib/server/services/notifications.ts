@@ -65,6 +65,7 @@ import { formatDate, formatMoney } from '#lib/format.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { addDays, localDate, localMinutes, localTime, localWeekday, zonedToUtc } from '#lib/tz.ts';
 import { entryProgress } from './challenges.ts';
+import { memberFieldMap, customFieldsEnabled } from '../ee/custom-fields.ts';
 
 async function orgTimezone(orgId: string) {
 	const [s] = await db
@@ -1703,13 +1704,27 @@ export async function requestAllPaymentNotices(orgId: string) {
 }
 
 /** Replaces {name}, {first_name}, {gym} and {date} merge tags in an announcement draft. */
-export function mergeTags(t: string, memberName: string, orgName = '', today = '') {
+/** {field:Label} pulls the member's custom-field value (Enterprise). */
+export function mergeTags(
+	t: string,
+	memberName: string,
+	orgName = '',
+	today = '',
+	fields?: Record<string, string>
+) {
 	const first = memberName.trim().split(/\s+/)[0] ?? memberName;
-	return t
+	let out = t
 		.replaceAll('{first_name}', first)
 		.replaceAll('{name}', memberName)
 		.replaceAll('{gym}', orgName)
 		.replaceAll('{date}', today);
+	if (fields) {
+		out = out.replace(/\{field:([^}]+)\}/gi, (_, label: string) => {
+			const k = Object.keys(fields).find((f) => f.toLowerCase() === label.trim().toLowerCase());
+			return k ? fields[k] : '';
+		});
+	}
+	return out;
 }
 
 /** Sends one preview of the draft announcement to the staff user composing it. */
@@ -1799,12 +1814,33 @@ export async function sendAnnouncement(
 	// {name} / {first_name} merge tags personalize per member; without them
 	// the body renders once and is shared.
 	const personalized = subject.includes('{') || message.includes('{');
+	// {field:Label} tags resolve per member from custom-field values.
+	const fieldsByMember = customFieldsEnabled()
+		? await memberFieldMap(
+				orgId,
+				members.map((mm) => mm.id)
+			)
+		: null;
 	const today2 = new Date().toISOString().slice(0, 10);
-	const render = (memberName: string) =>
+	const render = (memberName: string, memberId?: string) =>
 		renderEmail({
 			...name,
-			heading: mergeTags(subject, memberName, name.orgName, today2),
-			lines: mergeTags(message, memberName, name.orgName, today2).split(/\n+/).filter(Boolean),
+			heading: mergeTags(
+				subject,
+				memberName,
+				name.orgName,
+				today2,
+				memberId ? fieldsByMember?.get(memberId) : undefined
+			),
+			lines: mergeTags(
+				message,
+				memberName,
+				name.orgName,
+				today2,
+				memberId ? fieldsByMember?.get(memberId) : undefined
+			)
+				.split(/\n+/)
+				.filter(Boolean),
 			action: { label: 'Open the member portal', url: `${appOrigin()}/portal` }
 		});
 	const shared = personalized ? null : render('');
@@ -1813,10 +1849,10 @@ export async function sendAnnouncement(
 		if (!m.email) continue;
 		const logId = await logOnce(orgId, 'announcement', entityId, m.email);
 		if (!logId) continue;
-		const { text, html } = personalized ? render(m.name) : shared!;
+		const { text, html } = personalized ? render(m.name, m.id) : shared!;
 		await sendMemberEmail(m.id, {
 			to: m.email,
-			subject: `${name.orgName}: ${mergeTags(subject, m.name, name.orgName, today2)}`,
+			subject: `${name.orgName}: ${mergeTags(subject, m.name, name.orgName, today2, fieldsByMember?.get(m.id))}`,
 			text,
 			html: html + openPixel(logId)
 		});

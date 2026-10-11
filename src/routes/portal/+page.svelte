@@ -79,6 +79,7 @@
 		bookMakeup,
 		addDependent,
 		getPortalAi,
+		aiMonthSummary,
 		aiWorkoutPlan,
 		redeemGiftCard,
 		rateSession,
@@ -431,6 +432,18 @@
 	let wpMinutes = $state(45);
 	let wpNotes = $state('');
 	let wpPending = $state(false);
+	let monthSummary = $state<string | null>(null);
+	let monthBusy = $state(false);
+	async function summarizeMonth() {
+		monthBusy = true;
+		try {
+			const r = await aiMonthSummary(memberId);
+			monthSummary = r.summary;
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not summarize'));
+		}
+		monthBusy = false;
+	}
 	let wpResult = $state<{ title: string; plan: string } | null>(null);
 	async function submitWorkoutPlan(e: SubmitEvent) {
 		e.preventDefault();
@@ -2538,6 +2551,20 @@
 							><Sparkles /> Generate my plan</Button
 						>
 					{/if}
+					<div class="mt-4 border-t pt-3">
+						{#if monthSummary}
+							<p class="text-xs font-medium">Your month, summarized</p>
+							<p class="mt-1 text-sm text-muted-foreground">{monthSummary}</p>
+						{:else}
+							<Button
+								size="sm"
+								variant="ghost"
+								class="h-7 px-2 text-xs"
+								disabled={monthBusy}
+								onclick={summarizeMonth}>{monthBusy ? 'Summarizing…' : 'Summarize my month'}</Button
+							>
+						{/if}
+					</div>
 				</Card.Content>
 			</Card.Root>
 		{/if}
