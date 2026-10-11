@@ -439,7 +439,11 @@ export async function portalOverview(memberId: string) {
 				})
 				.from(classType)
 				.where(
-					and(eq(plan.organizationId, orgId), eq(plan.active, true), gt(classType.dropInPrice, 0))
+					and(
+						eq(classType.organizationId, orgId),
+						eq(classType.active, true),
+						gt(classType.dropInPrice, 0)
+					)
 				);
 			const [cheapest] = await db
 				.select({ name: plan.name, amount: plan.amount, interval: plan.interval })

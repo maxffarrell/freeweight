@@ -770,7 +770,9 @@
 																									? 'Pack expiring'
 																									: owesFilter === '__comped'
 																										? "Comp'd"
-																										: 'Any balance'}</Select.Trigger
+																										: owesFilter === '__nohealth'
+																											? 'No health form'
+																											: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>

@@ -2088,6 +2088,51 @@
 		</Card.Root>
 	{/if}
 
+	{#if parq.licensed}
+		<Card.Root>
+			<Card.Header class="pb-2">
+				<Card.Title class="text-base">Health questionnaire</Card.Title>
+				<Card.Description>
+					{parq.signedAt
+						? `Signed ${formatDate(parq.signedAt)}`
+						: 'PAR-Q — required before training'}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				{#if parq.signedAt && !parqReopen}
+					<p class="text-sm text-muted-foreground">
+						Your answers are on file. Tell the front desk if your health changes.
+					</p>
+					<Button class="mt-3" size="sm" variant="outline" onclick={() => (parqReopen = true)}
+						>Update answers</Button
+					>
+				{:else}
+					<div class="space-y-2 text-sm">
+						{#each parq.questions as q, i (i)}
+							<label class="flex items-start gap-2">
+								<Checkbox
+									checked={parqAnswers[String(i)] === true}
+									onCheckedChange={(v) => (parqAnswers[String(i)] = v === true)}
+								/>
+								<span class="leading-snug">{q}</span>
+							</label>
+						{/each}
+					</div>
+					<p class="mt-3 text-xs text-muted-foreground">
+						If you answered yes to any question, talk to staff before training. Your answers are
+						saved to your record.
+					</p>
+					<Button
+						class="mt-3"
+						size="sm"
+						disabled={parqBusy || parq.questions.some((_, i) => parqAnswers[String(i)] == null)}
+						onclick={signParq}>{parqBusy ? 'Saving…' : 'Sign and save'}</Button
+					>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	{#if news.length}
 		<Card.Root class="md:col-span-2">
 			<Card.Header>
@@ -2130,51 +2175,6 @@
 				{/if}
 			</Card.Content>
 		</Card.Root>
-
-		{#if parq.licensed}
-			<Card.Root>
-				<Card.Header class="pb-2">
-					<Card.Title class="text-base">Health questionnaire</Card.Title>
-					<Card.Description>
-						{parq.signedAt
-							? `Signed ${formatDate(parq.signedAt)}`
-							: 'PAR-Q — required before training'}
-					</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					{#if parq.signedAt && !parqReopen}
-						<p class="text-sm text-muted-foreground">
-							Your answers are on file. Tell the front desk if your health changes.
-						</p>
-						<Button class="mt-3" size="sm" variant="outline" onclick={() => (parqReopen = true)}
-							>Update answers</Button
-						>
-					{:else}
-						<div class="space-y-2 text-sm">
-							{#each parq.questions as q, i (i)}
-								<label class="flex items-start gap-2">
-									<Checkbox
-										checked={parqAnswers[String(i)] === true}
-										onCheckedChange={(v) => (parqAnswers[String(i)] = v === true)}
-									/>
-									<span class="leading-snug">{q}</span>
-								</label>
-							{/each}
-						</div>
-						<p class="mt-3 text-xs text-muted-foreground">
-							If you answered yes to any question, talk to staff before training. Your answers are
-							saved to your record.
-						</p>
-						<Button
-							class="mt-3"
-							size="sm"
-							disabled={parqBusy || parq.questions.some((_, i) => parqAnswers[String(i)] == null)}
-							onclick={signParq}>{parqBusy ? 'Saving…' : 'Sign and save'}</Button
-						>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-		{/if}
 
 		<Card.Root class="sm:col-span-2">
 			<Card.Header class="pb-2">
