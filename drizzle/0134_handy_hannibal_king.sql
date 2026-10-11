@@ -1,0 +1,1 @@
+ALTER TABLE "gym_member" ADD COLUMN "retention_exempt" boolean DEFAULT false NOT NULL;

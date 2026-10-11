@@ -114,6 +114,15 @@
 	const joinInfo = await getJoinInfo();
 	const memberFields = $derived(await getMemberFields());
 	const entitlements = $derived(await getEntitlements());
+	let passkeys = $state<{ id: string; name?: string | null }[]>([]);
+	let passkeyBusy = $state(false);
+	async function listPasskeys() {
+		const r = await authClient.passkey.listUserPasskeys();
+		return r?.data ?? [];
+	}
+	$effect(() => {
+		if (entitlements.passkeys) void listPasskeys().then((k) => (passkeys = k));
+	});
 
 	let exportBusy = $state(false);
 	async function exportOrgData() {
@@ -1472,6 +1481,48 @@
 					</form>
 				</Card.Content>
 			</Card.Root>
+			{#if entitlements.passkeys}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-base">Passkeys</Card.Title>
+						<Card.Description
+							>Your sign-in passkeys — fingerprint/face unlock on this device.</Card.Description
+						>
+					</Card.Header>
+					<Card.Content class="space-y-2">
+						{#each passkeys as k (k.id)}
+							<div class="flex items-center justify-between gap-2 text-sm">
+								<span>{k.name || 'Passkey'}</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={async () => {
+										await authClient.passkey.deletePasskey({ id: k.id });
+										passkeys = passkeys.filter((x) => x.id !== k.id);
+									}}>Remove</Button
+								>
+							</div>
+						{:else}
+							<p class="text-sm text-muted-foreground">No passkeys on this account yet.</p>
+						{/each}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={passkeyBusy}
+							onclick={async () => {
+								passkeyBusy = true;
+								const name = window.prompt('Name this passkey', 'This device');
+								if (name) {
+									const res = await authClient.passkey.addPasskey({ name });
+									if (res?.error) toast.error(res.error.message ?? 'Passkey not created');
+									else passkeys = await listPasskeys();
+								}
+								passkeyBusy = false;
+							}}>{passkeyBusy ? 'Working…' : 'Add passkey'}</Button
+						>
+					</Card.Content>
+				</Card.Root>
+			{/if}
 		</Tabs.Content>
 
 		<Tabs.Content value="payments">

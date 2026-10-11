@@ -1,11 +1,13 @@
 import { query } from '$app/server';
 import { getRequestEvent } from '$app/server';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
-import { activity, gymSettings } from '#lib/server/db/schema.ts';
+import { activity, gymMember, gymSettings } from '#lib/server/db/schema.ts';
 import { user } from '#lib/server/db/auth.schema.ts';
 import { toCsv } from '#lib/csv.ts';
+import { idSchema } from '#lib/schemas.ts';
+import { error } from '@sveltejs/kit';
 import { requireOrg } from '#lib/server/context.ts';
 import {
 	auditExportEnabled,
@@ -46,6 +48,8 @@ export const getEntitlements = query(async () => {
 		if (s?.whiteLabel) brandColor = s.brandColor;
 	}
 	return {
+		sso: hasFeature('sso'),
+		passkeys: hasFeature('passkeys'),
 		customFields: customFieldsEnabled(),
 		whiteLabel: hasFeature('white-label'),
 		auditExport: auditExportEnabled(),
@@ -219,3 +223,19 @@ export const exportAuditLog = query(async () => {
 	]);
 	return { csv, count: rows.length, truncated: rows.length === 20_000 };
 });
+
+/** Keep a member out of the anonymize sweep — litigation/legal hold. */
+export const setRetentionExempt = command(
+	v.object({ memberId: idSchema, exempt: v.boolean() }),
+	async ({ memberId, exempt }) => {
+		const { orgId } = await requireOrg('admin');
+		requireDataRetention();
+		const [row] = await db
+			.update(gymMember)
+			.set({ retentionExempt: exempt })
+			.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+			.returning({ id: gymMember.id });
+		if (!row) error(404, 'Member not found');
+		return { ok: true };
+	}
+);

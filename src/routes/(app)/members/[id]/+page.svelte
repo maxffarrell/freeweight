@@ -106,7 +106,11 @@
 		aiGenerateProgram,
 		getAiStatus
 	} from '#lib/remote/ai.remote.ts';
-	import { getEntitlements, getMemberDataExport } from '#lib/remote/ee.remote.ts';
+	import {
+		getEntitlements,
+		getMemberDataExport,
+		setRetentionExempt
+	} from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
@@ -1063,6 +1067,29 @@
 				{/if}
 				{#if ai.licensed && ai.configured}
 					<DropdownMenu.Item onclick={runAiSummary}>AI progress summary</DropdownMenu.Item>
+				{/if}
+				{#if entitlements.dataRetention}
+					<DropdownMenu.Item
+						onclick={async () => {
+							try {
+								await setRetentionExempt({
+									memberId: m.member.id,
+									exempt: !m.member.retentionExempt
+								});
+								m.member.retentionExempt = !m.member.retentionExempt;
+								toast.success(
+									m.member.retentionExempt
+										? 'Exempt from anonymize sweeps'
+										: 'Retention exemption removed'
+								);
+							} catch (err) {
+								toast.error(errMsg(err, 'Could not update'));
+							}
+						}}
+						>{m.member.retentionExempt
+							? 'Remove retention exemption'
+							: 'Exempt from retention sweeps'}</DropdownMenu.Item
+					>
 				{/if}
 				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive"
 					>Anonymize personal data…</DropdownMenu.Item
