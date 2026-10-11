@@ -548,6 +548,7 @@ export const settingsInput = v.object({
 	brandColor: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(9))),
 	parqMonths: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(120))),
 	healthQuestions: v.optional(v.pipe(v.string(), v.maxLength(2000))),
+	healthFormsRequired: v.optional(v.boolean()),
 	/** Comp classes granted on each member's birthday; null/0 = off. */
 	birthdayCompCredits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))

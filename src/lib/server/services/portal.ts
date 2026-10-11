@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
+import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
@@ -795,6 +796,32 @@ const memberCtx = (orgId: string, userId: string) => ({
 	org: { id: orgId, name: '', slug: '', logo: null }
 });
 
+/**
+ * Enterprise health-forms: when the gym requires a signed health form, members
+ * can't self-book until their PAR-Q is signed and unexpired. Staff-side
+ * booking is unaffected — the desk can still place anyone on a roster.
+ */
+async function assertHealthFormSigned(orgId: string, memberId: string) {
+	if (!healthFormsEnabled()) return;
+	const [st] = await db
+		.select({ required: gymSettings.healthFormsRequired, months: gymSettings.parqMonths })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	if (!st?.required) return;
+	const [m] = await db
+		.select({ parqSignedAt: gymMember.parqSignedAt })
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId))
+		.limit(1);
+	const expired =
+		st.months > 0 &&
+		!!m?.parqSignedAt &&
+		m.parqSignedAt.getTime() < Date.now() - st.months * 30.4 * 86400_000;
+	if (!m?.parqSignedAt || expired)
+		error(409, 'Your health form needs signing first — it only takes a minute, in the portal.');
+}
+
 export async function memberBook(
 	orgId: string,
 	userId: string,
@@ -802,6 +829,7 @@ export async function memberBook(
 	memberId: string,
 	opts?: { notify?: boolean; skipDailyLimit?: boolean; guests?: number }
 ) {
+	await assertHealthFormSigned(orgId, memberId);
 	// Booking window: how far ahead members may book (staff bookings are unrestricted).
 	const [s] = await db
 		.select({
@@ -1064,6 +1092,7 @@ export async function memberBookMakeup(
 	compFrom: string,
 	sessionId: string
 ) {
+	await assertHealthFormSigned(orgId, memberId);
 	return bookSession(memberCtx(orgId, userId), { sessionId, memberId }, userId, { compFrom });
 }
 
@@ -1079,6 +1108,9 @@ export async function memberBookSeries(
 	memberId: string,
 	classTypeId: string
 ) {
+	// Up front, not per-session: the health-form 409 must surface verbatim
+	// rather than being counted as an ordinary skip inside memberBook.
+	await assertHealthFormSigned(orgId, memberId);
 	const sessions = (await bookableSessions(memberId)).filter(
 		(b) => b.session.classTypeId === classTypeId
 	);

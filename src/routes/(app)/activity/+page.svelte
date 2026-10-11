@@ -13,7 +13,7 @@
 		getActivityTypes,
 		getSettings
 	} from '#lib/remote/workspace.remote.ts';
-	import { getAccessLog, getEntitlements } from '#lib/remote/ee.remote.ts';
+	import { exportAuditLog, getAccessLog, getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatRelative } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
@@ -83,6 +83,8 @@
 	};
 	const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replaceAll('_', ' ');
 
+	let auditBusy = $state(false);
+
 	function exportCsv() {
 		const csv = toCsv([
 			['When', 'Actor', 'Type', 'Action', 'Summary'],
@@ -117,6 +119,28 @@
 				<Button variant="outline" size="sm" onclick={exportCsv} disabled={!items.length}
 					>Export</Button
 				>
+				{#if entitlements.auditExport}
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={auditBusy}
+						onclick={async () => {
+							auditBusy = true;
+							try {
+								const r = await exportAuditLog();
+								const el = document.createElement('a');
+								el.href = URL.createObjectURL(new Blob([r.csv], { type: 'text/csv' }));
+								el.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+								el.click();
+								toast.success(`${r.count} rows exported${r.truncated ? ' (newest 20,000)' : ''}`);
+							} catch (err) {
+								toast.error(errMsg(err, 'Export failed'));
+							} finally {
+								auditBusy = false;
+							}
+						}}>{auditBusy ? 'Exporting…' : 'Export all'}</Button
+					>
+				{/if}
 				{#if actors.length > 1}
 					<Input placeholder="Search…" class="w-36" bind:value={q} />
 					<Select.Root type="single" bind:value={actorId} onValueChange={() => void refilter()}>

@@ -310,6 +310,7 @@
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
 	let healthQuestions = $state(settings.healthQuestions);
+	let healthFormsRequired = $state(settings.healthFormsRequired);
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
 	// svelte-ignore state_referenced_locally
@@ -380,6 +381,7 @@
 				brandColor,
 				parqMonths,
 				healthQuestions,
+				healthFormsRequired,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -1010,6 +1012,15 @@
 									</p>
 								</div>
 								<Input class="w-28" type="number" min="0" max="120" bind:value={parqMonths} />
+							</div>
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Required for booking</p>
+									<p class="text-xs text-muted-foreground">
+										Members can't book in the portal until their form is signed.
+									</p>
+								</div>
+								<Switch bind:checked={healthFormsRequired} />
 							</div>
 							<div class="flex items-start justify-between gap-4">
 								<div>

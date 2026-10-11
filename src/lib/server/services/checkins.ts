@@ -154,6 +154,19 @@ export async function checkOut(ctx: OrgContext, checkInId: string) {
 		action: 'checked-out',
 		summary: 'Member checked out'
 	});
+	if (row.memberId && !row.guestName) {
+		const [m] = await db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(eq(gymMember.id, row.memberId))
+			.limit(1);
+		void fireDoorWebhook(ctx.orgId, 'member.checked_out', {
+			memberId: row.memberId,
+			memberName: m?.name ?? '',
+			checkedAt: (row.checkedOutAt ?? new Date()).toISOString(),
+			locationId: row.locationId ?? null
+		});
+	}
 	return row;
 }
 
@@ -167,6 +180,19 @@ export async function voidCheckIn(ctx: OrgContext, checkInId: string) {
 		.where(and(eq(checkIn.organizationId, ctx.orgId), eq(checkIn.id, checkInId)))
 		.returning();
 	if (!row) error(404, 'Check-in not found');
+	if (row.memberId && !row.guestName) {
+		const [vm] = await db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(eq(gymMember.id, row.memberId))
+			.limit(1);
+		void fireDoorWebhook(ctx.orgId, 'member.checkin_voided', {
+			memberId: row.memberId,
+			memberName: vm?.name ?? '',
+			checkedAt: row.checkedAt.toISOString(),
+			locationId: row.locationId ?? null
+		});
+	}
 	let reverted = 0;
 	if (!row.guestName) {
 		const [st] = await db
@@ -527,7 +553,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
 			)
 		);
-	void fireDoorWebhook(ctx.orgId, {
+	void fireDoorWebhook(ctx.orgId, 'member.checked_in', {
 		memberId: m.id,
 		memberName: m.name,
 		checkedAt: row!.checkedAt.toISOString(),
