@@ -44,7 +44,8 @@ export const API_RESOURCES = [
 	'levels',
 	'workout_programs',
 	'recurring_expenses',
-	'closures'
+	'closures',
+	'org_export'
 ] as const;
 export type ApiResource = (typeof API_RESOURCES)[number];
 
@@ -97,7 +98,8 @@ export const API_RESOURCE_LABELS: Record<ApiResource, string> = {
 	levels: 'Progression levels',
 	workout_programs: 'Workout programs',
 	recurring_expenses: 'Recurring expenses',
-	closures: 'Gym closures'
+	closures: 'Gym closures',
+	org_export: 'Full-org export (Enterprise)'
 };
 
 const actionsFor = (level: Exclude<AccessLevel, 'none'>): ApiAction[] =>

@@ -93,7 +93,12 @@ export async function createLocation(
 ) {
 	const [row] = await db
 		.insert(location)
-		.values({ organizationId: ctx.orgId, name: input.name, address: input.address })
+		.values({
+			organizationId: ctx.orgId,
+			name: input.name,
+			address: input.address,
+			doorWebhookUrl: input.doorWebhookUrl ?? ''
+		})
 		.returning();
 	return row;
 }
@@ -107,6 +112,7 @@ export async function updateLocation(
 		.set({
 			name: input.name,
 			address: input.address,
+			doorWebhookUrl: input.doorWebhookUrl,
 			archivedAt: input.archived === undefined ? undefined : input.archived ? new Date() : null
 		})
 		.where(and(eq(location.organizationId, ctx.orgId), eq(location.id, input.id)))

@@ -165,6 +165,8 @@ export const location = pgTable(
 		organizationId: orgId(),
 		name: text('name').notNull(),
 		address: text('address').notNull().default(''),
+		// Per-branch door webhook — falls back to the org-wide settings URL.
+		doorWebhookUrl: text('door_webhook_url').notNull().default(''),
 		archivedAt: timestamp('archived_at', { withTimezone: true }),
 		...timestamps
 	},
@@ -220,6 +222,8 @@ export const gymMember = pgTable(
 		parqAnswers: jsonb('parq_answers').$type<Record<string, boolean>>(),
 		/** Enterprise data-retention: exempt this member from anonymize sweeps (legal hold). */
 		retentionExempt: boolean('retention_exempt').notNull().default(false),
+		parqHistory:
+			jsonb('parq_history').$type<{ answers: Record<string, boolean>; signedAt: string }[]>(),
 		parqSignedAt: timestamp('parq_signed_at', { withTimezone: true }),
 		...timestamps
 	},

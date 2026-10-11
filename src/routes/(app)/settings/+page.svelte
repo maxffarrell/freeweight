@@ -1639,9 +1639,27 @@
 					<ul class="divide-y">
 						{#each locations as l (l.id)}
 							<li class="flex items-center justify-between py-3 text-sm">
-								<div>
+								<div class="min-w-0 flex-1">
 									<p class="font-medium">{l.name}</p>
 									{#if l.address}<p class="text-xs text-muted-foreground">{l.address}</p>{/if}
+									{#if entitlements.doorAccess}
+										<input
+											class="mt-1 w-full max-w-72 rounded border bg-transparent px-1.5 py-0.5 text-xs text-muted-foreground"
+											placeholder="Door webhook URL (overrides org setting)"
+											defaultValue={l.doorWebhookUrl}
+											onblur={async (e) => {
+												const u = (e.currentTarget as HTMLInputElement).value.trim();
+												if (u === l.doorWebhookUrl) return;
+												try {
+													await updateLocation({ id: l.id, doorWebhookUrl: u });
+													l.doorWebhookUrl = u;
+													toast.success('Door webhook saved');
+												} catch (err) {
+													toast.error(errMsg(err, 'Failed'));
+												}
+											}}
+										/>
+									{/if}
 								</div>
 								<Button
 									variant="ghost"

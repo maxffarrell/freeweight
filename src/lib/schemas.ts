@@ -118,7 +118,8 @@ export const grantCreditsInput = v.object({
 
 export const locationInput = v.object({
 	name: requiredText('Name'),
-	address: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)), '')
+	address: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300)), ''),
+	doorWebhookUrl: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500)), '')
 });
 export const locationUpdate = v.object({
 	id: idSchema,

@@ -13,6 +13,7 @@ import * as challenges from '#lib/server/services/challenges.ts';
 import * as courses from '#lib/server/services/courses.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as amenities from '#lib/server/services/resources.ts';
+import { auditExportEnabled, exportOrgData } from '#lib/server/ee/audit-export.ts';
 import * as shifts from '#lib/server/services/shifts.ts';
 import * as giftcards from '#lib/server/services/giftcards.ts';
 import * as recurring from '#lib/server/services/recurring.ts';
@@ -475,6 +476,14 @@ export const resources: Record<string, Resource> = {
 		create: { schema: s.recurringExpenseInput, run: recurring.addRecurringExpense as never },
 		update: { schema: s.recurringExpenseUpdate, run: recurring.updateRecurringExpense as never },
 		delete: (ctx, id) => recurring.removeRecurringExpense(ctx, id)
+	},
+	org_export: {
+		description:
+			'Full-org JSON export (audit-export tier) — members, plans, bookings, billing, activity',
+		list: async (ctx) => {
+			if (!auditExportEnabled()) error(403, 'Data export is an Enterprise feature');
+			return exportOrgData(ctx.orgId);
+		}
 	},
 	closures: {
 		description: 'Closed days — sessions are cancelled and templates skipped',

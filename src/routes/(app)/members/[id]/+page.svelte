@@ -1323,6 +1323,23 @@
 									<span class={a ? 'text-amber-600' : ''}>{a ? 'Yes' : 'No'}</span>
 								</div>
 							{/each}
+							{#if m.member.parqHistory?.length}
+								<details class="pt-1 text-muted-foreground">
+									<summary class="cursor-pointer">
+										{m.member.parqHistory.length} earlier signing{m.member.parqHistory.length === 1
+											? ''
+											: 's'}
+									</summary>
+									{#each m.member.parqHistory as h, i (i)}
+										<p class="pt-0.5">
+											Signed {formatDate(h.signedAt)} — {Object.values(h.answers).filter(Boolean)
+												.length} yes answer{Object.values(h.answers).filter(Boolean).length === 1
+												? ''
+												: 's'}
+										</p>
+									{/each}
+								</details>
+							{/if}
 						</div>
 					{/if}
 				{/if}
