@@ -1,10 +1,14 @@
 /* @license Enterprise */
 
 import { createHmac } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { activity, gymSettings } from '#lib/server/db/schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
+import { sendEmail } from '#lib/server/email.ts';
+import { renderEmail } from '#lib/server/email-template.ts';
+import { orgBrand } from '../org-brand.ts';
 import { hasFeature } from '#lib/server/ee/license.ts';
 
 /**
@@ -67,5 +71,35 @@ export async function verifyKioskPin(orgId: string, pin: string): Promise<PinRes
 		summary: locked ? 'Kiosk PIN locked after 5 failed tries' : 'Wrong kiosk PIN entered',
 		data: locked ? { fails } : { fails, max: MAX_FAILS }
 	});
+	if (locked) void notifyPinLocked(orgId);
 	return locked ? 'locked' : 'wrong';
+}
+
+/** Owner/admin alert when the pad locks — a 5-fail lock means someone's guessing. */
+async function notifyPinLocked(orgId: string) {
+	try {
+		const staff = await db
+			.select({ email: user.email })
+			.from(member)
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+		if (!staff.length) return;
+		const brand = await orgBrand(orgId);
+		for (const s of staff) {
+			await sendEmail({
+				to: s.email,
+				subject: `${brand.orgName} — kiosk PIN locked`,
+				...renderEmail({
+					...brand,
+					heading: 'Kiosk PIN locked',
+					lines: [
+						'The self-serve kiosk PIN was just locked after 5 failed attempts.',
+						"If this wasn't your team, change the PIN from Settings → Kiosk PIN."
+					]
+				})
+			});
+		}
+	} catch {
+		// alert delivery must never block PIN verification
+	}
 }

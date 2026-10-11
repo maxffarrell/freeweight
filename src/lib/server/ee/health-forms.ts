@@ -1,10 +1,11 @@
 /* @license Enterprise */
 
 import { error } from '@sveltejs/kit';
-import { and, eq, isNotNull, lt } from 'drizzle-orm';
+import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { orgBrand } from '../org-brand.ts';
 import { gymMember, gymSettings, notificationLog } from '#lib/server/db/schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { hasFeature } from './license.ts';
@@ -58,6 +59,10 @@ export async function submitParq(
 		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
 		.returning({ id: gymMember.id });
 	if (!row) error(404, 'Member not found');
+	// Any "yes" answer → alert owner/admin staff so they can follow up at the desk.
+	if (Object.values(keyed).some(Boolean)) {
+		void notifyParqFlag(orgId, memberId).catch(() => {});
+	}
 	return row;
 }
 
@@ -117,4 +122,34 @@ export async function sendParqReminders(orgId: string): Promise<number> {
 		sent++;
 	}
 	return sent;
+}
+
+/** Staff alert when a signed PAR-Q carries a yes-answer. */
+async function notifyParqFlag(orgId: string, memberId: string) {
+	const staff = await db
+		.select({ email: user.email })
+		.from(member)
+		.innerJoin(user, eq(member.userId, user.id))
+		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	if (!staff.length) return;
+	const [m] = await db
+		.select({ name: gymMember.name })
+		.from(gymMember)
+		.where(eq(gymMember.id, memberId))
+		.limit(1);
+	const brand = await orgBrand(orgId);
+	for (const s of staff) {
+		await sendEmail({
+			to: s.email,
+			subject: `${brand.orgName} — health form flag for ${m?.name ?? 'a member'}`,
+			...renderEmail({
+				...brand,
+				heading: 'Health form flagged',
+				lines: [
+					`${m?.name ?? 'A member'} just signed the health questionnaire with at least one "yes" answer.`,
+					'Review their answers on the member page before their next class.'
+				]
+			})
+		});
+	}
 }

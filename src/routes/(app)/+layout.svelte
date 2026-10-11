@@ -5,9 +5,12 @@
 	import CommandPalette from '#lib/components/app/command-palette.svelte';
 	import OnboardingTour from '#lib/components/app/onboarding-tour.svelte';
 	import { tour } from '#lib/tour.svelte.ts';
+	import { setContext } from 'svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
+	// White-label brand for PageHeader's <title> and any brand-aware component.
+	setContext('orgBrand', { whiteLabel: data.whiteLabel, orgName: data.org.name });
 	let searchOpen = $state(false);
 </script>
 

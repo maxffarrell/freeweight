@@ -242,16 +242,17 @@ export async function sendWeekDigest(orgId: string, force = false): Promise<numb
 		.select({
 			timezone: gymSettings.timezone,
 			digestRecipients: gymSettings.digestRecipients,
-			digestWeekly: gymSettings.digestWeekly
+			digestWeekly: gymSettings.digestWeekly,
+			digestDay: gymSettings.digestDay
 		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
 	if (!s0?.digestWeekly && !force) return 0;
 	const today = localDate(new Date(), s0?.timezone ?? 'UTC');
-	// Monday in the org's timezone — parse the local date at noon UTC so the
-	// weekday isn't skewed by DST.
-	if (!force && new Date(`${today}T12:00:00Z`).getDay() !== 1) return 0;
+	// The org's chosen digest day in its timezone — parse the local date at
+	// noon UTC so the weekday isn't skewed by DST.
+	if (!force && new Date(`${today}T12:00:00Z`).getDay() !== (s0?.digestDay ?? 1)) return 0;
 	const p = await monthClosePayload(orgId, 7);
 	const week = today;
 	return sendDigest(
