@@ -123,7 +123,8 @@
 	let ssoForm = $state({ providerId: '', domain: '', issuer: '', clientId: '', clientSecret: '' });
 	async function listSsoProviders() {
 		const r = await authClient.sso.providers();
-		if (!r.error && Array.isArray(r.data)) ssoProviders = r.data;
+		const list = Array.isArray(r.data) ? r.data : (r.data?.providers ?? []);
+		if (!r.error) ssoProviders = list;
 	}
 	async function registerSso() {
 		ssoBusy = true;
