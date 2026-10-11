@@ -1030,6 +1030,13 @@
       "when": 1791718827443,
       "tag": "0146_abandoned_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1791720619810,
+      "tag": "0147_tan_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

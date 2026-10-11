@@ -74,6 +74,7 @@
 		approveTrial,
 		declineTrial,
 		anonymizeMember,
+		setDoorBlocked,
 		getMemberGiftCards
 	} from '#lib/remote/members.remote.ts';
 	import {
@@ -1068,6 +1069,22 @@
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end" class="min-w-48">
+				{#if entitlements.doorAccess}
+					<DropdownMenu.Item
+						onclick={async () => {
+							try {
+								await setDoorBlocked({ memberId: m.member.id, blocked: !m.member.doorBlocked });
+								m.member.doorBlocked = !m.member.doorBlocked;
+								toast.success(
+									m.member.doorBlocked ? 'Door unlock blocked' : 'Door unlock restored'
+								);
+							} catch (err) {
+								toast.error(errMsg(err, 'Could not update'));
+							}
+						}}
+						>{m.member.doorBlocked ? 'Unblock at the door' : 'Block at the door'}</DropdownMenu.Item
+					>
+				{/if}
 				<DropdownMenu.Item onclick={() => (guestOpen = true)}
 					><UserPlus /> Book a guest</DropdownMenu.Item
 				>
@@ -1189,6 +1206,13 @@
 					>
 						Requested deletion of their personal data {formatDate(m.member.deletionRequestedAt)} — use
 						"Anonymize personal data" in the menu.
+					</div>
+				{/if}
+				{#if m.member.doorBlocked}
+					<div
+						class="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 text-destructive"
+					>
+						Blocked at the door — check-ins still log but door unlock is suppressed.
 					</div>
 				{/if}
 				<div class="flex justify-between">

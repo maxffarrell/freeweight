@@ -73,7 +73,8 @@
 		sendDigestPreview,
 		sendExportWebhookNow,
 		getDigestPreview,
-		getDoorLog
+		getDoorLog,
+		resignAllParq
 	} from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
@@ -384,6 +385,7 @@
 	let anonPreview = $state<number | null>(null);
 	let anonNames = $state<string[]>([]);
 	let doorBusy = $state(false);
+	let resignAllBusy = $state(false);
 	let digestBusy = $state(false);
 	let exportSendBusy = $state(false);
 	let digestPrevOpen = $state(false);
@@ -1158,6 +1160,32 @@
 									placeholder="Has your doctor ever said you have a heart condition?&#10;Do you feel chest pain during activity?"
 									bind:value={healthQuestions}
 								/>
+							</div>
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Re-sign everyone</p>
+									<p class="text-xs text-muted-foreground">
+										Changed the questions? Email every member a fresh sign request.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={resignAllBusy}
+									onclick={async () => {
+										if (!confirm('Email every member a re-sign request?')) return;
+										resignAllBusy = true;
+										try {
+											const r = await resignAllParq({});
+											toast.success(`Sent ${r.sent} re-sign requests`);
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not send'));
+										} finally {
+											resignAllBusy = false;
+										}
+									}}>Re-sign all</Button
+								>
 							</div>
 						{/if}
 						{#if entitlements.doorAccess}

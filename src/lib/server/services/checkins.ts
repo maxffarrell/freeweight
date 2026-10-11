@@ -564,15 +564,20 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
 			)
 		);
-	void fireDoorWebhook(ctx.orgId, 'member.checked_in', {
-		memberId: m.id,
-		memberName: m.name,
-		checkedAt: row!.checkedAt.toISOString(),
-		locationId: row!.locationId ?? null
-	});
-	// Enterprise door-access: a heads-up flag (suspended membership or expired
-	// health form) fires a second event so door systems can log/deny.
-	if (suspended || parqMissing || parqFlagged) {
+	// doorBlocked members check in normally but the door never unlocks — the
+	// unlock event is skipped and the flag event carries 'door_blocked'.
+	if (!m.doorBlocked) {
+		void fireDoorWebhook(ctx.orgId, 'member.checked_in', {
+			memberId: m.id,
+			memberName: m.name,
+			checkedAt: row!.checkedAt.toISOString(),
+			locationId: row!.locationId ?? null
+		});
+	}
+	// Enterprise door-access: a heads-up flag (suspended membership, expired
+	// health form, or a door block) fires a second event so door systems can
+	// log/deny.
+	if (suspended || parqMissing || parqFlagged || m.doorBlocked) {
 		void fireDoorWebhook(ctx.orgId, 'member.checkin_flagged', {
 			memberId: m.id,
 			memberName: m.name,
@@ -580,7 +585,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			flags: [
 				suspended ? 'suspended' : '',
 				parqMissing ? 'health_form' : '',
-				parqFlagged ? 'medical_flag' : ''
+				parqFlagged ? 'medical_flag' : '',
+				m.doorBlocked ? 'door_blocked' : ''
 			].filter(Boolean),
 			locationId: row!.locationId ?? null
 		});

@@ -18,7 +18,8 @@ import {
 import {
 	healthFormsEnabled,
 	requestParqResign as requestParqResign_,
-	requireHealthForms
+	requireHealthForms,
+	resignAllParq as resignAllParq_
 } from '#lib/server/ee/health-forms.ts';
 import { verifyKioskPin as kioskPinVerify } from '#lib/server/ee/kiosk-pin.ts';
 import {
@@ -352,3 +353,9 @@ export const requestParqResign = command(
 		return { name: await requestParqResign_(memberId, orgId, userId) };
 	}
 );
+
+/** Ask EVERY member to re-attest — run after editing the custom questions. */
+export const resignAllParq = command(v.object({}), async () => {
+	const { orgId, userId } = await requireOrg('admin');
+	return { sent: await resignAllParq_(orgId, userId ?? null) };
+});
