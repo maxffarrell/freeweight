@@ -3,7 +3,7 @@
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
-import { gymMember, memberField, memberFieldValue } from '#lib/server/db/schema.ts';
+import { gymMember, memberField, memberFieldValue, outer } from '#lib/server/db/schema.ts';
 import { hasFeature } from './license.ts';
 
 export type MemberFieldKind = 'text' | 'number' | 'date' | 'select';
@@ -27,7 +27,7 @@ export async function listMemberFields(orgId: string) {
 			options: memberField.options,
 			position: memberField.position,
 			members:
-				sql<number>`(select count(*) from ${memberFieldValue} v where v.field_id = ${memberField.id} and v.value != '')`.mapWith(
+				sql<number>`(select count(*) from ${memberFieldValue} v where v.field_id = ${outer(memberField.id)} and v.value != '')`.mapWith(
 					Number
 				)
 		})
