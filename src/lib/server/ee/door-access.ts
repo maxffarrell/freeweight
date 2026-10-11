@@ -38,11 +38,20 @@ export async function fireDoorWebhook(
 	if (!doorAccessEnabled()) return;
 	try {
 		const [s] = await db
-			.select({ url: gymSettings.doorWebhookUrl })
+			.select({ url: gymSettings.doorWebhookUrl, events: gymSettings.doorEvents })
 			.from(gymSettings)
 			.where(eq(gymSettings.organizationId, orgId))
 			.limit(1);
 		if (!s?.url) return;
+		// Event toggles — empty list means all events fire.
+		if (
+			s.events &&
+			!s.events
+				.split(',')
+				.map((e) => e.trim())
+				.includes(event)
+		)
+			return;
 		await postDoor(s.url, { event, ...payload });
 	} catch (err) {
 		console.error(`door webhook failed for ${orgId}`, err);

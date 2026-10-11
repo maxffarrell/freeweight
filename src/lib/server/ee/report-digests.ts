@@ -91,7 +91,7 @@ async function monthClosePayload(orgId: string) {
 	};
 }
 
-export async function sendMonthClose(orgId: string): Promise<number> {
+export async function sendMonthClose(orgId: string, force = false): Promise<number> {
 	if (!reportDigestsEnabled()) return 0;
 	const [s0] = await db
 		.select({ timezone: gymSettings.timezone, digestRecipients: gymSettings.digestRecipients })
@@ -99,7 +99,7 @@ export async function sendMonthClose(orgId: string): Promise<number> {
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
 	const today = localDate(new Date(), s0?.timezone ?? 'UTC');
-	if (!today.endsWith('-01')) return 0;
+	if (!force && !today.endsWith('-01')) return 0;
 	const p = await monthClosePayload(orgId);
 	const staff = await db
 		.select({ email: user.email })
