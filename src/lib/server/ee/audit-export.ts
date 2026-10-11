@@ -43,7 +43,7 @@ export function requireAuditExport(): void {
  * member-facing table in stable order. Table keys mirror the REST resource
  * names so downstream tooling can map onto the API.
  */
-export async function exportOrgData(orgId: string) {
+export async function exportOrgData(orgId: string, since?: string) {
 	requireAuditExport();
 	const [
 		org,
@@ -98,6 +98,44 @@ export async function exportOrgData(orgId: string) {
 			.innerJoin(user, eq(member.userId, user.id))
 			.where(eq(member.organizationId, orgId))
 	]);
+
+	if (since) {
+		// Incremental export — only rows touched since the timestamp.
+		const cut = new Date(since);
+		const touched = <T>(rows: T[]) =>
+			rows.filter((r) => {
+				const o = r as Record<string, unknown>;
+				for (const k of ['updatedAt', 'createdAt', 'joinedAt', 'checkedAt']) {
+					const v = o[k];
+					if (v instanceof Date) return v >= cut;
+					if (typeof v === 'string' && v) return new Date(v) >= cut;
+				}
+				return true;
+			});
+		const f = <T>(rows: T[]) => touched(rows);
+		const out = {
+			locations,
+			members,
+			plans,
+			memberships,
+			memberTags,
+			memberFields,
+			memberFieldValues,
+			classTypes,
+			sessions,
+			bookings,
+			checkIns,
+			charges,
+			payments,
+			activityRows,
+			webhooks,
+			staffMembers
+		} as const;
+		for (const k of Object.keys(out) as (keyof typeof out)[]) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(out as any)[k] = f(out[k] as unknown[]);
+		}
+	}
 
 	return {
 		exportedAt: new Date().toISOString(),

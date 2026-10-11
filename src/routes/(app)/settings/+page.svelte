@@ -186,6 +186,7 @@
 	let cfKind = $state<'text' | 'number' | 'date' | 'select'>('text');
 	let cfOptions = $state('');
 	let cfJoin = $state(false);
+	let cfRoster = $state(false);
 	let cfJoinRequired = $state(false);
 	let cfMemberEdit = $state(false);
 	let cfBusy = $state(false);
@@ -196,6 +197,7 @@
 		kind: string;
 		options: string;
 		showOnJoin?: boolean;
+		showOnRoster?: boolean;
 		requireOnJoin?: boolean;
 		memberEditable?: boolean;
 	}) {
@@ -204,6 +206,7 @@
 		cfKind = (f?.kind as 'text' | 'number' | 'date' | 'select') ?? 'text';
 		cfOptions = f?.options ?? '';
 		cfJoin = f?.showOnJoin ?? false;
+		cfRoster = f?.showOnRoster ?? false;
 		cfJoinRequired = f?.requireOnJoin ?? false;
 		cfMemberEdit = f?.memberEditable ?? false;
 		cfOpen = true;
@@ -218,6 +221,7 @@
 				kind: cfKind,
 				options: cfOptions,
 				showOnJoin: cfJoin,
+				showOnRoster: cfRoster,
 				requireOnJoin: cfJoin && cfJoinRequired,
 				memberEditable: cfMemberEdit
 			});
@@ -2260,6 +2264,9 @@
 				{/if}
 				<label class="flex items-center gap-2 text-sm">
 					<input type="checkbox" bind:checked={cfMemberEdit} /> Editable by member in the portal
+				</label>
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={cfRoster} /> Show on the class roster
 				</label>
 			</div>
 			<Dialog.Footer>

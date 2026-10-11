@@ -1377,6 +1377,9 @@
 										>medical flag</Badge
 									>
 								{/if}
+								{#each r.fields ?? [] as f (f.label)}
+									<Badge variant="secondary" class="ml-1">{f.label}: {f.value}</Badge>
+								{/each}
 								{#if r.openBalance > 0}
 									<Badge variant="destructive" class="ml-1"
 										>owes {formatMoney(r.openBalance, currency)}</Badge

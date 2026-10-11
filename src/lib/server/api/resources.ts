@@ -480,9 +480,9 @@ export const resources: Record<string, Resource> = {
 	org_export: {
 		description:
 			'Full-org JSON export (audit-export tier) — members, plans, bookings, billing, activity',
-		list: async (ctx) => {
+		list: async (ctx, url) => {
 			if (!auditExportEnabled()) error(403, 'Data export is an Enterprise feature');
-			return exportOrgData(ctx.orgId);
+			return exportOrgData(ctx.orgId, url.searchParams.get('since') ?? undefined);
 		}
 	},
 	closures: {

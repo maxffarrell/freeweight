@@ -6,6 +6,7 @@
 	import OnboardingTour from '#lib/components/app/onboarding-tour.svelte';
 	import { tour } from '#lib/tour.svelte.ts';
 	import { setContext } from 'svelte';
+	import { contrastText } from '#lib/format.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
@@ -14,26 +15,33 @@
 	let searchOpen = $state(false);
 </script>
 
-<Sidebar.Provider>
-	<AppSidebar
-		user={data.user}
-		org={data.org}
-		whiteLabel={data.whiteLabel}
-		onsearch={() => (searchOpen = true)}
-		ontour={() => (tour.open = true)}
-	/>
-	<Sidebar.Inset>
-		{#if data.demo && data.demoExpiresAt}
-			<DemoBanner
-				expiresAt={data.demoExpiresAt}
-				serverNow={data.demoServerNow}
-				deployUrl="https://github.com/maxffarrell/freeweight#quick-start"
-			/>
-		{/if}
-		<main class="min-w-0 flex-1">
-			{@render children()}
-		</main>
-	</Sidebar.Inset>
-</Sidebar.Provider>
+<div
+	style={data.brandColor
+		? `--primary:${data.brandColor};--primary-foreground:${contrastText(data.brandColor)}`
+		: ''}
+	class="contents"
+>
+	<Sidebar.Provider>
+		<AppSidebar
+			user={data.user}
+			org={data.org}
+			whiteLabel={data.whiteLabel}
+			onsearch={() => (searchOpen = true)}
+			ontour={() => (tour.open = true)}
+		/>
+		<Sidebar.Inset>
+			{#if data.demo && data.demoExpiresAt}
+				<DemoBanner
+					expiresAt={data.demoExpiresAt}
+					serverNow={data.demoServerNow}
+					deployUrl="https://github.com/maxffarrell/freeweight#quick-start"
+				/>
+			{/if}
+			<main class="min-w-0 flex-1">
+				{@render children()}
+			</main>
+		</Sidebar.Inset>
+	</Sidebar.Provider>
+</div>
 <CommandPalette bind:open={searchOpen} />
 <OnboardingTour bind:open={tour.open} orgName={data.org.name} />

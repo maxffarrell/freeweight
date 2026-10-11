@@ -53,6 +53,7 @@ import type { OrgContext } from '#lib/server/context.ts';
 import { loyaltyTier, todayISO } from '#lib/format.ts';
 import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
+import { healthFormsEnabled, requestParqResign } from '#lib/server/ee/health-forms.ts';
 import { creditUsage, creditsUsedIn } from './schedule.ts';
 import {
 	notifyCreditsGifted,
@@ -1471,6 +1472,11 @@ export async function logIncident(ctx: OrgContext, input: v.InferOutput<typeof s
 		action: 'incident_logged',
 		summary: `${input.kind === 'injury' ? 'Injury' : 'Incident'} report — ${input.subjectName?.trim() || 'member'}`
 	});
+	if (input.memberId && healthFormsEnabled()) {
+		// An injury/incident may change what the member should have attested —
+		// ask them to re-confirm their health questionnaire.
+		void requestParqResign(input.memberId, ctx.orgId, ctx.userId).catch(() => {});
+	}
 	return row;
 }
 

@@ -1023,6 +1023,13 @@
       "when": 1791715748983,
       "tag": "0145_far_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1791718827443,
+      "tag": "0146_abandoned_johnny_storm",
+      "breakpoints": true
     }
   ]
 }

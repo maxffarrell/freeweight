@@ -15,6 +15,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 	const brand = await orgBrand(org.org.id);
 	return {
 		whiteLabel: brand.whiteLabel,
+		brandColor: brand.brandColor,
 		demoExpiresAt: isDemo() ? (locals.session?.expiresAt.getTime() ?? null) : null,
 		demoServerNow: Date.now(),
 		demo: isDemo(),
