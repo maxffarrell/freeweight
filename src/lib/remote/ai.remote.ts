@@ -6,8 +6,10 @@ import { idSchema } from '#lib/schemas.ts';
 import { db } from '#lib/server/db/index.ts';
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import {
+	charge,
 	checkIn,
 	gymMember,
+	memberNote,
 	gymSettings,
 	membership,
 	personalRecord,
@@ -227,4 +229,64 @@ export const aiMemberProgress = command(idSchema, async (memberId) => {
 		}
 	]);
 	return { summary: text };
+});
+
+/** Staff ops brief on a member — plan, attendance, billing, recent notes in
+ * 4-5 sentences. Different from the progress note (fitness-focused): this is
+ * the "what's the story here" a desk lead reads before a call. */
+export const aiMemberBrief = command(idSchema, async (memberId) => {
+	const { orgId } = await requireOrg();
+	requireAi();
+	const [m] = await db
+		.select({ name: gymMember.name, joinedAt: gymMember.joinedAt, status: gymMember.status })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+		.limit(1);
+	if (!m) error(404, 'Member not found');
+	const [ms] = await db
+		.select({ name: plan.name, status: membership.status, amount: plan.amount })
+		.from(membership)
+		.innerJoin(plan, eq(plan.id, membership.planId))
+		.where(and(eq(membership.memberId, memberId), eq(membership.status, 'active')))
+		.limit(1);
+	const since30 = new Date(Date.now() - 30 * 86400_000);
+	const [v30] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, since30)
+			)
+		);
+	const [owe] = await db
+		.select({ n: sql<number>`coalesce(sum(${charge.amount}),0)`.mapWith(Number) })
+		.from(charge)
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.memberId, memberId),
+				eq(charge.status, 'open')
+			)
+		);
+	const notes = await db
+		.select({ body: memberNote.body, at: memberNote.createdAt })
+		.from(memberNote)
+		.where(and(eq(memberNote.organizationId, orgId), eq(memberNote.memberId, memberId)))
+		.orderBy(desc(memberNote.createdAt))
+		.limit(3);
+	const text = await aiComplete([
+		{
+			role: 'system',
+			content:
+				'You are writing a 4-5 sentence ops brief about a gym member for front-desk staff before they pick up the phone. Cover plan, attendance trend, money owed, and anything notable in recent staff notes. Be direct and factual.'
+		},
+		{
+			role: 'user',
+			content: `Member: ${m.name} (${m.status}), joined ${m.joinedAt}. Plan: ${ms ? `${ms.name} $${(ms.amount / 100).toFixed(0)}/mo (${ms.status})` : 'none'}. Visits last 30d: ${v30?.n ?? 0}. Open balance: $${((owe?.n ?? 0) / 100).toFixed(2)}. Recent staff notes: ${notes.length ? notes.map((n) => n.body.slice(0, 120)).join(' | ') : 'none'}.`
+		}
+	]);
+	return { brief: text };
 });

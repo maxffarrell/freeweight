@@ -102,6 +102,7 @@
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import {
 		aiMemberProgress,
+		aiMemberBrief,
 		aiDraftWinBack,
 		aiGenerateProgram,
 		getAiStatus
@@ -999,13 +1000,16 @@
 	let aiSumOpen = $state(false);
 	let aiSumText = $state('');
 	let aiSumBusy = $state(false);
-	async function runAiSummary() {
+	let aiSumTitle = $state('Progress summary');
+	async function runAiSummary(kind: 'progress' | 'brief' = 'progress') {
 		aiSumOpen = true;
 		aiSumBusy = true;
 		aiSumText = '';
+		aiSumTitle = kind === 'brief' ? 'Ops brief' : 'Progress summary';
 		try {
-			const r = await aiMemberProgress(m.member.id);
-			aiSumText = r.summary;
+			const r =
+				kind === 'brief' ? await aiMemberBrief(m.member.id) : await aiMemberProgress(m.member.id);
+			aiSumText = 'brief' in r ? r.brief : r.summary;
 		} catch (err) {
 			toast.error(errMsg(err, 'AI summary failed'));
 			aiSumOpen = false;
@@ -1072,7 +1076,10 @@
 					>
 				{/if}
 				{#if ai.licensed && ai.configured}
-					<DropdownMenu.Item onclick={runAiSummary}>AI progress summary</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => runAiSummary('progress')}
+						>AI progress summary</DropdownMenu.Item
+					>
+					<DropdownMenu.Item onclick={() => runAiSummary('brief')}>AI ops brief</DropdownMenu.Item>
 				{/if}
 				{#if entitlements.dataRetention}
 					<DropdownMenu.Item
@@ -3346,8 +3353,12 @@
 <Dialog.Root bind:open={aiSumOpen}>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Progress summary</Dialog.Title>
-			<Dialog.Description>AI note for staff — check-ins, records and tenure.</Dialog.Description>
+			<Dialog.Title>{aiSumTitle}</Dialog.Title>
+			<Dialog.Description
+				>{aiSumTitle === 'Ops brief'
+					? 'AI note for staff — plan, attendance, billing and notes.'
+					: 'AI note for staff — check-ins, records and tenure.'}</Dialog.Description
+			>
 		</Dialog.Header>
 		{#if aiSumBusy}
 			<p class="text-sm text-muted-foreground">Summarizing…</p>
@@ -3355,7 +3366,12 @@
 			<p class="text-sm whitespace-pre-line">{aiSumText}</p>
 		{/if}
 		<Dialog.Footer>
-			<Button variant="outline" disabled={aiSumBusy} onclick={runAiSummary}>Regenerate</Button>
+			<Button
+				variant="outline"
+				disabled={aiSumBusy}
+				onclick={() => runAiSummary(aiSumTitle === 'Ops brief' ? 'brief' : 'progress')}
+				>Regenerate</Button
+			>
 			<Dialog.Close>Close</Dialog.Close>
 		</Dialog.Footer>
 	</Dialog.Content>
