@@ -2056,6 +2056,9 @@
 						it
 					</label>
 				{/if}
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={cfMemberEdit} /> Editable by member in the portal
+				</label>
 			</div>
 			<Dialog.Footer>
 				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
