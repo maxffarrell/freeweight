@@ -100,7 +100,12 @@
 	import { errMsg, formatDate, formatMoney, formatRelative } from '#lib/format.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
-	import { aiDraftWinBack, aiGenerateProgram, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import {
+		aiMemberProgress,
+		aiDraftWinBack,
+		aiGenerateProgram,
+		getAiStatus
+	} from '#lib/remote/ai.remote.ts';
 	import { getEntitlements, getMemberDataExport } from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -980,6 +985,25 @@
 		trialBusy = '';
 	}
 
+	let parqOpen = $state(false);
+	let aiSumOpen = $state(false);
+	let aiSumText = $state('');
+	let aiSumBusy = $state(false);
+	async function runAiSummary() {
+		aiSumOpen = true;
+		aiSumBusy = true;
+		aiSumText = '';
+		try {
+			const r = await aiMemberProgress(m.member.id);
+			aiSumText = r.summary;
+		} catch (err) {
+			toast.error(errMsg(err, 'AI summary failed'));
+			aiSumOpen = false;
+		} finally {
+			aiSumBusy = false;
+		}
+	}
+
 	async function doAnonymize() {
 		if (
 			!confirm(
@@ -1036,6 +1060,9 @@
 							a.click();
 						}}>Export member data</DropdownMenu.Item
 					>
+				{/if}
+				{#if ai.licensed && ai.configured}
+					<DropdownMenu.Item onclick={runAiSummary}>AI progress summary</DropdownMenu.Item>
 				{/if}
 				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive"
 					>Anonymize personal data…</DropdownMenu.Item
@@ -1189,9 +1216,22 @@
 						<span
 							>{m.member.parqSignedAt
 								? `PAR-Q signed ${formatDate(m.member.parqSignedAt)}`
-								: 'PAR-Q not signed'}</span
+								: 'PAR-Q not signed'}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
+									class="underline"
+									onclick={() => (parqOpen = !parqOpen)}>{parqOpen ? 'hide' : 'view'}</button
+								>{/if}</span
 						>
 					</div>
+					{#if parqOpen && m.member.parqAnswers}
+						<div class="space-y-0.5 border-l-2 pl-3 text-xs">
+							{#each Object.entries(m.member.parqAnswers) as [q, a] (q)}
+								<div class="flex justify-between gap-2">
+									<span class="text-muted-foreground">{q}</span>
+									<span class={a ? 'text-amber-600' : ''}>{a ? 'Yes' : 'No'}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Guest passes</span>
@@ -3265,3 +3305,21 @@
 		}
 	</style>
 </svelte:head>
+
+<Dialog.Root bind:open={aiSumOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Progress summary</Dialog.Title>
+			<Dialog.Description>AI note for staff — check-ins, records and tenure.</Dialog.Description>
+		</Dialog.Header>
+		{#if aiSumBusy}
+			<p class="text-sm text-muted-foreground">Summarizing…</p>
+		{:else}
+			<p class="text-sm whitespace-pre-line">{aiSumText}</p>
+		{/if}
+		<Dialog.Footer>
+			<Button variant="outline" disabled={aiSumBusy} onclick={runAiSummary}>Regenerate</Button>
+			<Dialog.Close>Close</Dialog.Close>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
