@@ -946,6 +946,13 @@
       "when": 1791694062374,
       "tag": "0134_handy_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1791694817907,
+      "tag": "0135_striped_banshee",
+      "breakpoints": true
     }
   ]
 }

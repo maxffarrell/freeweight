@@ -25,6 +25,7 @@ export async function listMemberFields(orgId: string) {
 			name: memberField.name,
 			kind: memberField.kind,
 			options: memberField.options,
+			showOnJoin: memberField.showOnJoin,
 			position: memberField.position,
 			members:
 				sql<number>`(select count(*) from ${memberFieldValue} v where v.field_id = ${outer(memberField.id)} and v.value != '')`.mapWith(
@@ -38,14 +39,20 @@ export async function listMemberFields(orgId: string) {
 
 export async function saveMemberField(
 	orgId: string,
-	input: { id?: string; name: string; kind: MemberFieldKind; options?: string }
+	input: {
+		id?: string;
+		name: string;
+		kind: MemberFieldKind;
+		options?: string;
+		showOnJoin?: boolean;
+	}
 ) {
 	requireCustomFields();
 	const options = (input.options ?? '').trim();
 	if (input.id) {
 		await db
 			.update(memberField)
-			.set({ name: input.name, kind: input.kind, options })
+			.set({ name: input.name, kind: input.kind, options, showOnJoin: !!input.showOnJoin })
 			.where(and(eq(memberField.id, input.id), eq(memberField.organizationId, orgId)));
 		return input.id;
 	}
@@ -60,6 +67,7 @@ export async function saveMemberField(
 		name: input.name,
 		kind: input.kind,
 		options,
+		showOnJoin: !!input.showOnJoin,
 		position: max.n + 1
 	});
 	return id;
@@ -158,4 +166,39 @@ export async function setMemberFieldValue(
 			target: [memberFieldValue.fieldId, memberFieldValue.memberId],
 			set: { value: v }
 		});
+}
+
+/** Fields flagged to appear on the public join page — licensed installs only. */
+export async function joinPageFields(orgId: string) {
+	if (!customFieldsEnabled()) return [];
+	return db
+		.select({
+			id: memberField.id,
+			name: memberField.name,
+			kind: memberField.kind,
+			options: memberField.options
+		})
+		.from(memberField)
+		.where(and(eq(memberField.organizationId, orgId), eq(memberField.showOnJoin, true)))
+		.orderBy(asc(memberField.position), asc(memberField.name));
+}
+
+/** Store join-page answers for a new member — ignores unknown/non-join field ids. */
+export async function saveJoinAnswers(
+	orgId: string,
+	memberId: string,
+	values: Record<string, string>
+) {
+	if (!customFieldsEnabled()) return;
+	const fields = await joinPageFields(orgId);
+	const allowed = new Set(fields.map((f) => f.id));
+	const rows = Object.entries(values)
+		.filter(([fid, val]) => allowed.has(fid) && val?.trim())
+		.map(([fieldId, value]) => ({
+			organizationId: orgId,
+			fieldId,
+			memberId,
+			value: value.trim().slice(0, 500)
+		}));
+	if (rows.length) await db.insert(memberFieldValue).values(rows);
 }

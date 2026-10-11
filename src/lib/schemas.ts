@@ -608,6 +608,8 @@ export const joinInput = v.object({
 	agreedWaiver: v.optional(v.boolean(), false),
 	/** Discount code applied to the up-front charge. */
 	promoCode: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(50)))),
+	/** Answers to the gym's custom join fields (fieldId → value). */
+	customValues: v.optional(v.record(v.string(), v.string())),
 	/** Honeypot: must stay empty. */
 	website: v.optional(v.string(), '')
 });
