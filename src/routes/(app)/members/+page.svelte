@@ -223,6 +223,7 @@
 			noHealthForm: owesFilter === '__nohealth' || undefined,
 			parqExpiring: owesFilter === '__parqexp' || undefined,
 			retentionExempt: owesFilter === '__retention' || undefined,
+			doorBlocked: owesFilter === '__doorblocked' || undefined,
 			customField:
 				cfFieldId && cfValue.trim() ? { fieldId: cfFieldId, value: cfValue.trim() } : undefined
 		});
@@ -825,7 +826,9 @@
 																												? 'Form expiring'
 																												: owesFilter === '__retention'
 																													? 'Retention exempt'
-																													: 'Any balance'}</Select.Trigger
+																													: owesFilter === '__doorblocked'
+																														? 'Door blocked'
+																														: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -858,6 +861,9 @@
 				{/if}
 				{#if entitlements.dataRetention}
 					<Select.Item value="__retention">Retention exempt</Select.Item>
+				{/if}
+				{#if entitlements.doorAccess}
+					<Select.Item value="__doorblocked">Door blocked</Select.Item>
 				{/if}
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>

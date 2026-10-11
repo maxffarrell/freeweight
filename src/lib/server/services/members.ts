@@ -181,7 +181,8 @@ export async function listMembers(
 	parqExpiring?: boolean,
 	/** Enterprise custom-fields: member has a value containing `value` on this field. */
 	customField?: { fieldId: string; value: string },
-	retentionExempt?: boolean
+	retentionExempt?: boolean,
+	doorBlocked?: boolean
 ) {
 	const [parqS] = await db
 		.select({ parqMonths: gymSettings.parqMonths })
@@ -324,6 +325,7 @@ export async function listMembers(
 					? sql`exists (select 1 from membership m14 where m14.member_id = ${gymMember.id} and m14.status = 'active' and m14.pause_requested_at is not null)`
 					: undefined,
 				retentionExempt ? eq(gymMember.retentionExempt, true) : undefined,
+				doorBlocked ? eq(gymMember.doorBlocked, true) : undefined,
 				noPortal ? isNull(gymMember.portalUserId) : undefined,
 				noBirthday ? isNull(gymMember.birthday) : undefined,
 				noPhoto ? isNull(gymMember.photoDocumentId) : undefined,

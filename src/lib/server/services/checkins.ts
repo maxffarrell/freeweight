@@ -605,6 +605,7 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		parqMissing,
 		parqFlagged,
 		suspended,
+		doorBlocked: !!m.doorBlocked,
 		pendingSigns,
 		creditsLeft: credits ? Math.max(0, credits.limit - credits.used) : null,
 		creditsClass: credits?.className ?? null,

@@ -1528,8 +1528,18 @@
 						const fieldLabels = [
 							...new Set(roster.flatMap((r) => (r.fields ?? []).map((f) => f.label)))
 						];
+						const medicalCol = entitlements.healthForms ? ['medical'] : [];
 						const rows = [
-							['name', 'email', 'status', 'guests', 'waitlist_pos', 'note', ...fieldLabels],
+							[
+								'name',
+								'email',
+								'status',
+								'guests',
+								'waitlist_pos',
+								'note',
+								...medicalCol,
+								...fieldLabels
+							],
 							...roster.map((r) => [
 								r.memberName,
 								r.memberEmail ?? '',
