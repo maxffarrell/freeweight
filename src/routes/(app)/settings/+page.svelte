@@ -56,7 +56,13 @@
 		removeLoanable
 	} from '#lib/remote/members.remote.ts';
 	import { API_RESOURCES } from '#lib/api-permissions.ts';
+	import {
+		getMemberFields,
+		saveMemberFieldCmd,
+		deleteMemberFieldCmd
+	} from '#lib/remote/custom-fields.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Trash from '@lucide/svelte/icons/trash-2';
@@ -100,6 +106,40 @@
 	let closures = $state(await getClosures());
 	const staff = await getStaff();
 	const joinInfo = await getJoinInfo();
+	const memberFields = $derived(await getMemberFields());
+	let cfOpen = $state(false);
+	let cfEditId = $state<string | null>(null);
+	let cfName = $state('');
+	let cfKind = $state<'text' | 'number' | 'date' | 'select'>('text');
+	let cfOptions = $state('');
+	let cfBusy = $state(false);
+
+	function openCfField(f?: { id: string; name: string; kind: string; options: string }) {
+		cfEditId = f?.id ?? null;
+		cfName = f?.name ?? '';
+		cfKind = (f?.kind as 'text' | 'number' | 'date' | 'select') ?? 'text';
+		cfOptions = f?.options ?? '';
+		cfOpen = true;
+	}
+
+	async function saveCfField() {
+		cfBusy = true;
+		try {
+			await saveMemberFieldCmd({
+				id: cfEditId ?? undefined,
+				name: cfName,
+				kind: cfKind,
+				options: cfOptions
+			});
+			cfOpen = false;
+			toast.success('Field saved');
+		} catch (e) {
+			toast.error(errMsg(e, 'Something went wrong'));
+		} finally {
+			cfBusy = false;
+		}
+	}
+
 	let joinQr = $state('');
 	$effect(() => {
 		if (joinQr) return;
@@ -963,6 +1003,60 @@
 					</div>
 				</Card.Content>
 			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<Card.Title class="text-base">Custom member fields</Card.Title>
+						<Badge variant="secondary">Enterprise</Badge>
+					</div>
+					<Card.Description>
+						Extra fields on member records — shirt sizes, referral codes, whatever your gym tracks.
+						They edit on the member page and export in the members CSV.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content class="space-y-2">
+					{#if !memberFields.licensed}
+						<p class="text-sm text-muted-foreground">
+							Custom fields are available on Freeweight Cloud and licensed self-hosted installs.
+						</p>
+					{:else}
+						{#each memberFields.fields as fld (fld.id)}
+							<div class="flex items-center justify-between gap-2 border-b pb-2 last:border-0">
+								<div>
+									<p class="text-sm font-medium">{fld.name}</p>
+									<p class="text-xs text-muted-foreground">
+										{fld.kind}{fld.kind === 'select' && fld.options ? ` — ${fld.options}` : ''} · {fld.members}
+										filled
+									</p>
+								</div>
+								<div class="flex gap-2">
+									<Button size="sm" variant="ghost" onclick={() => openCfField(fld)}>Edit</Button>
+									<Button
+										size="sm"
+										variant="ghost"
+										class="text-destructive"
+										onclick={async () => {
+											if (!confirm(`Delete "${fld.name}" and its values?`)) return;
+											try {
+												await deleteMemberFieldCmd({ id: fld.id });
+												toast.success('Field deleted');
+											} catch (e) {
+												toast.error(errMsg(e, 'Something went wrong'));
+											}
+										}}>Delete</Button
+									>
+								</div>
+							</div>
+						{:else}
+							<p class="text-sm text-muted-foreground">No fields yet.</p>
+						{/each}
+						<Button size="sm" variant="outline" onclick={() => openCfField()}
+							><Plus class="mr-1 h-4 w-4" /> Add field</Button
+						>
+					{/if}
+				</Card.Content>
+			</Card.Root>
 		</Tabs.Content>
 
 		<Tabs.Content value="locations">
@@ -1421,6 +1515,40 @@
 			</Card.Root>
 		</Tabs.Content>
 	</Tabs.Root>
+
+	<Dialog.Root bind:open={cfOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>{cfEditId ? 'Edit field' : 'New member field'}</Dialog.Title>
+			</Dialog.Header>
+			<div class="space-y-3 py-2">
+				<Field.Field>
+					<Field.Label>Name</Field.Label>
+					<Input bind:value={cfName} placeholder="T-shirt size" />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label>Type</Field.Label>
+					<NativeSelect bind:value={cfKind}>
+						<option value="text">Text</option>
+						<option value="number">Number</option>
+						<option value="date">Date</option>
+						<option value="select">Dropdown</option>
+					</NativeSelect>
+				</Field.Field>
+				{#if cfKind === 'select'}
+					<Field.Field>
+						<Field.Label>Options (one per line or comma-separated)</Field.Label>
+						<Textarea bind:value={cfOptions} rows={3} placeholder={'S\nM\nL\nXL'} />
+					</Field.Field>
+				{/if}
+			</div>
+			<Dialog.Footer>
+				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
+					>{cfBusy ? 'Saving…' : 'Save field'}</Button
+				>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
 </div>
 
 <Dialog.Root bind:open={locOpen}>

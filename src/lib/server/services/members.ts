@@ -214,6 +214,10 @@ export async function listMembers(
 			guardianName: sql<
 				string | null
 			>`(select g3.name from ${gymMember} g3 where g3.id = ${outer(gymMember.guardianId)})`,
+			/** Enterprise custom-field values keyed by field id — powers the CSV's dynamic columns. */
+			customFields: sql<
+				Record<string, string>
+			>`coalesce((select jsonb_object_agg(mfv.field_id, mfv.value) from member_field_value mfv where mfv.member_id = ${outer(gymMember.id)}), '{}'::jsonb)`,
 			/** Nearest end date of an active membership (pack expiry or commitment end); null = open-ended. */
 			memberEnds: sql<Date | null>`(select m6.ends_at from ${membership} m6 where m6.member_id = ${outer(gymMember.id)} and m6.status = 'active' and m6.ends_at is not null order by m6.ends_at asc limit 1)`,
 			/** Member's own visits in the trailing 30 days (excludes their guest check-ins). */
