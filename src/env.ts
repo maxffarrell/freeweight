@@ -70,5 +70,20 @@ export const variables = defineEnvVars({
 		description:
 			'Enterprise: override the provider endpoint, e.g. `http://localhost:11434` for Ollama or an OpenRouter/LiteLLM gateway URL.',
 		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_DECISION_KEY: {
+		description:
+			'Enterprise: API key for structured decision calls (JSON the app consumes). OpenAI-spec `/chat/completions` only — no anthropic path. Falls back to `FREEWEIGHT_AI_KEY`.',
+		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_DECISION_MODEL: {
+		description:
+			'Enterprise: model for structured decision calls. Falls back to `FREEWEIGHT_AI_MODEL` (then `gpt-4o-mini`).',
+		schema: (value) => value || undefined
+	},
+	FREEWEIGHT_AI_DECISION_BASE_URL: {
+		description:
+			'Enterprise: endpoint override for decision calls — must serve POST `/v1/chat/completions`. Falls back to `FREEWEIGHT_AI_BASE_URL` (then `https://api.openai.com`).',
+		schema: (value) => value || undefined
 	}
 });

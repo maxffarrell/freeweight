@@ -17,8 +17,17 @@ import { member, user } from '#lib/server/db/auth.schema.ts';
 import { localDate } from '#lib/tz.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
+import * as v from 'valibot';
 import { orgBrand } from '../org-brand.ts';
-import { aiComplete, aiJson, aiAvailable } from './ai.ts';
+import { aiComplete, aiDecision, aiDecisionAvailable } from './ai.ts';
+
+/** Decision-call schemas — the structured JSON shapes the app consumes. */
+const draftEmailSchema = v.object({ subject: v.string(), body: v.string() });
+const insightsSchema = v.object({ insights: v.array(v.string()) });
+const programSchema = v.object({
+	name: v.string(),
+	days: v.array(v.object({ title: v.string(), body: v.string() }))
+});
 
 /**
  * Drafts an announcement email for staff to review before sending. The member
@@ -29,7 +38,7 @@ export async function draftAnnouncement(
 	orgName: string,
 	opts: { goal: string; audience?: string }
 ): Promise<{ subject: string; body: string }> {
-	const out = await aiJson<{ subject: string; body: string }>([
+	const out = await aiDecision(draftEmailSchema, [
 		{
 			role: 'user',
 			content: `You write concise, friendly announcement emails for a gym called "${orgName}".
@@ -168,7 +177,8 @@ export async function gymInsights(orgId: string, tz: string): Promise<string[]> 
 		cancelled_memberships_last_30d: ends?.count ?? 0
 	};
 
-	const out = await aiJson<{ insights: string[] }>(
+	const out = await aiDecision(
+		insightsSchema,
 		[
 			{
 				role: 'user',
@@ -181,7 +191,7 @@ Return JSON {"insights": [...]} with 3-5 short, specific, actionable observation
 		],
 		800
 	);
-	return Array.isArray(out.insights) ? out.insights.filter((s) => typeof s === 'string') : [];
+	return out.insights.filter((s) => s.trim().length > 0);
 }
 
 /** Full member-facing workout plan generator — portal EE surface. */
@@ -229,7 +239,7 @@ export async function draftWinBack(
 		totalVisits: number;
 	}
 ): Promise<{ subject: string; body: string }> {
-	const out = await aiJson<{ subject: string; body: string }>([
+	const out = await aiDecision(draftEmailSchema, [
 		{
 			role: 'user',
 			content: `You write concise, friendly win-back emails for a gym called "${orgName}".
@@ -277,7 +287,8 @@ export async function generateProgram(opts: {
 	weeks: number;
 	daysPerWeek: number;
 }): Promise<{ name: string; days: { title: string; body: string }[] }> {
-	const out = await aiJson<{ name: string; days: { title: string; body: string }[] }>(
+	const out = await aiDecision(
+		programSchema,
 		[
 			{
 				role: 'system',
@@ -308,7 +319,7 @@ Return JSON {"name": "short program name", "days": [{"title": "Day 1 — focus",
  * bullets by email. Deduped per week via notification_log 'ai_insights'.
  */
 export async function sendWeeklyInsights(orgId: string): Promise<number> {
-	if (!aiAvailable()) return 0;
+	if (!aiDecisionAvailable()) return 0;
 	const [s] = await db
 		.select({ timezone: gymSettings.timezone })
 		.from(gymSettings)
@@ -360,7 +371,7 @@ export async function draftIssueReply(
 	member: { name: string },
 	issueText: string
 ): Promise<{ subject: string; body: string }> {
-	const out = await aiJson<{ subject: string; body: string }>([
+	const out = await aiDecision(draftEmailSchema, [
 		{
 			role: 'user',
 			content: `You write short, human reply emails for a gym called "${orgName}".
