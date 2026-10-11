@@ -1,5 +1,3 @@
-/* @license Enterprise */
-
 import { and, eq, gte, isNull, lt, ne, notInArray, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import {
@@ -57,7 +55,7 @@ Rules:
 	return { subject: out.subject.trim(), body: out.body.trim() };
 }
 
-/** 3-5 actionable observations generated from live gym stats (Enterprise AI). */
+/** 3-5 actionable observations generated from live gym stats (BYOK AI). */
 export async function gymInsights(orgId: string, tz: string): Promise<string[]> {
 	const today = localDate(new Date(), tz);
 	const d30 = new Date(Date.now() - 30 * 86400_000);

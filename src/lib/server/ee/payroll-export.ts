@@ -5,7 +5,7 @@ import { gte, and, asc, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm
 import { db } from '#lib/server/db/index.ts';
 import { member, session, user } from '#lib/server/db/auth.schema.ts';
 import { classSession, classType, shift } from '#lib/server/db/schema.ts';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 export function payrollExportEnabled() {
 	return hasFeature('payroll-export');

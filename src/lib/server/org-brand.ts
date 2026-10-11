@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { gymSettings, organization } from '#lib/server/db/schema.ts';
 import { appOrigin } from '#lib/server/email.ts';
-import { isEnterpriseEnabled } from './ee/license.ts';
+import { isEnterpriseEnabled } from './features.ts';
 
 /** Shared email branding — org name, logo, and the licensed white-label flag. */
 export async function orgBrand(orgId: string) {

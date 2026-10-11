@@ -13,7 +13,7 @@ import {
 	outer
 } from '#lib/server/db/schema.ts';
 import { anonymizeMember } from '#lib/server/services/members.ts';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 export function dataRetentionEnabled() {
 	return hasFeature('data-retention');

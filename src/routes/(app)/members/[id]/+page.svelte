@@ -1122,7 +1122,7 @@
 						}}>Export member data</DropdownMenu.Item
 					>
 				{/if}
-				{#if ai.licensed && ai.configured}
+				{#if ai.configured}
 					<DropdownMenu.Item onclick={() => runAiSummary('progress')}
 						>AI progress summary</DropdownMenu.Item
 					>

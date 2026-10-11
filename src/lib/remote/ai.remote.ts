@@ -20,7 +20,6 @@ import {
 	plan
 } from '#lib/server/db/schema.ts';
 import { member, user } from '#lib/server/db/auth.schema.ts';
-import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
 import {
 	aiAvailable,
 	aiComplete,
@@ -28,7 +27,7 @@ import {
 	aiDecisionAvailable,
 	requireAi,
 	requireAiDecision
-} from '#lib/server/ee/ai.ts';
+} from '#lib/server/ai/ai.ts';
 import {
 	draftAnnouncement,
 	draftClassDescription,
@@ -37,16 +36,15 @@ import {
 	generateProgram,
 	gymInsights,
 	rosterBrief
-} from '#lib/server/ee/ai-features.ts';
+} from '#lib/server/ai/ai-features.ts';
 
 /**
- * Enterprise AI surfaces. The API key never crosses the wire — clients only see
- * booleans, and every call re-checks the license + provider on the server.
+ * BYOK AI surfaces. The API key never crosses the wire — clients only see
+ * booleans, and every call re-checks the provider configuration on the server.
  */
 export const getAiStatus = query(async () => {
 	await requireOrg();
 	return {
-		licensed: isEnterpriseEnabled(),
 		configured: aiAvailable(),
 		decisionConfigured: aiDecisionAvailable(),
 		provider: aiConfig()?.provider ?? null
@@ -68,15 +66,13 @@ export const aiDraftEmail = command(aiDraftInput, async (input) => {
 /** Dashboard insights — a handful of actionable bullets computed from live stats. */
 export const getAiInsights = query(async () => {
 	const { orgId } = await requireOrg();
-	if (!isEnterpriseEnabled())
-		return { licensed: false, configured: false, bullets: [] as string[] };
-	if (!aiDecisionAvailable()) return { licensed: true, configured: false, bullets: [] as string[] };
+	if (!aiDecisionAvailable()) return { configured: false, bullets: [] as string[] };
 	const [settings] = await db
 		.select({ timezone: gymSettings.timezone })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const bullets = await gymInsights(orgId, settings?.timezone ?? 'UTC');
-	return { licensed: true, configured: true, bullets };
+	return { configured: true, bullets };
 });
 
 /** Win-back draft personalized from the member's real plan/visit stats. */
@@ -333,7 +329,7 @@ export const aiMemberBrief = command(idSchema, async (memberId) => {
 	return { brief: text };
 });
 
-/** Three subject-line variants for an announcement body (Enterprise ai). */
+/** Three subject-line variants for an announcement body (BYOK AI). */
 export const aiSubjectVariants = command(v.object({ body: v.string() }), async ({ body }) => {
 	const { org } = await requireOrg();
 	requireAi();
@@ -361,7 +357,7 @@ export const aiSubjectVariants = command(v.object({ body: v.string() }), async (
 	return { variants: variants.filter(Boolean) };
 });
 
-/** Rewrite an announcement body for clarity/tone (Enterprise ai). */
+/** Rewrite an announcement body for clarity/tone (BYOK AI). */
 export const aiImproveDraft = command(v.object({ body: v.string() }), async ({ body }) => {
 	const { org } = await requireOrg();
 	requireAi();

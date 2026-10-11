@@ -6,6 +6,10 @@ Files marked with `/* @license Enterprise */` (including everything under
 `src/lib/server/ee/`) are licensed under this Freeweight Enterprise License and
 NOT under the AGPLv3 that covers the rest of the repository.
 
+Basic SSO, passkeys and BYOK AI in `src/lib/server/auth-plugins.ts` and
+`src/lib/server/ai/` are part of the AGPLv3 core and are not covered by this
+Enterprise License.
+
 You may use, copy and modify these files for development and testing. Use of
 these files in production requires a valid Freeweight Enterprise subscription
 (a `FREEWEIGHT_ENTERPRISE_KEY`) or running on Freeweight Cloud, and is limited to

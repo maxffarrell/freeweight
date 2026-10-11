@@ -43,7 +43,7 @@ import {
 	payrollExportEnabled
 } from '#lib/server/ee/payroll-export.ts';
 import { customFieldsEnabled } from '#lib/server/ee/custom-fields.ts';
-import { hasFeature } from '#lib/server/ee/license.ts';
+import { hasFeature } from '#lib/server/features.ts';
 import {
 	reportDigestsEnabled,
 	sendMonthClose,

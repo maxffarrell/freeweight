@@ -4,7 +4,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
 import { gymMember, memberField, memberFieldValue, outer } from '#lib/server/db/schema.ts';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 export type MemberFieldKind = 'text' | 'number' | 'date' | 'select';
 

@@ -7,7 +7,9 @@ Portions of this software are licensed as follows:
   defined in `ee/LICENSE`.
 * The SDK (`packages/sdk/`) is licensed under the MIT license in its directory.
 * All other content is licensed under the GNU Affero General Public License v3
-  (AGPLv3), reproduced in `LICENSE-AGPL.txt`.
+  (AGPLv3), reproduced in `LICENSE-AGPL.txt`. This includes basic SSO,
+  passkeys and BYOK AI in `src/lib/server/auth-plugins.ts` and
+  `src/lib/server/ai/`.
 
 Application exception: programs that interact with Freeweight only through its
 published interfaces (the REST API, webhooks and the SDK) without incorporating

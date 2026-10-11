@@ -26,7 +26,8 @@ Members, memberships, class scheduling, QR check-ins and billing, plus a member 
 - **Public join page** (`/j/[gym]`): gym info, listed plans, weekly schedule, anti-spam join form
 - **Command palette** (<kbd>⌘K</kbd>), `d`/`m`/`s`/`c`/`b`/`p`/`t` nav shortcuts
 - **REST API + API keys** (`fw_`), signed **webhooks** (`x-freeweight-signature`), and an MIT **SDK** in `packages/sdk`
-- **Enterprise** (Cloud or `FREEWEIGHT_ENTERPRISE_KEY`): SAML & OIDC single sign-on, passkeys
+- **Basic SAML/OIDC SSO and passkeys**: included in the free self-hosted core; connect your own identity provider
+- **BYOK AI**: included in the free self-hosted core; use your own API key or a compatible local model endpoint
 
 Out of scope by design: payroll, workout programming, and access-control hardware. Webhooks + the REST API are the integration surface.
 
@@ -59,6 +60,10 @@ Open http://localhost:5173, create an account, then click **Explore with demo da
 
 Environment variables are documented in [`src/env.ts`](src/env.ts).
 
+### Self-hosted SSO and AI
+
+Basic SAML/OIDC SSO, passkeys and BYOK AI are included without an enterprise key or Cloud subscription. See [the configuration guide](docs/self-hosted-sso-ai.md). You supply your identity provider and any model-provider credentials; provider usage fees are separate. Credentials stay on the server. Public demos continue to block SSO/passkey configuration.
+
 ## Scheduled jobs
 
 Membership billing (creating the next period's charge and marking overdue charges) runs whenever someone opens the app. To run it on time every day, set `CRON_SECRET` and call `GET /api/cron` with `Authorization: Bearer $CRON_SECRET`. On Vercel, the cron in `vercel.json` does this for you. Elsewhere, use any scheduler, for example:
@@ -79,4 +84,4 @@ Webhooks (Settings → Webhooks) are signed with HMAC-SHA256 in `x-freeweight-si
 
 ## License
 
-AGPLv3 for the core. `ee/`/`src/lib/server/ee/` under the Freeweight Enterprise License (SAML/OIDC SSO, passkeys — free with `FREEWEIGHT_ENTERPRISE_KEY` or on Freeweight Cloud). `packages/sdk` is MIT.
+AGPLv3 for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.

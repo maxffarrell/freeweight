@@ -19,8 +19,8 @@ import { sendEmail } from '#lib/server/email.ts';
 import { orgBrand } from '../org-brand.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { localDate } from '#lib/tz.ts';
-import { hasFeature } from './license.ts';
-import { aiAvailable, aiComplete } from './ai.ts';
+import { hasFeature } from '../features.ts';
+import { aiAvailable, aiComplete } from '../ai/ai.ts';
 
 export function reportDigestsEnabled() {
 	return hasFeature('report-digests');

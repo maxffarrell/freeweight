@@ -23,7 +23,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
-import { isEnterpriseEnabled } from '../ee/license.ts';
+import { isEnterpriseEnabled } from '../features.ts';
 import { joinPageFields, saveJoinAnswers } from '../ee/custom-fields.ts';
 import { healthFormsEnabled, PARQ_QUESTIONS, submitParq } from '../ee/health-forms.ts';
 import {

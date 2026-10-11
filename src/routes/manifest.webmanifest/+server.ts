@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
 import { gymSettings } from '#lib/server/db/schema.ts';
-import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
+import { isEnterpriseEnabled } from '#lib/server/features.ts';
 
 /** PWA manifest — keeps the kiosk/portal installable on desk tablets and phones. */
 export const GET: RequestHandler = async (event) => {

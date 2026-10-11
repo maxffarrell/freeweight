@@ -6,7 +6,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { activity, gymMember, gymSettings, location, membership } from '#lib/server/db/schema.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 export function doorAccessEnabled() {
 	return hasFeature('door-access');

@@ -651,7 +651,7 @@
 		}
 	}
 	let testPending = $state(false);
-	// ------- AI draft (Enterprise) -------
+	// ------- AI draft (BYOK) -------
 	let aiDraftOpen = $state(false);
 	let aiGoal = $state('');
 	let aiPending = $state(false);
@@ -1257,41 +1257,38 @@
 				{/if}
 			</div>
 		{/if}
-		{#if ai.licensed}
-			<div class="rounded-md border bg-muted/40 p-3">
-				{#if ai.configured}
-					{#if aiDraftOpen}
-						<div class="flex items-center gap-2">
-							<Input bind:value={aiGoal} placeholder="e.g. Closed July 4, reopen Monday" />
-							<Button
-								type="button"
-								size="sm"
-								disabled={aiPending || !aiGoal.trim()}
-								onclick={runAiDraft}>{aiPending ? 'Drafting…' : 'Draft'}</Button
-							>
-							<Button type="button" variant="ghost" size="sm" onclick={() => (aiDraftOpen = false)}
-								>Cancel</Button
-							>
-						</div>
-						<p class="mt-1.5 text-xs text-muted-foreground">
-							Describe the announcement — AI writes the subject + body for review.
-						</p>
-					{:else}
-						<button
+		<div class="rounded-md border bg-muted/40 p-3">
+			{#if ai.decisionConfigured}
+				{#if aiDraftOpen}
+					<div class="flex items-center gap-2">
+						<Input bind:value={aiGoal} placeholder="e.g. Closed July 4, reopen Monday" />
+						<Button
 							type="button"
-							class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-							onclick={() => (aiDraftOpen = true)}
-							><Sparkles class="size-3.5" /> Draft with AI</button
+							size="sm"
+							disabled={aiPending || !aiGoal.trim()}
+							onclick={runAiDraft}>{aiPending ? 'Drafting…' : 'Draft'}</Button
 						>
-					{/if}
-				{:else}
-					<p class="text-xs text-muted-foreground">
-						AI drafting is available — set FREEWEIGHT_AI_PROVIDER/_MODEL/_KEY on the server to
-						enable it.
+						<Button type="button" variant="ghost" size="sm" onclick={() => (aiDraftOpen = false)}
+							>Cancel</Button
+						>
+					</div>
+					<p class="mt-1.5 text-xs text-muted-foreground">
+						Describe the announcement — AI writes the subject + body for review.
 					</p>
+				{:else}
+					<button
+						type="button"
+						class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+						onclick={() => (aiDraftOpen = true)}><Sparkles class="size-3.5" /> Draft with AI</button
+					>
 				{/if}
-			</div>
-		{/if}
+			{:else}
+				<p class="text-xs text-muted-foreground">
+					AI drafting is available — set FREEWEIGHT_AI_PROVIDER/_MODEL/_KEY on the server to enable
+					it.
+				</p>
+			{/if}
+		</div>
 		{#if announcements.length}
 			<div class="rounded-md border bg-muted/40 p-3 text-sm">
 				<p class="mb-2 font-medium text-muted-foreground">Recently sent</p>
