@@ -1923,7 +1923,7 @@
 						</Table.Row>
 					</Table.Header>
 					<Table.Body>
-						{#each r.staffing as st (st.name)}
+						{#each r.staffing as st (st.memberId)}
 							<Table.Row>
 								<Table.Cell class="font-medium">{st.name}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{st.rotaHrs.toFixed(1)}h</Table.Cell>
