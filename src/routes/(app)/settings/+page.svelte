@@ -1538,7 +1538,7 @@
 				{#if cfKind === 'select'}
 					<Field.Field>
 						<Field.Label>Options (one per line or comma-separated)</Field.Label>
-						<Textarea bind:value={cfOptions} rows={3} placeholder={'S\nM\nL\nXL'} />
+						<Textarea bind:value={cfOptions} rows={3} placeholder="S, M, L, XL" />
 					</Field.Field>
 				{/if}
 			</div>
