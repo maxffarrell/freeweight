@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "door_webhook_url" text DEFAULT '' NOT NULL;

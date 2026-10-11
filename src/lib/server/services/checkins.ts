@@ -35,6 +35,7 @@ import {
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
 import { healthFormsEnabled } from '../ee/health-forms.ts';
+import { fireDoorWebhook } from '../ee/door-access.ts';
 import {
 	notifyCheckInMilestone,
 	notifyFirstVisit,
@@ -521,6 +522,12 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				gte(checkIn.checkedAt, zonedToUtc(`${today.slice(0, 7)}-01T00:00`, tz))
 			)
 		);
+	void fireDoorWebhook(ctx.orgId, {
+		memberId: m.id,
+		memberName: m.name,
+		checkedAt: row!.checkedAt.toISOString(),
+		locationId: row!.locationId ?? null
+	});
 	return {
 		checkIn: row!,
 		member: m,

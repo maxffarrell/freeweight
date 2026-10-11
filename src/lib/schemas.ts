@@ -542,6 +542,7 @@ export const settingsInput = v.object({
 	/** Enterprise kiosk-pin: 4-digit desk PIN; empty = unlocked. */
 	kioskPin: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(8))),
 	retentionDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(3650))),
+	doorWebhookUrl: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 	/** Comp classes granted on each member's birthday; null/0 = off. */
 	birthdayCompCredits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))

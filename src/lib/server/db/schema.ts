@@ -121,6 +121,8 @@ export const gymSettings = pgTable('gym_settings', {
 	kioskPin: text('kiosk_pin').notNull().default(''),
 	/** Enterprise data-retention: purge activity + notification log older than N days. 0 = keep forever. */
 	retentionDays: integer('retention_days').notNull().default(0),
+	/** Enterprise door-access: POST a signed check-in event to this URL (door systems). */
+	doorWebhookUrl: text('door_webhook_url').notNull().default(''),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
