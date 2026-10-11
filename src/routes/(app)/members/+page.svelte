@@ -515,13 +515,15 @@
 						? 'Inactive members'
 						: emailAudience === '__noportal'
 							? 'Members without portal access'
-							: emailAudience === '__recent'
-								? 'New this week'
-								: audTag
-									? `Tag: ${audTag}`
-									: audLoc
-										? `Location: ${audLocName}`
-										: `Plan: ${audPlanName}`
+							: emailAudience === '__nohealth'
+								? 'Members without a current health form'
+								: emailAudience === '__recent'
+									? 'New this week'
+									: audTag
+										? `Tag: ${audTag}`
+										: audLoc
+											? `Location: ${audLocName}`
+											: `Plan: ${audPlanName}`
 	);
 	const audienceCount = $derived(
 		emailAudience === '__sel'
@@ -534,7 +536,8 @@
 						atRisk: emailAudience === '__risk',
 						inactive: emailAudience === '__inactive',
 						recent: emailAudience === '__recent',
-						noPortal: emailAudience === '__noportal'
+						noPortal: emailAudience === '__noportal',
+						noHealthForm: emailAudience === '__nohealth'
 					})
 				: null
 	);
@@ -542,7 +545,12 @@
 		e.preventDefault();
 		emailPending = true;
 		try {
-			if (emailSendAt && emailAudience !== '__sel' && emailAudience !== '__noportal') {
+			if (
+				emailSendAt &&
+				emailAudience !== '__sel' &&
+				emailAudience !== '__noportal' &&
+				emailAudience !== '__nohealth'
+			) {
 				await scheduleEmail({
 					subject: emailSubject,
 					message: emailBody,
@@ -566,6 +574,7 @@
 					inactive: emailAudience === '__inactive',
 					recent: emailAudience === '__recent',
 					noPortal: emailAudience === '__noportal',
+					noHealthForm: emailAudience === '__nohealth',
 					memberIds: emailAudience === '__sel' ? [...selected] : undefined
 				});
 				toast.success(r.total ? `Sent to ${r.sent} of ${r.total} members` : 'No members to email');
@@ -1324,6 +1333,9 @@
 							<Select.Item value="__inactive">Inactive members</Select.Item>
 							<Select.Item value="__recent">New this week</Select.Item>
 							<Select.Item value="__noportal">No portal access</Select.Item>
+							{#if entitlements.healthForms}
+								<Select.Item value="__nohealth">No health form</Select.Item>
+							{/if}
 							{#each allTags as t (t)}
 								<Select.Item value="tag:{t}">Tag: {t}</Select.Item>
 							{/each}

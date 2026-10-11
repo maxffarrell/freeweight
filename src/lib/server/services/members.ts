@@ -28,6 +28,7 @@ import {
 	gymSettings,
 	incident,
 	location,
+	memberFieldValue,
 	memberMeasurement,
 	memberNote,
 	memberTag,
@@ -1898,6 +1899,8 @@ export async function anonymizeMember(
 			referralSource: null,
 			photoDocumentId: null,
 			goalVisitsPerMonth: null,
+			parqSignedAt: null,
+			parqAnswers: null,
 			deletionRequestedAt: null,
 			updatedAt: new Date()
 		})
@@ -1910,6 +1913,12 @@ export async function anonymizeMember(
 		.delete(memberMeasurement)
 		.where(
 			and(eq(memberMeasurement.organizationId, ctx.orgId), eq(memberMeasurement.memberId, memberId))
+		);
+	// Health-questionnaire answers and custom-field values are PII too.
+	await db
+		.delete(memberFieldValue)
+		.where(
+			and(eq(memberFieldValue.organizationId, ctx.orgId), eq(memberFieldValue.memberId, memberId))
 		);
 	await emit({
 		orgId: ctx.orgId,

@@ -1759,9 +1759,11 @@ export async function sendAnnouncement(
 	locationId?: string,
 	inactive?: boolean,
 	recent?: boolean,
-	noPortal?: boolean
+	noPortal?: boolean,
+	noHealthForm?: boolean
 ) {
 	if (!emailProvider()) error(409, 'No email provider configured');
+	const parqMonths = noHealthForm ? await parqMonthsFor(orgId) : 0;
 	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 	const members = await db
 		.select({ id: gymMember.id, email: gymMember.email, name: gymMember.name })
@@ -1778,6 +1780,7 @@ export async function sendAnnouncement(
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				noPortal ? isNull(gymMember.portalUserId) : undefined,
+				noHealthForm ? noCurrentHealthForm(parqMonths) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
@@ -1867,9 +1870,11 @@ export async function countAnnouncementAudience(
 	locationId?: string,
 	inactive?: boolean,
 	recent?: boolean,
-	noPortal?: boolean
+	noPortal?: boolean,
+	noHealthForm?: boolean
 ) {
 	const joinedAfter = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+	const parqMonths = noHealthForm ? await parqMonthsFor(orgId) : 0;
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(gymMember)
@@ -1884,11 +1889,32 @@ export async function countAnnouncementAudience(
 				locationId ? eq(gymMember.locationId, locationId) : undefined,
 				recent ? gte(gymMember.joinedAt, joinedAfter) : undefined,
 				noPortal ? isNull(gymMember.portalUserId) : undefined,
+				noHealthForm ? noCurrentHealthForm(parqMonths) : undefined,
 				isNull(gymMember.unsubscribedAt),
 				sql`${gymMember.email} is not null and ${gymMember.email} <> ''`
 			)
 		);
 	return n;
+}
+
+/** gymSettings.parqMonths — read once per audience build. */
+async function parqMonthsFor(orgId: string): Promise<number> {
+	const [s] = await db
+		.select({ m: gymSettings.parqMonths })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	return s?.m ?? 0;
+}
+
+/** "No current signed health form" — unsigned, or signed beyond the expiry window. */
+function noCurrentHealthForm(parqMonths: number) {
+	return parqMonths > 0
+		? or(
+				isNull(gymMember.parqSignedAt),
+				lt(gymMember.parqSignedAt, new Date(Date.now() - parqMonths * 30.4 * 86400_000))
+			)
+		: isNull(gymMember.parqSignedAt);
 }
 
 /** Queues an announcement for a later send time; the cron delivers it. */

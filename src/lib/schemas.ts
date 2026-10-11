@@ -688,7 +688,9 @@ export const announcementInput = v.object({
 	/** Restrict the batch to members who joined in the last 7 days. */
 	recent: v.optional(v.boolean()),
 	/** Restrict the batch to members who never claimed a portal login. */
-	noPortal: v.optional(v.boolean())
+	noPortal: v.optional(v.boolean()),
+	/** Restrict the batch to members without a current signed health form (Enterprise). */
+	noHealthForm: v.optional(v.boolean())
 });
 
 export const scheduledAnnouncementInput = v.object({
