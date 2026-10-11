@@ -318,3 +318,21 @@ export const aiSubjectVariants = command(v.object({ body: v.string() }), async (
 	}
 	return { variants: variants.filter(Boolean) };
 });
+
+/** Rewrite an announcement body for clarity/tone (Enterprise ai). */
+export const aiImproveDraft = command(v.object({ body: v.string() }), async ({ body }) => {
+	const { org } = await requireOrg();
+	requireAi();
+	const text = await aiComplete(
+		[
+			{
+				role: 'system',
+				content:
+					'You edit gym announcement emails. Rewrite the body: tighter, warmer, scannable (short paragraphs or bullets when a list exists). Keep every fact exactly. Plain text only, under 400 words. Reply with ONLY the rewritten body.'
+			},
+			{ role: 'user', content: `Gym: ${org.name}. Current draft:\n${body.slice(0, 3000)}` }
+		],
+		1000
+	);
+	return { improved: text.trim() };
+});

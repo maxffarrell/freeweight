@@ -19,8 +19,10 @@ import {
 	membership,
 	organization,
 	payment,
-	plan
+	plan,
+	webhook
 } from '#lib/server/db/schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { localDate } from '#lib/tz.ts';
 import { notificationLog } from '#lib/server/db/schema.ts';
@@ -58,7 +60,9 @@ export async function exportOrgData(orgId: string) {
 		checkIns,
 		charges,
 		payments,
-		activityRows
+		activityRows,
+		webhooks,
+		staffMembers
 	] = await Promise.all([
 		db.select().from(organization).where(eq(organization.id, orgId)),
 		db
@@ -86,7 +90,13 @@ export async function exportOrgData(orgId: string) {
 			.select()
 			.from(activity)
 			.where(eq(activity.organizationId, orgId))
-			.orderBy(asc(activity.createdAt))
+			.orderBy(asc(activity.createdAt)),
+		db.select().from(webhook).where(eq(webhook.organizationId, orgId)),
+		db
+			.select({ name: user.name, email: user.email, role: member.role })
+			.from(member)
+			.innerJoin(user, eq(member.userId, user.id))
+			.where(eq(member.organizationId, orgId))
 	]);
 
 	return {
@@ -105,7 +115,9 @@ export async function exportOrgData(orgId: string) {
 		checkIns,
 		charges,
 		payments,
-		activity: activityRows
+		activity: activityRows,
+		webhooks,
+		staffMembers
 	};
 }
 

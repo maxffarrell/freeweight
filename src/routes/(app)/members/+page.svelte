@@ -66,7 +66,12 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { aiDraftEmail, aiSubjectVariants, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import {
+		aiDraftEmail,
+		aiImproveDraft,
+		aiSubjectVariants,
+		getAiStatus
+	} from '#lib/remote/ai.remote.ts';
 
 	const currency = await getCurrency();
 	const ai = await getAiStatus();
@@ -457,6 +462,18 @@
 	let emailSubject = $state('');
 	let subjectVariants = $state<string[]>([]);
 	let subjectBusy = $state(false);
+	let improveBusy = $state(false);
+	async function improveDraft() {
+		improveBusy = true;
+		try {
+			const res = await aiImproveDraft({ body: emailBody });
+			if (res.improved) emailBody = res.improved;
+		} catch (err) {
+			toast.error(errMsg(err, 'AI unavailable'));
+		} finally {
+			improveBusy = false;
+		}
+	}
 	async function suggestSubjects() {
 		subjectBusy = true;
 		try {
@@ -1370,6 +1387,16 @@
 				<Field.Description>
 					Personalize with {'{name}'}, {'{first_name}'}, {'{gym}'} or {'{date}'}.
 				</Field.Description>
+				{#if entitlements.ai}
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-6 w-fit px-2 text-xs"
+						disabled={improveBusy || !emailBody.trim()}
+						onclick={improveDraft}>Improve draft</Button
+					>
+				{/if}
 			</Field.Field>
 			{#if emailPreview != null}
 				<iframe

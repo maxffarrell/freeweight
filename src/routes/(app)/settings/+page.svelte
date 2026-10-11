@@ -69,6 +69,7 @@
 		testDoorWebhook,
 		syncDoorRosterNow,
 		getOrgDataExport,
+		sendDigestNow,
 		sendDigestPreview,
 		sendExportWebhookNow
 	} from '#lib/remote/ee.remote.ts';
@@ -365,6 +366,7 @@
 	let anonymizeMonths = $state(settings.anonymizeMonths);
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
 	let digestRecipients = $state(settings.digestRecipients);
+	let doorEventsCsv = $state(settings.doorEvents);
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
 	let healthQuestions = $state(settings.healthQuestions);
@@ -442,6 +444,7 @@
 				anonymizeMonths,
 				exportWebhookUrl,
 				digestRecipients,
+				doorEvents: doorEventsCsv,
 				brandColor,
 				parqMonths,
 				healthQuestions,
@@ -1188,6 +1191,36 @@
 									>
 								</div>
 							</div>
+							<div
+								class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
+							>
+								<span>Fire events:</span>
+								{#each [['member.checked_in', 'check-in'], ['member.checked_out', 'check-out'], ['member.checkin_voided', 'void'], ['guest.checked_in', 'guest'], ['member.checkin_flagged', 'flagged'], ['member.suspended', 'suspended'], ['member.reactivated', 'reactivated'], ['member.provisioned', 'provisioned']] as [ev, lbl] (ev)}
+									{@const list = doorEventsCsv ? doorEventsCsv.split(',').map((e) => e.trim()) : []}
+									<label class="flex items-center gap-1.5">
+										<Checkbox
+											checked={list.length === 0 || list.includes(ev)}
+											onCheckedChange={(c) => {
+												const cur = list.length
+													? [...list]
+													: [
+															'member.checked_in',
+															'member.checked_out',
+															'member.checkin_voided',
+															'guest.checked_in',
+															'member.checkin_flagged',
+															'member.suspended',
+															'member.reactivated',
+															'member.provisioned'
+														];
+												const next = c ? [...cur, ev] : cur.filter((e) => e !== ev);
+												doorEventsCsv = [...new Set(next)].join(',');
+											}}
+										/>
+										{lbl}
+									</label>
+								{/each}
+							</div>
 						{/if}
 						{#if entitlements.auditExport}
 							<div class="flex items-center justify-between gap-4">
@@ -1247,6 +1280,31 @@
 												digestBusy = false;
 											}
 										}}>Email me a preview</Button
+									>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={digestBusy}
+										onclick={async () => {
+											if (
+												!confirm(
+													"Send last month's digest to all recipients now? They won't get it again on the 1st."
+												)
+											)
+												return;
+											digestBusy = true;
+											try {
+												const r = await sendDigestNow();
+												toast.success(
+													`Digest sent to ${r.sent} recipient${r.sent === 1 ? '' : 's'}`
+												);
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not send'));
+											} finally {
+												digestBusy = false;
+											}
+										}}>Send now</Button
 									>
 								</div>
 							</div>
