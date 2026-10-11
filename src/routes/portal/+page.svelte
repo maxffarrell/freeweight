@@ -3449,9 +3449,9 @@
 												class="flex items-center gap-1 text-xs whitespace-nowrap text-muted-foreground"
 												title={`Also book: ${dependents.map((o) => o.label).join(', ')}`}
 											>
-												<input
-													type="checkbox"
+												<Checkbox
 													class="size-3"
+													aria-label="Also book family members"
 													bind:checked={familyPick[b.session.id]}
 												/>
 												+family

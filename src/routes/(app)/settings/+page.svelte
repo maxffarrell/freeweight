@@ -1478,7 +1478,7 @@
 								bind:value={hours[i].close}
 							/>
 							<label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-								<input type="checkbox" class="size-3.5" bind:checked={hours[i].closed} /> Closed
+								<Checkbox bind:checked={hours[i].closed} /> Closed
 							</label>
 						</div>
 					{/each}
@@ -1675,8 +1675,8 @@
 									<p class="font-medium">{l.name}</p>
 									{#if l.address}<p class="text-xs text-muted-foreground">{l.address}</p>{/if}
 									{#if entitlements.doorAccess}
-										<input
-											class="mt-1 w-full max-w-72 rounded border bg-transparent px-1.5 py-0.5 text-xs text-muted-foreground"
+										<Input
+											class="mt-1 h-7 w-full max-w-72 text-xs text-muted-foreground"
 											placeholder="Door webhook URL (overrides org setting)"
 											defaultValue={l.doorWebhookUrl}
 											onblur={async (e) => {
@@ -2091,7 +2091,7 @@
 							<div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
 								{#each API_RESOURCES as r (r)}
 									<label class="flex items-center gap-2">
-										<input type="checkbox" bind:checked={keyPerms[r]} class="accent-primary" />
+										<Checkbox bind:checked={keyPerms[r]} />
 										{r}
 									</label>
 								{/each}
@@ -2282,19 +2282,18 @@
 					</Field.Field>
 				{/if}
 				<label class="flex items-center gap-2 text-sm">
-					<input type="checkbox" bind:checked={cfJoin} /> Ask on the join page
+					<Checkbox bind:checked={cfJoin} /> Ask on the join page
 				</label>
 				{#if cfJoin}
 					<label class="ml-6 flex items-center gap-2 text-sm">
-						<input type="checkbox" bind:checked={cfJoinRequired} /> Required — join can't submit without
-						it
+						<Checkbox bind:checked={cfJoinRequired} /> Required — join can't submit without it
 					</label>
 				{/if}
 				<label class="flex items-center gap-2 text-sm">
-					<input type="checkbox" bind:checked={cfMemberEdit} /> Editable by member in the portal
+					<Checkbox bind:checked={cfMemberEdit} /> Editable by member in the portal
 				</label>
 				<label class="flex items-center gap-2 text-sm">
-					<input type="checkbox" bind:checked={cfRoster} /> Show on the class roster
+					<Checkbox bind:checked={cfRoster} /> Show on the class roster
 				</label>
 			</div>
 			<Dialog.Footer>

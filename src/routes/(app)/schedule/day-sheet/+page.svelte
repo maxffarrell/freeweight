@@ -5,6 +5,7 @@
 	import { localTime } from '#lib/tz.ts';
 	import { formatDate } from '#lib/format.ts';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import Printer from '@lucide/svelte/icons/printer';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
@@ -21,12 +22,7 @@
 	<div class="flex flex-wrap items-center justify-between gap-2 print:hidden">
 		<Button variant="ghost" size="sm" href="/schedule"><ArrowLeft /> Back to schedule</Button>
 		<div class="flex items-center gap-2">
-			<input
-				type="date"
-				class="h-8 rounded-md border bg-background px-2 text-sm"
-				bind:value={date}
-				onchange={() => void reload()}
-			/>
+			<Input type="date" class="h-8 w-auto" bind:value={date} onchange={() => void reload()} />
 			<Button size="sm" onclick={() => window.print()}><Printer /> Print / save as PDF</Button>
 		</div>
 	</div>
