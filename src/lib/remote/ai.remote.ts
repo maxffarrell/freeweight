@@ -155,3 +155,21 @@ export const aiChurnAnalysis = query(async () => {
 	});
 	return { available: true, members };
 });
+
+/** One workout-of-the-day for a session — staff review before saving. */
+export const aiGenerateWod = command(
+	v.object({ className: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)) }),
+	async ({ className }) => {
+		await requireOrg();
+		requireAi();
+		const text = await aiComplete([
+			{
+				role: 'system',
+				content:
+					'You write gym workouts. Reply with ONLY the workout text — 3-6 lines, plain text, no intro, no markdown headers.'
+			},
+			{ role: 'user', content: `Write one workout-of-the-day suitable for a "${className}" class.` }
+		]);
+		return { workout: text.slice(0, 2000) };
+	}
+);

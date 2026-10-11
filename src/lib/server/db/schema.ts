@@ -131,6 +131,8 @@ export const gymSettings = pgTable('gym_settings', {
 	brandColor: text('brand_color').notNull().default(''),
 	/** Enterprise health-forms: re-screen members after this many months (0 = never expires). */
 	parqMonths: integer('parq_months').notNull().default(0),
+	/** Enterprise health-forms: custom screening questions, one per line (blank = standard PAR-Q). */
+	healthQuestions: text('health_questions').notNull().default(''),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

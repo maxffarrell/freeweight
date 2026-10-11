@@ -11,8 +11,19 @@
 <div class="min-h-svh bg-muted/30">
 	<header class="border-b bg-background">
 		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
-			<Logo />
-			<span class="font-semibold">Member portal</span>
+			{#if data.brand.whiteLabel}
+				{#if data.brand.logoDocumentId}
+					<img
+						src="/api/logo/{data.brand.logoDocumentId}"
+						alt=""
+						class="h-7 w-auto object-contain"
+					/>
+				{/if}
+				<span class="font-semibold">{data.brand.orgName}</span>
+			{:else}
+				<Logo />
+				<span class="font-semibold">Member portal</span>
+			{/if}
 			<span class="ml-auto hidden text-sm text-muted-foreground sm:block">{data.user.email}</span>
 			<Button
 				size="sm"

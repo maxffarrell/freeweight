@@ -77,7 +77,7 @@
 		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
-	import { aiDraftClassDescription, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { aiDraftClassDescription, aiGenerateWod, getAiStatus } from '#lib/remote/ai.remote.ts';
 	import { getJoinInfo, getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
@@ -307,6 +307,7 @@
 	let editInstructorId = $state('');
 	let editNote = $state('');
 	let editWorkout = $state('');
+	let wodAiBusy = $state(false);
 	let editStreamUrl = $state('');
 	let editNeedsCover = $state(false);
 	function openEdit() {
@@ -1893,7 +1894,30 @@
 				/>
 			</Field.Field>
 			<Field.Field>
-				<Field.Label for="edit-wod">Workout of the day (optional)</Field.Label>
+				<div class="flex items-center justify-between">
+					<Field.Label for="edit-wod">Workout of the day (optional)</Field.Label>
+					{#if ai.configured}
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							disabled={wodAiBusy}
+							onclick={async () => {
+								wodAiBusy = true;
+								try {
+									const r = await aiGenerateWod({
+										className: focus?.className ?? 'class'
+									});
+									editWorkout = r.workout;
+								} catch (err) {
+									toast.error(errMsg(err, 'AI failed'));
+								} finally {
+									wodAiBusy = false;
+								}
+							}}>{wodAiBusy ? 'Writing…' : 'Write with AI'}</Button
+						>
+					{/if}
+				</div>
 				<Textarea
 					id="edit-wod"
 					bind:value={editWorkout}
