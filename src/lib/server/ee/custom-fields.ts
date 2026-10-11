@@ -27,6 +27,7 @@ export async function listMemberFields(orgId: string) {
 			options: memberField.options,
 			showOnJoin: memberField.showOnJoin,
 			requireOnJoin: memberField.requireOnJoin,
+			memberEditable: memberField.memberEditable,
 			position: memberField.position,
 			members:
 				sql<number>`(select count(*) from ${memberFieldValue} v where v.field_id = ${outer(memberField.id)} and v.value != '')`.mapWith(
@@ -47,6 +48,7 @@ export async function saveMemberField(
 		options?: string;
 		showOnJoin?: boolean;
 		requireOnJoin?: boolean;
+		memberEditable?: boolean;
 	}
 ) {
 	requireCustomFields();
@@ -59,7 +61,8 @@ export async function saveMemberField(
 				kind: input.kind,
 				options,
 				showOnJoin: !!input.showOnJoin,
-				requireOnJoin: !!input.requireOnJoin
+				requireOnJoin: !!input.requireOnJoin,
+				memberEditable: !!input.memberEditable
 			})
 			.where(and(eq(memberField.id, input.id), eq(memberField.organizationId, orgId)));
 		return input.id;
@@ -77,6 +80,7 @@ export async function saveMemberField(
 		options,
 		showOnJoin: !!input.showOnJoin,
 		requireOnJoin: !!input.requireOnJoin,
+		memberEditable: !!input.memberEditable,
 		position: max.n + 1
 	});
 	return id;
@@ -129,6 +133,24 @@ interface FieldRow {
 	members: number;
 	parsedOptions: string[];
 	value: string;
+	memberEditable: boolean;
+}
+
+/** Member-side upsert — only for fields flagged memberEditable. Used by the
+ * portal "Your details" card; everything else stays staff-only. */
+export async function setMyFieldValue(
+	orgId: string,
+	memberId: string,
+	fieldId: string,
+	value: string
+) {
+	requireCustomFields();
+	const [field] = await db
+		.select({ memberEditable: memberField.memberEditable })
+		.from(memberField)
+		.where(and(eq(memberField.id, fieldId), eq(memberField.organizationId, orgId)));
+	if (!field?.memberEditable) throw error(403, 'This field is staff-managed');
+	return setMemberFieldValue(orgId, memberId, fieldId, value);
 }
 
 /** Upserts one value; empty string clears the row. Validates select options. */

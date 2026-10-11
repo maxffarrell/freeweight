@@ -22,6 +22,7 @@
 		getBookable,
 		getMyParq,
 		getMyCustomFields,
+		updateMyCustomField,
 		submitParq,
 		memberBook,
 		memberGiveSpot,
@@ -254,6 +255,23 @@
 	const npsStatus = $derived(await getNpsStatus(memberId));
 	const parq = $derived(await getMyParq(memberId));
 	const customFields = $derived(await getMyCustomFields(memberId));
+	let cfDraft = $state<Record<string, string>>({});
+	$effect(() => {
+		for (const f of customFields.rows) cfDraft[f.fieldId] ??= f.value;
+	});
+	let cfBusy = $state<string | null>(null);
+	async function saveMyField(fieldId: string) {
+		cfBusy = fieldId;
+		try {
+			await updateMyCustomField({ memberId, fieldId, value: cfDraft[fieldId] ?? '' });
+			await getMyCustomFields(memberId).refresh();
+			toast.success('Saved');
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not save'));
+		} finally {
+			cfBusy = null;
+		}
+	}
 	let parqAnswers = $state<Record<string, boolean>>({});
 	let parqBusy = $state(false);
 	let parqReopen = $state(false);
@@ -2172,11 +2190,44 @@
 				</Card.Header>
 				<Card.Content>
 					<div class="space-y-2 text-sm">
-						{#each customFields.rows as f (f.name)}
-							<div class="flex items-baseline justify-between gap-3">
-								<span class="text-muted-foreground">{f.name}</span>
-								<span class="font-medium">{f.value}</span>
-							</div>
+						{#each customFields.rows as f (f.fieldId)}
+							{#if f.editable}
+								<div class="space-y-1">
+									<p class="text-muted-foreground">{f.name}</p>
+									<div class="flex gap-2">
+										{#if f.kind === 'select'}
+											<NativeSelect class="h-9 flex-1" bind:value={cfDraft[f.fieldId]}>
+												<option value="">{f.value || 'Select'}</option>
+												{#each f.options as opt (opt)}
+													<option
+														value={opt}
+														selected={cfDraft[f.fieldId] === opt ||
+															(cfDraft[f.fieldId] === undefined && f.value === opt)}>{opt}</option
+													>
+												{/each}
+											</NativeSelect>
+										{:else}
+											<Input
+												class="h-9 flex-1"
+												type={f.kind === 'number' ? 'number' : f.kind === 'date' ? 'date' : 'text'}
+												placeholder={f.value || '—'}
+												bind:value={cfDraft[f.fieldId]}
+											/>
+										{/if}
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={cfBusy === f.fieldId}
+											onclick={() => saveMyField(f.fieldId)}>Save</Button
+										>
+									</div>
+								</div>
+							{:else}
+								<div class="flex items-baseline justify-between gap-3">
+									<span class="text-muted-foreground">{f.name}</span>
+									<span class="font-medium">{f.value}</span>
+								</div>
+							{/if}
 						{/each}
 					</div>
 				</Card.Content>

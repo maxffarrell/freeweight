@@ -612,6 +612,8 @@ export const joinInput = v.object({
 	promoCode: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(50)))),
 	/** Answers to the gym's custom join fields (fieldId → value). */
 	customValues: v.optional(v.record(v.string(), v.string())),
+	/** PAR-Q answers when the org requires health forms at join (question index → yes/no). */
+	parqAnswers: v.optional(v.record(v.string(), v.boolean())),
 	/** Honeypot: must stay empty. */
 	website: v.optional(v.string(), '')
 });

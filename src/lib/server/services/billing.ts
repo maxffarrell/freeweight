@@ -32,6 +32,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
+import { fireDoorWebhook } from '../ee/door-access.ts';
 import {
 	notifyChargePosted,
 	notifyLowStock,
@@ -549,6 +550,21 @@ export async function updateMembership(
 		.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.id, input.id)))
 		.returning();
 	if (!row) error(404, 'Membership not found');
+	// Suspend/reactivate flips tell the door system to revoke/restore entry.
+	if (input.status && input.status !== current.status) {
+		if (input.status === 'suspended' || input.status === 'active') {
+			const [gm] = await db
+				.select({ name: gymMember.name })
+				.from(gymMember)
+				.where(eq(gymMember.id, row.memberId))
+				.limit(1);
+			void fireDoorWebhook(
+				ctx.orgId,
+				input.status === 'suspended' ? 'member.suspended' : 'member.reactivated',
+				{ memberId: row.memberId, memberName: gm?.name ?? '', membershipId: row.id }
+			);
+		}
+	}
 	// A staff cancel inside the plan's commitment window posts the plan's
 	// early-termination fee; the member gets a confirmation email either way.
 	if (input.status === 'cancelled' && current.status !== 'cancelled') {
@@ -743,6 +759,11 @@ export async function suspendDelinquentMembers(orgId: string) {
 			action: 'suspended',
 			summary: 'Membership suspended for non-payment',
 			data: { memberId: r.memberId }
+		});
+		void fireDoorWebhook(orgId, 'member.suspended', {
+			memberId: r.memberId,
+			membershipId: r.id,
+			reason: 'non-payment'
 		});
 	}
 	if (rows.length)

@@ -25,6 +25,7 @@ import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
 import { isEnterpriseEnabled } from '../ee/license.ts';
 import { joinPageFields, saveJoinAnswers } from '../ee/custom-fields.ts';
+import { healthFormsEnabled, PARQ_QUESTIONS, submitParq } from '../ee/health-forms.ts';
 import {
 	createMembership,
 	getPlan,
@@ -111,8 +112,19 @@ export async function getPublicGym(slug: string) {
 		closures,
 		whiteLabel: settings.whiteLabel && isEnterpriseEnabled(),
 		brandColor: settings.whiteLabel && isEnterpriseEnabled() ? settings.brandColor : '',
-		joinFields: await joinPageFields(org.id)
+		joinFields: await joinPageFields(org.id),
+		parqRequired: settings.healthFormsRequired && healthFormsEnabled(),
+		parqQuestions: parqQuestionsFor(settings.healthQuestions)
 	};
+}
+
+/** Custom health questions when set, else the standard PAR-Q list. */
+function parqQuestionsFor(healthQuestions: string | null | undefined): string[] {
+	const custom = (healthQuestions ?? '')
+		.split('\n')
+		.map((q) => q.trim())
+		.filter(Boolean);
+	return custom.length ? custom : [...PARQ_QUESTIONS];
 }
 
 /** First name of the member behind a ?ref= link, for the "Invited by X" line. Public-safe. */
@@ -194,6 +206,14 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		}
 	}
 	if (input.customValues) await saveJoinAnswers(org.id, m!.id, input.customValues);
+	// Gyms that require health forms ask the PAR-Q during signup — answers
+	// land on the member record exactly like a portal signing.
+	if (input.parqAnswers && settings?.healthFormsRequired && healthFormsEnabled()) {
+		const need = parqQuestionsFor(settings.healthQuestions).length;
+		const answered = Object.keys(input.parqAnswers).length;
+		if (answered < need) error(400, 'Answer every health question');
+		await submitParq(m!.id, org.id, input.parqAnswers);
+	}
 	if (settings?.waiver) await recordWaiver(org.id, m!.id, settings.waiver);
 	await emit({
 		orgId: org.id,

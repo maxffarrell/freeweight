@@ -183,6 +183,7 @@
 	let cfOptions = $state('');
 	let cfJoin = $state(false);
 	let cfJoinRequired = $state(false);
+	let cfMemberEdit = $state(false);
 	let cfBusy = $state(false);
 
 	function openCfField(f?: {
@@ -192,6 +193,7 @@
 		options: string;
 		showOnJoin?: boolean;
 		requireOnJoin?: boolean;
+		memberEditable?: boolean;
 	}) {
 		cfEditId = f?.id ?? null;
 		cfName = f?.name ?? '';
@@ -199,6 +201,7 @@
 		cfOptions = f?.options ?? '';
 		cfJoin = f?.showOnJoin ?? false;
 		cfJoinRequired = f?.requireOnJoin ?? false;
+		cfMemberEdit = f?.memberEditable ?? false;
 		cfOpen = true;
 	}
 
@@ -211,7 +214,8 @@
 				kind: cfKind,
 				options: cfOptions,
 				showOnJoin: cfJoin,
-				requireOnJoin: cfJoin && cfJoinRequired
+				requireOnJoin: cfJoin && cfJoinRequired,
+				memberEditable: cfMemberEdit
 			});
 			cfOpen = false;
 			toast.success('Field saved');
@@ -2052,6 +2056,9 @@
 						it
 					</label>
 				{/if}
+				<label class="flex items-center gap-2 text-sm">
+					<input type="checkbox" bind:checked={cfMemberEdit} /> Editable by member in the portal
+				</label>
 			</div>
 			<Dialog.Footer>
 				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
