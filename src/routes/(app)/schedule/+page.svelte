@@ -1549,6 +1549,9 @@
 									? String(waitlistPos.get(r.booking.id) ?? '')
 									: '',
 								r.booking.note ?? '',
+								...medicalCol.map(() =>
+									r.parqAnswers && Object.values(r.parqAnswers).some(Boolean) ? 'yes' : ''
+								),
 								...fieldLabels.map((l) => (r.fields ?? []).find((f) => f.label === l)?.value ?? '')
 							])
 						];
