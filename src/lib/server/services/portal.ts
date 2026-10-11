@@ -1108,6 +1108,9 @@ export async function memberBookSeries(
 	memberId: string,
 	classTypeId: string
 ) {
+	// Up front, not per-session: the health-form 409 must surface verbatim
+	// rather than being counted as an ordinary skip inside memberBook.
+	await assertHealthFormSigned(orgId, memberId);
 	const sessions = (await bookableSessions(memberId)).filter(
 		(b) => b.session.classTypeId === classTypeId
 	);
