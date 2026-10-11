@@ -5,7 +5,7 @@ import { db } from '#lib/server/db/index.ts';
 import { and, eq, sql } from 'drizzle-orm';
 import { checkIn, gymMember, gymSettings, membership, plan } from '#lib/server/db/schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
-import { aiAvailable, aiConfig, requireAi } from '#lib/server/ee/ai.ts';
+import { aiAvailable, aiComplete, aiConfig, requireAi } from '#lib/server/ee/ai.ts';
 import {
 	draftAnnouncement,
 	draftClassDescription,
@@ -114,3 +114,44 @@ export const aiGenerateProgram = command(
 		return generateProgram(input);
 	}
 );
+
+/** AI churn-risk scoring — ranks the at-risk list with a reason + suggested action each. */
+export const aiChurnAnalysis = query(async () => {
+	const { orgId } = await requireOrg();
+	if (!aiAvailable()) return { available: false, members: [] };
+	const { atRiskMembers } = await import('#lib/server/services/reports.ts');
+	const risk = (await atRiskMembers(orgId)).slice(0, 15);
+	if (!risk.length) return { available: true, members: [] };
+	const roster = risk
+		.map(
+			(m) => `- ${m.name}: last visit ${m.daysSince == null ? 'never' : `${m.daysSince} days ago`}`
+		)
+		.join('\n');
+	const text = await aiComplete([
+		{
+			role: 'system',
+			content:
+				'You analyze gym member churn risk. Reply with ONLY a JSON array — no prose — of objects {"name": string, "risk": "high"|"medium", "reason": string (max 12 words), "action": string (max 12 words)}. One object per member, same order given.'
+		},
+		{ role: 'user', content: `Members at risk of churning:\n${roster}` }
+	]);
+	let parsed: { name: string; risk: string; reason: string; action: string }[] = [];
+	try {
+		const m = /\[[\s\S]*\]/.exec(text);
+		if (m) parsed = JSON.parse(m[0]);
+	} catch {
+		parsed = [];
+	}
+	const members = risk.map((r, i) => {
+		const p = parsed[i] ?? { risk: undefined, reason: undefined, action: undefined };
+		return {
+			memberId: r.memberId,
+			name: r.name,
+			daysSince: r.daysSince,
+			risk: p.risk,
+			reason: p.reason,
+			action: p.action
+		};
+	});
+	return { available: true, members };
+});

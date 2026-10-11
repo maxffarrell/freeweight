@@ -284,7 +284,8 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 			timezone: gymSettings.timezone,
 			waiverText: gymSettings.waiver,
 			rewardCredits: gymSettings.rewardCredits,
-			streakRewardCredits: gymSettings.streakRewardCredits
+			streakRewardCredits: gymSettings.streakRewardCredits,
+			parqMonths: gymSettings.parqMonths
 		})
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, ctx.orgId));
@@ -420,7 +421,11 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 				.limit(1)
 		).length;
 	// Desk heads-up (Enterprise health-forms): PAR-Q not yet signed.
-	const parqMissing = healthFormsEnabled() && !m.parqSignedAt;
+	const parqMissing =
+		healthFormsEnabled() &&
+		(!m.parqSignedAt ||
+			(!!st?.parqMonths &&
+				m.parqSignedAt.getTime() < Date.now() - st.parqMonths * 30.4 * 86400_000));
 	// Desk heads-up: a suspended membership (dunning or staff action) — the
 	// member can still walk in, staff decide whether to chase the balance.
 	const suspended = !!(

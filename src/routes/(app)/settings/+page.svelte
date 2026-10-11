@@ -308,6 +308,7 @@
 	let anonymizeMonths = $state(settings.anonymizeMonths);
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
 	let brandColor = $state(settings.brandColor);
+	let parqMonths = $state(settings.parqMonths);
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
 	// svelte-ignore state_referenced_locally
@@ -376,6 +377,7 @@
 				anonymizeMonths,
 				exportWebhookUrl,
 				brandColor,
+				parqMonths,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -994,6 +996,18 @@
 										}
 									}}>Anonymize</Button
 								>
+							</div>
+						{/if}
+						{#if entitlements.healthForms}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Health form re-screening</p>
+									<p class="text-xs text-muted-foreground">
+										PAR-Q expires after this many months — members are flagged to sign again. 0 =
+										never.
+									</p>
+								</div>
+								<Input class="w-28" type="number" min="0" max="120" bind:value={parqMonths} />
 							</div>
 						{/if}
 						{#if entitlements.doorAccess}

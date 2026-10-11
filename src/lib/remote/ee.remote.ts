@@ -116,3 +116,62 @@ export const anonymizeInactiveMembers = command(
 		return { anonymized: await anonymizeInactive(ctx.orgId, input.months ?? 24) };
 	}
 );
+
+/** Per-member data export (GDPR subject access) — everything we hold on one member. */
+export const getMemberDataExport = query(
+	v.object({ memberId: v.string() }),
+	async ({ memberId }) => {
+		const { orgId } = await requireOrg('admin');
+		if (!dataRetentionEnabled()) return { licensed: false as const, data: null };
+		const {
+			gymMember,
+			membership,
+			plan,
+			booking,
+			checkIn,
+			charge,
+			payment,
+			memberNote,
+			memberMeasurement
+		} = await import('#lib/server/db/schema.ts');
+		const { and, desc, eq } = await import('drizzle-orm');
+		const [m] = await db
+			.select()
+			.from(gymMember)
+			.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+			.limit(1);
+		if (!m) return { licensed: true as const, data: null };
+		const [memberships, bookings, checkIns, charges, payments, notes, measurements] =
+			await Promise.all([
+				db
+					.select({ membership, planName: plan.name })
+					.from(membership)
+					.leftJoin(plan, eq(membership.planId, plan.id))
+					.where(eq(membership.memberId, memberId)),
+				db.select().from(booking).where(eq(booking.memberId, memberId)),
+				db.select().from(checkIn).where(eq(checkIn.memberId, memberId)),
+				db.select().from(charge).where(eq(charge.memberId, memberId)),
+				db.select().from(payment).where(eq(payment.memberId, memberId)),
+				db
+					.select()
+					.from(memberNote)
+					.where(eq(memberNote.memberId, memberId))
+					.orderBy(desc(memberNote.createdAt)),
+				db.select().from(memberMeasurement).where(eq(memberMeasurement.memberId, memberId))
+			]);
+		return {
+			licensed: true as const,
+			data: {
+				exportedAt: new Date().toISOString(),
+				member: m,
+				memberships,
+				bookings,
+				checkIns,
+				charges,
+				payments,
+				notes,
+				measurements
+			}
+		};
+	}
+);
