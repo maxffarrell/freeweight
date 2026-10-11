@@ -77,6 +77,7 @@
 		setClassTypeQuals
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
+	import { aiDraftClassDescription, getAiStatus } from '#lib/remote/ai.remote.ts';
 	import { getJoinInfo, getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
@@ -93,9 +94,11 @@
 	import Flame from '@lucide/svelte/icons/flame';
 	import Wrench from '@lucide/svelte/icons/wrench';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
 
 	const settings = await getSettings();
+	const ai = $derived(await getAiStatus());
 	const tz = settings.timezone;
 	const currency = settings.currency;
 	const locations = await getLocations();
@@ -944,6 +947,21 @@
 	let tWaitlistCap = $state<number | null>(null);
 	let tBookCutoff = $state<number | null>(null);
 	let tDescription = $state('');
+	let aiDescBusy = $state(false);
+	async function aiFillDescription() {
+		aiDescBusy = true;
+		try {
+			const r = await aiDraftClassDescription({
+				name: tName.trim(),
+				durationMin: tDuration ?? 60,
+				existing: tDescription.trim() || undefined
+			});
+			tDescription = r.description;
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not draft'));
+		}
+		aiDescBusy = false;
+	}
 	let tActive = $state(true);
 	let tMemberBookable = $state(true);
 	let tMinLevel = $state('');
@@ -2078,10 +2096,21 @@
 				/></Field.Field
 			>
 			<Field.Field
-				><Field.Label for="t-desc">Description</Field.Label><Input
-					id="t-desc"
-					bind:value={tDescription}
-				/></Field.Field
+				><Field.Label for="t-desc">Description</Field.Label>
+				<div class="flex items-center gap-2">
+					<Input id="t-desc" class="flex-1" bind:value={tDescription} />
+					{#if ai.configured}
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="h-8 shrink-0 px-2 text-xs"
+							disabled={aiDescBusy || !tName.trim()}
+							onclick={aiFillDescription}
+							><Sparkles class="mr-1 h-3.5 w-3.5" />{aiDescBusy ? 'Working…' : 'AI'}</Button
+						>
+					{/if}
+				</div></Field.Field
 			>
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
