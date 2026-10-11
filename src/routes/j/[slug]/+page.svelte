@@ -26,7 +26,7 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	const { org, settings, plans, sessions, closures } = $derived(data);
+	const { org, settings, plans, sessions, closures, whiteLabel } = $derived(data);
 	const tz = $derived(settings.timezone);
 	const currency = $derived(settings.currency);
 
@@ -494,10 +494,13 @@
 			{/if}
 		</section>
 
-		<p class="pb-4 text-center text-xs text-muted-foreground">
-			Powered by <a href="https://github.com/maxffarrell/freeweight" class="underline">Freeweight</a
-			>
-		</p>
+		{#if !whiteLabel}
+			<p class="pb-4 text-center text-xs text-muted-foreground">
+				Powered by <a href="https://github.com/maxffarrell/freeweight" class="underline"
+					>Freeweight</a
+				>
+			</p>
+		{/if}
 	</main>
 
 	<Dialog.Root bind:open={dropOpen}>

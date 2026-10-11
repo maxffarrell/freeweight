@@ -537,6 +537,8 @@ export const settingsInput = v.object({
 	),
 	/** Monthly revenue goal in minor units for the Reports progress bar; null = off. */
 	revenueTarget: v.optional(v.nullable(v.pipe(v.number(), v.integer(), v.minValue(1)))),
+	/** Enterprise: hide Freeweight branding on the public join page. */
+	whiteLabel: v.optional(v.boolean()),
 	/** Comp classes granted on each member's birthday; null/0 = off. */
 	birthdayCompCredits: v.optional(
 		v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)))

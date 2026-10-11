@@ -115,6 +115,8 @@ export const gymSettings = pgTable('gym_settings', {
 	lateCancelFreebies: integer('late_cancel_freebies'),
 	/** Monthly revenue goal in minor units, shown as a progress bar on Reports; null = off. */
 	revenueTarget: integer('revenue_target'),
+	/** Enterprise: hide "Powered by Freeweight" on the public join page; only honored when licensed. */
+	whiteLabel: boolean('white_label').notNull().default(false),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

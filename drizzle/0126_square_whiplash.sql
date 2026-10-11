@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "white_label" boolean DEFAULT false NOT NULL;

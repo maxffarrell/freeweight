@@ -23,6 +23,7 @@ import {
 } from '#lib/server/db/schema.ts';
 import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
+import { isEnterpriseEnabled } from '../ee/license.ts';
 import {
 	createMembership,
 	getPlan,
@@ -101,7 +102,14 @@ export async function getPublicGym(slug: string) {
 		.orderBy(asc(closure.date))
 		.limit(20);
 
-	return { org, settings, plans, sessions, closures };
+	return {
+		org,
+		settings,
+		plans,
+		sessions,
+		closures,
+		whiteLabel: settings.whiteLabel && isEnterpriseEnabled()
+	};
 }
 
 /** First name of the member behind a ?ref= link, for the "Invited by X" line. Public-safe. */
