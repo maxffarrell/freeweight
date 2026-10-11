@@ -68,6 +68,7 @@ export async function anonymizeInactive(orgId: string, months: number): Promise<
 				eq(gymMember.organizationId, orgId),
 				lt(gymMember.joinedAt, cutoffDay),
 				isNotNull(gymMember.email),
+				eq(gymMember.retentionExempt, false),
 				notExists(
 					db
 						.select({ one: sql`1` })

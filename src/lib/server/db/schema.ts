@@ -202,6 +202,8 @@ export const gymMember = pgTable(
 		deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
 		/** Enterprise health-forms: PAR-Q answers keyed by question index, null until signed. */
 		parqAnswers: jsonb('parq_answers').$type<Record<string, boolean>>(),
+		/** Enterprise data-retention: exempt this member from anonymize sweeps (legal hold). */
+		retentionExempt: boolean('retention_exempt').notNull().default(false),
 		parqSignedAt: timestamp('parq_signed_at', { withTimezone: true }),
 		...timestamps
 	},

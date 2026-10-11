@@ -226,6 +226,26 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Staff access log</Card.Title>
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() => {
+						const csv = toCsv([
+							['Name', 'Email', 'Signed in', 'IP', 'Agent'],
+							...(access?.rows ?? []).map((a) => [
+								a.name,
+								a.email,
+								new Date(a.signedInAt).toISOString(),
+								a.ipAddress ?? '',
+								a.userAgent ?? ''
+							])
+						]);
+						const el = document.createElement('a');
+						el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+						el.download = `access-log-${new Date().toISOString().slice(0, 10)}.csv`;
+						el.click();
+					}}>Export</Button
+				>
 				<Card.Description>Recent staff sign-ins — audit trail</Card.Description>
 			</Card.Header>
 			<Card.Content class="divide-y px-6">
