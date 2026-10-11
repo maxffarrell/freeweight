@@ -21,6 +21,10 @@ class DeploymentTests(unittest.TestCase):
     with self.assertRaisesRegex(RuntimeError,'previous image and database restored'):server.deploy('leroa',PAYLOAD)
    restore=next(i for i,a in enumerate(calls) if 'pg_restore' in a)
    retag=next(i for i,a in enumerate(calls) if a[:3]==['docker','tag','sha256:old'] and a[-1].endswith(':latest'))
+   self.assertIn('--create',calls[restore])
+   self.assertIn('--exit-on-error',calls[restore])
+   self.assertEqual(calls[restore][calls[restore].index('-d')+1],'postgres')
+   self.assertNotIn('--single-transaction',calls[restore])
    self.assertLess(restore,retag)
    self.assertEqual(calls[-1],['docker','compose','up','-d','--no-build','--pull','never'])
 class PlanTests(unittest.TestCase):
