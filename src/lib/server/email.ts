@@ -9,7 +9,14 @@ import {
 import { getRequestEvent } from '$app/server';
 import { createTransport, type Transporter } from 'nodemailer';
 
-export type Email = { to: string; subject: string; text: string; html: string };
+export type Email = {
+	to: string;
+	subject: string;
+	text: string;
+	html: string;
+	/** White-label orgs send as '{orgName} <addr>' instead of the install's EMAIL_FROM name. */
+	fromName?: string;
+};
 
 export const emailProvider = (): 'resend' | 'smtp' | null =>
 	RESEND_API_KEY ? 'resend' : SMTP_URL ? 'smtp' : null;
@@ -30,7 +37,9 @@ let smtp: Transporter | undefined;
 /** Sends through Resend or SMTP; without either, logs instead. Never sends in the public demo. */
 export async function sendEmail(email: Email) {
 	if (FREEWEIGHT_DEMO) return;
-	const from = EMAIL_FROM ?? 'Freeweight <no-reply@freeweight.localhost>';
+	const fallback = EMAIL_FROM ?? 'Freeweight <no-reply@freeweight.localhost>';
+	const addr = /<(.+)>/.exec(fallback)?.[1] ?? fallback;
+	const from = email.fromName ? `${email.fromName} <${addr}>` : fallback;
 	const provider = emailProvider();
 	if (provider === 'resend') {
 		const res = await fetch('https://api.resend.com/emails', {

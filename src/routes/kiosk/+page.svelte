@@ -51,7 +51,7 @@
 		}
 		if (pinInput.length >= 8) return;
 		pinInput += k;
-		if (pinInput.length >= settings.kioskPinLen) {
+		if (pinInput.length >= Math.max(4, settings.kioskPinLen)) {
 			const { result } = await verifyKioskPin({ pin: pinInput });
 			if (result === 'ok') pinOk = true;
 			else {

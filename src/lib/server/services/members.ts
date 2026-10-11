@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import {
 	isNull,
 	gte,
+	lte,
 	and,
 	asc,
 	desc,
@@ -174,6 +175,7 @@ export async function listMembers(
 	inEvent?: boolean,
 	/** Enterprise health-forms: members without a signed PAR-Q. */
 	noHealthForm?: boolean,
+	parqExpiring?: boolean,
 	/** Enterprise custom-fields: member has a value containing `value` on this field. */
 	customField?: { fieldId: string; value: string }
 ) {
@@ -376,6 +378,16 @@ export async function listMembers(
 					: noHealthForm
 						? isNull(gymMember.parqSignedAt)
 						: undefined,
+				// Signed but expires within 30 days (renewal-pitch window).
+				parqExpiring && parqMonths > 0
+					? and(
+							gte(gymMember.parqSignedAt, new Date(Date.now() - parqMonths * 30.4 * 86400_000)),
+							lte(
+								gymMember.parqSignedAt,
+								new Date(Date.now() - (parqMonths * 30.4 - 30) * 86400_000)
+							)
+						)
+					: undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

@@ -42,5 +42,5 @@ export function renderEmail({
 		: `<p style="margin:0 0 16px;font-size:13px;color:#71717a">${escapeHtml(orgName)}</p>`;
 	const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#18181b"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px"><tr><td style="padding:32px">${brand}<h1 style="margin:0 0 16px;font-size:20px;line-height:1.3">${escapeHtml(heading)}</h1>${paragraphs}${button}</td></tr></table><p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Sent by ${escapeHtml(orgName)}${whiteLabel ? '' : ' with Freeweight'}</p></td></tr></table></body></html>`;
 
-	return { text, html };
+	return { text, html, fromName: whiteLabel ? orgName : undefined };
 }

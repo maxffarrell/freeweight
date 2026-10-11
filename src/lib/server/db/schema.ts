@@ -133,6 +133,10 @@ export const gymSettings = pgTable('gym_settings', {
 	digestRecipients: text('digest_recipients').notNull().default(''),
 	/** Enterprise door-access: comma-separated event names to fire; empty = all. */
 	doorEvents: text('door_events').notNull().default(''),
+	/** Door-access ops readout: last webhook post attempt + result. */
+	doorLastEvent: text('door_last_event').notNull().default(''),
+	doorLastStatus: integer('door_last_status'),
+	doorLastAt: timestamp('door_last_at', { withTimezone: true }),
 	/** Enterprise white-label: brand accent color (hex) on public/portal pages. */
 	brandColor: text('brand_color').notNull().default(''),
 	/** Enterprise health-forms: re-screen members after this many months (0 = never expires). */

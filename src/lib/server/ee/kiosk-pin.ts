@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
-import { gymSettings } from '#lib/server/db/schema.ts';
+import { activity, gymSettings } from '#lib/server/db/schema.ts';
 import { hasFeature } from '#lib/server/ee/license.ts';
 
 /**
@@ -27,7 +27,17 @@ export async function verifyKioskPin(orgId: string, pin: string): Promise<PinRes
 	if (!hasFeature('kiosk-pin')) return 'disabled';
 	const now = Date.now();
 	const a = attempts.get(orgId);
-	if (a && a.lockedUntil > now) return 'locked';
+	if (a && a.lockedUntil > now) {
+		await db.insert(activity).values({
+			organizationId: orgId,
+			entityType: 'security',
+			entityId: 'kiosk-pin',
+			action: 'pin_rejected_locked',
+			summary: 'Kiosk PIN attempt rejected — pad locked',
+			data: { reason: 'locked pad' }
+		});
+		return 'locked';
+	}
 	const [s] = await db
 		.select({ pin: gymSettings.kioskPin })
 		.from(gymSettings)
@@ -49,5 +59,13 @@ export async function verifyKioskPin(orgId: string, pin: string): Promise<PinRes
 	const fails = (a?.fails ?? 0) + 1;
 	const locked = fails >= MAX_FAILS;
 	attempts.set(orgId, { fails: locked ? 0 : fails, lockedUntil: locked ? now + LOCK_MS : 0 });
+	await db.insert(activity).values({
+		organizationId: orgId,
+		entityType: 'security',
+		entityId: 'kiosk-pin',
+		action: locked ? 'pin_locked' : 'pin_failed',
+		summary: locked ? 'Kiosk PIN locked after 5 failed tries' : 'Wrong kiosk PIN entered',
+		data: locked ? { fails } : { fails, max: MAX_FAILS }
+	});
 	return locked ? 'locked' : 'wrong';
 }
