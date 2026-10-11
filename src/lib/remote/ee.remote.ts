@@ -15,7 +15,11 @@ import {
 	requireAuditExport,
 	sendExportNow
 } from '#lib/server/ee/audit-export.ts';
-import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
+import {
+	healthFormsEnabled,
+	requestParqResign as requestParqResign_,
+	requireHealthForms
+} from '#lib/server/ee/health-forms.ts';
 import { verifyKioskPin as kioskPinVerify } from '#lib/server/ee/kiosk-pin.ts';
 import {
 	anonymizeInactive,
@@ -338,3 +342,13 @@ export const pushMemberDoor = command(v.object({ memberId: v.string() }), async 
 	const { orgId } = await requireOrg('admin');
 	return { name: await pushDoorMember(orgId, memberId) };
 });
+
+/** Email a member asking them to re-sign their health questionnaire (health-forms tier). */
+export const requestParqResign = command(
+	v.object({ memberId: v.string() }),
+	async ({ memberId }) => {
+		const { orgId, userId } = await requireOrg();
+		requireHealthForms();
+		return { name: await requestParqResign_(memberId, orgId, userId) };
+	}
+);

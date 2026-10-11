@@ -379,3 +379,34 @@ Rules:
 	]);
 	return { subject: out.subject.trim(), body: out.body.trim() };
 }
+
+/** Pre-class instructor brief — who is coming and who needs attention. */
+export async function rosterBrief(
+	orgName: string,
+	facts: {
+		className: string;
+		when: string;
+		instructor: string | null;
+		booked: number;
+		capacity: number | null;
+		waitlisted: number;
+		firstTimers: string[];
+		medicalFlags: string[];
+	}
+): Promise<string> {
+	const text = await aiComplete(
+		[
+			{
+				role: 'system',
+				content:
+					'You write 2-3 sentence pre-class briefs for gym instructors. Say who is coming, name first-timers so they get a welcome, name health-flagged members so the instructor checks in on them privately, and note a full waitlist. Direct, warm, no markdown or emoji.'
+			},
+			{
+				role: 'user',
+				content: `Gym: ${orgName}. Class: ${facts.className} at ${facts.when}${facts.instructor ? `, instructor ${facts.instructor}` : ''}. Booked ${facts.booked}${facts.capacity ? `/${facts.capacity}` : ''}, waitlisted ${facts.waitlisted}. First-timers: ${facts.firstTimers.length ? facts.firstTimers.join(', ') : 'none'}. Health-flagged: ${facts.medicalFlags.length ? facts.medicalFlags.join(', ') : 'none'}.`
+			}
+		],
+		300
+	);
+	return text.trim();
+}

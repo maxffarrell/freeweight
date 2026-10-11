@@ -429,9 +429,11 @@ export async function findDuplicates(orgId: string) {
 		.orderBy(asc(gymMember.name));
 	const byKey = new Map<string, typeof rows>();
 	for (const r of rows) {
+		// 'Former member' is the anonymize scrub — every erased member shares it,
+		// so it's never a duplicate signal (email is nulled by the scrub anyway).
 		const keys = [
 			r.email ? `e:${r.email.trim().toLowerCase()}` : null,
-			`n:${r.name.trim().toLowerCase().replace(/\s+/g, ' ')}`
+			r.name === 'Former member' ? null : `n:${r.name.trim().toLowerCase().replace(/\s+/g, ' ')}`
 		];
 		for (const key of keys) {
 			if (!key) continue;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -104,9 +105,11 @@
 		el.click();
 		URL.revokeObjectURL(el.href);
 	}
+	const __brand = getContext<{ whiteLabel?: boolean; orgName?: string } | undefined>('orgBrand');
+	const appName = __brand?.whiteLabel && __brand?.orgName ? __brand.orgName : 'Freeweight';
 </script>
 
-<svelte:head><title>Activity · Freeweight</title></svelte:head>
+<svelte:head><title>Activity · {appName}</title></svelte:head>
 
 <PageHeader title="Activity" />
 

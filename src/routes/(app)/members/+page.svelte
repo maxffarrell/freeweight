@@ -35,6 +35,7 @@
 		importMembers,
 		bulkGrantCredits,
 		bulkSetInactive,
+		anonymizeMembers,
 		tagMembers,
 		getLevels,
 		addLevel,
@@ -959,6 +960,30 @@
 					}
 				}}>Mark inactive</Button
 			>
+			{#if entitlements.dataRetention}
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={async () => {
+						if (
+							!confirm(
+								`Anonymize ${selected.size} member${selected.size === 1 ? '' : 's'}? This permanently scrubs their personal data and cannot be undone.`
+							)
+						)
+							return;
+						try {
+							const r = await anonymizeMembers({ memberIds: [...selected] });
+							toast.success(
+								`Anonymized ${r.anonymized} member${r.anonymized === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} on legal hold` : ''}`
+							);
+							selected.clear();
+							await refilter();
+						} catch (e) {
+							toast.error(errMsg(e, 'Could not anonymize'));
+						}
+					}}>Anonymize</Button
+				>
+			{/if}
 			<Button size="sm" variant="ghost" onclick={() => selected.clear()}>Clear</Button>
 		</div>
 	{/if}

@@ -3,6 +3,9 @@ import { atRiskMembers } from '#lib/server/services/reports.ts';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
 import * as svc from '#lib/server/services/members.ts';
+import { db } from '#lib/server/db/index.ts';
+import { and, eq, inArray } from 'drizzle-orm';
+import { gymMember } from '#lib/server/db/schema.ts';
 import * as workoutSvc from '#lib/server/services/workouts.ts';
 import * as checkins from '#lib/server/services/checkins.ts';
 import * as sched from '#lib/server/services/schedule.ts';
@@ -266,6 +269,38 @@ export const anonymizeMember = command(idSchema, async (memberId) => {
 	void getMembers().refresh();
 	return r;
 });
+
+/** Bulk anonymize the selected members — same scrub as the per-member button. */
+export const anonymizeMembers = command(
+	v.object({ memberIds: v.pipe(v.array(idSchema), v.minLength(1), v.maxLength(200)) }),
+	async ({ memberIds }) => {
+		const ctx = await requireOrg('admin');
+		// Legal-hold members are never bulk-scrubbed — same guard as the sweeps.
+		const exemptRows = await db
+			.select({ id: gymMember.id })
+			.from(gymMember)
+			.where(
+				and(
+					eq(gymMember.organizationId, ctx.orgId),
+					eq(gymMember.retentionExempt, true),
+					inArray(gymMember.id, memberIds)
+				)
+			);
+		const exempt = new Set(exemptRows.map((r) => r.id));
+		let n = 0;
+		for (const id of memberIds) {
+			if (exempt.has(id)) continue;
+			try {
+				await svc.anonymizeMember(ctx, id);
+				n++;
+			} catch {
+				// skip members that vanish mid-selection
+			}
+		}
+		void getMembers().refresh();
+		return { anonymized: n, skipped: exempt.size };
+	}
+);
 
 /** Push a pack's expiry out N days — "she paid before it lapsed" fixes. */
 export const extendPack = command(

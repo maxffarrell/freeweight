@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -145,9 +146,11 @@
 		}
 		toggling = null;
 	}
+	const __brand = getContext<{ whiteLabel?: boolean; orgName?: string } | undefined>('orgBrand');
+	const appName = __brand?.whiteLabel && __brand?.orgName ? __brand.orgName : 'Freeweight';
 </script>
 
-<svelte:head><title>My classes · Freeweight</title></svelte:head>
+<svelte:head><title>My classes · {appName}</title></svelte:head>
 
 <PageHeader title="My classes" />
 

@@ -4,7 +4,7 @@ import { error } from '@sveltejs/kit';
 import { and, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { orgBrand } from '../org-brand.ts';
-import { gymMember, gymSettings, notificationLog } from '#lib/server/db/schema.ts';
+import { activity, gymMember, gymSettings, notificationLog } from '#lib/server/db/schema.ts';
 import { member, user } from '#lib/server/db/auth.schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
@@ -152,4 +152,39 @@ async function notifyParqFlag(orgId: string, memberId: string) {
 			})
 		});
 	}
+}
+
+/** Staff-issued "please re-sign" — emails the member + leaves an activity row. */
+export async function requestParqResign(memberId: string, orgId: string, actorId?: string) {
+	requireHealthForms();
+	const [m] = await db
+		.select({ name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+		.limit(1);
+	if (!m) error(404, 'Member not found');
+	if (!m.email) error(400, 'Member has no email on file');
+	const brand = await orgBrand(orgId);
+	await sendEmail({
+		to: m.email,
+		subject: `${brand.orgName} — please re-sign your health questionnaire`,
+		...renderEmail({
+			...brand,
+			heading: 'Health form re-sign requested',
+			lines: [
+				`Hi ${m.name.split(' ')[0]},`,
+				`${brand.orgName} has asked you to re-sign the health questionnaire (PAR-Q). It takes a minute — open the member portal and look for the Health form card.`
+			]
+		})
+	});
+	await db.insert(activity).values({
+		organizationId: orgId,
+		actorId: actorId ?? null,
+		entityType: 'member',
+		entityId: memberId,
+		action: 'parq_resign_requested',
+		summary: `Asked ${m.name} to re-sign the health questionnaire`,
+		data: {}
+	});
+	return m.name;
 }
