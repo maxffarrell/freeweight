@@ -1,0 +1,1 @@
+ALTER TABLE "gym_member" ADD COLUMN "door_blocked" boolean DEFAULT false NOT NULL;

@@ -246,3 +246,24 @@ export async function requestParqResign(memberId: string, orgId: string, actorId
 	});
 	return m.name;
 }
+
+/** health-forms: after the org edits its custom questions, every member with
+ * a signed/expired form should re-attest — sends re-sign requests to all of
+ * them. Returns how many were emailed. */
+export async function resignAllParq(orgId: string, actorId: string | null): Promise<number> {
+	requireHealthForms();
+	const rows = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), isNotNull(gymMember.email)));
+	let n = 0;
+	for (const r of rows) {
+		try {
+			await requestParqResign(r.id, orgId, actorId ?? undefined);
+			n++;
+		} catch {
+			// skip odd rows; the sweep continues
+		}
+	}
+	return n;
+}

@@ -222,6 +222,9 @@ export const gymMember = pgTable(
 		parqAnswers: jsonb('parq_answers').$type<Record<string, boolean>>(),
 		/** Enterprise data-retention: exempt this member from anonymize sweeps (legal hold). */
 		retentionExempt: boolean('retention_exempt').notNull().default(false),
+		// door-access: check-in still logs but door unlock events are suppressed
+		// and a door_blocked flag is fired instead (suspension at the door only).
+		doorBlocked: boolean('door_blocked').notNull().default(false),
 		parqHistory:
 			jsonb('parq_history').$type<{ answers: Record<string, boolean>; signedAt: string }[]>(),
 		parqSignedAt: timestamp('parq_signed_at', { withTimezone: true }),

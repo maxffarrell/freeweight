@@ -1,4 +1,6 @@
 import * as v from 'valibot';
+import { error } from '@sveltejs/kit';
+import { emit } from '#lib/server/services/events.ts';
 import { atRiskMembers } from '#lib/server/services/reports.ts';
 import { command, query } from '$app/server';
 import { requireOrg } from '#lib/server/context.ts';
@@ -259,6 +261,32 @@ export const declineTrial = command(
 		const r = await trialSvc.declineTrialRequest(await requireOrg(), requestId);
 		void getMember(memberId).refresh();
 		return r;
+	}
+);
+
+/** door-access: block/unblock a member's door unlock (check-in still logs). */
+export const setDoorBlocked = command(
+	v.object({ memberId: idSchema, blocked: v.boolean() }),
+	async ({ memberId, blocked }) => {
+		const { orgId } = await requireOrg('admin');
+		const { requireDoorAccess } = await import('#lib/server/ee/door-access.ts');
+		requireDoorAccess();
+		const [r] = await db
+			.update(gymMember)
+			.set({ doorBlocked: blocked, updatedAt: new Date() })
+			.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+			.returning({ name: gymMember.name });
+		if (!r) error(404, 'Member not found');
+		await emit({
+			orgId,
+			actorId: (await requireOrg()).userId ?? null,
+			entityType: 'member',
+			entityId: memberId,
+			action: blocked ? 'door_blocked' : 'door_unblocked',
+			summary: `${r.name} ${blocked ? 'blocked at the door' : 'unblocked at the door'}`
+		});
+		void getMember(memberId).refresh();
+		return { ok: true };
 	}
 );
 

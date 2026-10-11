@@ -1525,8 +1525,11 @@
 					class="h-7 px-2 text-xs"
 					title="Download the roster as CSV"
 					onclick={() => {
+						const fieldLabels = [
+							...new Set(roster.flatMap((r) => (r.fields ?? []).map((f) => f.label)))
+						];
 						const rows = [
-							['name', 'email', 'status', 'guests', 'waitlist_pos', 'note'],
+							['name', 'email', 'status', 'guests', 'waitlist_pos', 'note', ...fieldLabels],
 							...roster.map((r) => [
 								r.memberName,
 								r.memberEmail ?? '',
@@ -1535,7 +1538,8 @@
 								r.booking.status === 'waitlisted'
 									? String(waitlistPos.get(r.booking.id) ?? '')
 									: '',
-								r.booking.note ?? ''
+								r.booking.note ?? '',
+								...fieldLabels.map((l) => (r.fields ?? []).find((f) => f.label === l)?.value ?? '')
 							])
 						];
 						const csv = rows
