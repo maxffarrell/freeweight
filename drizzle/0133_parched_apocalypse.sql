@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "health_forms_required" boolean DEFAULT false NOT NULL;

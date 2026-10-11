@@ -1,11 +1,17 @@
 import { query } from '$app/server';
 import { getRequestEvent } from '$app/server';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
-import { gymSettings } from '#lib/server/db/schema.ts';
+import { activity, gymSettings } from '#lib/server/db/schema.ts';
+import { user } from '#lib/server/db/auth.schema.ts';
+import { toCsv } from '#lib/csv.ts';
 import { requireOrg } from '#lib/server/context.ts';
-import { auditExportEnabled, exportOrgData } from '#lib/server/ee/audit-export.ts';
+import {
+	auditExportEnabled,
+	exportOrgData,
+	requireAuditExport
+} from '#lib/server/ee/audit-export.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import {
 	anonymizeInactive,
@@ -98,7 +104,7 @@ export const getAccessLog = query(async () => {
 export const testDoorWebhook = command(async () => {
 	const { orgId } = await requireOrg('admin');
 	requireDoorAccess();
-	await fireDoorWebhook(orgId, {
+	await fireDoorWebhook(orgId, 'member.checked_in', {
 		memberId: 'test',
 		memberName: 'Test member',
 		checkedAt: new Date().toISOString(),
@@ -175,3 +181,35 @@ export const getMemberDataExport = query(
 		};
 	}
 );
+
+/** Enterprise audit-export: every audit row as one CSV (cap 20k) — compliance dump. */
+export const exportAuditLog = query(async () => {
+	const { orgId } = await requireOrg();
+	requireAuditExport();
+	const rows = await db
+		.select({
+			createdAt: activity.createdAt,
+			actorName: user.name,
+			entityType: activity.entityType,
+			entityId: activity.entityId,
+			action: activity.action,
+			summary: activity.summary
+		})
+		.from(activity)
+		.leftJoin(user, eq(activity.actorId, user.id))
+		.where(eq(activity.organizationId, orgId))
+		.orderBy(desc(activity.createdAt))
+		.limit(20_000);
+	const csv = toCsv([
+		['When', 'Actor', 'Type', 'Entity', 'Action', 'Summary'],
+		...rows.map((r) => [
+			r.createdAt.toISOString(),
+			r.actorName ?? '',
+			r.entityType,
+			r.entityId,
+			r.action,
+			r.summary
+		])
+	]);
+	return { csv, count: rows.length, truncated: rows.length === 20_000 };
+});

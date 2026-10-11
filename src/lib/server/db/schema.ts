@@ -133,6 +133,8 @@ export const gymSettings = pgTable('gym_settings', {
 	parqMonths: integer('parq_months').notNull().default(0),
 	/** Enterprise health-forms: custom screening questions, one per line (blank = standard PAR-Q). */
 	healthQuestions: text('health_questions').notNull().default(''),
+	/** Enterprise health-forms: members must have a signed (unexpired) health form to self-book. */
+	healthFormsRequired: boolean('health_forms_required').notNull().default(false),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

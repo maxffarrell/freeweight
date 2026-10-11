@@ -24,6 +24,7 @@ export function requireDoorAccess() {
  */
 export async function fireDoorWebhook(
 	orgId: string,
+	event: 'member.checked_in' | 'member.checked_out' | 'member.checkin_voided',
 	payload: { memberId: string; memberName: string; checkedAt: string; locationId: string | null }
 ) {
 	if (!doorAccessEnabled()) return;
@@ -34,7 +35,7 @@ export async function fireDoorWebhook(
 			.where(eq(gymSettings.organizationId, orgId))
 			.limit(1);
 		if (!s?.url) return;
-		const body = JSON.stringify({ event: 'member.checked_in', ...payload });
+		const body = JSON.stringify({ event, ...payload });
 		const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(body).digest('hex');
 		await fetch(s.url, {
 			method: 'POST',
