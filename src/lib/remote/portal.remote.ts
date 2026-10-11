@@ -1025,9 +1025,15 @@ export const inviteFriend = command(
 export const getMyParq = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!healthFormsEnabled())
-		return { licensed: false, questions: [] as string[], answers: null, signedAt: null };
+		return {
+			licensed: false,
+			questions: [] as string[],
+			answers: null,
+			signedAt: null,
+			expired: false
+		};
 	const [s] = await db
-		.select({ healthQuestions: gymSettings.healthQuestions })
+		.select({ healthQuestions: gymSettings.healthQuestions, parqMonths: gymSettings.parqMonths })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, m.organizationId))
 		.limit(1);
@@ -1035,11 +1041,16 @@ export const getMyParq = query(idSchema, async (memberId) => {
 		.split('\n')
 		.map((q) => q.trim())
 		.filter(Boolean);
+	const expired =
+		(s?.parqMonths ?? 0) > 0 &&
+		!!m.parqSignedAt &&
+		m.parqSignedAt.getTime() < Date.now() - s!.parqMonths * 30.4 * 86400_000;
 	return {
 		licensed: true,
 		questions: custom?.length ? custom : [...PARQ_QUESTIONS],
 		answers: m.parqAnswers ?? null,
-		signedAt: m.parqSignedAt
+		signedAt: m.parqSignedAt,
+		expired
 	};
 });
 

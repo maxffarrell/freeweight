@@ -587,6 +587,12 @@ export async function getMember(orgId: string, id: string) {
 		.orderBy(desc(checkIn.checkedAt))
 		.limit(50);
 
+	const [parqS] = await db
+		.select({ parqMonths: gymSettings.parqMonths })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+
 	const credits = await creditUsage(orgId, id);
 
 	const [signedWaiver] = await db
@@ -879,6 +885,7 @@ export async function getMember(orgId: string, id: string) {
 		workoutLogs,
 		issues,
 		emailStats,
+		parqMonths: parqS?.parqMonths ?? 0,
 		guestPasses: activeMs?.guestPasses ?? 0,
 		guestsUsed: guests?.n ?? 0,
 		loyalty: loyaltyTier(att?.visits ?? 0),
