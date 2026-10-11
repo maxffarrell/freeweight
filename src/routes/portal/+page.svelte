@@ -3452,7 +3452,8 @@
 												<Checkbox
 													class="size-3"
 													aria-label="Also book family members"
-													bind:checked={familyPick[b.session.id]}
+													checked={familyPick[b.session.id] ?? false}
+													onCheckedChange={(v) => (familyPick[b.session.id] = v === true)}
 												/>
 												+family
 											</label>

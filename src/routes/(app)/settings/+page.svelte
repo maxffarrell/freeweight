@@ -2091,7 +2091,10 @@
 							<div class="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
 								{#each API_RESOURCES as r (r)}
 									<label class="flex items-center gap-2">
-										<Checkbox bind:checked={keyPerms[r]} />
+										<Checkbox
+											checked={keyPerms[r] ?? false}
+											onCheckedChange={(v) => (keyPerms[r] = v === true)}
+										/>
 										{r}
 									</label>
 								{/each}

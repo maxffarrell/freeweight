@@ -1140,7 +1140,7 @@
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-6">
-	<div class="flex items-center gap-2">
+	<div class="flex flex-wrap items-center gap-2">
 		<Button
 			variant="outline"
 			size="icon"
@@ -1159,7 +1159,8 @@
 			onclick={async () => ((weekStart = addDays(weekStart, 7)), await reload())}
 			><ChevronRight /></Button
 		>
-		<span class="ml-2 text-sm text-muted-foreground"
+		<span
+			class="order-last basis-full text-sm text-muted-foreground sm:order-none sm:ml-2 sm:basis-auto"
 			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
 				(s) => !s.session.instructorId && !s.session.cancelledAt
 			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
