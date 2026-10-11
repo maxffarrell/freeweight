@@ -40,6 +40,7 @@ import {
 	signRequest,
 	trialRequest,
 	user,
+	member as staffMember,
 	waiver,
 	plan,
 	outer,
@@ -1919,7 +1920,16 @@ export async function anonymizeMember(
 			and(eq(memberMeasurement.organizationId, ctx.orgId), eq(memberMeasurement.memberId, memberId))
 		);
 	// Sever the portal account — an erased member must not keep a working login.
-	if (m.portalUserId) await db.delete(user).where(eq(user.id, m.portalUserId));
+	// Guard: if the linked user is org staff (e.g. a staffer who claimed a portal
+	// link while logged in), don't delete their login — just unlink.
+	if (m.portalUserId) {
+		const staff = await db
+			.select({ id: staffMember.id })
+			.from(staffMember)
+			.where(eq(staffMember.userId, m.portalUserId))
+			.limit(1);
+		if (staff.length === 0) await db.delete(user).where(eq(user.id, m.portalUserId));
+	}
 	// Health-questionnaire answers and custom-field values are PII too.
 	await db
 		.delete(memberFieldValue)
