@@ -7,6 +7,12 @@ import { gymSettings } from '#lib/server/db/schema.ts';
 import { requireOrg } from '#lib/server/context.ts';
 import { auditExportEnabled, exportOrgData } from '#lib/server/ee/audit-export.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
+import { dataRetentionEnabled } from '#lib/server/ee/data-retention.ts';
+import {
+	exportPayroll,
+	listAccessLog,
+	payrollExportEnabled
+} from '#lib/server/ee/payroll-export.ts';
 import { customFieldsEnabled } from '#lib/server/ee/custom-fields.ts';
 import { hasFeature } from '#lib/server/ee/license.ts';
 
@@ -19,6 +25,8 @@ export const getEntitlements = query(async () => {
 		auditExport: auditExportEnabled(),
 		healthForms: healthFormsEnabled(),
 		kioskPin: hasFeature('kiosk-pin'),
+		payrollExport: payrollExportEnabled(),
+		dataRetention: dataRetentionEnabled(),
 		ai: hasFeature('ai')
 	};
 });
@@ -47,4 +55,18 @@ export const getErrorBranding = query(async () => {
 	} catch {
 		return fallback;
 	}
+});
+
+/** Monthly pay run for payroll providers — CSV on the Reports page. */
+export const getPayrollExport = query(async () => {
+	const { orgId } = await requireOrg('admin');
+	if (!payrollExportEnabled()) return { licensed: false, data: null };
+	return { licensed: true, data: await exportPayroll(orgId) };
+});
+
+/** Staff sign-in access log for the audit view (audit-export flag). */
+export const getAccessLog = query(async () => {
+	const { orgId } = await requireOrg('admin');
+	if (!auditExportEnabled()) return { licensed: false, rows: [] };
+	return { licensed: true, rows: await listAccessLog(orgId) };
 });

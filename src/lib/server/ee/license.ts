@@ -10,7 +10,9 @@ export type EnterpriseFeature =
 	| 'white-label'
 	| 'audit-export'
 	| 'health-forms'
-	| 'kiosk-pin';
+	| 'kiosk-pin'
+	| 'payroll-export'
+	| 'data-retention';
 
 /**
  * Enterprise features are enabled on Freeweight Cloud, or on self-hosted installs

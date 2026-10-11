@@ -13,6 +13,7 @@
 	import { errMsg } from '#lib/format.ts';
 	import Mail from '@lucide/svelte/icons/mail';
 	import { markPayrollPaid, getReportsQuery } from '#lib/remote/reports.remote.ts';
+	import { getEntitlements, getPayrollExport } from '#lib/remote/ee.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
@@ -23,6 +24,7 @@
 	import type { ChartConfig } from '#lib/components/ui/chart/index.js';
 
 	const r = await getReportsQuery();
+	const entitlements = $derived(await getEntitlements());
 	const currency = await getCurrency();
 	const repSettings = await getSettings();
 	const thisMonthRevenue =
@@ -114,6 +116,34 @@
 		a.download = `instructor-pay-${new Date().toISOString().slice(0, 7)}.csv`;
 		a.click();
 		URL.revokeObjectURL(a.href);
+	}
+	async function exportFullPayroll() {
+		try {
+			const res = await getPayrollExport();
+			if (!res.licensed || !res.data) {
+				toast.error('Payroll export is an Enterprise feature');
+				return;
+			}
+			const csv = toCsv([
+				['Employee', 'Email', 'Classes taught', 'Class pay', 'Desk hours', 'Hourly pay', 'Gross'],
+				...res.data.rows.map((d) => [
+					d.employee,
+					d.email,
+					d.classes,
+					(d.classPay / 100).toFixed(2),
+					d.hours,
+					(d.hourlyPay / 100).toFixed(2),
+					(d.gross / 100).toFixed(2)
+				])
+			]);
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+			a.download = `payroll-${res.data.month}.csv`;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		} catch (err) {
+			toast.error(errMsg(err, 'Could not export payroll'));
+		}
 	}
 	function exportPnl() {
 		const csv = toCsv([
@@ -1768,6 +1798,11 @@
 				{#if r.payrollDetail.length}
 					<Button variant="ghost" size="sm" onclick={exportPayroll}>
 						<Download class="size-3.5" /> CSV
+					</Button>
+				{/if}
+				{#if entitlements.payrollExport}
+					<Button variant="ghost" size="sm" onclick={exportFullPayroll}>
+						<Download class="size-3.5" /> Payroll export
 					</Button>
 				{/if}
 			</div>
