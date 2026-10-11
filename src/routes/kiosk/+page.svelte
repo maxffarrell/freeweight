@@ -21,7 +21,7 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
-	import { getEntitlements } from '#lib/remote/ee.remote.ts';
+	import { getEntitlements, verifyKioskPin } from '#lib/remote/ee.remote.ts';
 	import { contrastText, errMsg, formatMoney, formatRelative } from '#lib/format.ts';
 	import { toast } from 'svelte-sonner';
 	import { localTime } from '#lib/tz.ts';
@@ -37,12 +37,13 @@
 	const tz = settings.timezone;
 	const liveLocations = $derived(locations);
 	const entitlements = $derived(await getEntitlements());
-	const pinRequired = $derived(entitlements.kioskPin && !!settings.kioskPin);
+	const pinRequired = $derived(entitlements.kioskPin && !!settings.kioskPinSet);
 	let pinInput = $state('');
 	let pinOk = $state(false);
 	let pinError = $state(false);
+	let pinLockedMsg = $state(false);
 	const pinLocked = $derived(pinRequired && !pinOk);
-	function pinKey(k: string) {
+	async function pinKey(k: string) {
 		pinError = false;
 		if (k === 'back') {
 			pinInput = pinInput.slice(0, -1);
@@ -50,10 +51,14 @@
 		}
 		if (pinInput.length >= 8) return;
 		pinInput += k;
-		if (pinInput === settings.kioskPin) pinOk = true;
-		else if (pinInput.length >= settings.kioskPin.length) {
-			pinError = true;
-			pinInput = '';
+		if (pinInput.length >= settings.kioskPinLen) {
+			const { result } = await verifyKioskPin({ pin: pinInput });
+			if (result === 'ok') pinOk = true;
+			else {
+				if (result === 'locked') pinLockedMsg = true;
+				pinError = true;
+				pinInput = '';
+			}
 		}
 	}
 
@@ -426,7 +431,7 @@
 				<p class="text-lg font-semibold">Staff PIN required</p>
 				<p class="text-sm text-muted-foreground">Enter the desk PIN to open the kiosk.</p>
 				<div class="flex justify-center gap-2">
-					{#each { length: settings.kioskPin.length } as _, i (i)}
+					{#each { length: settings.kioskPinLen } as _, i (i)}
 						<div
 							class="size-3 rounded-full border {pinInput.length > i
 								? 'bg-foreground'
@@ -434,7 +439,11 @@
 						></div>
 					{/each}
 				</div>
-				{#if pinError}<p class="text-sm text-destructive">Wrong PIN — try again.</p>{/if}
+				{#if pinLockedMsg}
+					<p class="text-sm text-destructive">Too many tries — the pad is locked for a minute.</p>
+				{:else if pinError}
+					<p class="text-sm text-destructive">Wrong PIN — try again.</p>
+				{/if}
 				<div class="mx-auto grid max-w-56 grid-cols-3 gap-2">
 					{#each ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as k (k)}
 						{#if k === ''}

@@ -3,6 +3,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { gymSettings, location } from '#lib/server/db/schema.ts';
 import { deleteDocument, uploadDocument } from '#lib/server/services/documents.ts';
+import { hashKioskPin } from '#lib/server/ee/kiosk-pin.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import type * as s from '#lib/schemas.ts';
 import type * as v from 'valibot';
@@ -23,9 +24,20 @@ export async function updateSettings(
 	input: v.InferOutput<typeof s.settingsInput>
 ) {
 	await getSettings(ctx.orgId);
+	const { kioskPin, kioskPinClear, ...rest } = input;
+	// PIN is stored hashed — an empty field in the settings form keeps the
+	// existing value, a non-empty one replaces hash + length together.
+	const set: Record<string, unknown> = { ...rest, updatedAt: new Date() };
+	if (kioskPinClear) {
+		set.kioskPin = '';
+		set.kioskPinLen = 0;
+	} else if (kioskPin) {
+		set.kioskPin = hashKioskPin(kioskPin);
+		set.kioskPinLen = kioskPin.length;
+	}
 	const [row] = await db
 		.update(gymSettings)
-		.set({ ...input, updatedAt: new Date() })
+		.set(set)
 		.where(eq(gymSettings.organizationId, ctx.orgId))
 		.returning();
 	return row;

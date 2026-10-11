@@ -16,6 +16,7 @@ import {
 	sendExportNow
 } from '#lib/server/ee/audit-export.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
+import { verifyKioskPin as kioskPinVerify } from '#lib/server/ee/kiosk-pin.ts';
 import {
 	anonymizeInactive,
 	dataRetentionEnabled,
@@ -273,4 +274,10 @@ export const sendExportWebhookNow = command(async () => {
 	const sent = await sendExportNow(orgId);
 	if (!sent) error(400, 'No export webhook configured (or delivery failed)');
 	return { ok: true };
+});
+
+/** Staff kiosk PIN check — never returns the PIN; 5 misses locks the pad for a minute. */
+export const verifyKioskPin = command(v.object({ pin: v.string() }), async ({ pin }) => {
+	const { orgId } = await requireOrg();
+	return { result: await kioskPinVerify(orgId, pin) };
 });

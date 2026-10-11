@@ -57,6 +57,11 @@
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		pending = true;
+		const missing = joinFields.find((f) => f.requireOnJoin && !customValues[f.id]?.trim());
+		if (missing) {
+			pending = false;
+			return toast.error(`${missing.name} is required`);
+		}
 		try {
 			const r = await joinGymForm({
 				slug: org.slug,
@@ -465,7 +470,11 @@
 							</div>
 							{#each joinFields as f (f.id)}
 								<div class="space-y-1.5">
-									<Field.Label for="jf-{f.id}">{f.name}</Field.Label>
+									<Field.Label for="jf-{f.id}"
+										>{f.name}{#if f.requireOnJoin}<span class="text-destructive">
+												*</span
+											>{/if}</Field.Label
+									>
 									{#if f.kind === 'select'}
 										<Select.Root type="single" bind:value={customValues[f.id]}>
 											<Select.Trigger class="w-full"

@@ -26,6 +26,7 @@ export async function listMemberFields(orgId: string) {
 			kind: memberField.kind,
 			options: memberField.options,
 			showOnJoin: memberField.showOnJoin,
+			requireOnJoin: memberField.requireOnJoin,
 			position: memberField.position,
 			members:
 				sql<number>`(select count(*) from ${memberFieldValue} v where v.field_id = ${outer(memberField.id)} and v.value != '')`.mapWith(
@@ -45,6 +46,7 @@ export async function saveMemberField(
 		kind: MemberFieldKind;
 		options?: string;
 		showOnJoin?: boolean;
+		requireOnJoin?: boolean;
 	}
 ) {
 	requireCustomFields();
@@ -52,7 +54,13 @@ export async function saveMemberField(
 	if (input.id) {
 		await db
 			.update(memberField)
-			.set({ name: input.name, kind: input.kind, options, showOnJoin: !!input.showOnJoin })
+			.set({
+				name: input.name,
+				kind: input.kind,
+				options,
+				showOnJoin: !!input.showOnJoin,
+				requireOnJoin: !!input.requireOnJoin
+			})
 			.where(and(eq(memberField.id, input.id), eq(memberField.organizationId, orgId)));
 		return input.id;
 	}
@@ -68,6 +76,7 @@ export async function saveMemberField(
 		kind: input.kind,
 		options,
 		showOnJoin: !!input.showOnJoin,
+		requireOnJoin: !!input.requireOnJoin,
 		position: max.n + 1
 	});
 	return id;
@@ -176,7 +185,8 @@ export async function joinPageFields(orgId: string) {
 			id: memberField.id,
 			name: memberField.name,
 			kind: memberField.kind,
-			options: memberField.options
+			options: memberField.options,
+			requireOnJoin: memberField.requireOnJoin
 		})
 		.from(memberField)
 		.where(and(eq(memberField.organizationId, orgId), eq(memberField.showOnJoin, true)))
@@ -191,6 +201,8 @@ export async function saveJoinAnswers(
 ) {
 	if (!customFieldsEnabled()) return;
 	const fields = await joinPageFields(orgId);
+	const missing = fields.find((f) => f.requireOnJoin && !values[f.id]?.trim());
+	if (missing) error(400, `${missing.name} is required`);
 	const allowed = new Set(fields.map((f) => f.id));
 	const rows = Object.entries(values)
 		.filter(([fid, val]) => allowed.has(fid) && val?.trim())

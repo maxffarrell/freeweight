@@ -14,6 +14,7 @@
 	import MoneyInput from '#lib/components/app/money-input.svelte';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
 	import { authClient } from '#lib/auth-client.ts';
@@ -179,6 +180,7 @@
 	let cfKind = $state<'text' | 'number' | 'date' | 'select'>('text');
 	let cfOptions = $state('');
 	let cfJoin = $state(false);
+	let cfJoinRequired = $state(false);
 	let cfBusy = $state(false);
 
 	function openCfField(f?: {
@@ -187,12 +189,14 @@
 		kind: string;
 		options: string;
 		showOnJoin?: boolean;
+		requireOnJoin?: boolean;
 	}) {
 		cfEditId = f?.id ?? null;
 		cfName = f?.name ?? '';
 		cfKind = (f?.kind as 'text' | 'number' | 'date' | 'select') ?? 'text';
 		cfOptions = f?.options ?? '';
 		cfJoin = f?.showOnJoin ?? false;
+		cfJoinRequired = f?.requireOnJoin ?? false;
 		cfOpen = true;
 	}
 
@@ -204,7 +208,8 @@
 				name: cfName,
 				kind: cfKind,
 				options: cfOptions,
-				showOnJoin: cfJoin
+				showOnJoin: cfJoin,
+				requireOnJoin: cfJoin && cfJoinRequired
 			});
 			cfOpen = false;
 			toast.success('Field saved');
@@ -346,7 +351,8 @@
 	// svelte-ignore state_referenced_locally
 	let whiteLabel = $state(settings.whiteLabel);
 	// svelte-ignore state_referenced_locally
-	let kioskPin = $state(settings.kioskPin);
+	let kioskPin = $state('');
+	let kioskPinClear = $state(false);
 	// svelte-ignore state_referenced_locally
 	let retentionDays = $state(settings.retentionDays);
 	let doorWebhookUrl = $state(settings.doorWebhookUrl);
@@ -421,6 +427,7 @@
 				staffBriefing,
 				whiteLabel,
 				kioskPin,
+				kioskPinClear,
 				retentionDays,
 				doorWebhookUrl,
 				anonymizeMonths,
@@ -994,13 +1001,24 @@
 										Require a staff PIN before the front-desk kiosk opens.
 									</p>
 								</div>
-								<Input
-									class="w-28"
-									inputmode="numeric"
-									placeholder="4 digits"
-									bind:value={kioskPin}
-								/>
+								<div class="flex items-center gap-2">
+									<Input
+										class="w-28"
+										inputmode="numeric"
+										placeholder={settings.kioskPinSet ? '••••' : '4 digits'}
+										bind:value={kioskPin}
+									/>
+								</div>
 							</div>
+							{#if settings.kioskPinSet}
+								<label class="flex items-center gap-2 text-xs text-muted-foreground">
+									<Checkbox bind:checked={kioskPinClear} />
+									Remove the PIN (kiosk opens without one)
+								</label>
+								<p class="-mt-2 text-xs text-muted-foreground">
+									Leave the field blank to keep the current PIN.
+								</p>
+							{/if}
 						{/if}
 						{#if entitlements.dataRetention}
 							<div class="flex items-center justify-between gap-4">
@@ -1983,6 +2001,12 @@
 				<label class="flex items-center gap-2 text-sm">
 					<input type="checkbox" bind:checked={cfJoin} /> Ask on the join page
 				</label>
+				{#if cfJoin}
+					<label class="ml-6 flex items-center gap-2 text-sm">
+						<input type="checkbox" bind:checked={cfJoinRequired} /> Required — join can't submit without
+						it
+					</label>
+				{/if}
 			</div>
 			<Dialog.Footer>
 				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
