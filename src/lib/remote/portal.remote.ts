@@ -45,7 +45,7 @@ import {
 	requireHealthForms,
 	submitParq as hfSubmit
 } from '#lib/server/ee/health-forms.ts';
-import { memberFieldValues } from '#lib/server/ee/custom-fields.ts';
+import { memberFieldValues, setMyFieldValue } from '#lib/server/ee/custom-fields.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
@@ -1084,6 +1084,32 @@ export const getMyCustomFields = query(idSchema, async (memberId) => {
 	const res = await memberFieldValues(m.organizationId, memberId);
 	return {
 		licensed: res.licensed,
-		rows: res.rows.filter((x) => x.value?.trim()).map((x) => ({ name: x.name, value: x.value }))
+		// Read-only fields only show when filled; member-editable fields always
+		// render so the member can set them.
+		rows: res.rows
+			.filter((x) => x.memberEditable || x.value?.trim())
+			.map((x) => ({
+				fieldId: x.id,
+				name: x.name,
+				kind: x.kind,
+				options: x.parsedOptions,
+				editable: x.memberEditable,
+				value: x.value
+			}))
 	};
 });
+
+/** Member edits one of their own custom fields — gated to fields flagged
+ * memberEditable; the staff setMemberFieldValue still checks select/number. */
+export const updateMyCustomField = command(
+	v.object({
+		memberId: v.string(),
+		fieldId: v.string(),
+		value: v.string()
+	}),
+	async ({ memberId, fieldId, value }) => {
+		const m = await myMember(memberId);
+		await setMyFieldValue(m.organizationId, memberId, fieldId, value);
+		return { ok: true };
+	}
+);

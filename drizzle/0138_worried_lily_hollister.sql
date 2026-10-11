@@ -1,0 +1,1 @@
+ALTER TABLE "member_field" ADD COLUMN "member_editable" boolean DEFAULT false NOT NULL;

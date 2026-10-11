@@ -1671,6 +1671,8 @@ export const memberField = pgTable(
 		showOnJoin: boolean('show_on_join').notNull().default(false),
 		/** Block join-page submit until this field is answered (custom-fields tier). */
 		requireOnJoin: boolean('require_on_join').notNull().default(false),
+		/** Member can edit this field's value from the portal (custom-fields tier). */
+		memberEditable: boolean('member_editable').notNull().default(false),
 		position: integer('position').notNull().default(0),
 		...timestamps
 	},

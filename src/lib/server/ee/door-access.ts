@@ -29,7 +29,9 @@ export async function fireDoorWebhook(
 		| 'member.checked_out'
 		| 'member.checkin_voided'
 		| 'guest.checked_in'
-		| 'member.checkin_flagged',
+		| 'member.checkin_flagged'
+		| 'member.suspended'
+		| 'member.reactivated',
 	payload: Record<string, unknown>
 ) {
 	if (!doorAccessEnabled()) return;

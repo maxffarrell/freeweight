@@ -47,6 +47,7 @@
 	let agreedWaiver = $state(false);
 	const joinFields = $derived(data.joinFields ?? []);
 	let customValues = $state<Record<string, string>>({});
+	let parqAnswers = $state<Record<string, boolean>>({});
 	let pending = $state(false);
 	let joined = $state(false);
 	let checkoutUrl = $state<string | null>(null);
@@ -62,6 +63,10 @@
 			pending = false;
 			return toast.error(`${missing.name} is required`);
 		}
+		if (data.parqRequired && Object.keys(parqAnswers).length < data.parqQuestions.length) {
+			pending = false;
+			return toast.error('Answer every health question');
+		}
 		try {
 			const r = await joinGymForm({
 				slug: org.slug,
@@ -75,6 +80,7 @@
 					promoCode: promoCode || undefined,
 					agreedWaiver,
 					customValues,
+					parqAnswers: data.parqRequired ? parqAnswers : undefined,
 					website
 				}
 			});
@@ -498,6 +504,35 @@
 									{/if}
 								</div>
 							{/each}
+							{#if data.parqRequired}
+								<div class="space-y-2 rounded-lg border bg-muted/40 p-3">
+									<p class="text-sm font-medium">Health questionnaire</p>
+									<p class="text-xs text-muted-foreground">
+										The gym needs these answered before you can train.
+									</p>
+									{#each data.parqQuestions as q, i (i)}
+										<div class="flex items-start justify-between gap-3 text-sm">
+											<span>{q}</span>
+											<div class="flex shrink-0 gap-1">
+												<button
+													type="button"
+													class="rounded-md border px-2.5 py-1 text-xs {parqAnswers[i] === true
+														? 'bg-primary text-primary-foreground'
+														: ''}"
+													onclick={() => (parqAnswers[i] = true)}>Yes</button
+												>
+												<button
+													type="button"
+													class="rounded-md border px-2.5 py-1 text-xs {parqAnswers[i] === false
+														? 'bg-primary text-primary-foreground'
+														: ''}"
+													onclick={() => (parqAnswers[i] = false)}>No</button
+												>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
 							{#if settings.waiver}
 								<div class="rounded-lg border bg-muted/40 p-3">
 									<p
