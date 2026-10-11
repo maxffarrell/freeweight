@@ -129,6 +129,13 @@ export async function recordGuestVisit(
 		action: 'recorded',
 		summary: `Guest ${input.guestName} checked in with ${m.name}`
 	});
+	fireDoorWebhook(ctx.orgId, 'guest.checked_in', {
+		checkInId: row!.id,
+		memberId: m.id,
+		memberName: m.name,
+		guestName: input.guestName,
+		locationId: input.locationId ?? m.locationId
+	});
 	return { checkIn: row!, member: m, used: (used?.n ?? 0) + 1, cap };
 }
 
