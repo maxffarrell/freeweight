@@ -1226,7 +1226,9 @@
 						<div class="space-y-0.5 border-l-2 pl-3 text-xs">
 							{#each Object.entries(m.member.parqAnswers) as [q, a] (q)}
 								<div class="flex justify-between gap-2">
-									<span class="text-muted-foreground">{q}</span>
+									<span class="text-muted-foreground"
+										>{isNaN(Number(q)) ? q : `Q${Number(q) + 1}`}</span
+									>
 									<span class={a ? 'text-amber-600' : ''}>{a ? 'Yes' : 'No'}</span>
 								</div>
 							{/each}

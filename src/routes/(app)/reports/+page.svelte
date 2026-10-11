@@ -17,7 +17,7 @@
 	import { aiChurnAnalysis } from '#lib/remote/ai.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
-	import { addDays, formatDate, formatMoney } from '#lib/format.ts';
+	import { formatDate, formatMoney } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import Download from '@lucide/svelte/icons/download';
 	import { BarChart } from 'layerchart';
@@ -126,7 +126,7 @@
 		try {
 			const res = await getPayrollExport({
 				from: payFrom || undefined,
-				to: payTo ? addDays(payTo, 1) : undefined
+				to: payTo || undefined
 			});
 			if (!res.licensed || !res.data) {
 				toast.error('Payroll export is an Enterprise feature');

@@ -21,7 +21,8 @@ export function requirePayrollExport() {
  */
 export async function exportPayroll(orgId: string, from?: string, to?: string) {
 	const start = new Date(from ?? `${new Date().toISOString().slice(0, 7)}-01T00:00:00Z`);
-	const end = to ? new Date(`${to}T00:00:00Z`) : new Date();
+	// `to` is an inclusive YYYY-MM-DD pick — bump a day for the exclusive bound.
+	const end = to ? new Date(new Date(`${to}T00:00:00Z`).getTime() + 86400_000) : new Date();
 	const [classRows, shiftRows] = await Promise.all([
 		db
 			.select({

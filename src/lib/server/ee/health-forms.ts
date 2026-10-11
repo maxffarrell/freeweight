@@ -3,7 +3,7 @@
 import { error } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { gymMember } from '#lib/server/db/schema.ts';
+import { gymMember, gymSettings } from '#lib/server/db/schema.ts';
 import { hasFeature } from './license.ts';
 
 /** Standard PAR-Q questions — indexes are stable, answers store as {"0": true, ...}. */
@@ -33,9 +33,25 @@ export async function submitParq(
 	answers: Record<string, boolean>
 ) {
 	requireHealthForms();
+	// The portal submits answers index-keyed against the served questions;
+	// store them keyed by question text so staff views and exports stay
+	// readable even if the gym's custom list changes later.
+	const [st] = await db
+		.select({ healthQuestions: gymSettings.healthQuestions })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const custom = st?.healthQuestions
+		.split('\n')
+		.map((q) => q.trim())
+		.filter(Boolean);
+	const questions = custom?.length ? custom : [...PARQ_QUESTIONS];
+	const keyed = Object.fromEntries(
+		Object.entries(answers).map(([k, v]) => [questions[Number(k)] ?? k, v])
+	);
 	const [row] = await db
 		.update(gymMember)
-		.set({ parqAnswers: answers, parqSignedAt: new Date() })
+		.set({ parqAnswers: keyed, parqSignedAt: new Date() })
 		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
 		.returning({ id: gymMember.id });
 	if (!row) error(404, 'Member not found');
