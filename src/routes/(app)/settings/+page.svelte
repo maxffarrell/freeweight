@@ -65,7 +65,8 @@
 		anonymizeInactiveMembers,
 		getEntitlements,
 		testDoorWebhook,
-		getOrgDataExport
+		getOrgDataExport,
+		sendDigestPreview
 	} from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
@@ -151,13 +152,21 @@
 	let cfName = $state('');
 	let cfKind = $state<'text' | 'number' | 'date' | 'select'>('text');
 	let cfOptions = $state('');
+	let cfJoin = $state(false);
 	let cfBusy = $state(false);
 
-	function openCfField(f?: { id: string; name: string; kind: string; options: string }) {
+	function openCfField(f?: {
+		id: string;
+		name: string;
+		kind: string;
+		options: string;
+		showOnJoin?: boolean;
+	}) {
 		cfEditId = f?.id ?? null;
 		cfName = f?.name ?? '';
 		cfKind = (f?.kind as 'text' | 'number' | 'date' | 'select') ?? 'text';
 		cfOptions = f?.options ?? '';
+		cfJoin = f?.showOnJoin ?? false;
 		cfOpen = true;
 	}
 
@@ -168,7 +177,8 @@
 				id: cfEditId ?? undefined,
 				name: cfName,
 				kind: cfKind,
-				options: cfOptions
+				options: cfOptions,
+				showOnJoin: cfJoin
 			});
 			cfOpen = false;
 			toast.success('Field saved');
@@ -322,6 +332,7 @@
 	let healthFormsRequired = $state(settings.healthFormsRequired);
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
+	let digestBusy = $state(false);
 	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
@@ -1087,6 +1098,32 @@
 								<Input class="w-56" placeholder="https://…" bind:value={exportWebhookUrl} />
 							</div>
 						{/if}
+						{#if entitlements.reportDigests}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Month-close digest</p>
+									<p class="text-xs text-muted-foreground">
+										Owners/admins get last month's numbers on the 1st. Preview it in your inbox.
+									</p>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={digestBusy}
+									onclick={async () => {
+										digestBusy = true;
+										try {
+											await sendDigestPreview();
+											toast.success('Preview sent to your email');
+										} catch (err) {
+											toast.error(errMsg(err, 'Could not send'));
+										} finally {
+											digestBusy = false;
+										}
+									}}>Email me a preview</Button
+								>
+							</div>
+						{/if}
 						{#if entitlements.whiteLabel}
 							<div class="flex items-center justify-between gap-4">
 								<div>
@@ -1830,6 +1867,9 @@
 					<Field.Field>
 						<Field.Label>Options (one per line or comma-separated)</Field.Label>
 						<Textarea bind:value={cfOptions} rows={3} placeholder="S, M, L, XL" />
+						<label class="flex items-center gap-2 text-sm">
+							<input type="checkbox" bind:checked={cfJoin} /> Ask on the join page
+						</label>
 					</Field.Field>
 				{/if}
 			</div>

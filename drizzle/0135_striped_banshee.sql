@@ -1,0 +1,1 @@
+ALTER TABLE "member_field" ADD COLUMN "show_on_join" boolean DEFAULT false NOT NULL;

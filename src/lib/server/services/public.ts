@@ -24,6 +24,7 @@ import {
 import { localDate } from '#lib/tz.ts';
 import { emit } from './events.ts';
 import { isEnterpriseEnabled } from '../ee/license.ts';
+import { joinPageFields, saveJoinAnswers } from '../ee/custom-fields.ts';
 import {
 	createMembership,
 	getPlan,
@@ -109,7 +110,8 @@ export async function getPublicGym(slug: string) {
 		sessions,
 		closures,
 		whiteLabel: settings.whiteLabel && isEnterpriseEnabled(),
-		brandColor: settings.whiteLabel && isEnterpriseEnabled() ? settings.brandColor : ''
+		brandColor: settings.whiteLabel && isEnterpriseEnabled() ? settings.brandColor : '',
+		joinFields: await joinPageFields(org.id)
 	};
 }
 
@@ -191,6 +193,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 			checkoutUrl = await signupCheckout(org.id, slug, settings, p, m!.id, input.email, promo);
 		}
 	}
+	if (input.customValues) await saveJoinAnswers(org.id, m!.id, input.customValues);
 	if (settings?.waiver) await recordWaiver(org.id, m!.id, settings.waiver);
 	await emit({
 		orgId: org.id,

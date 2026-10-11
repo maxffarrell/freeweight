@@ -25,16 +25,13 @@ export function reportDigestsEnabled() {
  * emails every owner/admin last month's numbers. Deduped via
  * notification_log so a re-fired cron never double-sends.
  */
-export async function sendMonthClose(orgId: string): Promise<number> {
-	if (!reportDigestsEnabled()) return 0;
+async function monthClosePayload(orgId: string) {
 	const [s] = await db
 		.select({ timezone: gymSettings.timezone, logoDocumentId: gymSettings.logoDocumentId })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
 	const tz = s?.timezone ?? 'UTC';
-	const today = localDate(new Date(), tz);
-	if (!today.endsWith('-01')) return 0;
 	const prev = new Date(Date.now() - 86400_000);
 	const month = localDate(prev, tz).slice(0, 7);
 	const from = new Date(`${month}-01T00:00:00Z`);
@@ -80,6 +77,30 @@ export async function sendMonthClose(orgId: string): Promise<number> {
 			.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'open')))
 	]);
 	const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+	return {
+		orgName: o?.name ?? 'your gym',
+		logoUrl: s?.logoDocumentId ? `/api/logo/${s.logoDocumentId}` : undefined,
+		month,
+		lines: [
+			`Revenue collected: ${money(rev[0]?.n ?? 0)}`,
+			`New members: ${joined[0]?.n ?? 0}`,
+			`Check-ins: ${visits[0]?.n ?? 0}`,
+			`Open balances now: ${money(open[0]?.n ?? 0)}`,
+			'Full detail is on the Reports page.'
+		]
+	};
+}
+
+export async function sendMonthClose(orgId: string): Promise<number> {
+	if (!reportDigestsEnabled()) return 0;
+	const [s0] = await db
+		.select({ timezone: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const today = localDate(new Date(), s0?.timezone ?? 'UTC');
+	if (!today.endsWith('-01')) return 0;
+	const p = await monthClosePayload(orgId);
 	const staff = await db
 		.select({ email: user.email })
 		.from(member)
@@ -89,27 +110,42 @@ export async function sendMonthClose(orgId: string): Promise<number> {
 	for (const st of staff) {
 		const [row] = await db
 			.insert(notificationLog)
-			.values({ organizationId: orgId, kind: 'month_close', entityId: month, recipient: st.email })
+			.values({
+				organizationId: orgId,
+				kind: 'month_close',
+				entityId: p.month,
+				recipient: st.email
+			})
 			.onConflictDoNothing()
 			.returning({ id: notificationLog.id });
 		if (!row) continue;
 		await sendEmail({
 			to: st.email,
-			subject: `${o?.name ?? 'Your gym'} — ${month} close`,
+			subject: `${p.orgName} — ${p.month} close`,
 			...renderEmail({
-				orgName: o?.name ?? 'your gym',
-				logoUrl: s?.logoDocumentId ? `/api/logo/${s.logoDocumentId}` : undefined,
-				heading: `${month} in review`,
-				lines: [
-					`Revenue collected: ${money(rev[0]?.n ?? 0)}`,
-					`New members: ${joined[0]?.n ?? 0}`,
-					`Check-ins: ${visits[0]?.n ?? 0}`,
-					`Open balances now: ${money(open[0]?.n ?? 0)}`,
-					'Full detail is on the Reports page.'
-				]
+				orgName: p.orgName,
+				logoUrl: p.logoUrl,
+				heading: `${p.month} in review`,
+				lines: p.lines
 			})
 		});
 		sent++;
 	}
 	return sent;
+}
+
+/** Preview — emails last month's digest to the requesting admin only, no dedupe. */
+export async function sendMonthClosePreview(orgId: string, email: string): Promise<void> {
+	if (!reportDigestsEnabled()) return;
+	const p = await monthClosePayload(orgId);
+	await sendEmail({
+		to: email,
+		subject: `[preview] ${p.orgName} — ${p.month} close`,
+		...renderEmail({
+			orgName: p.orgName,
+			logoUrl: p.logoUrl,
+			heading: `${p.month} in review (preview)`,
+			lines: p.lines
+		})
+	});
 }

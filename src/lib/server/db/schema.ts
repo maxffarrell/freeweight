@@ -1665,6 +1665,8 @@ export const memberField = pgTable(
 		kind: text('kind').notNull().default('text'),
 		/** Newline/comma-separated choices for kind='select'. */
 		options: text('options').notNull().default(''),
+		/** Ask for this on the public join page (custom-fields tier). */
+		showOnJoin: boolean('show_on_join').notNull().default(false),
 		position: integer('position').notNull().default(0),
 		...timestamps
 	},

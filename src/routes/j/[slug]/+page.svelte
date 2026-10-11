@@ -45,6 +45,8 @@
 	let promoCode = $state('');
 	let website = $state(''); // honeypot — must stay empty
 	let agreedWaiver = $state(false);
+	const joinFields = $derived(data.joinFields ?? []);
+	let customValues = $state<Record<string, string>>({});
 	let pending = $state(false);
 	let joined = $state(false);
 	let checkoutUrl = $state<string | null>(null);
@@ -67,6 +69,7 @@
 					planId: planId || undefined,
 					promoCode: promoCode || undefined,
 					agreedWaiver,
+					customValues,
 					website
 				}
 			});
@@ -460,6 +463,32 @@
 									{/if}
 								{/if}
 							</div>
+							{#each joinFields as f (f.id)}
+								<div class="space-y-1.5">
+									<Field.Label for="jf-{f.id}">{f.name}</Field.Label>
+									{#if f.kind === 'select'}
+										<Select.Root type="single" bind:value={customValues[f.id]}>
+											<Select.Trigger class="w-full"
+												>{customValues[f.id] || 'Select'}</Select.Trigger
+											>
+											<Select.Content>
+												{#each f.options
+													.split(/[\n,]/)
+													.map((o) => o.trim())
+													.filter(Boolean) as opt (opt)}
+													<Select.Item value={opt}>{opt}</Select.Item>
+												{/each}
+											</Select.Content>
+										</Select.Root>
+									{:else}
+										<Input
+											id="jf-{f.id}"
+											type={f.kind === 'number' ? 'number' : f.kind === 'date' ? 'date' : 'text'}
+											bind:value={customValues[f.id]}
+										/>
+									{/if}
+								</div>
+							{/each}
 							{#if settings.waiver}
 								<div class="rounded-lg border bg-muted/40 p-3">
 									<p

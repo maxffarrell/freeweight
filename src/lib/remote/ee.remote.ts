@@ -34,6 +34,7 @@ import {
 } from '#lib/server/ee/payroll-export.ts';
 import { customFieldsEnabled } from '#lib/server/ee/custom-fields.ts';
 import { hasFeature } from '#lib/server/ee/license.ts';
+import { reportDigestsEnabled, sendMonthClosePreview } from '#lib/server/ee/report-digests.ts';
 
 /** Feature flags for the current install — drives every gated surface in one round-trip. */
 export const getEntitlements = query(async () => {
@@ -239,3 +240,13 @@ export const setRetentionExempt = command(
 		return { ok: true };
 	}
 );
+
+/** Email the caller a preview of last month's digest (report-digests tier). */
+export const sendDigestPreview = command(async () => {
+	const { orgId, userId } = await requireOrg('admin');
+	if (!reportDigestsEnabled()) error(403, 'Report digests are an Enterprise feature');
+	const [u] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1);
+	if (!u?.email) error(400, 'No email on your account');
+	await sendMonthClosePreview(orgId, u.email);
+	return { ok: true };
+});
