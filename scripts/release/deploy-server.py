@@ -87,7 +87,7 @@ def deploy(app,payload):
   print('Deployment failed; restoring previous release',file=sys.stderr,flush=True)
   run(['docker','compose','stop','app'])
   if backed_up:
-   with backup.open('rb') as f:run(['docker','exec','-i',app+'-db-1','pg_restore','-U',app,'-d',app,'--clean','--if-exists','--no-owner','--single-transaction'],stdin=f)
+   with backup.open('rb') as f:run(['docker','exec','-i',app+'-db-1','pg_restore','-U',app,'-d','postgres','--clean','--if-exists','--create','--no-owner','--exit-on-error'],stdin=f)
   run(['docker','tag',old,image+':latest'])
   run(['docker','compose','up','-d','--no-build','--pull','never'])
   ready(app)
