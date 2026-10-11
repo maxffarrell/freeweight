@@ -990,6 +990,12 @@
 	}
 
 	let parqOpen = $state(false);
+	const parqExpired = $derived(
+		!!m?.member?.parqSignedAt &&
+			(m?.parqMonths ?? 0) > 0 &&
+			new Date(m.member.parqSignedAt).getTime() <
+				Date.now() - (m.parqMonths ?? 0) * 30.4 * 86400_000
+	);
 	let aiSumOpen = $state(false);
 	let aiSumText = $state('');
 	let aiSumBusy = $state(false);
@@ -1243,7 +1249,9 @@
 						<span
 							>{m.member.parqSignedAt
 								? `PAR-Q signed ${formatDate(m.member.parqSignedAt)}`
-								: 'PAR-Q not signed'}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
+								: 'PAR-Q not signed'}{#if parqExpired}<span class="font-medium text-amber-600">
+									— expired</span
+								>{/if}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
 									class="underline"
 									onclick={() => (parqOpen = !parqOpen)}>{parqOpen ? 'hide' : 'view'}</button
 								>{/if}</span

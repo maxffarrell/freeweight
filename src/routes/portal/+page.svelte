@@ -2120,13 +2120,15 @@
 				<Card.Header class="pb-2">
 					<Card.Title class="text-base">Health questionnaire</Card.Title>
 					<Card.Description>
-						{parq.signedAt
-							? `Signed ${formatDate(parq.signedAt)}`
-							: 'PAR-Q — required before training'}
+						{parq.expired
+							? `Expired ${formatDate(parq.signedAt!)} — sign again to keep booking`
+							: parq.signedAt
+								? `Signed ${formatDate(parq.signedAt)}`
+								: 'PAR-Q — required before training'}
 					</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					{#if parq.signedAt && !parqReopen}
+					{#if parq.signedAt && !parqReopen && !parq.expired}
 						<p class="text-sm text-muted-foreground">
 							Your answers are on file. Tell the front desk if your health changes.
 						</p>
@@ -2160,49 +2162,49 @@
 			</Card.Root>
 		{/if}
 
-		{#if news.length}
-			<Card.Root class="md:col-span-2">
-				<Card.Header>
-					<Card.Title class="text-base">How are we doing?</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					{#if npsDue === null}
-						<p class="text-sm text-muted-foreground">Loading…</p>
-					{:else if !npsDue}
-						<p class="text-sm text-muted-foreground">
-							Thanks for the feedback — we'll ask again soon.
-						</p>
-					{:else if npsSent}
-						<p class="text-sm text-muted-foreground">Thanks — noted!</p>
-					{:else}
-						<p class="text-sm text-muted-foreground">
-							How likely are you to recommend us to a friend?
-						</p>
-						<div class="mt-2 flex flex-wrap gap-1">
-							{#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as n (n)}
-								<button
-									type="button"
-									class="size-8 rounded-md border text-sm transition-colors {npsScore === n
-										? 'border-primary bg-primary text-primary-foreground'
-										: 'text-muted-foreground hover:border-primary'}"
-									onclick={() => (npsScore = n)}>{n}</button
-								>
-							{/each}
-						</div>
-						{#if npsScore !== null}
-							<Input
-								class="mt-3"
-								placeholder="Anything we could do better? (optional)"
-								bind:value={npsComment}
-							/>
-							<Button class="mt-2" size="sm" onclick={sendNps} disabled={npsPending}
-								>{npsPending ? 'Sending…' : 'Send feedback'}</Button
+		<Card.Root class="md:col-span-2">
+			<Card.Header>
+				<Card.Title class="text-base">How are we doing?</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				{#if npsDue === null}
+					<p class="text-sm text-muted-foreground">Loading…</p>
+				{:else if !npsDue}
+					<p class="text-sm text-muted-foreground">
+						Thanks for the feedback — we'll ask again soon.
+					</p>
+				{:else if npsSent}
+					<p class="text-sm text-muted-foreground">Thanks — noted!</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						How likely are you to recommend us to a friend?
+					</p>
+					<div class="mt-2 flex flex-wrap gap-1">
+						{#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as n (n)}
+							<button
+								type="button"
+								class="size-8 rounded-md border text-sm transition-colors {npsScore === n
+									? 'border-primary bg-primary text-primary-foreground'
+									: 'text-muted-foreground hover:border-primary'}"
+								onclick={() => (npsScore = n)}>{n}</button
 							>
-						{/if}
+						{/each}
+					</div>
+					{#if npsScore !== null}
+						<Input
+							class="mt-3"
+							placeholder="Anything we could do better? (optional)"
+							bind:value={npsComment}
+						/>
+						<Button class="mt-2" size="sm" onclick={sendNps} disabled={npsPending}
+							>{npsPending ? 'Sending…' : 'Send feedback'}</Button
+						>
 					{/if}
-				</Card.Content>
-			</Card.Root>
+				{/if}
+			</Card.Content>
+		</Card.Root>
 
+		{#if news.length}
 			<Card.Root class="sm:col-span-2">
 				<Card.Header class="pb-2">
 					<Card.Title class="text-base">News</Card.Title>
