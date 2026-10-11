@@ -169,6 +169,7 @@
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.parqMissing ? 'no health form' : '',
+					r.parqFlagged ? 'medical flag — check PAR-Q' : '',
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					r.welcomeBack ? 'welcome back' : '',
@@ -305,6 +306,7 @@
 				[
 					r.waiverMissing ? 'waiver unsigned' : '',
 					r.parqMissing ? 'no health form' : '',
+					r.parqFlagged ? 'medical flag — check PAR-Q' : '',
 					(r.pendingSigns ?? 0) > 0 ? 'signature pending' : '',
 					(r.visitsToday ?? 0) >= 3 ? `${r.visitsToday ?? 0}th visit today — shared card?` : '',
 					(r.visitsMonth ?? 0) > 1 ? `${r.visitsMonth} visits this month` : '',

@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { gymMember, gymSettings, membership } from '#lib/server/db/schema.ts';
+import { activity, gymMember, gymSettings, membership } from '#lib/server/db/schema.ts';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { hasFeature } from './license.ts';
 
@@ -31,7 +31,8 @@ export async function fireDoorWebhook(
 		| 'guest.checked_in'
 		| 'member.checkin_flagged'
 		| 'member.suspended'
-		| 'member.reactivated',
+		| 'member.reactivated'
+		| 'member.provisioned',
 	payload: Record<string, unknown>
 ) {
 	if (!doorAccessEnabled()) return;
@@ -92,5 +93,45 @@ export async function syncDoorRoster(orgId: string): Promise<number> {
 		sentAt: new Date().toISOString(),
 		members
 	});
+	await db.insert(activity).values({
+		organizationId: orgId,
+		entityType: 'door_access',
+		entityId: 'roster',
+		action: 'roster_sync',
+		summary: `Door roster synced — ${members.length} active members pushed`,
+		data: { members: members.length }
+	});
 	return members.length;
+}
+
+/** Provision a single member at the door system — staff "Push to door" on the
+ * member page. Throws when there's no webhook URL or the member doesn't exist. */
+export async function pushDoorMember(orgId: string, memberId: string) {
+	requireDoorAccess();
+	const [s] = await db
+		.select({ url: gymSettings.doorWebhookUrl })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	if (!s?.url) throw error(400, 'Set the door webhook URL first');
+	const [m] = await db
+		.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+		.limit(1);
+	if (!m) throw error(404, 'Member not found');
+	await postDoor(s.url, {
+		event: 'member.provisioned',
+		sentAt: new Date().toISOString(),
+		member: m
+	});
+	await db.insert(activity).values({
+		organizationId: orgId,
+		entityType: 'door_access',
+		entityId: m.id,
+		action: 'provisioned',
+		summary: `${m.name} provisioned at the door`,
+		data: { memberId: m.id }
+	});
+	return m.name;
 }
