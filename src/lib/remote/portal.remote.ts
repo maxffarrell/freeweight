@@ -16,7 +16,7 @@ import {
 	personalRecord,
 	plan
 } from '#lib/server/db/schema.ts';
-import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as billingSvc from '#lib/server/services/billing.ts';
 import * as progSvc from '#lib/server/services/programs.ts';
@@ -781,7 +781,7 @@ export const aiMonthSummary = command(idSchema, async (memberId) => {
 					eq(booking.organizationId, m.organizationId),
 					eq(booking.memberId, memberId),
 					eq(booking.status, 'attended'),
-					sql`${classSession.startsAt} >= ${since}`
+					gte(classSession.startsAt, since)
 				)
 			)
 			.groupBy(classType.name)
@@ -793,7 +793,7 @@ export const aiMonthSummary = command(idSchema, async (memberId) => {
 				and(
 					eq(personalRecord.organizationId, m.organizationId),
 					eq(personalRecord.memberId, memberId),
-					sql`${personalRecord.createdAt} >= ${since}`
+					gte(personalRecord.createdAt, since)
 				)
 			)
 	]);
