@@ -9,6 +9,7 @@ import {
 	ilike,
 	inArray,
 	isNotNull,
+	lt,
 	ne,
 	or,
 	sql
@@ -174,6 +175,12 @@ export async function listMembers(
 	/** Enterprise health-forms: members without a signed PAR-Q. */
 	noHealthForm?: boolean
 ) {
+	const [parqS] = await db
+		.select({ parqMonths: gymSettings.parqMonths })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	const parqMonths = parqS?.parqMonths ?? 0;
 	const term = q?.trim();
 	const [st] = noWaiver
 		? await db
@@ -356,7 +363,14 @@ export async function listMembers(
 				inEvent
 					? sql`exists (select 1 from event_registration er join gym_event ge on ge.id = er.event_id where er.member_id = ${gymMember.id} and er.status = 'registered' and er.waitlisted = false and ge.starts_at > now())`
 					: undefined,
-				noHealthForm ? isNull(gymMember.parqSignedAt) : undefined,
+				noHealthForm && parqMonths > 0
+					? or(
+							isNull(gymMember.parqSignedAt),
+							lt(gymMember.parqSignedAt, new Date(Date.now() - parqMonths * 30.4 * 86400_000))
+						)
+					: noHealthForm
+						? isNull(gymMember.parqSignedAt)
+						: undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,

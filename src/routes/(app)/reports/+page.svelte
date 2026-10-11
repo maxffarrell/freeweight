@@ -14,6 +14,7 @@
 	import Mail from '@lucide/svelte/icons/mail';
 	import { markPayrollPaid, getReportsQuery } from '#lib/remote/reports.remote.ts';
 	import { getEntitlements, getPayrollExport } from '#lib/remote/ee.remote.ts';
+	import { aiChurnAnalysis } from '#lib/remote/ai.remote.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { getCurrency } from '#lib/remote/billing.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
@@ -25,6 +26,8 @@
 
 	const r = await getReportsQuery();
 	const entitlements = $derived(await getEntitlements());
+	let churn = $state<Awaited<ReturnType<typeof aiChurnAnalysis>> | null>(null);
+	let churnBusy = $state(false);
 	const currency = await getCurrency();
 	const repSettings = await getSettings();
 	const thisMonthRevenue =
@@ -2219,6 +2222,72 @@
 			</Table.Root>
 		</Card.Content>
 	</Card.Root>
+
+	{#if entitlements.ai}
+		<Card.Root class="lg:col-span-2">
+			<Card.Header class="flex-row items-center justify-between space-y-0">
+				<Card.Title class="text-base">Churn risk (AI)</Card.Title>
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={churnBusy}
+					onclick={async () => {
+						churnBusy = true;
+						try {
+							churn = await aiChurnAnalysis();
+							if (!churn.available) toast.error('No AI provider configured');
+						} catch (err) {
+							toast.error(errMsg(err, 'Analysis failed'));
+						} finally {
+							churnBusy = false;
+						}
+					}}>{churnBusy ? 'Analyzing…' : 'Analyze with AI'}</Button
+				>
+				<Card.Description
+					>AI-ranked at-risk members with a suggested save play each.</Card.Description
+				>
+			</Card.Header>
+			<Card.Content>
+				{#if churn?.members?.length}
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Member</Table.Head>
+								<Table.Head>Risk</Table.Head>
+								<Table.Head>Why</Table.Head>
+								<Table.Head>Suggested play</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each churn.members as c (c.memberId)}
+								<Table.Row>
+									<Table.Cell>
+										<a
+											class="font-medium underline-offset-2 hover:underline"
+											href="/members/{c.memberId}">{c.name}</a
+										>
+									</Table.Cell>
+									<Table.Cell>
+										<Badge variant={c.risk === 'high' ? 'destructive' : 'secondary'}
+											>{c.risk ?? '—'}</Badge
+										>
+									</Table.Cell>
+									<Table.Cell class="text-muted-foreground">{c.reason ?? '—'}</Table.Cell>
+									<Table.Cell class="text-muted-foreground">{c.action ?? '—'}</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						{churn
+							? 'No at-risk members to score.'
+							: 'Runs the current at-risk list through your AI provider.'}
+					</p>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 
 	<Card.Root>
 		<Card.Header>

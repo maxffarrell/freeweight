@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "parq_months" integer DEFAULT 0 NOT NULL;

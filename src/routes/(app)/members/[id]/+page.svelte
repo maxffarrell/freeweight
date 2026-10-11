@@ -101,7 +101,7 @@
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { aiDraftWinBack, aiGenerateProgram, getAiStatus } from '#lib/remote/ai.remote.ts';
-	import { getEntitlements } from '#lib/remote/ee.remote.ts';
+	import { getEntitlements, getMemberDataExport } from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
@@ -1022,6 +1022,21 @@
 				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
+				{#if entitlements.dataRetention}
+					<DropdownMenu.Item
+						onclick={async () => {
+							const r = await getMemberDataExport({ memberId: m.member.id });
+							if (!r.data) return toast.error('Nothing to export');
+							const blob = new Blob([JSON.stringify(r.data, null, 2)], {
+								type: 'application/json'
+							});
+							const a = document.createElement('a');
+							a.href = URL.createObjectURL(blob);
+							a.download = `member-${m.member.name.replace(/\s+/g, '-')}-data.json`;
+							a.click();
+						}}>Export member data</DropdownMenu.Item
+					>
+				{/if}
 				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive"
 					>Anonymize personal data…</DropdownMenu.Item
 				>
