@@ -298,6 +298,8 @@
 	// svelte-ignore state_referenced_locally
 	let kioskPin = $state(settings.kioskPin);
 	// svelte-ignore state_referenced_locally
+	let retentionDays = $state(settings.retentionDays);
+	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
 	const currencyOptions = ['usd', 'eur', 'gbp', 'aud', 'cad', 'nzd', 'brl', 'inr'];
@@ -358,6 +360,7 @@
 				staffBriefing,
 				whiteLabel,
 				kioskPin,
+				retentionDays,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -929,6 +932,17 @@
 									placeholder="4 digits"
 									bind:value={kioskPin}
 								/>
+							</div>
+						{/if}
+						{#if entitlements.dataRetention}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Data retention</p>
+									<p class="text-xs text-muted-foreground">
+										Purge audit + notification logs older than N days. 0 keeps everything.
+									</p>
+								</div>
+								<Input class="w-28" type="number" min="0" max="3650" bind:value={retentionDays} />
 							</div>
 						{/if}
 						<Button type="submit" disabled={pending}>Save</Button>

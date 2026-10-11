@@ -119,6 +119,8 @@ export const gymSettings = pgTable('gym_settings', {
 	whiteLabel: boolean('white_label').notNull().default(false),
 	/** Enterprise kiosk-pin: 4-digit PIN the kiosk requires before use; empty = unlocked. */
 	kioskPin: text('kiosk_pin').notNull().default(''),
+	/** Enterprise data-retention: purge activity + notification log older than N days. 0 = keep forever. */
+	retentionDays: integer('retention_days').notNull().default(0),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()

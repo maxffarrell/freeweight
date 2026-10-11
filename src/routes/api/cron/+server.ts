@@ -4,6 +4,7 @@ import { CRON_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
+import { purgeOldData } from '#lib/server/ee/data-retention.ts';
 import { syncAtRiskTags } from '#lib/server/services/reports.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import {
@@ -97,12 +98,18 @@ export const GET: RequestHandler = async ({ request }) => {
 	let usualNudges = 0;
 	let serviceReminders = 0;
 	let ownerInsights = 0;
+	let retentionPurged = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
 			suspended += await suspendDelinquentMembers(o.id);
 			recurringPosted += await postDueRecurring(o.id);
 			recurringPosted += await postDueRecurringExpenses(o.id);
+			try {
+				retentionPurged += await purgeOldData(o.id);
+			} catch (err) {
+				console.error(`data-retention cron failed for ${o.id}`, err);
+			}
 			try {
 				await sendNewMemberDrip(o.id);
 				await sendSignReminders(o.id);
@@ -313,6 +320,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		usualNudges,
 		serviceReminders,
 		ownerInsights,
+		retentionPurged,
 		failed,
 		reminders,
 		eventReminders,

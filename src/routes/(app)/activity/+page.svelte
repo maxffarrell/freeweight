@@ -13,11 +13,14 @@
 		getActivityTypes,
 		getSettings
 	} from '#lib/remote/workspace.remote.ts';
+	import { getAccessLog, getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatRelative } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import { localTime, localDate } from '#lib/tz.ts';
 
 	const settings = await getSettings();
+	const entitlements = $derived(await getEntitlements());
+	const access = $derived(entitlements.auditExport ? await getAccessLog() : null);
 	const types = await getActivityTypes();
 	const actors = await getActivityActors();
 	const actions = await getActivityActions();
@@ -194,4 +197,32 @@
 			</Card.Footer>
 		{/if}
 	</Card.Root>
+
+	{#if access?.licensed}
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Staff access log</Card.Title>
+				<Card.Description>Recent staff sign-ins — audit trail</Card.Description>
+			</Card.Header>
+			<Card.Content class="divide-y px-6">
+				{#each access.rows as a (a.signedInAt + a.email)}
+					<div class="py-2.5 first:pt-0 last:pb-0">
+						<p class="text-sm">{a.name} <span class="text-muted-foreground">{a.email}</span></p>
+						<p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+							<span
+								>{localDate(new Date(a.signedInAt), settings.timezone)} · {localTime(
+									a.signedInAt,
+									settings.timezone
+								)}</span
+							>
+							{#if a.ipAddress}<span>{a.ipAddress}</span>{/if}
+							{#if a.userAgent}<span class="truncate">{a.userAgent}</span>{/if}
+						</p>
+					</div>
+				{:else}
+					<p class="py-4 text-center text-sm text-muted-foreground">No sign-ins recorded.</p>
+				{/each}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 </div>

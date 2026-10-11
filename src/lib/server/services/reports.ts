@@ -2459,10 +2459,13 @@ export async function rotaVsClocked(orgId: string) {
 		db
 			.select({
 				memberId: shift.memberId,
+				name: user.name,
 				clockedInAt: shift.clockedInAt,
 				clockedOutAt: shift.clockedOutAt
 			})
 			.from(shift)
+			.innerJoin(member, eq(shift.memberId, member.id))
+			.innerJoin(user, eq(member.userId, user.id))
 			.where(and(eq(shift.organizationId, orgId), gte(shift.clockedInAt, monthStart)))
 	]);
 	const days: string[] = [];
@@ -2487,13 +2490,14 @@ export async function rotaVsClocked(orgId: string) {
 		byMember.set(r.memberId, row);
 	}
 	for (const s2 of shiftRows) {
-		const row = byMember.get(s2.memberId) ?? { name: '(removed)', rotaMin: 0, clockedMin: 0 };
+		const row = byMember.get(s2.memberId) ?? { name: s2.name, rotaMin: 0, clockedMin: 0 };
 		const end = s2.clockedOutAt ?? new Date();
 		row.clockedMin += Math.max(0, (end.getTime() - s2.clockedInAt.getTime()) / 60000);
 		byMember.set(s2.memberId, row);
 	}
-	return [...byMember.values()]
-		.map((v) => ({
+	return [...byMember.entries()]
+		.map(([memberId, v]) => ({
+			memberId,
 			name: v.name,
 			rotaHrs: Math.round(v.rotaMin / 6) / 10,
 			clockedHrs: Math.round(v.clockedMin / 6) / 10,
