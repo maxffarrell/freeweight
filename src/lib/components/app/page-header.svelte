@@ -1,10 +1,12 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import * as Breadcrumb from '#lib/components/ui/breadcrumb/index.js';
 
 	type Crumb = { label: string; href?: string };
+	const brand = getContext<{ whiteLabel?: boolean; orgName?: string } | undefined>('orgBrand');
+	const appName = brand?.whiteLabel && brand?.orgName ? brand.orgName : 'Freeweight';
 	let {
 		title,
 		crumbs = [],
@@ -12,7 +14,7 @@
 	}: { title: string; crumbs?: Crumb[]; actions?: Snippet } = $props();
 </script>
 
-<svelte:head><title>{title} · Freeweight</title></svelte:head>
+<svelte:head><title>{title} · {appName}</title></svelte:head>
 
 <header
 	class="sticky top-0 z-10 flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b bg-background/80 px-4 py-1.5 backdrop-blur"

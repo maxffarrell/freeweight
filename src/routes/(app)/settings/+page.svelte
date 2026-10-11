@@ -370,6 +370,7 @@
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
 	let digestRecipients = $state(settings.digestRecipients);
 	let digestWeekly = $state(settings.digestWeekly);
+	let digestDay = $state(String(settings.digestDay ?? 1));
 	let doorEventsCsv = $state(settings.doorEvents);
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
@@ -453,6 +454,7 @@
 				exportWebhookUrl,
 				digestRecipients,
 				digestWeekly,
+				digestDay: Number(digestDay),
 				doorEvents: doorEventsCsv,
 				brandColor,
 				parqMonths,
@@ -1368,10 +1370,21 @@
 								<div>
 									<p class="text-sm font-medium">Weekly digest</p>
 									<p class="text-xs text-muted-foreground">
-										Also send the digest every Monday covering the last 7 days.
+										Also send the digest on the chosen day covering the last 7 days.
 									</p>
 								</div>
 								<div class="flex items-center gap-2">
+									{#if digestWeekly}
+										<NativeSelect bind:value={digestDay} class="w-32" aria-label="Digest day">
+											<option value="1">Mondays</option>
+											<option value="2">Tuesdays</option>
+											<option value="3">Wednesdays</option>
+											<option value="4">Thursdays</option>
+											<option value="5">Fridays</option>
+											<option value="6">Saturdays</option>
+											<option value="0">Sundays</option>
+										</NativeSelect>
+									{/if}
 									<Button
 										variant="outline"
 										size="sm"

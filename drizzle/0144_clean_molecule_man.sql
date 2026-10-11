@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "digest_day" integer DEFAULT 1 NOT NULL;
