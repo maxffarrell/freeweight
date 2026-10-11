@@ -26,6 +26,7 @@ export async function listMemberFields(orgId: string) {
 			kind: memberField.kind,
 			options: memberField.options,
 			showOnJoin: memberField.showOnJoin,
+			showOnRoster: memberField.showOnRoster,
 			requireOnJoin: memberField.requireOnJoin,
 			memberEditable: memberField.memberEditable,
 			position: memberField.position,
@@ -47,6 +48,7 @@ export async function saveMemberField(
 		kind: MemberFieldKind;
 		options?: string;
 		showOnJoin?: boolean;
+		showOnRoster?: boolean;
 		requireOnJoin?: boolean;
 		memberEditable?: boolean;
 	}
@@ -61,6 +63,7 @@ export async function saveMemberField(
 				kind: input.kind,
 				options,
 				showOnJoin: !!input.showOnJoin,
+				showOnRoster: !!input.showOnRoster,
 				requireOnJoin: !!input.requireOnJoin,
 				memberEditable: !!input.memberEditable
 			})
@@ -79,6 +82,7 @@ export async function saveMemberField(
 		kind: input.kind,
 		options,
 		showOnJoin: !!input.showOnJoin,
+		showOnRoster: !!input.showOnRoster,
 		requireOnJoin: !!input.requireOnJoin,
 		memberEditable: !!input.memberEditable,
 		position: max.n + 1

@@ -99,7 +99,7 @@ export const getSession = query(idSchema, async (id) =>
 	svc.getSession((await requireOrg()).orgId, id)
 );
 export const getRoster = query(idSchema, async (id) =>
-	svc.getRoster((await requireOrg()).orgId, id)
+	svc.getRosterWithFields((await requireOrg()).orgId, id)
 );
 
 /** Staff re-seats a booking into another session of the same class. */

@@ -15,7 +15,8 @@ export async function orgBrand(orgId: string) {
 		db
 			.select({
 				logoDocumentId: gymSettings.logoDocumentId,
-				whiteLabel: gymSettings.whiteLabel
+				whiteLabel: gymSettings.whiteLabel,
+				brandColor: gymSettings.brandColor
 			})
 			.from(gymSettings)
 			.where(eq(gymSettings.organizationId, orgId))
@@ -24,6 +25,7 @@ export async function orgBrand(orgId: string) {
 	return {
 		orgName: o[0]?.name ?? 'your gym',
 		logoUrl: s[0]?.logoDocumentId ? `${appOrigin()}/api/logo/${s[0].logoDocumentId}` : undefined,
-		whiteLabel: !!(s[0]?.whiteLabel && isEnterpriseEnabled())
+		whiteLabel: !!(s[0]?.whiteLabel && isEnterpriseEnabled()),
+		brandColor: s[0]?.whiteLabel && isEnterpriseEnabled() ? s[0].brandColor : ''
 	};
 }

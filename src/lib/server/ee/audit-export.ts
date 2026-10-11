@@ -43,7 +43,7 @@ export function requireAuditExport(): void {
  * member-facing table in stable order. Table keys mirror the REST resource
  * names so downstream tooling can map onto the API.
  */
-export async function exportOrgData(orgId: string) {
+export async function exportOrgData(orgId: string, since?: string) {
 	requireAuditExport();
 	const [
 		org,
@@ -99,9 +99,7 @@ export async function exportOrgData(orgId: string) {
 			.where(eq(member.organizationId, orgId))
 	]);
 
-	return {
-		exportedAt: new Date().toISOString(),
-		organization: org[0] ?? null,
+	let collections = {
 		locations,
 		members,
 		plans,
@@ -115,9 +113,47 @@ export async function exportOrgData(orgId: string) {
 		checkIns,
 		charges,
 		payments,
-		activity: activityRows,
+		activityRows,
 		webhooks,
 		staffMembers
+	};
+	if (since) {
+		// Incremental export — only rows touched since the timestamp.
+		const cut = new Date(since);
+		const touched = <T>(rows: T[]) =>
+			rows.filter((r) => {
+				const o = r as Record<string, unknown>;
+				for (const k of ['updatedAt', 'createdAt', 'joinedAt', 'checkedAt']) {
+					const v = o[k];
+					if (v instanceof Date) return v >= cut;
+					if (typeof v === 'string' && v) return new Date(v) >= cut;
+				}
+				return true;
+			});
+		collections = Object.fromEntries(
+			Object.entries(collections).map(([k, rows]) => [k, touched(rows as unknown[])])
+		) as typeof collections;
+	}
+
+	return {
+		exportedAt: new Date().toISOString(),
+		organization: org[0] ?? null,
+		locations: collections.locations,
+		members: collections.members,
+		plans: collections.plans,
+		memberships: collections.memberships,
+		memberTags: collections.memberTags,
+		memberFields: collections.memberFields,
+		memberFieldValues: collections.memberFieldValues,
+		classTypes: collections.classTypes,
+		sessions: collections.sessions,
+		bookings: collections.bookings,
+		checkIns: collections.checkIns,
+		charges: collections.charges,
+		payments: collections.payments,
+		activity: collections.activityRows,
+		webhooks: collections.webhooks,
+		staffMembers: collections.staffMembers
 	};
 }
 

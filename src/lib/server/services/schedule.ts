@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { customFieldsEnabled } from '../ee/custom-fields.ts';
 import {
 	and,
 	asc,
@@ -19,6 +20,8 @@ import {
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '#lib/server/db/index.ts';
 import {
+	memberField,
+	memberFieldValue,
 	memberLevel,
 	instructorQual,
 	booking,
@@ -503,6 +506,38 @@ export async function getRoster(orgId: string, sessionId: string) {
 		)
 		.where(and(eq(booking.organizationId, orgId), eq(booking.sessionId, sessionId)))
 		.orderBy(asc(booking.createdAt));
+}
+
+/** Same roster plus each member's roster-visible custom-field values
+ * (custom-fields flag). Called by getSessionRoster, not getRoster callers
+ * that only need bookings. */
+export async function getRosterWithFields(orgId: string, sessionId: string) {
+	const rows = await getRoster(orgId, sessionId);
+	if (!customFieldsEnabled() || !rows.length) return rows.map((r) => ({ ...r, fields: [] }));
+	const memberIds = rows.map((r) => r.booking.memberId);
+	const fieldRows = await db
+		.select({
+			memberId: memberFieldValue.memberId,
+			label: memberField.name,
+			value: memberFieldValue.value
+		})
+		.from(memberFieldValue)
+		.innerJoin(memberField, eq(memberFieldValue.fieldId, memberField.id))
+		.where(
+			and(
+				eq(memberFieldValue.organizationId, orgId),
+				eq(memberField.showOnRoster, true),
+				inArray(memberFieldValue.memberId, memberIds),
+				sql`${memberFieldValue.value} != ''`
+			)
+		);
+	const byMember = new Map<string, { label: string; value: string }[]>();
+	for (const f of fieldRows) {
+		const cur = byMember.get(f.memberId) ?? [];
+		cur.push({ label: f.label, value: f.value });
+		byMember.set(f.memberId, cur);
+	}
+	return rows.map((r) => ({ ...r, fields: byMember.get(r.booking.memberId) ?? [] }));
 }
 
 /** Fill history for a session's class — the last 4 past sessions of the same class type. */

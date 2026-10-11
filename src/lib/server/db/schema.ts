@@ -1687,6 +1687,8 @@ export const memberField = pgTable(
 		options: text('options').notNull().default(''),
 		/** Ask for this on the public join page (custom-fields tier). */
 		showOnJoin: boolean('show_on_join').notNull().default(false),
+		// Surfaced as a badge on the class roster (allergies, belt size, etc.).
+		showOnRoster: boolean('show_on_roster').notNull().default(false),
 		/** Block join-page submit until this field is answered (custom-fields tier). */
 		requireOnJoin: boolean('require_on_join').notNull().default(false),
 		/** Member can edit this field's value from the portal (custom-fields tier). */
