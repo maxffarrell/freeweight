@@ -133,6 +133,9 @@ export const gymSettings = pgTable('gym_settings', {
 	digestRecipients: text('digest_recipients').notNull().default(''),
 	/** Also send the digest every Monday covering the trailing 7 days. */
 	digestWeekly: boolean('digest_weekly').notNull().default(false),
+	/** Export webhook ops readout: last POST attempt + result. */
+	exportLastStatus: integer('export_last_status'),
+	exportLastAt: timestamp('export_last_at', { withTimezone: true }),
 	/** Enterprise door-access: comma-separated event names to fire; empty = all. */
 	doorEvents: text('door_events').notNull().default(''),
 	/** Door-access ops readout: last webhook post attempt + result. */

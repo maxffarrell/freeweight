@@ -40,6 +40,18 @@
 	const pinRequired = $derived(entitlements.kioskPin && !!settings.kioskPinSet);
 	let pinInput = $state('');
 	let pinOk = $state(false);
+	let pinLastAt = $state(0);
+	// Re-lock the staff pad after 10 min idle — an unattended unlocked kiosk is
+	// the exact thing the PIN exists to stop.
+	$effect(() => {
+		const t = setInterval(() => {
+			if (pinOk && Date.now() - pinLastAt > 600_000) {
+				pinOk = false;
+				pinInput = '';
+			}
+		}, 30_000);
+		return () => clearInterval(t);
+	});
 	let pinError = $state(false);
 	let pinLockedMsg = $state(false);
 	const pinLocked = $derived(pinRequired && !pinOk);
@@ -53,8 +65,10 @@
 		pinInput += k;
 		if (pinInput.length >= Math.max(4, settings.kioskPinLen)) {
 			const { result } = await verifyKioskPin({ pin: pinInput });
-			if (result === 'ok') pinOk = true;
-			else {
+			if (result === 'ok') {
+				pinOk = true;
+				pinLastAt = Date.now();
+			} else {
 				if (result === 'locked') pinLockedMsg = true;
 				pinError = true;
 				pinInput = '';

@@ -1261,6 +1261,13 @@
 									>
 								</div>
 							</div>
+							{#if settings.exportLastAt}
+								<p class="text-xs text-muted-foreground">
+									Last post: {settings.exportLastStatus
+										? `HTTP ${settings.exportLastStatus}`
+										: 'delivery failed'} · {formatDate(settings.exportLastAt)}
+								</p>
+							{/if}
 						{/if}
 						{#if entitlements.reportDigests}
 							<div class="flex items-center justify-between gap-4">

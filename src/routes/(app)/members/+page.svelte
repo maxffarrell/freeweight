@@ -346,6 +346,7 @@
 				'Referral source',
 				'Portal',
 				'Guardian',
+				...(entitlements.healthForms ? ['Health form'] : []),
 				...memberFields.fields.map((f) => f.name)
 			],
 			...rows.map((m) => [
@@ -364,6 +365,7 @@
 				m.referralSource ?? '',
 				m.portalUserId ? 'yes' : '',
 				m.guardianName ?? '',
+				...(entitlements.healthForms ? [m.parqSignedAt ? formatDate(m.parqSignedAt) : ''] : []),
 				...memberFields.fields.map((f) => m.customFields?.[f.id] ?? '')
 			])
 		]);
