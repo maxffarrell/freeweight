@@ -122,10 +122,15 @@ export async function sendWeeklyExport(orgId: string): Promise<number> {
 		.onConflictDoNothing()
 		.returning({ id: notificationLog.id });
 	if (!row) return 0;
+	return postExport(orgId, s.url);
+}
+
+/** POST the full org export to the configured webhook — shared by cron and "send now". */
+async function postExport(orgId: string, url: string): Promise<number> {
 	try {
 		const body = JSON.stringify(await exportOrgData(orgId));
 		const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(body).digest('hex');
-		await fetch(s.url, {
+		await fetch(url, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', 'x-freeweight-signature': signature },
 			body,
@@ -133,7 +138,19 @@ export async function sendWeeklyExport(orgId: string): Promise<number> {
 		});
 		return 1;
 	} catch (err) {
-		console.error(`weekly export failed for ${orgId}`, err);
+		console.error(`export webhook failed for ${orgId}`, err);
 		return 0;
 	}
+}
+
+/** On-demand "send now" — bypasses the Monday gate and dedupe. 0 when no URL set. */
+export async function sendExportNow(orgId: string): Promise<number> {
+	if (!auditExportEnabled()) return 0;
+	const [s] = await db
+		.select({ url: gymSettings.exportWebhookUrl })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, orgId))
+		.limit(1);
+	if (!s?.url) return 0;
+	return postExport(orgId, s.url);
 }

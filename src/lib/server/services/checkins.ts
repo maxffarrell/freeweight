@@ -566,6 +566,17 @@ export async function recordCheckIn(ctx: OrgContext, input: v.InferOutput<typeof
 		checkedAt: row!.checkedAt.toISOString(),
 		locationId: row!.locationId ?? null
 	});
+	// Enterprise door-access: a heads-up flag (suspended membership or expired
+	// health form) fires a second event so door systems can log/deny.
+	if (suspended || parqMissing) {
+		void fireDoorWebhook(ctx.orgId, 'member.checkin_flagged', {
+			memberId: m.id,
+			memberName: m.name,
+			checkInId: row!.id,
+			flags: [suspended ? 'suspended' : '', parqMissing ? 'health_form' : ''].filter(Boolean),
+			locationId: row!.locationId ?? null
+		});
+	}
 	return {
 		checkIn: row!,
 		member: m,

@@ -24,7 +24,12 @@ export function requireDoorAccess() {
  */
 export async function fireDoorWebhook(
 	orgId: string,
-	event: 'member.checked_in' | 'member.checked_out' | 'member.checkin_voided' | 'guest.checked_in',
+	event:
+		| 'member.checked_in'
+		| 'member.checked_out'
+		| 'member.checkin_voided'
+		| 'guest.checked_in'
+		| 'member.checkin_flagged',
 	payload: Record<string, unknown>
 ) {
 	if (!doorAccessEnabled()) return;
