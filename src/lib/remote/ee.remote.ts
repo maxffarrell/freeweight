@@ -118,7 +118,7 @@ export const anonymizeInactiveMembers = command(
 							.where(
 								and(
 									eq(checkIn.memberId, outer(gymMember.id)),
-									sql`${checkIn.checkedAt} > ${cutoff}`
+									sql`${checkIn.checkedAt} > ${cutoff.toISOString()}`
 								)
 							)
 					),
