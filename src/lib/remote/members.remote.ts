@@ -119,6 +119,7 @@ export const getMembers = query(
 			inEvent: v.optional(v.boolean()),
 			noHealthForm: v.optional(v.boolean()),
 			parqExpiring: v.optional(v.boolean()),
+			retentionExempt: v.optional(v.boolean()),
 			customField: v.optional(v.object({ fieldId: v.string(), value: v.string() }))
 		})
 	),
@@ -175,7 +176,8 @@ export const getMembers = query(
 			opts?.inEvent,
 			opts?.noHealthForm,
 			opts?.parqExpiring,
-			opts?.customField
+			opts?.customField,
+			opts?.retentionExempt
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

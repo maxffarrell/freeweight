@@ -353,3 +353,29 @@ export async function sendWeeklyInsights(orgId: string): Promise<number> {
 	}
 	return sent;
 }
+
+/** Staff reply draft for a member-submitted issue report. */
+export async function draftIssueReply(
+	orgName: string,
+	member: { name: string },
+	issueText: string
+): Promise<{ subject: string; body: string }> {
+	const out = await aiJson<{ subject: string; body: string }>([
+		{
+			role: 'user',
+			content: `You write short, human reply emails for a gym called "${orgName}".
+
+A member (${member.name}) reported this issue at the front desk portal:
+"${issueText}"
+
+Write a reply acknowledging it and saying the team is on it — warm, brief, no promises you can't keep.
+
+Rules:
+- Return JSON {"subject": "...", "body": "..."}.
+- Plain-text body under ~80 words; no markdown, HTML, or emoji.
+- Open with a greeting using {first_name}; end with the gym's name only.
+- No invented timelines, compensation, names, links or phone numbers.`
+		}
+	]);
+	return { subject: out.subject.trim(), body: out.body.trim() };
+}

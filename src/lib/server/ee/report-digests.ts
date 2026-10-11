@@ -238,3 +238,8 @@ export async function sendMonthClosePreview(orgId: string, email: string): Promi
 		})
 	});
 }
+
+/** In-app digest preview — the exact payload the weekly digest would send. */
+export async function previewDigest(orgId: string) {
+	return monthClosePayload(orgId, 7);
+}
