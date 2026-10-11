@@ -2,7 +2,8 @@
 
 import { FREEWEIGHT_CLOUD, FREEWEIGHT_ENTERPRISE_KEY } from '$app/env/private';
 
-export type EnterpriseFeature = 'sso' | 'passkeys' | 'ai';
+export type EnterpriseFeature =
+	'sso' | 'passkeys' | 'ai' | 'custom-fields' | 'white-label' | 'audit-export';
 
 /**
  * Enterprise features are enabled on Freeweight Cloud, or on self-hosted installs

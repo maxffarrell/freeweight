@@ -20,6 +20,10 @@
 	import { toCsv } from '#lib/csv.ts';
 	import { toast } from 'svelte-sonner';
 	import {
+		getMemberFieldValues,
+		setMemberFieldValueCmd
+	} from '#lib/remote/custom-fields.remote.ts';
+	import {
 		getMember,
 		extendPack,
 		updateMember,
@@ -112,6 +116,19 @@
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
+	const customFields = $derived(await getMemberFieldValues({ memberId: m.member.id }));
+	let cfBusy = $state<string | null>(null);
+
+	async function saveCf(fieldId: string, value: string) {
+		cfBusy = fieldId;
+		try {
+			await setMemberFieldValueCmd({ memberId: m.member.id, fieldId, value });
+		} catch (e) {
+			toast.error(errMsg(e, 'Something went wrong'));
+		} finally {
+			cfBusy = null;
+		}
+	}
 	const workouts = $derived(await getMemberWorkouts(id));
 	const memberPrograms = $derived(await getMemberPrograms(id));
 	const programs = $derived(await getPrograms());
@@ -2090,6 +2107,47 @@
 				{/each}
 			</Card.Content>
 		</Card.Root>
+
+		{#if customFields.rows.length}
+			<Card.Root>
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<Card.Title class="text-base">Custom fields</Card.Title>
+						<Badge variant="secondary">Enterprise</Badge>
+					</div>
+				</Card.Header>
+				<Card.Content class="space-y-3 px-4">
+					{#each customFields.rows as fld (fld.id)}
+						<div>
+							<label class="text-xs text-muted-foreground" for="cf-{fld.id}">{fld.name}</label>
+							{#if fld.kind === 'select'}
+								<NativeSelect
+									id="cf-{fld.id}"
+									value={fld.value}
+									disabled={cfBusy === fld.id}
+									onchange={(e) => saveCf(fld.id, e.currentTarget.value)}
+								>
+									<option value="">—</option>
+									{#each fld.parsedOptions as opt (opt)}
+										<option value={opt}>{opt}</option>
+									{/each}
+								</NativeSelect>
+							{:else}
+								<Input
+									id="cf-{fld.id}"
+									type={fld.kind === 'number' ? 'number' : fld.kind === 'date' ? 'date' : 'text'}
+									defaultValue={fld.value}
+									disabled={cfBusy === fld.id}
+									onblur={(e) => {
+										if (e.currentTarget.value !== fld.value) saveCf(fld.id, e.currentTarget.value);
+									}}
+								/>
+							{/if}
+						</div>
+					{/each}
+				</Card.Content>
+			</Card.Root>
+		{/if}
 	</div>
 
 	<Card.Root class="lg:col-span-2">

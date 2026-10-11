@@ -1624,6 +1624,50 @@ export const announcementTemplate = pgTable(
 	(t) => [index('announcement_template_org_idx').on(t.organizationId)]
 );
 
+/**
+ * Enterprise: gym-defined extra fields on members (text/number/date/select).
+ * Gated by `hasFeature('custom-fields')` — the tables exist on every edition so
+ * schema stays identical; the feature just stops reading/writing them.
+ */
+export const memberField = pgTable(
+	'member_field',
+	{
+		id: id(),
+		organizationId: orgId(),
+		/** Staff-facing label, e.g. "T-shirt size". */
+		name: text('name').notNull(),
+		/** 'text' | 'number' | 'date' | 'select'. */
+		kind: text('kind').notNull().default('text'),
+		/** Newline/comma-separated choices for kind='select'. */
+		options: text('options').notNull().default(''),
+		position: integer('position').notNull().default(0),
+		...timestamps
+	},
+	(t) => [index('member_field_org_idx').on(t.organizationId)]
+);
+
+/** One value per member per custom field. */
+export const memberFieldValue = pgTable(
+	'member_field_value',
+	{
+		id: id(),
+		organizationId: orgId(),
+		fieldId: text('field_id')
+			.notNull()
+			.references(() => memberField.id, { onDelete: 'cascade' }),
+		memberId: text('member_id')
+			.notNull()
+			.references(() => gymMember.id, { onDelete: 'cascade' }),
+		value: text('value').notNull().default(''),
+		...timestamps
+	},
+	(t) => [
+		uniqueIndex('member_field_value_field_member_idx').on(t.fieldId, t.memberId),
+		index('member_field_value_member_idx').on(t.memberId),
+		index('member_field_value_org_idx').on(t.organizationId)
+	]
+);
+
 /** Saved document drafts staff reuse when sending sign requests. */
 export const signDocTemplate = pgTable(
 	'sign_doc_template',

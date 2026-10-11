@@ -12,6 +12,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { getMemberFields } from '#lib/remote/custom-fields.remote.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
@@ -88,6 +89,7 @@
 	let sort = $state<keyof typeof SORT_LABELS>('name');
 	let owesFilter = $state(initOwes ? 'owes' : 'any');
 	let members = $state(await getMembers({ owes: initOwes || undefined }));
+	const memberFields = $derived(await getMemberFields());
 	const dupes = await getDuplicates();
 	const initials = (name: string) =>
 		name
@@ -330,7 +332,8 @@
 				'Visits (30d)',
 				'Referral source',
 				'Portal',
-				'Guardian'
+				'Guardian',
+				...memberFields.fields.map((f) => f.name)
 			],
 			...rows.map((m) => [
 				m.name,
@@ -347,7 +350,8 @@
 				m.visits30,
 				m.referralSource ?? '',
 				m.portalUserId ? 'yes' : '',
-				m.guardianName ?? ''
+				m.guardianName ?? '',
+				...memberFields.fields.map((f) => m.customFields?.[f.id] ?? '')
 			])
 		]);
 		const a = document.createElement('a');
