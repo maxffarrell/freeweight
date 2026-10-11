@@ -290,3 +290,31 @@ export const aiMemberBrief = command(idSchema, async (memberId) => {
 	]);
 	return { brief: text };
 });
+
+/** Three subject-line variants for an announcement body (Enterprise ai). */
+export const aiSubjectVariants = command(v.object({ body: v.string() }), async ({ body }) => {
+	const { org } = await requireOrg();
+	requireAi();
+	const text = await aiComplete(
+		[
+			{
+				role: 'system',
+				content:
+					'You write gym announcement subject lines. Reply with ONLY a JSON array of 3 short subject lines (each under 60 chars) — no prose. Match the gym tone: direct, warm, no emoji.'
+			},
+			{
+				role: 'user',
+				content: `Gym: ${org.name}. Announcement body:\n${body.slice(0, 1500)}`
+			}
+		],
+		300
+	);
+	let variants: string[] = [];
+	try {
+		const m = /\[[\s\S]*\]/.exec(text);
+		if (m) variants = (JSON.parse(m[0]) as string[]).slice(0, 3).map((s) => String(s).trim());
+	} catch {
+		variants = [];
+	}
+	return { variants: variants.filter(Boolean) };
+});

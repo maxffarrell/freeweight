@@ -94,7 +94,7 @@ async function monthClosePayload(orgId: string) {
 export async function sendMonthClose(orgId: string): Promise<number> {
 	if (!reportDigestsEnabled()) return 0;
 	const [s0] = await db
-		.select({ timezone: gymSettings.timezone })
+		.select({ timezone: gymSettings.timezone, digestRecipients: gymSettings.digestRecipients })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
@@ -106,8 +106,15 @@ export async function sendMonthClose(orgId: string): Promise<number> {
 		.from(member)
 		.innerJoin(user, eq(member.userId, user.id))
 		.where(and(eq(member.organizationId, orgId), sql`${member.role} in ('owner','admin')`));
+	// Extra comma-separated recipients (owners' investors, accountants…)
+	// alongside owner/admin staff — dedupe against the staff list.
+	const seen = new Set(staff.map((s) => s.email));
+	const extras = (s0?.digestRecipients ?? '')
+		.split(',')
+		.map((e) => e.trim().toLowerCase())
+		.filter((e) => e.includes('@') && !seen.has(e));
 	let sent = 0;
-	for (const st of staff) {
+	for (const st of [...staff, ...extras.map((email) => ({ email }))]) {
 		const [row] = await db
 			.insert(notificationLog)
 			.values({

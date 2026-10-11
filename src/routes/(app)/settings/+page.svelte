@@ -364,12 +364,14 @@
 	let doorWebhookUrl = $state(settings.doorWebhookUrl);
 	let anonymizeMonths = $state(settings.anonymizeMonths);
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
+	let digestRecipients = $state(settings.digestRecipients);
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
 	let healthQuestions = $state(settings.healthQuestions);
 	let healthFormsRequired = $state(settings.healthFormsRequired);
 	let anonBusy = $state(false);
 	let anonPreview = $state<number | null>(null);
+	let anonNames = $state<string[]>([]);
 	let doorBusy = $state(false);
 	let digestBusy = $state(false);
 	let exportSendBusy = $state(false);
@@ -439,6 +441,7 @@
 				doorWebhookUrl,
 				anonymizeMonths,
 				exportWebhookUrl,
+				digestRecipients,
 				brandColor,
 				parqMonths,
 				healthQuestions,
@@ -1066,6 +1069,7 @@
 											try {
 												const r = await anonymizePreviewCount({});
 												anonPreview = r.count;
+												anonNames = r.names;
 											} catch (err) {
 												toast.error(errMsg(err, 'Failed'));
 											} finally {
@@ -1074,8 +1078,11 @@
 										}}>Preview</Button
 									>
 									{#if anonPreview !== null}
-										<span class="text-xs text-muted-foreground"
-											>{anonPreview} member{anonPreview === 1 ? '' : 's'} would be scrubbed</span
+										<span class="text-xs text-muted-foreground" title={anonNames.join(', ')}
+											>{anonPreview} member{anonPreview === 1 ? '' : 's'} would be scrubbed{#if anonNames.length}
+												({anonNames.slice(0, 3).join(', ')}{anonNames.length > 3
+													? '…'
+													: ''}){/if}</span
 										>
 									{/if}
 									<Button
@@ -1089,6 +1096,7 @@
 												const r = await anonymizeInactiveMembers({});
 												toast.success(`Anonymized ${r.anonymized} members`);
 												anonPreview = null;
+												anonNames = [];
 											} catch (err) {
 												toast.error(errMsg(err, 'Failed'));
 											} finally {
@@ -1218,22 +1226,29 @@
 										Owners/admins get last month's numbers on the 1st. Preview it in your inbox.
 									</p>
 								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={digestBusy}
-									onclick={async () => {
-										digestBusy = true;
-										try {
-											await sendDigestPreview();
-											toast.success('Preview sent to your email');
-										} catch (err) {
-											toast.error(errMsg(err, 'Could not send'));
-										} finally {
-											digestBusy = false;
-										}
-									}}>Email me a preview</Button
-								>
+								<div class="flex items-center gap-2">
+									<Input
+										class="w-56"
+										placeholder="Extra emails, comma separated"
+										bind:value={digestRecipients}
+									/>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={digestBusy}
+										onclick={async () => {
+											digestBusy = true;
+											try {
+												await sendDigestPreview();
+												toast.success('Preview sent to your email');
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not send'));
+											} finally {
+												digestBusy = false;
+											}
+										}}>Email me a preview</Button
+									>
+								</div>
 							</div>
 						{/if}
 						{#if entitlements.whiteLabel}

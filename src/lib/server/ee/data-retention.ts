@@ -117,11 +117,14 @@ export async function autoAnonymize(orgId: string): Promise<number> {
 
 /** Count of members the sweep would scrub — the Settings "preview" before
  * running anonymizeInactive for real. */
-export async function anonymizePreview(orgId: string, months: number): Promise<number> {
+export async function anonymizePreview(
+	orgId: string,
+	months: number
+): Promise<{ count: number; names: string[] }> {
 	const cutoff = new Date(Date.now() - months * 30.4 * 86400_000);
 	const cutoffDay = cutoff.toISOString().slice(0, 10);
 	const rows = await db
-		.select({ id: gymMember.id })
+		.select({ id: gymMember.id, name: gymMember.name })
 		.from(gymMember)
 		.where(
 			and(
@@ -151,5 +154,5 @@ export async function anonymizePreview(orgId: string, months: number): Promise<n
 			)
 		)
 		.limit(501);
-	return rows.length;
+	return { count: rows.length, names: rows.slice(0, 20).map((r) => r.name) };
 }

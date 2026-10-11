@@ -66,7 +66,7 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { aiDraftEmail, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { aiDraftEmail, aiSubjectVariants, getAiStatus } from '#lib/remote/ai.remote.ts';
 
 	const currency = await getCurrency();
 	const ai = await getAiStatus();
@@ -455,6 +455,20 @@
 		}
 	}
 	let emailSubject = $state('');
+	let subjectVariants = $state<string[]>([]);
+	let subjectBusy = $state(false);
+	async function suggestSubjects() {
+		subjectBusy = true;
+		try {
+			const res = await aiSubjectVariants({ body: emailBody || emailSubject });
+			subjectVariants = res.variants;
+			if (!res.variants.length) toast.error('No suggestions');
+		} catch (err) {
+			toast.error(errMsg(err, 'AI unavailable'));
+		} finally {
+			subjectBusy = false;
+		}
+	}
 	let emailBody = $state('');
 	let emailAudience = $state('__all');
 	let emailSendAt = $state('');
@@ -1297,6 +1311,28 @@
 			<Field.Field>
 				<Field.Label for="a-subject">Subject</Field.Label>
 				<Input id="a-subject" required bind:value={emailSubject} autofocus />
+				{#if entitlements.ai}
+					<div class="flex flex-wrap items-center gap-1.5 pt-1">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="h-6 px-2 text-xs"
+							disabled={subjectBusy}
+							onclick={suggestSubjects}>Suggest subjects</Button
+						>
+						{#each subjectVariants as vsub (vsub)}
+							<button
+								type="button"
+								class="rounded-full border px-2 py-0.5 text-xs hover:bg-accent"
+								onclick={() => {
+									emailSubject = vsub;
+									subjectVariants = [];
+								}}>{vsub}</button
+							>
+						{/each}
+					</div>
+				{/if}
 			</Field.Field>
 			{#if emailAudience !== '__sel'}
 				<Field.Field>

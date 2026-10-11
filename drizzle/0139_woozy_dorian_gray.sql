@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "digest_recipients" text DEFAULT '' NOT NULL;

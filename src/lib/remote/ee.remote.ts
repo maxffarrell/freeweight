@@ -146,7 +146,7 @@ export const anonymizePreviewCount = query(
 	async (input) => {
 		const ctx = await requireOrg('admin');
 		requireDataRetention();
-		return { count: await anonymizePreview(ctx.orgId, input.months ?? 24) };
+		return await anonymizePreview(ctx.orgId, input.months ?? 24);
 	}
 );
 
