@@ -92,6 +92,8 @@
 	let members = $state(await getMembers({ owes: initOwes || undefined }));
 	const memberFields = $derived(await getMemberFields());
 	const entitlements = $derived(await getEntitlements());
+	let cfFieldId = $state('');
+	let cfValue = $state('');
 	const dupes = await getDuplicates();
 	const initials = (name: string) =>
 		name
@@ -212,7 +214,9 @@
 			bookedToday: owesFilter === '__bookedtoday' || undefined,
 			hasIssue: owesFilter === '__hasissue' || undefined,
 			inEvent: owesFilter === '__inevent' || undefined,
-			noHealthForm: owesFilter === '__nohealth' || undefined
+			noHealthForm: owesFilter === '__nohealth' || undefined,
+			customField:
+				cfFieldId && cfValue.trim() ? { fieldId: cfFieldId, value: cfValue.trim() } : undefined
 		});
 	}
 	function search() {
@@ -832,6 +836,29 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
+		{#if entitlements.customFields && memberFields.licensed && memberFields.fields.length}
+			<Select.Root
+				type="single"
+				bind:value={cfFieldId}
+				onValueChange={(v) => {
+					if (!v) cfFieldId = '';
+					void refilter();
+				}}
+			>
+				<Select.Trigger class="w-44"
+					>{memberFields.fields.find((f) => f.id === cfFieldId)?.name ??
+						'Custom field…'}</Select.Trigger
+				>
+				<Select.Content>
+					{#each memberFields.fields as f (f.id)}
+						<Select.Item value={f.id}>{f.name}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+			{#if cfFieldId}
+				<Input class="w-44" placeholder="value contains…" bind:value={cfValue} oninput={search} />
+			{/if}
+		{/if}
 	</div>
 
 	{#if dupes.length}
