@@ -383,19 +383,19 @@
 		? `--primary:${entitlements.brandColor};--primary-foreground:${contrastText(entitlements.brandColor)}`
 		: ''}
 >
-	<header class="flex items-center justify-between gap-4 border-b px-6 py-4">
-		<div class="flex items-center gap-3">
+	<header class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-6 py-4">
+		<div class="flex min-w-0 items-center gap-3">
 			{#if settings.logoDocumentId}
 				<img src="/api/logo/{settings.logoDocumentId}" alt="" class="h-8 w-auto object-contain" />
 			{:else}
 				<Logo class="size-8" />
 			{/if}
-			<div>
-				<p class="font-semibold">{data.gymName}</p>
+			<div class="min-w-0">
+				<p class="truncate font-semibold">{data.gymName}</p>
 				<p class="text-xs text-muted-foreground">Front-desk check-in</p>
 			</div>
 		</div>
-		<div class="flex items-center gap-4 text-sm">
+		<div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
 			<span class="tabular-nums">{localTime(now, tz)}</span>
 			<Badge
 				variant="secondary"

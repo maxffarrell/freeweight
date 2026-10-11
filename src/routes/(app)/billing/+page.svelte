@@ -11,6 +11,7 @@
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
@@ -702,10 +703,10 @@
 								<Table.Row>
 									<Table.Cell>
 										{#if c.charge.status === 'open'}
-											<input
-												type="checkbox"
+											<Checkbox
+												aria-label={`Select charge ${c.charge.id}`}
 												checked={selectedCharges.includes(c.charge.id)}
-												onchange={() =>
+												onCheckedChange={() =>
 													(selectedCharges = selectedCharges.includes(c.charge.id)
 														? selectedCharges.filter((x) => x !== c.charge.id)
 														: [...selectedCharges, c.charge.id])}

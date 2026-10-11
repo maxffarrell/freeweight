@@ -13,6 +13,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import { toast } from 'svelte-sonner';
@@ -1139,7 +1140,7 @@
 </PageHeader>
 
 <div class="space-y-4 p-4 md:p-6">
-	<div class="flex items-center gap-2">
+	<div class="flex flex-wrap items-center gap-2">
 		<Button
 			variant="outline"
 			size="icon"
@@ -1158,7 +1159,8 @@
 			onclick={async () => ((weekStart = addDays(weekStart, 7)), await reload())}
 			><ChevronRight /></Button
 		>
-		<span class="ml-2 text-sm text-muted-foreground"
+		<span
+			class="order-last basis-full text-sm text-muted-foreground sm:order-none sm:ml-2 sm:basis-auto"
 			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
 				(s) => !s.session.instructorId && !s.session.cancelledAt
 			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
@@ -3164,20 +3166,17 @@
 				<Field.Label>Weekly sessions</Field.Label>
 				<div class="flex items-center gap-2">
 					{#each WEEKDAYS as d, i (d)}
-						<label
+						<button
+							type="button"
+							aria-pressed={cDays.includes(i)}
 							class="cursor-pointer rounded-md border px-2 py-1 text-xs {cDays.includes(i)
 								? 'border-primary bg-primary/10 font-medium'
 								: 'text-muted-foreground'}"
+							onclick={() =>
+								(cDays = cDays.includes(i) ? cDays.filter((x) => x !== i) : [...cDays, i])}
 						>
-							<input
-								type="checkbox"
-								class="sr-only"
-								checked={cDays.includes(i)}
-								onchange={() =>
-									(cDays = cDays.includes(i) ? cDays.filter((x) => x !== i) : [...cDays, i])}
-							/>
 							{d.slice(0, 3)}
-						</label>
+						</button>
 					{/each}
 				</div>
 			</Field.Field>
@@ -3398,11 +3397,10 @@
 		<ul class="max-h-80 divide-y overflow-y-auto">
 			{#each bulkSessions as s (s.session.id)}
 				<li class="flex items-center gap-3 py-2.5 text-sm">
-					<input
-						type="checkbox"
-						class="size-4 accent-primary"
+					<Checkbox
+						aria-label={`Select session ${s.session.id}`}
 						checked={bulkChecked.has(s.session.id)}
-						onchange={() => toggleBulk(s.session.id)}
+						onCheckedChange={() => toggleBulk(s.session.id)}
 					/>
 					<div class="flex-1">
 						<p class="font-medium">{s.className}</p>

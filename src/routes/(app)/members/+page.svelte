@@ -53,6 +53,7 @@
 		updateChallenge
 	} from '#lib/remote/challenges.remote.ts';
 	import { Switch } from '#lib/components/ui/switch/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import Medal from '@lucide/svelte/icons/medal';
 	import { parseCsv, toCsv } from '#lib/csv.ts';
@@ -1000,12 +1001,10 @@
 				<Table.Header>
 					<Table.Row>
 						<Table.Head class="w-8">
-							<input
-								type="checkbox"
-								class="accent-primary"
+							<Checkbox
 								aria-label="Select all"
 								checked={members.length > 0 && selected.size === members.length}
-								onchange={toggleAll}
+								onCheckedChange={toggleAll}
 							/>
 						</Table.Head>
 						<Table.Head>Name</Table.Head>
@@ -1021,12 +1020,10 @@
 					{#each members as m (m.id)}
 						<Table.Row class="cursor-pointer" onclick={() => goto(`/members/${m.id}`)}>
 							<Table.Cell onclick={(e) => e.stopPropagation()}>
-								<input
-									type="checkbox"
-									class="accent-primary"
+								<Checkbox
 									aria-label={`Select ${m.name}`}
 									checked={selected.has(m.id)}
-									onchange={() => toggleSelect(m.id)}
+									onCheckedChange={() => toggleSelect(m.id)}
 								/>
 							</Table.Cell>
 							<Table.Cell class="font-medium">

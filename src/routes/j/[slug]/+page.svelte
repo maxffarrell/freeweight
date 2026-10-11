@@ -4,6 +4,7 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { toast } from 'svelte-sonner';
@@ -541,7 +542,12 @@
 										{settings.waiver}
 									</p>
 									<label class="flex items-start gap-2 text-sm">
-										<input type="checkbox" required bind:checked={agreedWaiver} class="mt-0.5" />
+										<Checkbox
+											name="agreedWaiver"
+											required
+											bind:checked={agreedWaiver}
+											class="mt-0.5"
+										/>
 										<span>I have read and agree to the liability waiver.</span>
 									</label>
 								</div>
@@ -625,7 +631,7 @@
 								{settings.waiver}
 							</p>
 							<label class="flex items-start gap-2 text-sm">
-								<input type="checkbox" required bind:checked={dAgreed} class="mt-0.5" />
+								<Checkbox name="dAgreed" required bind:checked={dAgreed} class="mt-0.5" />
 								<span>I have read and agree to the liability waiver.</span>
 							</label>
 						</div>
@@ -684,7 +690,7 @@
 								{settings.waiver}
 							</p>
 							<label class="flex items-start gap-2 text-sm">
-								<input type="checkbox" required bind:checked={dAgreed} class="mt-0.5" />
+								<Checkbox name="dAgreed" required bind:checked={dAgreed} class="mt-0.5" />
 								<span>I have read and agree to the liability waiver.</span>
 							</label>
 						</div>
