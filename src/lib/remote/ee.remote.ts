@@ -276,7 +276,7 @@ export const setRetentionExempt = command(
 );
 
 /** Send last month's digest to every recipient now, bypassing the 1st-of-month gate. */
-export const sendDigestNow = command(v.object({}), async () => {
+export const sendDigestNow = command(async () => {
 	const ctx = await requireOrg('admin');
 	if (!reportDigestsEnabled()) error(403, 'Report digests are an Enterprise feature');
 	return { sent: await sendMonthClose(ctx.orgId, true) };
