@@ -10,6 +10,7 @@ import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { autoAnonymize, purgeOldData } from '#lib/server/ee/data-retention.ts';
 import { sendWeeklyExport } from '#lib/server/ee/audit-export.ts';
 import { sendMonthClose } from '#lib/server/ee/report-digests.ts';
+import { sendParqReminders } from '#lib/server/ee/health-forms.ts';
 import {
 	sendAnniversaryGreetings,
 	sendBillingReminders,
@@ -105,6 +106,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let monthCloseSent = 0;
 	let anonymizedInactive = 0;
 	let exportsSent = 0;
+	let parqReminders = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -122,6 +124,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			try {
 				await sendNewMemberDrip(o.id);
 				await sendSignReminders(o.id);
+				parqReminders += await sendParqReminders(o.id);
 			} catch (err) {
 				console.error(`member-drip cron failed for ${o.id}`, err);
 			}
@@ -333,6 +336,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		monthCloseSent,
 		anonymizedInactive,
 		exportsSent,
+		parqReminders,
 		failed,
 		reminders,
 		eventReminders,
