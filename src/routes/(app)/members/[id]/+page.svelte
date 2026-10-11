@@ -101,6 +101,7 @@
 	import { localTime, localDate } from '#lib/tz.ts';
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { aiDraftWinBack, aiGenerateProgram, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { getMemberDocuments, deleteDocument } from '#lib/remote/documents.remote.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Link from '@lucide/svelte/icons/link';
@@ -120,6 +121,7 @@
 	const m = $derived(await getMember(id));
 	const customFields = $derived(await getMemberFieldValues({ memberId: m.member.id }));
 	const ai = $derived(await getAiStatus());
+	const entitlements = $derived(await getEntitlements());
 	let cfBusy = $state<string | null>(null);
 
 	async function saveCf(fieldId: string, value: string) {
@@ -1166,6 +1168,16 @@
 						>
 					{/if}
 				</div>
+				{#if entitlements.healthForms}
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Health form</span>
+						<span
+							>{m.member.parqSignedAt
+								? `PAR-Q signed ${formatDate(m.member.parqSignedAt)}`
+								: 'PAR-Q not signed'}</span
+						>
+					</div>
+				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Guest passes</span>
 					<span

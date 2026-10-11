@@ -116,7 +116,8 @@ export const getMembers = query(
 			trialEnding: v.optional(v.boolean()),
 			bookedToday: v.optional(v.boolean()),
 			hasIssue: v.optional(v.boolean()),
-			inEvent: v.optional(v.boolean())
+			inEvent: v.optional(v.boolean()),
+			noHealthForm: v.optional(v.boolean())
 		})
 	),
 	async (opts) =>
@@ -169,7 +170,8 @@ export const getMembers = query(
 			opts?.trialEnding,
 			opts?.bookedToday,
 			opts?.hasIssue,
-			opts?.inEvent
+			opts?.inEvent,
+			opts?.noHealthForm
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */

@@ -117,6 +117,8 @@ export const gymSettings = pgTable('gym_settings', {
 	revenueTarget: integer('revenue_target'),
 	/** Enterprise: hide "Powered by Freeweight" on the public join page; only honored when licensed. */
 	whiteLabel: boolean('white_label').notNull().default(false),
+	/** Enterprise kiosk-pin: 4-digit PIN the kiosk requires before use; empty = unlocked. */
+	kioskPin: text('kiosk_pin').notNull().default(''),
 	updatedAt: timestamp('updated_at', { withTimezone: true })
 		.notNull()
 		.defaultNow()
@@ -182,6 +184,9 @@ export const gymMember = pgTable(
 		birthday: date('birthday', { mode: 'string' }),
 		/** Member asked (via the portal) for their personal data to be deleted — staff anonymize. */
 		deletionRequestedAt: timestamp('deletion_requested_at', { withTimezone: true }),
+		/** Enterprise health-forms: PAR-Q answers keyed by question index, null until signed. */
+		parqAnswers: jsonb('parq_answers').$type<Record<string, boolean>>(),
+		parqSignedAt: timestamp('parq_signed_at', { withTimezone: true }),
 		...timestamps
 	},
 	(t) => [

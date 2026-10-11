@@ -1,6 +1,12 @@
 import { query } from '$app/server';
+import { getRequestEvent } from '$app/server';
+import { eq } from 'drizzle-orm';
+import { db } from '#lib/server/db/index.ts';
+import { organization } from '#lib/server/db/auth.schema.ts';
+import { gymSettings } from '#lib/server/db/schema.ts';
 import { requireOrg } from '#lib/server/context.ts';
 import { auditExportEnabled, exportOrgData } from '#lib/server/ee/audit-export.ts';
+import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import { customFieldsEnabled } from '#lib/server/ee/custom-fields.ts';
 import { hasFeature } from '#lib/server/ee/license.ts';
 
@@ -11,6 +17,8 @@ export const getEntitlements = query(async () => {
 		customFields: customFieldsEnabled(),
 		whiteLabel: hasFeature('white-label'),
 		auditExport: auditExportEnabled(),
+		healthForms: healthFormsEnabled(),
+		kioskPin: hasFeature('kiosk-pin'),
 		ai: hasFeature('ai')
 	};
 });
@@ -20,4 +28,23 @@ export const getOrgDataExport = query(async () => {
 	const { orgId } = await requireOrg('admin');
 	if (!auditExportEnabled()) return { licensed: false, data: null };
 	return { licensed: true, data: await exportOrgData(orgId) };
+});
+
+/** Branding for the error page — org name when the install is white-labelled. Never throws. */
+export const getErrorBranding = query(async () => {
+	const fallback = { appName: 'Freeweight', hideBranding: false };
+	try {
+		const orgId = getRequestEvent().locals.session?.activeOrganizationId;
+		if (!orgId) return fallback;
+		const [row] = await db
+			.select({ name: organization.name, whiteLabel: gymSettings.whiteLabel })
+			.from(organization)
+			.leftJoin(gymSettings, eq(gymSettings.organizationId, organization.id))
+			.where(eq(organization.id, orgId))
+			.limit(1);
+		if (!row?.whiteLabel || !hasFeature('white-label')) return fallback;
+		return { appName: row.name, hideBranding: true };
+	} catch {
+		return fallback;
+	}
 });

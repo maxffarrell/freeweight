@@ -38,6 +38,12 @@ import {
 	giftCreditsInput
 } from '#lib/schemas.ts';
 import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
+import {
+	healthFormsEnabled,
+	PARQ_QUESTIONS,
+	requireHealthForms,
+	submitParq as hfSubmit
+} from '#lib/server/ee/health-forms.ts';
 import { workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
@@ -1011,5 +1017,41 @@ export const inviteFriend = command(
 	async ({ memberId, email, name }) => {
 		const m = await myMember(memberId);
 		return notif.sendReferralInvite(m.organizationId, m.id, email, name);
+	}
+);
+
+/** Enterprise health-forms: the member's PAR-Q state + the question list. */
+export const getMyParq = query(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	if (!healthFormsEnabled())
+		return { licensed: false, questions: [] as string[], answers: null, signedAt: null };
+	return {
+		licensed: true,
+		questions: [...PARQ_QUESTIONS],
+		answers: m.parqAnswers ?? null,
+		signedAt: m.parqSignedAt
+	};
+});
+
+/** Member signs their PAR-Q in the portal. */
+export const submitParq = command(
+	v.object({
+		memberId: idSchema,
+		answers: v.record(v.string(), v.boolean())
+	}),
+	async ({ memberId, answers }) => {
+		const m = await myMember(memberId);
+		requireHealthForms();
+		await hfSubmit(m.id, m.organizationId, answers);
+		emit({
+			orgId: m.organizationId,
+			actorId: null,
+			entityType: 'member',
+			entityId: m.id,
+			action: 'parq-signed',
+			summary: 'Signed the health questionnaire'
+		});
+		await getMyParq(m.id).refresh();
+		return { ok: true };
 	}
 );

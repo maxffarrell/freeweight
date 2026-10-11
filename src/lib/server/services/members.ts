@@ -170,7 +170,9 @@ export async function listMembers(
 	/** Members with an unresolved issue report. */
 	hasIssue?: boolean,
 	/** Members registered for an upcoming event. */
-	inEvent?: boolean
+	inEvent?: boolean,
+	/** Enterprise health-forms: members without a signed PAR-Q. */
+	noHealthForm?: boolean
 ) {
 	const term = q?.trim();
 	const [st] = noWaiver
@@ -354,6 +356,7 @@ export async function listMembers(
 				inEvent
 					? sql`exists (select 1 from event_registration er join gym_event ge on ge.id = er.event_id where er.member_id = ${gymMember.id} and er.status = 'registered' and er.waitlisted = false and ge.starts_at > now())`
 					: undefined,
+				noHealthForm ? isNull(gymMember.parqSignedAt) : undefined,
 				recent
 					? gte(
 							gymMember.joinedAt,
