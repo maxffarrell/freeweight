@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { getRequestEvent } from '$app/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
 import { activity, gymMember, gymSettings } from '#lib/server/db/schema.ts';
@@ -194,36 +194,50 @@ export const getMemberDataExport = query(
 );
 
 /** Enterprise audit-export: every audit row as one CSV (cap 20k) — compliance dump. */
-export const exportAuditLog = query(async () => {
-	const { orgId } = await requireOrg();
-	requireAuditExport();
-	const rows = await db
-		.select({
-			createdAt: activity.createdAt,
-			actorName: user.name,
-			entityType: activity.entityType,
-			entityId: activity.entityId,
-			action: activity.action,
-			summary: activity.summary
-		})
-		.from(activity)
-		.leftJoin(user, eq(activity.actorId, user.id))
-		.where(eq(activity.organizationId, orgId))
-		.orderBy(desc(activity.createdAt))
-		.limit(20_000);
-	const csv = toCsv([
-		['When', 'Actor', 'Type', 'Entity', 'Action', 'Summary'],
-		...rows.map((r) => [
-			r.createdAt.toISOString(),
-			r.actorName ?? '',
-			r.entityType,
-			r.entityId,
-			r.action,
-			r.summary
-		])
-	]);
-	return { csv, count: rows.length, truncated: rows.length === 20_000 };
-});
+export const exportAuditLog = query(
+	v.object({
+		from: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+		to: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
+	}),
+	async ({ from, to }) => {
+		const { orgId } = await requireOrg();
+		requireAuditExport();
+		const start = from ? new Date(`${from}T00:00:00Z`) : null;
+		const end = to ? new Date(Date.parse(`${to}T00:00:00Z`) + 86400_000) : null;
+		const rows = await db
+			.select({
+				createdAt: activity.createdAt,
+				actorName: user.name,
+				entityType: activity.entityType,
+				entityId: activity.entityId,
+				action: activity.action,
+				summary: activity.summary
+			})
+			.from(activity)
+			.leftJoin(user, eq(activity.actorId, user.id))
+			.where(
+				and(
+					eq(activity.organizationId, orgId),
+					...(start ? [gte(activity.createdAt, start)] : []),
+					...(end ? [lt(activity.createdAt, end)] : [])
+				)
+			)
+			.orderBy(desc(activity.createdAt))
+			.limit(20_000);
+		const csv = toCsv([
+			['When', 'Actor', 'Type', 'Entity', 'Action', 'Summary'],
+			...rows.map((r) => [
+				r.createdAt.toISOString(),
+				r.actorName ?? '',
+				r.entityType,
+				r.entityId,
+				r.action,
+				r.summary
+			])
+		]);
+		return { csv, count: rows.length, truncated: rows.length === 20_000 };
+	}
+);
 
 /** Keep a member out of the anonymize sweep — litigation/legal hold. */
 export const setRetentionExempt = command(

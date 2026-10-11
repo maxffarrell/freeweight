@@ -84,6 +84,8 @@
 	const typeLabel = (t: string) => TYPE_LABELS[t] ?? t.replaceAll('_', ' ');
 
 	let auditBusy = $state(false);
+	let auditFrom = $state('');
+	let auditTo = $state('');
 
 	function exportCsv() {
 		const csv = toCsv([
@@ -120,6 +122,8 @@
 					>Export</Button
 				>
 				{#if entitlements.auditExport}
+					<Input type="date" class="w-36" bind:value={auditFrom} aria-label="Audit from" />
+					<Input type="date" class="w-36" bind:value={auditTo} aria-label="Audit to" />
 					<Button
 						variant="outline"
 						size="sm"
@@ -127,7 +131,10 @@
 						onclick={async () => {
 							auditBusy = true;
 							try {
-								const r = await exportAuditLog();
+								const r = await exportAuditLog({
+									from: auditFrom || undefined,
+									to: auditTo || undefined
+								});
 								const el = document.createElement('a');
 								el.href = URL.createObjectURL(new Blob([r.csv], { type: 'text/csv' }));
 								el.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
