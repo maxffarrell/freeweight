@@ -71,9 +71,12 @@
 		getOrgDataExport,
 		sendDigestNow,
 		sendDigestPreview,
-		sendExportWebhookNow
+		sendExportWebhookNow,
+		getDigestPreview,
+		getDoorLog
 	} from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
+	import { toCsv } from '#lib/csv.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Copy from '@lucide/svelte/icons/copy';
@@ -378,6 +381,10 @@
 	let doorBusy = $state(false);
 	let digestBusy = $state(false);
 	let exportSendBusy = $state(false);
+	let digestPrevOpen = $state(false);
+	let digestPrevBusy = $state(false);
+	let digestPrev: { heading: string; lines: string[] } | null = $state(null);
+	let doorLogBusy = $state(false);
 	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
@@ -1232,6 +1239,37 @@
 										: ''}
 								</p>
 							{/if}
+							<div>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-7 px-1.5"
+									disabled={doorLogBusy}
+									onclick={async () => {
+										doorLogBusy = true;
+										try {
+											const rows = await getDoorLog();
+											const csv = toCsv([
+												['Time', 'Action', 'Summary'],
+												...rows.map((r) => [
+													new Date(r.createdAt).toISOString(),
+													r.action,
+													r.summary
+												])
+											]);
+											const a = document.createElement('a');
+											a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+											a.download = `door-log-${new Date().toISOString().slice(0, 10)}.csv`;
+											a.click();
+											URL.revokeObjectURL(a.href);
+										} catch (err) {
+											toast.error(errMsg(err, 'Failed'));
+										} finally {
+											doorLogBusy = false;
+										}
+									}}>Download door log</Button
+								>
+							</div>
 						{/if}
 						{#if entitlements.auditExport}
 							<div class="flex items-center justify-between gap-4">
@@ -1333,7 +1371,25 @@
 										Also send the digest every Monday covering the last 7 days.
 									</p>
 								</div>
-								<Switch bind:checked={digestWeekly} />
+								<div class="flex items-center gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={digestPrevBusy}
+										onclick={async () => {
+											digestPrevBusy = true;
+											try {
+												digestPrev = await getDigestPreview();
+												digestPrevOpen = true;
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												digestPrevBusy = false;
+											}
+										}}>Preview</Button
+									>
+									<Switch bind:checked={digestWeekly} />
+								</div>
 							</div>
 						{/if}
 						{#if entitlements.whiteLabel}
@@ -2122,6 +2178,21 @@
 		</Tabs.Content>
 	</Tabs.Root>
 
+	<Dialog.Root bind:open={digestPrevOpen}>
+		<Dialog.Content>
+			<Dialog.Header>
+				<Dialog.Title>{digestPrev?.heading ?? 'Digest preview'}</Dialog.Title>
+				<Dialog.Description>Exactly what the next digest email will say.</Dialog.Description>
+			</Dialog.Header>
+			{#if digestPrev}
+				<ul class="list-inside list-disc space-y-1 text-sm">
+					{#each digestPrev.lines as line (line)}
+						<li>{line}</li>
+					{/each}
+				</ul>
+			{/if}
+		</Dialog.Content>
+	</Dialog.Root>
 	<Dialog.Root bind:open={cfOpen}>
 		<Dialog.Content>
 			<Dialog.Header>

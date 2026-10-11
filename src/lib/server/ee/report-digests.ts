@@ -102,7 +102,7 @@ async function monthClosePayload(orgId: string, lookbackDays?: number) {
 						lt(checkIn.checkedAt, to)
 					)
 				);
-			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-ins`);
+			locationLines.push(`${loc.name}: ${n?.n ?? 0} check-in${(n?.n ?? 0) === 1 ? '' : 's'}`);
 		}
 	}
 	return {
@@ -237,4 +237,9 @@ export async function sendMonthClosePreview(orgId: string, email: string): Promi
 			lines: p.lines
 		})
 	});
+}
+
+/** In-app digest preview — the exact payload the weekly digest would send. */
+export async function previewDigest(orgId: string) {
+	return monthClosePayload(orgId, 7);
 }

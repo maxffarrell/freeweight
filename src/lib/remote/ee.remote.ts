@@ -42,7 +42,8 @@ import { hasFeature } from '#lib/server/ee/license.ts';
 import {
 	reportDigestsEnabled,
 	sendMonthClose,
-	sendMonthClosePreview
+	sendMonthClosePreview,
+	previewDigest
 } from '#lib/server/ee/report-digests.ts';
 
 /** Feature flags for the current install — drives every gated surface in one round-trip. */
@@ -289,6 +290,25 @@ export const sendDigestPreview = command(async () => {
 	if (!u?.email) error(400, 'No email on your account');
 	await sendMonthClosePreview(orgId, u.email);
 	return { ok: true };
+});
+
+/** In-app preview of what the next digest will say (report-digests tier). */
+export const getDigestPreview = query(async () => {
+	const { orgId } = await requireOrg('admin');
+	if (!reportDigestsEnabled()) error(403, 'Report digests are an Enterprise feature');
+	return previewDigest(orgId);
+});
+
+/** Door-access audit trail — activity rows stamped by webhook fires/pushes. */
+export const getDoorLog = query(async () => {
+	const { orgId } = await requireOrg('admin');
+	requireDoorAccess();
+	return db
+		.select({ createdAt: activity.createdAt, action: activity.action, summary: activity.summary })
+		.from(activity)
+		.where(and(eq(activity.organizationId, orgId), eq(activity.entityType, 'door_access')))
+		.orderBy(desc(activity.createdAt))
+		.limit(200);
 });
 
 /** On-demand POST of the full org export to the configured webhook (audit-export tier). */

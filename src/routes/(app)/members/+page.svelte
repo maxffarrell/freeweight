@@ -221,6 +221,7 @@
 			inEvent: owesFilter === '__inevent' || undefined,
 			noHealthForm: owesFilter === '__nohealth' || undefined,
 			parqExpiring: owesFilter === '__parqexp' || undefined,
+			retentionExempt: owesFilter === '__retention' || undefined,
 			customField:
 				cfFieldId && cfValue.trim() ? { fieldId: cfFieldId, value: cfValue.trim() } : undefined
 		});
@@ -812,7 +813,9 @@
 																											? 'No health form'
 																											: owesFilter === '__parqexp'
 																												? 'Form expiring'
-																												: 'Any balance'}</Select.Trigger
+																												: owesFilter === '__retention'
+																													? 'Retention exempt'
+																													: 'Any balance'}</Select.Trigger
 			>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
@@ -842,6 +845,9 @@
 				{#if entitlements.healthForms}
 					<Select.Item value="__nohealth">No health form</Select.Item>
 					<Select.Item value="__parqexp">Health form expiring ≤30d</Select.Item>
+				{/if}
+				{#if entitlements.dataRetention}
+					<Select.Item value="__retention">Retention exempt</Select.Item>
 				{/if}
 				<Select.Item value="__comped">Comp'd membership</Select.Item>
 				<Select.Item value="__packexp">Pack expiring</Select.Item>

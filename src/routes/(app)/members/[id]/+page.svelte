@@ -103,6 +103,7 @@
 	import {
 		aiMemberProgress,
 		aiMemberBrief,
+		aiDraftIssueReply,
 		aiDraftWinBack,
 		aiGenerateProgram,
 		getAiStatus
@@ -610,6 +611,20 @@
 	let emailSubject = $state('');
 	let emailMessage = $state('');
 	let aiDraftBusy = $state(false);
+	async function draftIssueReplyEmail(issueId: string) {
+		aiDraftBusy = true;
+		try {
+			const r = await aiDraftIssueReply({ memberId: id, issueId });
+			if (r) {
+				emailSubject = r.subject;
+				emailMessage = r.body;
+				emailOpen = true;
+			}
+		} catch (e) {
+			toast.error(errMsg(e, 'Could not draft'));
+		}
+		aiDraftBusy = false;
+	}
 	async function draftWinBackEmail() {
 		aiDraftBusy = true;
 		try {
@@ -1913,6 +1928,15 @@
 									{formatRelative(i.createdAt)}
 								</span>
 								{#if i.status === 'open'}
+									{#if entitlements.ai}
+										<Button
+											size="sm"
+											variant="ghost"
+											class="h-7 px-1.5"
+											disabled={aiDraftBusy}
+											onclick={() => draftIssueReplyEmail(i.id)}>Reply</Button
+										>
+									{/if}
 									<Button
 										size="sm"
 										variant="ghost"

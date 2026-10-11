@@ -9,6 +9,7 @@ import {
 	charge,
 	checkIn,
 	gymMember,
+	memberIssue,
 	memberNote,
 	gymSettings,
 	membership,
@@ -20,6 +21,7 @@ import { aiAvailable, aiComplete, aiConfig, requireAi } from '#lib/server/ee/ai.
 import {
 	draftAnnouncement,
 	draftClassDescription,
+	draftIssueReply,
 	draftWinBack,
 	generateProgram,
 	gymInsights
@@ -91,6 +93,34 @@ export const aiDraftWinBack = command(v.object({ memberId: v.string() }), async 
 		totalVisits: stats?.total ?? 0
 	});
 });
+
+/** Staff-side reply draft for a member's portal issue report. */
+export const aiDraftIssueReply = command(
+	v.object({ memberId: v.string(), issueId: v.string() }),
+	async ({ memberId, issueId }) => {
+		const { orgId, org } = await requireOrg();
+		requireAi();
+		if (!aiAvailable()) error(400, 'No AI provider configured');
+		const [i] = await db
+			.select({ text: memberIssue.text })
+			.from(memberIssue)
+			.where(
+				and(
+					eq(memberIssue.id, issueId),
+					eq(memberIssue.memberId, memberId),
+					eq(memberIssue.organizationId, orgId)
+				)
+			)
+			.limit(1);
+		if (!i) error(404, 'Issue not found');
+		const [m] = await db
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+			.limit(1);
+		return draftIssueReply(org.name, { name: m?.name ?? 'Member' }, i.text);
+	}
+);
 
 /** One-sentence description for a class type (timetable/join page). */
 export const aiDraftClassDescription = command(
