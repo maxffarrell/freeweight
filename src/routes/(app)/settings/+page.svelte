@@ -61,7 +61,12 @@
 		saveMemberFieldCmd,
 		deleteMemberFieldCmd
 	} from '#lib/remote/custom-fields.remote.ts';
-	import { getEntitlements, getOrgDataExport } from '#lib/remote/ee.remote.ts';
+	import {
+		anonymizeInactiveMembers,
+		getEntitlements,
+		testDoorWebhook,
+		getOrgDataExport
+	} from '#lib/remote/ee.remote.ts';
 	import { errMsg, formatDate } from '#lib/format.ts';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import Plus from '@lucide/svelte/icons/plus';
@@ -299,6 +304,9 @@
 	let kioskPin = $state(settings.kioskPin);
 	// svelte-ignore state_referenced_locally
 	let retentionDays = $state(settings.retentionDays);
+	let doorWebhookUrl = $state(settings.doorWebhookUrl);
+	let anonBusy = $state(false);
+	let doorBusy = $state(false);
 	// svelte-ignore state_referenced_locally
 	let firstClassFree = $state(settings.firstClassFree);
 	const tzOptions = Intl.supportedValuesOf('timeZone');
@@ -361,6 +369,7 @@
 				whiteLabel,
 				kioskPin,
 				retentionDays,
+				doorWebhookUrl,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -943,6 +952,63 @@
 									</p>
 								</div>
 								<Input class="w-28" type="number" min="0" max="3650" bind:value={retentionDays} />
+							</div>
+						{/if}
+						{#if entitlements.dataRetention}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Anonymize inactive members</p>
+									<p class="text-xs text-muted-foreground">
+										Scrub personal details of members with no visit in 24+ months (GDPR).
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="outline"
+									disabled={anonBusy}
+									onclick={async () => {
+										if (!confirm('Scrub personal details of long-inactive members?')) return;
+										anonBusy = true;
+										try {
+											const r = await anonymizeInactiveMembers({});
+											toast.success(`Anonymized ${r.anonymized} members`);
+										} catch (err) {
+											toast.error(errMsg(err, 'Failed'));
+										} finally {
+											anonBusy = false;
+										}
+									}}>Anonymize</Button
+								>
+							</div>
+						{/if}
+						{#if entitlements.doorAccess}
+							<div class="flex items-center justify-between gap-4">
+								<div>
+									<p class="font-medium">Door access webhook</p>
+									<p class="text-xs text-muted-foreground">
+										POST each member check-in to this URL (Kisi/Brivo-style door systems).
+									</p>
+								</div>
+								<div class="flex items-center gap-2">
+									<Input class="w-56" placeholder="https://…" bind:value={doorWebhookUrl} />
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={doorBusy}
+										onclick={async () => {
+											doorBusy = true;
+											try {
+												await testDoorWebhook();
+												toast.success('Test ping sent');
+											} catch (err) {
+												toast.error(errMsg(err, 'Failed'));
+											} finally {
+												doorBusy = false;
+											}
+										}}>Test</Button
+									>
+								</div>
 							</div>
 						{/if}
 						<Button type="submit" disabled={pending}>Save</Button>

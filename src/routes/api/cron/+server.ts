@@ -4,9 +4,11 @@ import { CRON_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/schema.ts';
 import { runBilling, suspendDelinquentMembers } from '#lib/server/services/billing.ts';
-import { purgeOldData } from '#lib/server/ee/data-retention.ts';
+
 import { syncAtRiskTags } from '#lib/server/services/reports.ts';
 import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
+import { purgeOldData } from '#lib/server/ee/data-retention.ts';
+import { sendMonthClose } from '#lib/server/ee/report-digests.ts';
 import {
 	sendAnniversaryGreetings,
 	sendBillingReminders,
@@ -99,6 +101,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	let serviceReminders = 0;
 	let ownerInsights = 0;
 	let retentionPurged = 0;
+	let monthCloseSent = 0;
 	for (const o of orgs) {
 		try {
 			await runBilling(o.id);
@@ -107,6 +110,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			recurringPosted += await postDueRecurringExpenses(o.id);
 			try {
 				retentionPurged += await purgeOldData(o.id);
+				monthCloseSent += await sendMonthClose(o.id);
 			} catch (err) {
 				console.error(`data-retention cron failed for ${o.id}`, err);
 			}
@@ -321,6 +325,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		serviceReminders,
 		ownerInsights,
 		retentionPurged,
+		monthCloseSent,
 		failed,
 		reminders,
 		eventReminders,

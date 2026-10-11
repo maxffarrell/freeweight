@@ -12,7 +12,9 @@ export type EnterpriseFeature =
 	| 'health-forms'
 	| 'kiosk-pin'
 	| 'payroll-export'
-	| 'data-retention';
+	| 'data-retention'
+	| 'door-access'
+	| 'report-digests';
 
 /**
  * Enterprise features are enabled on Freeweight Cloud, or on self-hosted installs
