@@ -123,7 +123,7 @@
 	}
 	let payFrom = $state('');
 	let payTo = $state('');
-	let payFormat = $state<'default' | 'gusto'>('default');
+	let payFormat = $state<'default' | 'gusto' | 'quickbooks'>('default');
 	async function exportFullPayroll() {
 		try {
 			const res = await getPayrollExport({
@@ -148,26 +148,38 @@
 								d.memo
 							])
 						])
-					: toCsv([
-							[
-								'Employee',
-								'Email',
-								'Classes taught',
-								'Class pay',
-								'Desk hours',
-								'Hourly pay',
-								'Gross'
-							],
-							...res.data.rows.map((d) => [
-								d.employee,
-								d.email,
-								d.classes,
-								(d.classPay / 100).toFixed(2),
-								d.hours,
-								(d.hourlyPay / 100).toFixed(2),
-								(d.gross / 100).toFixed(2)
+					: res.data.format === 'quickbooks'
+						? toCsv([
+								['employee', 'email', 'regular_hours', 'regular_wages', 'commission', 'total'],
+								...res.data.rows.map((d) => [
+									d.employee,
+									d.email,
+									d.regular_hours,
+									d.regular_wages,
+									d.commission,
+									d.total
+								])
 							])
-						]);
+						: toCsv([
+								[
+									'Employee',
+									'Email',
+									'Classes taught',
+									'Class pay',
+									'Desk hours',
+									'Hourly pay',
+									'Gross'
+								],
+								...res.data.rows.map((d) => [
+									d.employee,
+									d.email,
+									d.classes,
+									(d.classPay / 100).toFixed(2),
+									d.hours,
+									(d.hourlyPay / 100).toFixed(2),
+									(d.gross / 100).toFixed(2)
+								])
+							]);
 			const a = document.createElement('a');
 			a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
 			a.download = `payroll-${res.data.month}.csv`;
@@ -1838,6 +1850,7 @@
 					<NativeSelect class="h-7 w-28 text-xs" bind:value={payFormat} aria-label="Format">
 						<option value="default">Standard</option>
 						<option value="gusto">Gusto</option>
+						<option value="quickbooks">QuickBooks</option>
 					</NativeSelect>
 					<Button variant="ghost" size="sm" onclick={exportFullPayroll}>
 						<Download class="size-3.5" /> Payroll export

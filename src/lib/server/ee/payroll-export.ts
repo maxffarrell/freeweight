@@ -125,6 +125,25 @@ export async function exportPayroll(orgId: string, from?: string, to?: string, f
 			total: rows.reduce((a, r) => a + r.gross, 0)
 		};
 	}
+	if (format === 'quickbooks') {
+		// QuickBooks Online payroll CSV: one line per employee with hours,
+		// wages (desk pay) and commission (per-class pay).
+		return {
+			month: from
+				? `${from.slice(0, 10)}_to_${(to ?? new Date().toISOString()).slice(0, 10)}`
+				: new Date().toISOString().slice(0, 7),
+			format: 'quickbooks' as const,
+			rows: rows.map((r) => ({
+				employee: r.employee,
+				email: r.email,
+				regular_hours: r.hours,
+				regular_wages: (r.hourlyPay / 100).toFixed(2),
+				commission: (r.classPay / 100).toFixed(2),
+				total: (r.gross / 100).toFixed(2)
+			})),
+			total: rows.reduce((a, r) => a + r.gross, 0)
+		};
+	}
 	return {
 		format: 'default' as const,
 		month: from

@@ -1,6 +1,6 @@
 /* @license Enterprise */
 
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
 import { gymMember, memberField, memberFieldValue, outer } from '#lib/server/db/schema.ts';
@@ -235,4 +235,31 @@ export async function saveJoinAnswers(
 			value: value.trim().slice(0, 500)
 		}));
 	if (rows.length) await db.insert(memberFieldValue).values(rows);
+}
+
+/** label→value map per member for merge tags — one batch query for an
+ * announcement audience. Only runs under the custom-fields flag. */
+export async function memberFieldMap(
+	orgId: string,
+	memberIds: string[]
+): Promise<Map<string, Record<string, string>>> {
+	const out = new Map<string, Record<string, string>>();
+	if (!customFieldsEnabled() || memberIds.length === 0) return out;
+	const rows = await db
+		.select({
+			memberId: memberFieldValue.memberId,
+			label: memberField.name,
+			value: memberFieldValue.value
+		})
+		.from(memberFieldValue)
+		.innerJoin(memberField, eq(memberFieldValue.fieldId, memberField.id))
+		.where(
+			and(eq(memberFieldValue.organizationId, orgId), inArray(memberFieldValue.memberId, memberIds))
+		);
+	for (const r of rows) {
+		const cur = out.get(r.memberId) ?? {};
+		if (r.value) cur[r.label] = r.value;
+		out.set(r.memberId, cur);
+	}
+	return out;
 }

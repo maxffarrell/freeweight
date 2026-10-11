@@ -537,7 +537,7 @@ async function hasPriorBooking(memberId: string) {
 	return n > 0;
 }
 
-async function attendanceStats(orgId: string, memberId: string, tz: string) {
+export async function attendanceStats(orgId: string, memberId: string, tz: string) {
 	const rows = await db
 		.select({ checkedAt: checkIn.checkedAt, locationName: location.name })
 		.from(checkIn)

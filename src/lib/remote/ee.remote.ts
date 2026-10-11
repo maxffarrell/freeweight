@@ -110,7 +110,7 @@ export const getPayrollExport = query(
 	v.object({
 		from: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
 		to: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
-		format: v.optional(v.picklist(['default', 'gusto']))
+		format: v.optional(v.picklist(['default', 'gusto', 'quickbooks']))
 	}),
 	async ({ from, to, format }) => {
 		const { orgId } = await requireOrg('admin');

@@ -410,3 +410,35 @@ export async function rosterBrief(
 	);
 	return text.trim();
 }
+
+/** Portal "Your month" — friendly 2-3 sentence recap of the member's recent
+ * training from real stats. Runs under the ai flag + configured provider. */
+export async function memberMonthSummary(
+	orgName: string,
+	facts: {
+		memberName: string;
+		visits30: number;
+		totalVisits: number;
+		topClass: string | null;
+		topClassCount: number;
+		classesBooked30: number;
+		prs30: number;
+		streakWeeks: number;
+	}
+): Promise<string> {
+	const text = await aiComplete(
+		[
+			{
+				role: 'system',
+				content:
+					"You write a 2-3 sentence 'your month' recap addressed to a gym member ('you'). Celebrate wins briefly, name their top class when there is one, and end with one forward-looking nudge. Warm, concrete, no markdown or emoji."
+			},
+			{
+				role: 'user',
+				content: `Gym: ${orgName}. Member: ${facts.memberName.split(' ')[0]}. Last 30 days: ${facts.visits30} check-ins, ${facts.classesBooked30} classes attended, ${facts.prs30} personal records. Top class: ${facts.topClass ? `${facts.topClass} (${facts.topClassCount}x)` : 'none'}. Current streak: ${facts.streakWeeks} weeks. Lifetime visits: ${facts.totalVisits}.`
+			}
+		],
+		220
+	);
+	return text.trim();
+}

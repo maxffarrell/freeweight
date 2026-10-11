@@ -4,6 +4,8 @@ import { command, query } from '$app/server';
 import { requireUser } from '#lib/server/context.ts';
 import { db } from '#lib/server/db/index.ts';
 import {
+	booking,
+	classSession,
 	classType,
 	classWatch,
 	document,
@@ -11,9 +13,10 @@ import {
 	gymSettings,
 	membership,
 	outer,
+	personalRecord,
 	plan
 } from '#lib/server/db/schema.ts';
-import { and, asc, desc, eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, sql } from 'drizzle-orm';
 import * as svc from '#lib/server/services/portal.ts';
 import * as billingSvc from '#lib/server/services/billing.ts';
 import * as progSvc from '#lib/server/services/programs.ts';
@@ -27,6 +30,9 @@ import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
 import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
+import { memberFieldMap } from '#lib/server/ee/custom-fields.ts';
+import { mergeTags } from '#lib/server/services/notifications.ts';
+import { orgBrand } from '#lib/server/org-brand.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import { emit } from '#lib/server/services/events.ts';
@@ -46,7 +52,7 @@ import {
 	submitParq as hfSubmit
 } from '#lib/server/ee/health-forms.ts';
 import { memberFieldValues, setMyFieldValue } from '#lib/server/ee/custom-fields.ts';
-import { workoutPlan } from '#lib/server/ee/ai-features.ts';
+import { memberMonthSummary, workoutPlan } from '#lib/server/ee/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -672,7 +678,29 @@ export const bookMakeup = command(
 export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!m.email) return [];
-	return notif.memberAnnouncements(m.organizationId, m.email);
+	// News shows the same merged text the member got in their inbox — resolve
+	// {name}/{field:Label} tags against this member before rendering.
+	const [fields, brand] = await Promise.all([
+		memberFieldMap(m.organizationId, [m.id]),
+		orgBrand(m.organizationId)
+	]);
+	return (await notif.memberAnnouncements(m.organizationId, m.email)).map((a) => ({
+		...a,
+		subject: mergeTags(
+			a.subject,
+			m.name,
+			brand.orgName,
+			a.sentAt.toISOString().slice(0, 10),
+			fields.get(m.id)
+		),
+		message: mergeTags(
+			a.message,
+			m.name,
+			brand.orgName,
+			a.sentAt.toISOString().slice(0, 10),
+			fields.get(m.id)
+		)
+	}));
 });
 
 export const joinChallenge = command(
@@ -755,6 +783,58 @@ export const aiWorkoutPlan = command(
 		});
 	}
 );
+
+/** Member's AI "your month" recap — visits, top class, streak, PRs → 2-3 sentences. */
+export const aiMonthSummary = command(idSchema, async (memberId) => {
+	const m = await myMember(memberId);
+	requireAi();
+	const [s] = await db
+		.select({ tz: gymSettings.timezone })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, m.organizationId))
+		.limit(1);
+	const since = new Date(Date.now() - 30 * 86400_000);
+	const [attendance, classes, prs] = await Promise.all([
+		svc.attendanceStats(m.organizationId, memberId, s?.tz ?? 'UTC'),
+		db
+			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
+			.from(booking)
+			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
+			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.where(
+				and(
+					eq(booking.organizationId, m.organizationId),
+					eq(booking.memberId, memberId),
+					eq(booking.status, 'attended'),
+					gte(classSession.startsAt, since)
+				)
+			)
+			.groupBy(classType.name)
+			.orderBy(desc(sql`count(*)`)),
+		db
+			.select({ n: sql<number>`count(*)`.mapWith(Number) })
+			.from(personalRecord)
+			.where(
+				and(
+					eq(personalRecord.organizationId, m.organizationId),
+					eq(personalRecord.memberId, memberId),
+					gte(personalRecord.createdAt, since)
+				)
+			)
+	]);
+	const top = classes[0];
+	const summary = await memberMonthSummary(m.organizationId, {
+		memberName: m.name,
+		visits30: attendance.visitsThisMonth,
+		totalVisits: attendance.totalVisits,
+		topClass: top?.name ?? null,
+		topClassCount: top?.n ?? 0,
+		classesBooked30: classes.reduce((a, c) => a + c.n, 0),
+		prs30: prs[0]?.n ?? 0,
+		streakWeeks: attendance.weekStreak
+	});
+	return { summary };
+});
 
 /** Whether the portal workout-plan generator is on (Enterprise + provider configured). */
 export const getPortalAi = query(async () => {
