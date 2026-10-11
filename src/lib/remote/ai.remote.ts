@@ -1,9 +1,18 @@
+import { error } from '@sveltejs/kit';
 import { command, query } from '$app/server';
 import * as v from 'valibot';
 import { requireOrg } from '#lib/server/context.ts';
+import { idSchema } from '#lib/schemas.ts';
 import { db } from '#lib/server/db/index.ts';
-import { and, eq, sql } from 'drizzle-orm';
-import { checkIn, gymMember, gymSettings, membership, plan } from '#lib/server/db/schema.ts';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import {
+	checkIn,
+	gymMember,
+	gymSettings,
+	membership,
+	personalRecord,
+	plan
+} from '#lib/server/db/schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
 import { aiAvailable, aiComplete, aiConfig, requireAi } from '#lib/server/ee/ai.ts';
 import {
@@ -173,3 +182,49 @@ export const aiGenerateWod = command(
 		return { workout: text.slice(0, 2000) };
 	}
 );
+
+/** Coach-facing progress summary — visits, PRs and tenure distilled to a note. */
+export const aiMemberProgress = command(idSchema, async (memberId) => {
+	const { orgId } = await requireOrg();
+	requireAi();
+	const [m] = await db
+		.select({ name: gymMember.name, joinedAt: gymMember.joinedAt })
+		.from(gymMember)
+		.where(and(eq(gymMember.id, memberId), eq(gymMember.organizationId, orgId)))
+		.limit(1);
+	if (!m) error(404, 'Member not found');
+	const since = new Date(Date.now() - 90 * 86400_000);
+	const [visits] = await db
+		.select({ n: sql<number>`count(*)`.mapWith(Number) })
+		.from(checkIn)
+		.where(
+			and(
+				eq(checkIn.organizationId, orgId),
+				eq(checkIn.memberId, memberId),
+				isNull(checkIn.guestName),
+				gte(checkIn.checkedAt, since)
+			)
+		);
+	const prs = await db
+		.select({
+			label: personalRecord.label,
+			value: personalRecord.value,
+			on: personalRecord.recordedOn
+		})
+		.from(personalRecord)
+		.where(and(eq(personalRecord.organizationId, orgId), eq(personalRecord.memberId, memberId)))
+		.orderBy(desc(personalRecord.recordedOn), desc(personalRecord.createdAt))
+		.limit(5);
+	const text = await aiComplete([
+		{
+			role: 'system',
+			content:
+				'You are a coach writing a 3-4 sentence progress note about a gym member for staff. Be concrete: use the numbers given, note trends, and end with one suggestion. No headers, no bullets.'
+		},
+		{
+			role: 'user',
+			content: `Member: ${m.name}, joined ${m.joinedAt}. Check-ins in last 90 days: ${visits?.n ?? 0}. Latest personal records: ${prs.length ? prs.map((p) => `${p.label} ${p.value} (${p.on})`).join('; ') : 'none on file'}.`
+		}
+	]);
+	return { summary: text };
+});

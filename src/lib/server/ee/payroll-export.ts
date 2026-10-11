@@ -1,7 +1,7 @@
 /* @license Enterprise */
 
 import { error } from '@sveltejs/kit';
-import { and, asc, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { gte, and, asc, desc, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { member, session, user } from '#lib/server/db/auth.schema.ts';
 import { classSession, classType, shift } from '#lib/server/db/schema.ts';
@@ -19,7 +19,10 @@ export function requirePayrollExport() {
  * Payroll-provider-style pay run for the current month: instructor per-class
  * pay plus front-desk clocked hours at their hourly rate.
  */
-export async function exportPayroll(orgId: string) {
+export async function exportPayroll(orgId: string, from?: string, to?: string) {
+	const start = new Date(from ?? `${new Date().toISOString().slice(0, 7)}-01T00:00:00Z`);
+	// `to` is an inclusive YYYY-MM-DD pick — bump a day for the exclusive bound.
+	const end = to ? new Date(new Date(`${to}T00:00:00Z`).getTime() + 86400_000) : new Date();
 	const [classRows, shiftRows] = await Promise.all([
 		db
 			.select({
@@ -36,8 +39,8 @@ export async function exportPayroll(orgId: string) {
 			.where(
 				and(
 					eq(classSession.organizationId, orgId),
-					sql`${classSession.startsAt} >= date_trunc('month', now())`,
-					lt(classSession.startsAt, new Date()),
+					gte(classSession.startsAt, start),
+					lt(classSession.startsAt, end),
 					isNull(classSession.cancelledAt),
 					isNotNull(classType.payRate)
 				)
@@ -61,7 +64,8 @@ export async function exportPayroll(orgId: string) {
 			.where(
 				and(
 					eq(shift.organizationId, orgId),
-					sql`${shift.clockedInAt} >= date_trunc('month', now())`,
+					gte(shift.clockedInAt, start),
+					lt(shift.clockedInAt, end),
 					isNotNull(shift.clockedOutAt)
 				)
 			)
@@ -104,7 +108,9 @@ export async function exportPayroll(orgId: string) {
 	}
 	const rows = [...byMember.values()].map((r) => ({ ...r, gross: r.classPay + r.hourlyPay }));
 	return {
-		month: new Date().toISOString().slice(0, 7),
+		month: from
+			? `${from.slice(0, 10)}_to_${(to ?? new Date().toISOString()).slice(0, 10)}`
+			: new Date().toISOString().slice(0, 7),
 		rows,
 		total: rows.reduce((a, r) => a + r.gross, 0)
 	};

@@ -120,9 +120,14 @@
 		a.click();
 		URL.revokeObjectURL(a.href);
 	}
+	let payFrom = $state('');
+	let payTo = $state('');
 	async function exportFullPayroll() {
 		try {
-			const res = await getPayrollExport();
+			const res = await getPayrollExport({
+				from: payFrom || undefined,
+				to: payTo || undefined
+			});
 			if (!res.licensed || !res.data) {
 				toast.error('Payroll export is an Enterprise feature');
 				return;
@@ -1804,6 +1809,8 @@
 					</Button>
 				{/if}
 				{#if entitlements.payrollExport}
+					<Input type="date" class="h-7 w-32 text-xs" bind:value={payFrom} aria-label="From" />
+					<Input type="date" class="h-7 w-32 text-xs" bind:value={payTo} aria-label="To" />
 					<Button variant="ghost" size="sm" onclick={exportFullPayroll}>
 						<Download class="size-3.5" /> Payroll export
 					</Button>

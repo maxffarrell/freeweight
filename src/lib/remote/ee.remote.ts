@@ -87,11 +87,17 @@ export const getErrorBranding = query(async () => {
 });
 
 /** Monthly pay run for payroll providers — CSV on the Reports page. */
-export const getPayrollExport = query(async () => {
-	const { orgId } = await requireOrg('admin');
-	if (!payrollExportEnabled()) return { licensed: false, data: null };
-	return { licensed: true, data: await exportPayroll(orgId) };
-});
+export const getPayrollExport = query(
+	v.object({
+		from: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/))),
+		to: v.optional(v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/)))
+	}),
+	async ({ from, to }) => {
+		const { orgId } = await requireOrg('admin');
+		if (!payrollExportEnabled()) return { licensed: false, data: null };
+		return { licensed: true, data: await exportPayroll(orgId, from, to) };
+	}
+);
 
 /** Staff sign-in access log for the audit view (audit-export flag). */
 export const getAccessLog = query(async () => {
