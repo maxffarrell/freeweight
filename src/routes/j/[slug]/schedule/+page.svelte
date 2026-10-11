@@ -17,7 +17,7 @@
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-	const { org, settings, sessions } = $derived(data);
+	const { org, settings, sessions, whiteLabel } = $derived(data);
 	const tz = $derived(settings.timezone);
 	/** Deep link: /j/{slug}/schedule?session=<id> scrolls to + highlights one class. */
 	const focusId = $derived(page.url.searchParams.get('session'));
@@ -110,7 +110,7 @@
 		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
 			{#if settings.logoDocumentId}
 				<img src="/api/logo/{settings.logoDocumentId}" alt="" class="h-8 w-auto object-contain" />
-			{:else}
+			{:else if !whiteLabel}
 				<Logo />
 			{/if}
 			<span class="truncate font-semibold">{org.name}</span>

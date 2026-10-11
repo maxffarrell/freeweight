@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "health_questions" text DEFAULT '' NOT NULL;

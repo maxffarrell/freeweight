@@ -309,6 +309,7 @@
 	let exportWebhookUrl = $state(settings.exportWebhookUrl);
 	let brandColor = $state(settings.brandColor);
 	let parqMonths = $state(settings.parqMonths);
+	let healthQuestions = $state(settings.healthQuestions);
 	let anonBusy = $state(false);
 	let doorBusy = $state(false);
 	// svelte-ignore state_referenced_locally
@@ -378,6 +379,7 @@
 				exportWebhookUrl,
 				brandColor,
 				parqMonths,
+				healthQuestions,
 				firstClassFree,
 				openHours: hoursOut
 			});
@@ -1008,6 +1010,20 @@
 									</p>
 								</div>
 								<Input class="w-28" type="number" min="0" max="120" bind:value={parqMonths} />
+							</div>
+							<div class="flex items-start justify-between gap-4">
+								<div>
+									<p class="font-medium">Custom health questions</p>
+									<p class="text-xs text-muted-foreground">
+										One per line — replaces the standard PAR-Q. Blank uses the defaults.
+									</p>
+								</div>
+								<Textarea
+									class="w-72"
+									rows={4}
+									placeholder="Has your doctor ever said you have a heart condition?&#10;Do you feel chest pain during activity?"
+									bind:value={healthQuestions}
+								/>
 							</div>
 						{/if}
 						{#if entitlements.doorAccess}

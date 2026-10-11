@@ -8,6 +8,7 @@ import {
 	classWatch,
 	document,
 	gymMember,
+	gymSettings,
 	membership,
 	outer,
 	plan
@@ -1025,9 +1026,18 @@ export const getMyParq = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!healthFormsEnabled())
 		return { licensed: false, questions: [] as string[], answers: null, signedAt: null };
+	const [s] = await db
+		.select({ healthQuestions: gymSettings.healthQuestions })
+		.from(gymSettings)
+		.where(eq(gymSettings.organizationId, m.organizationId))
+		.limit(1);
+	const custom = s?.healthQuestions
+		.split('\n')
+		.map((q) => q.trim())
+		.filter(Boolean);
 	return {
 		licensed: true,
-		questions: [...PARQ_QUESTIONS],
+		questions: custom?.length ? custom : [...PARQ_QUESTIONS],
 		answers: m.parqAnswers ?? null,
 		signedAt: m.parqSignedAt
 	};
