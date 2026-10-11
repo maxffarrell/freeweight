@@ -2,7 +2,7 @@
 
 import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { member, organization, user } from '#lib/server/db/auth.schema.ts';
+import { member, user } from '#lib/server/db/auth.schema.ts';
 import {
 	checkIn,
 	charge,
@@ -12,6 +12,7 @@ import {
 	payment
 } from '#lib/server/db/schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
+import { orgBrand } from '../org-brand.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { localDate } from '#lib/tz.ts';
 import { hasFeature } from './license.ts';
@@ -26,12 +27,15 @@ export function reportDigestsEnabled() {
  * notification_log so a re-fired cron never double-sends.
  */
 async function monthClosePayload(orgId: string) {
-	const [s] = await db
-		.select({ timezone: gymSettings.timezone, logoDocumentId: gymSettings.logoDocumentId })
-		.from(gymSettings)
-		.where(eq(gymSettings.organizationId, orgId))
-		.limit(1);
-	const tz = s?.timezone ?? 'UTC';
+	const [s, brand] = await Promise.all([
+		db
+			.select({ timezone: gymSettings.timezone })
+			.from(gymSettings)
+			.where(eq(gymSettings.organizationId, orgId))
+			.limit(1),
+		orgBrand(orgId)
+	]);
+	const tz = s[0]?.timezone ?? 'UTC';
 	const prev = new Date(Date.now() - 86400_000);
 	const month = localDate(prev, tz).slice(0, 7);
 	const from = new Date(`${month}-01T00:00:00Z`);
@@ -39,11 +43,6 @@ async function monthClosePayload(orgId: string) {
 	const fromDay = from.toISOString().slice(0, 10);
 	const toDay = to.toISOString().slice(0, 10);
 
-	const [o] = await db
-		.select({ name: organization.name })
-		.from(organization)
-		.where(eq(organization.id, orgId))
-		.limit(1);
 	const [rev, joined, visits, open] = await Promise.all([
 		db
 			.select({ n: sql<number>`coalesce(sum(${payment.amount}),0)`.mapWith(Number) })
@@ -78,8 +77,9 @@ async function monthClosePayload(orgId: string) {
 	]);
 	const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 	return {
-		orgName: o?.name ?? 'your gym',
-		logoUrl: s?.logoDocumentId ? `/api/logo/${s.logoDocumentId}` : undefined,
+		orgName: brand.orgName,
+		logoUrl: brand.logoUrl,
+		whiteLabel: brand.whiteLabel,
 		month,
 		lines: [
 			`Revenue collected: ${money(rev[0]?.n ?? 0)}`,
@@ -125,6 +125,7 @@ export async function sendMonthClose(orgId: string): Promise<number> {
 			...renderEmail({
 				orgName: p.orgName,
 				logoUrl: p.logoUrl,
+				whiteLabel: p.whiteLabel,
 				heading: `${p.month} in review`,
 				lines: p.lines
 			})
@@ -144,6 +145,7 @@ export async function sendMonthClosePreview(orgId: string, email: string): Promi
 		...renderEmail({
 			orgName: p.orgName,
 			logoUrl: p.logoUrl,
+			whiteLabel: p.whiteLabel,
 			heading: `${p.month} in review (preview)`,
 			lines: p.lines
 		})

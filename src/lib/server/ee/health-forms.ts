@@ -3,7 +3,7 @@
 import { error } from '@sveltejs/kit';
 import { and, eq, isNotNull, lt } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
-import { organization } from '#lib/server/db/auth.schema.ts';
+import { orgBrand } from '../org-brand.ts';
 import { gymMember, gymSettings, notificationLog } from '#lib/server/db/schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
@@ -68,7 +68,7 @@ export async function submitParq(
 export async function sendParqReminders(orgId: string): Promise<number> {
 	if (!healthFormsEnabled()) return 0;
 	const [s] = await db
-		.select({ months: gymSettings.parqMonths, logoDocumentId: gymSettings.logoDocumentId })
+		.select({ months: gymSettings.parqMonths })
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
@@ -87,11 +87,7 @@ export async function sendParqReminders(orgId: string): Promise<number> {
 		)
 		.limit(500);
 	if (!members.length) return 0;
-	const [o] = await db
-		.select({ name: organization.name })
-		.from(organization)
-		.where(eq(organization.id, orgId))
-		.limit(1);
+	const brand = await orgBrand(orgId);
 	const month = new Date().toISOString().slice(0, 7);
 	let sent = 0;
 	for (const m of members) {
@@ -108,10 +104,9 @@ export async function sendParqReminders(orgId: string): Promise<number> {
 		if (!row) continue;
 		await sendEmail({
 			to: m.email!,
-			subject: `${o?.name ?? 'Your gym'} — health form due`,
+			subject: `${brand.orgName} — health form due`,
 			...renderEmail({
-				orgName: o?.name ?? 'your gym',
-				logoUrl: s.logoDocumentId ? `/api/logo/${s.logoDocumentId}` : undefined,
+				...brand,
 				heading: 'Your health form needs re-signing',
 				lines: [
 					`Hi ${m.name.split(' ')[0]},`,
