@@ -21,7 +21,14 @@ import {
 } from '#lib/server/db/schema.ts';
 import { member, user } from '#lib/server/db/auth.schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
-import { aiAvailable, aiComplete, aiConfig, requireAi } from '#lib/server/ee/ai.ts';
+import {
+	aiAvailable,
+	aiComplete,
+	aiConfig,
+	aiDecisionAvailable,
+	requireAi,
+	requireAiDecision
+} from '#lib/server/ee/ai.ts';
 import {
 	draftAnnouncement,
 	draftClassDescription,
@@ -41,6 +48,7 @@ export const getAiStatus = query(async () => {
 	return {
 		licensed: isEnterpriseEnabled(),
 		configured: aiAvailable(),
+		decisionConfigured: aiDecisionAvailable(),
 		provider: aiConfig()?.provider ?? null
 	};
 });
@@ -53,7 +61,7 @@ const aiDraftInput = v.object({
 /** Drafts an announcement subject + body from a one-line goal (staff review before sending). */
 export const aiDraftEmail = command(aiDraftInput, async (input) => {
 	const { org } = await requireOrg();
-	requireAi();
+	requireAiDecision();
 	return draftAnnouncement(org.name, { goal: input.goal, audience: input.audience });
 });
 
@@ -62,7 +70,7 @@ export const getAiInsights = query(async () => {
 	const { orgId } = await requireOrg();
 	if (!isEnterpriseEnabled())
 		return { licensed: false, configured: false, bullets: [] as string[] };
-	if (!aiAvailable()) return { licensed: true, configured: false, bullets: [] as string[] };
+	if (!aiDecisionAvailable()) return { licensed: true, configured: false, bullets: [] as string[] };
 	const [settings] = await db
 		.select({ timezone: gymSettings.timezone })
 		.from(gymSettings)
@@ -74,7 +82,7 @@ export const getAiInsights = query(async () => {
 /** Win-back draft personalized from the member's real plan/visit stats. */
 export const aiDraftWinBack = command(v.object({ memberId: v.string() }), async ({ memberId }) => {
 	const { org, orgId } = await requireOrg();
-	requireAi();
+	requireAiDecision();
 	const [m] = await db.select().from(gymMember).where(eq(gymMember.id, memberId));
 	if (!m || m.organizationId !== orgId) return null;
 	const [ms] = await db
@@ -104,8 +112,7 @@ export const aiDraftIssueReply = command(
 	v.object({ memberId: v.string(), issueId: v.string() }),
 	async ({ memberId, issueId }) => {
 		const { orgId, org } = await requireOrg();
-		requireAi();
-		if (!aiAvailable()) error(400, 'No AI provider configured');
+		requireAiDecision();
 		const [i] = await db
 			.select({ text: memberIssue.text })
 			.from(memberIssue)
@@ -156,7 +163,7 @@ export const aiGenerateProgram = command(
 	}),
 	async (input) => {
 		await requireOrg();
-		requireAi();
+		requireAiDecision();
 		return generateProgram(input);
 	}
 );
