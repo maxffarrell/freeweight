@@ -1,0 +1,1 @@
+ALTER TABLE "gym_settings" ADD COLUMN "digest_weekly" boolean DEFAULT false NOT NULL;

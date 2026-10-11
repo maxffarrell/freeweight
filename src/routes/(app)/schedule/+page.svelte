@@ -78,6 +78,7 @@
 	} from '#lib/remote/schedule.remote.ts';
 	import { getMembers, getLevels } from '#lib/remote/members.remote.ts';
 	import { aiDraftClassDescription, aiGenerateWod, getAiStatus } from '#lib/remote/ai.remote.ts';
+	import { getEntitlements } from '#lib/remote/ee.remote.ts';
 	import { getJoinInfo, getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { localDate, localTime, localWeekday, addDays } from '#lib/tz.ts';
@@ -99,6 +100,7 @@
 
 	const settings = await getSettings();
 	const ai = $derived(await getAiStatus());
+	const entitlements = $derived(await getEntitlements());
 	const tz = settings.timezone;
 	const currency = settings.currency;
 	const locations = await getLocations();
@@ -1341,6 +1343,11 @@
 								{r.memberName}
 								{#if r.firstTimer}
 									<Badge variant="secondary" class="ml-1">1st visit</Badge>
+								{/if}
+								{#if entitlements.healthForms && r.parqAnswers && Object.values(r.parqAnswers).some(Boolean)}
+									<Badge variant="outline" class="ml-1 border-amber-500 text-amber-600"
+										>medical flag</Badge
+									>
 								{/if}
 								{#if r.openBalance > 0}
 									<Badge variant="destructive" class="ml-1"
