@@ -30,6 +30,9 @@ import * as checkinSvc from '#lib/server/services/checkins.ts';
 import * as chalSvc from '#lib/server/services/challenges.ts';
 import * as gcSvc from '#lib/server/services/giftcards.ts';
 import * as notif from '#lib/server/services/notifications.ts';
+import { memberFieldMap } from '#lib/server/ee/custom-fields.ts';
+import { mergeTags } from '#lib/server/services/notifications.ts';
+import { orgBrand } from '#lib/server/org-brand.ts';
 import { getSettings } from '#lib/server/services/settings.ts';
 import { zonedToUtc } from '#lib/tz.ts';
 import { emit } from '#lib/server/services/events.ts';
@@ -675,7 +678,29 @@ export const bookMakeup = command(
 export const getPortalAnnouncements = query(idSchema, async (memberId) => {
 	const m = await myMember(memberId);
 	if (!m.email) return [];
-	return notif.memberAnnouncements(m.organizationId, m.email);
+	// News shows the same merged text the member got in their inbox — resolve
+	// {name}/{field:Label} tags against this member before rendering.
+	const [fields, brand] = await Promise.all([
+		memberFieldMap(m.organizationId, [m.id]),
+		orgBrand(m.organizationId)
+	]);
+	return (await notif.memberAnnouncements(m.organizationId, m.email)).map((a) => ({
+		...a,
+		subject: mergeTags(
+			a.subject,
+			m.name,
+			brand.orgName,
+			a.sentAt.toISOString().slice(0, 10),
+			fields.get(m.id)
+		),
+		message: mergeTags(
+			a.message,
+			m.name,
+			brand.orgName,
+			a.sentAt.toISOString().slice(0, 10),
+			fields.get(m.id)
+		)
+	}));
 });
 
 export const joinChallenge = command(
