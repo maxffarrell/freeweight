@@ -1528,8 +1528,18 @@
 						const fieldLabels = [
 							...new Set(roster.flatMap((r) => (r.fields ?? []).map((f) => f.label)))
 						];
+						const medicalCol = entitlements.healthForms ? ['medical'] : [];
 						const rows = [
-							['name', 'email', 'status', 'guests', 'waitlist_pos', 'note', ...fieldLabels],
+							[
+								'name',
+								'email',
+								'status',
+								'guests',
+								'waitlist_pos',
+								'note',
+								...medicalCol,
+								...fieldLabels
+							],
 							...roster.map((r) => [
 								r.memberName,
 								r.memberEmail ?? '',
@@ -1539,6 +1549,9 @@
 									? String(waitlistPos.get(r.booking.id) ?? '')
 									: '',
 								r.booking.note ?? '',
+								...medicalCol.map(() =>
+									r.parqAnswers && Object.values(r.parqAnswers).some(Boolean) ? 'yes' : ''
+								),
 								...fieldLabels.map((l) => (r.fields ?? []).find((f) => f.label === l)?.value ?? '')
 							])
 						];

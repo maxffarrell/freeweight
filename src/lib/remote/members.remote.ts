@@ -125,6 +125,7 @@ export const getMembers = query(
 			noHealthForm: v.optional(v.boolean()),
 			parqExpiring: v.optional(v.boolean()),
 			retentionExempt: v.optional(v.boolean()),
+			doorBlocked: v.optional(v.boolean()),
 			customField: v.optional(v.object({ fieldId: v.string(), value: v.string() }))
 		})
 	),
@@ -182,7 +183,8 @@ export const getMembers = query(
 			opts?.noHealthForm,
 			opts?.parqExpiring,
 			opts?.customField,
-			opts?.retentionExempt
+			opts?.retentionExempt,
+			opts?.doorBlocked
 		)
 );
 /** Distinct tags in use — feeds the members-page filter and the member-page autocomplete. */
