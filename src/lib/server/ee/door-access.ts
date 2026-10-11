@@ -52,7 +52,11 @@ export async function fireDoorWebhook(
 				.includes(event)
 		)
 			return;
-		await postDoor(s.url, { event, ...payload });
+		const status = await postDoor(s.url, { event, ...payload });
+		await db
+			.update(gymSettings)
+			.set({ doorLastEvent: event, doorLastStatus: status, doorLastAt: new Date() })
+			.where(eq(gymSettings.organizationId, orgId));
 	} catch (err) {
 		console.error(`door webhook failed for ${orgId}`, err);
 	}

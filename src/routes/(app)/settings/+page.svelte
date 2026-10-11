@@ -1223,7 +1223,7 @@
 							</div>
 							{#if settings.doorLastEvent}
 								<p class="text-xs text-muted-foreground">
-									Last post: {settings.doorLastEvent} — {settings.doorLastStatus != null
+									Last post: {settings.doorLastEvent} — {settings.doorLastStatus
 										? `HTTP ${settings.doorLastStatus}`
 										: 'delivery failed'}{settings.doorLastAt
 										? ` · ${formatDate(settings.doorLastAt)}`
