@@ -37,16 +37,65 @@ import { notifyCreditsGifted, notifyPaymentReceived, notifyPlanChanged } from '.
 import { bookSession, creditsUsedIn } from './schedule.ts';
 import { acceptSaveOffer, memberChangePlan, setClassWatch } from './portal.ts';
 
-vi.mock('./notifications.ts', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('./notifications.ts')>();
+const notificationSpies = vi.hoisted(() => new Map<string, ReturnType<typeof vi.fn>>());
+
+// A synchronous fixture avoids notifications -> reports -> members importing real
+// notification functions while an importOriginal-based factory is still loading.
+vi.mock('./notifications.ts', () => {
+	const names = [
+		'calendarToken',
+		'notifyBookingCancelled',
+		'notifyBookingConfirmed',
+		'notifyCancellationRequested',
+		'notifyChargePosted',
+		'notifyClassFull',
+		'notifyClassWatchers',
+		'notifyCreditsGifted',
+		'notifyDeletionRequested',
+		'notifyInstructorChanged',
+		'notifyLowRating',
+		'notifyLowStock',
+		'notifyMembershipCancelled',
+		'notifyMembershipResumed',
+		'notifyMembershipSuspended',
+		'notifyNoShow',
+		'notifyPackLowCredit',
+		'notifyPauseRequested',
+		'notifyPaymentReceived',
+		'notifyPaymentRefunded',
+		'notifyPersonalRecord',
+		'notifyPlanChanged',
+		'notifyPlanPriceChange',
+		'notifyReferralJoin',
+		'notifyReferralReward',
+		'notifySeriesBooked',
+		'notifySessionCancelled',
+		'notifySessionChanged',
+		'notifySignRequest',
+		'notifyTrialRequested',
+		'notifyWaitlistPromoted',
+		'sendCoverRequests'
+	];
 	return Object.fromEntries(
-		Object.entries(actual).map(([key, value]) => [
-			key,
-			typeof value === 'function' ? vi.fn(async () => undefined) : value
-		])
+		names.map((key) => {
+			let spy = notificationSpies.get(key);
+			if (!spy) {
+				spy = vi.fn(async () => undefined);
+				notificationSpies.set(key, spy);
+			}
+			return [key, spy];
+		})
 	);
 });
 vi.mock('./events.ts', () => ({ emit: vi.fn(async () => undefined) }));
+
+describe('notification mock identities', () => {
+	it('shares stable keyed spies across module imports', () => {
+		expect(notifyCreditsGifted).toBe(notificationSpies.get('notifyCreditsGifted'));
+		expect(notifyPaymentReceived).toBe(notificationSpies.get('notifyPaymentReceived'));
+		expect(notifyPlanChanged).toBe(notificationSpies.get('notifyPlanChanged'));
+	});
+});
 
 // CI supplies a migrated disposable PostgreSQL database. Fixtures never use existing tenants.
 describe.skipIf(!process.env.DATABASE_URL)(
