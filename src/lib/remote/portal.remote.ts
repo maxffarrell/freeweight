@@ -7,7 +7,6 @@ import {
 	booking,
 	classSession,
 	classType,
-	classWatch,
 	document,
 	gymMember,
 	gymSettings,
@@ -64,7 +63,13 @@ async function myMember(memberId: string) {
 			? await db
 					.select({ id: gymMember.id })
 					.from(gymMember)
-					.where(and(eq(gymMember.id, m.guardianId), eq(gymMember.portalUserId, user.id)))
+					.where(
+						and(
+							eq(gymMember.organizationId, m.organizationId),
+							eq(gymMember.id, m.guardianId),
+							eq(gymMember.portalUserId, user.id)
+						)
+					)
 					.limit(1)
 			: [];
 		if (!guardian) error(403, 'Not your member record');
@@ -1069,22 +1074,7 @@ export const setClassWatch = command(
 	}),
 	async ({ memberId, classTypeId, on }) => {
 		const m = await myMember(memberId);
-		if (on) {
-			await db
-				.insert(classWatch)
-				.values({ organizationId: m.organizationId, memberId: m.id, classTypeId })
-				.onConflictDoNothing();
-		} else {
-			await db
-				.delete(classWatch)
-				.where(
-					and(
-						eq(classWatch.organizationId, m.organizationId),
-						eq(classWatch.memberId, m.id),
-						eq(classWatch.classTypeId, classTypeId)
-					)
-				);
-		}
+		await svc.setClassWatch(m.organizationId, m.id, classTypeId, on);
 		await getPortalOverview(m.id).refresh();
 	}
 );

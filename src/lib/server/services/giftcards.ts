@@ -1,3 +1,4 @@
+import { outer } from '#lib/server/db/schema.ts';
 import { randomBytes } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import { aliasedTable } from 'drizzle-orm';
@@ -122,12 +123,18 @@ export async function redeemGiftCard(orgId: string, memberId: string, rawCode: s
 		const open = await tx
 			.select({
 				id: charge.id,
-				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = "charge"."id" and p.refunded_at is null), 0)`.mapWith(
+				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 			})
 			.from(charge)
-			.where(and(eq(charge.memberId, memberId), eq(charge.status, 'open')))
+			.where(
+				and(
+					eq(charge.organizationId, orgId),
+					eq(charge.memberId, memberId),
+					eq(charge.status, 'open')
+				)
+			)
 			.orderBy(asc(charge.dueDate), asc(charge.createdAt));
 		for (const part of allocate(card.balance, open)) {
 			await tx.insert(payment).values({
@@ -152,8 +159,8 @@ export async function redeemGiftCard(orgId: string, memberId: string, rawCode: s
 		// Same coverage flip as recordPayment — charges now fully covered become 'paid'.
 		await tx.execute(sql`
 			update ${charge} c set status = 'paid', updated_at = now()
-			where c.member_id = ${memberId} and c.status = 'open'
-			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.refunded_at is null) >= c.amount
+			where c.organization_id = ${orgId} and c.member_id = ${memberId} and c.status = 'open'
+			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id and p.refunded_at is null) >= c.amount
 		`);
 		return card.balance;
 	});

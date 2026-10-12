@@ -34,10 +34,11 @@ Out of scope by design: payroll, workout programming, and access-control hardwar
 ## Quick start
 
 ```sh
-docker compose up -d db        # or bring your own Postgres
-cp .env.example .env           # set DATABASE_URL and BETTER_AUTH_SECRET
+cp .env.example .env           # set a persistent random BETTER_AUTH_SECRET (32+ characters)
+# In .env set DATABASE_URL=postgres://freeweight:freeweight@localhost:5432/freeweight
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
 pnpm install
-pnpm db:migrate
+node --env-file=.env scripts/migrate.ts
 pnpm dev
 ```
 
@@ -85,3 +86,15 @@ Webhooks (Settings → Webhooks) are signed with HMAC-SHA256 in `x-freeweight-si
 ## License
 
 AGPLv3 for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.
+
+Existing members use the member portal for bookings and purchases; public forms are for new visitors.
+
+For a reverse proxy, set `TRUSTED_PROXY_IPS` to a comma-separated list of its exact socket peer IP addresses (including IPv6 notation if used). Only these peers may supply `X-Forwarded-For`; the proxy must overwrite that header and direct access to its address must be restricted. Direct Docker connections use the socket address for rate limits.
+
+## Release readiness
+
+This is pre-1.0 software. Start with a disposable evaluation and check your workflows before using real customer data. Review [SECURITY.md](SECURITY.md), test your identity provider and payment webhooks, verify scheduled jobs, and perform a backup/restore drill for your installation.
+
+For Docker self-hosting, create `.env` once and keep its authentication secret across upgrades. Optional SSO/AI/provider settings in `.env` are passed to the application container. Use `docker compose up -d --build` when building this checkout; published images use version tags rather than an unversioned `latest` tag.
+
+The source Compose setup builds this checkout and requires Docker Compose 2.24 or newer for its optional `.env` file. Rebuild after updating source to pick up security fixes.

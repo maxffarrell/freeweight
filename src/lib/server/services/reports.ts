@@ -12,6 +12,7 @@ import {
 	lte,
 	ne,
 	notInArray,
+	or,
 	sql,
 	count
 } from 'drizzle-orm';
@@ -226,10 +227,18 @@ async function revenueByKind(orgId: string) {
 			total: sql<number>`sum(${payment.amount})`.mapWith(Number)
 		})
 		.from(payment)
-		.leftJoin(charge, eq(payment.chargeId, charge.id))
+		.leftJoin(
+			charge,
+			and(
+				eq(payment.chargeId, charge.id),
+				eq(payment.organizationId, charge.organizationId),
+				eq(payment.memberId, charge.memberId)
+			)
+		)
 		.where(
 			and(
 				eq(payment.organizationId, orgId),
+				or(isNull(payment.chargeId), isNotNull(charge.id)),
 				isNull(payment.refundedAt),
 				notInArray(payment.method, ['gift_card', 'credit']),
 				gte(payment.paidAt, new Date(Date.now() - 90 * 86400_000))
@@ -332,6 +341,8 @@ async function classProfitability(orgId: string) {
 			payment,
 			and(
 				eq(payment.chargeId, booking.chargeId),
+				eq(payment.organizationId, booking.organizationId),
+				eq(payment.memberId, booking.memberId),
 				isNull(payment.refundedAt),
 				notInArray(payment.method, ['gift_card', 'credit'])
 			)
@@ -893,8 +904,8 @@ async function referralConversion(orgId: string) {
 			referred: count(),
 			paying: sql<number>`count(*) filter (where exists (
 				select 1 from payment p
-				join charge c on p.charge_id = c.id
-				where c.member_id = ${outer(gymMember.id)} and c.kind = 'membership'
+				join charge c on p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id
+				where c.member_id = ${outer(gymMember.id)} and c.organization_id = ${outer(gymMember.organizationId)} and c.kind = 'membership'
 			))`.mapWith(Number)
 		})
 		.from(gymMember)
@@ -912,7 +923,14 @@ async function planRevenue(orgId: string) {
 			payers: sql<number>`count(distinct ${charge.memberId})`.mapWith(Number)
 		})
 		.from(payment)
-		.innerJoin(charge, eq(payment.chargeId, charge.id))
+		.innerJoin(
+			charge,
+			and(
+				eq(payment.chargeId, charge.id),
+				eq(payment.organizationId, charge.organizationId),
+				eq(payment.memberId, charge.memberId)
+			)
+		)
 		.innerJoin(membership, eq(charge.membershipId, membership.id))
 		.innerJoin(plan, eq(membership.planId, plan.id))
 		.where(

@@ -1,3 +1,4 @@
+import { billingPayer } from '../member-ownership.ts';
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { error } from '@sveltejs/kit';
@@ -163,7 +164,7 @@ export async function registerForEvent(orgId: string, memberId: string, eventId:
 
 		let chargeId: string | null = null;
 		if (!waitlisted && ev.price && ev.price > 0) {
-			const payerId = m.guardianId ?? m.id;
+			const payerId = await billingPayer(orgId, m.id, m.guardianId, tx);
 			const forDependent = payerId !== m.id ? ` — ${m.name}` : '';
 			const [c] = await tx
 				.insert(charge)
@@ -330,7 +331,7 @@ async function promoteInTx(tx: Tx, orgId: string, eventId: string) {
 	for (const w of waiting) {
 		let chargeId: string | null = null;
 		if (ev.price && ev.price > 0) {
-			const payerId = w.guardianId ?? w.reg.memberId;
+			const payerId = await billingPayer(orgId, w.reg.memberId, w.guardianId, tx);
 			const forDependent = payerId !== w.reg.memberId ? ` — ${w.name}` : '';
 			const [c] = await tx
 				.insert(charge)

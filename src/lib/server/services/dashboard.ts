@@ -64,15 +64,15 @@ export async function dashboard(orgId: string) {
 	const [openStats] = await db
 		.select({
 			openTotal:
-				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open'), 0)`.mapWith(
+				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open'), 0)`.mapWith(
 					Number
 				),
 			overdueTotal:
-				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} < ${today}), 0)`.mapWith(
+				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} < ${today}), 0)`.mapWith(
 					Number
 				),
 			dueWeekTotal:
-				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} >= ${today} and ${outer(charge.dueDate)} <= ${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}), 0)`.mapWith(
+				sql<number>`coalesce(sum(${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)) filter (where ${outer(charge.status)} = 'open' and ${outer(charge.dueDate)} >= ${today} and ${outer(charge.dueDate)} <= ${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}), 0)`.mapWith(
 					Number
 				)
 		})

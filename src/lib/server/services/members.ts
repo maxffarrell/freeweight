@@ -217,7 +217,7 @@ export async function listMembers(
 				string[]
 			>`coalesce((select array_agg(t.tag order by t.tag) from ${memberTag} t where t.member_id = ${outer(gymMember.id)}), '{}')`,
 			openBalance:
-				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.status = 'open'), 0)`.mapWith(
+				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.organization_id = ${outer(gymMember.organizationId)} and c.status = 'open'), 0)`.mapWith(
 					Number
 				),
 			planName: sql<
@@ -227,12 +227,12 @@ export async function listMembers(
 			 * eligibility gate needs to know without a second query. */
 			guardianPlanName: sql<
 				string | null
-			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id where g.id = ${outer(gymMember.id)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
+			>`(select p3.name from ${membership} m3 join ${plan} p3 on p3.id = m3.plan_id join ${gymMember} g on g.guardian_id = m3.member_id join ${gymMember} guardian on guardian.id = g.guardian_id where g.id = ${outer(gymMember.id)} and g.organization_id = ${outer(gymMember.organizationId)} and guardian.organization_id = ${outer(gymMember.organizationId)} and m3.organization_id = ${outer(gymMember.organizationId)} and p3.organization_id = ${outer(gymMember.organizationId)} and m3.status = 'active' order by m3.created_at desc limit 1)`,
 			lastVisit: sql<Date | null>`(select max(c.checked_at) from ${checkIn} c where c.member_id = ${outer(gymMember.id)})`,
 			/** Guardian member's name (dependents only) — family exports need it. */
 			guardianName: sql<
 				string | null
-			>`(select g3.name from ${gymMember} g3 where g3.id = ${outer(gymMember.guardianId)})`,
+			>`(select g3.name from ${gymMember} g3 where g3.id = ${outer(gymMember.guardianId)} and g3.organization_id = ${outer(gymMember.organizationId)})`,
 			/** Enterprise custom-field values keyed by field id — powers the CSV's dynamic columns. */
 			customFields: sql<
 				Record<string, string>
@@ -271,7 +271,7 @@ export async function listMembers(
 								? sql`exists (select 1 from ${membership} m3 where m3.member_id = ${gymMember.id} and m3.status = 'active' and m3.plan_id = ${planId})`
 								: undefined,
 				owes
-					? sql`exists (select 1 from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open' and c.amount > coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0))`
+					? sql`exists (select 1 from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.organization_id = ${outer(gymMember.organizationId)} and c.status = 'open' and c.amount > coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id and p.refunded_at is null), 0))`
 					: undefined,
 				suspended
 					? sql`exists (select 1 from ${membership} m4 where m4.member_id = ${gymMember.id} and m4.status = 'suspended')`
@@ -577,7 +577,7 @@ export async function getMember(orgId: string, id: string) {
 	const charges = await db
 		.select({
 			charge,
-			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
+			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 				Number
 			)
 		})
@@ -708,7 +708,7 @@ export async function getMember(orgId: string, id: string) {
 			? db
 					.select({ id: gymMember.id, name: gymMember.name })
 					.from(gymMember)
-					.where(eq(gymMember.id, row.member.guardianId))
+					.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, row.member.guardianId)))
 					.limit(1)
 			: Promise.resolve([]),
 		db
@@ -955,7 +955,17 @@ export async function resolveIssue(ctx: OrgContext, id: string) {
 	return row;
 }
 
+async function assertGuardian(orgId: string, guardianId: string | null | undefined) {
+	if (!guardianId) return;
+	const [guardian] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, guardianId)));
+	if (!guardian) error(404, 'Guardian not found');
+}
+
 export async function createMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberInput>) {
+	await assertGuardian(ctx.orgId, input.guardianId);
 	const [row] = await db
 		.insert(gymMember)
 		.values({
@@ -1155,6 +1165,7 @@ export async function mergeMembers(ctx: OrgContext, keepId: string, dropId: stri
 
 export async function updateMember(ctx: OrgContext, input: v.InferOutput<typeof s.memberUpdate>) {
 	const { id, ...set } = input;
+	await assertGuardian(ctx.orgId, set.guardianId);
 	if (set.guardianId === id) error(400, "A member can't be their own guardian");
 	const [row] = await db
 		.update(gymMember)
@@ -1607,60 +1618,63 @@ export async function transferPackCredits(
 	credits: number
 ) {
 	if (!Number.isInteger(credits) || credits < 1) error(400, 'Give at least 1 class');
-	const [donor] = await db
-		.select({
-			ms: membership,
-			classCredits: plan.classCredits,
-			classTypeId: plan.classTypeId,
-			planName: plan.name
-		})
-		.from(membership)
-		.innerJoin(plan, eq(membership.planId, plan.id))
-		.where(
-			and(
-				eq(membership.id, fromMembershipId),
-				eq(membership.organizationId, ctx.orgId),
-				eq(membership.status, 'active'),
-				eq(plan.isPack, true),
-				isNotNull(plan.classCredits)
+	const { donor, recipient, donorMember, remaining } = await db.transaction(async (tx) => {
+		await tx
+			.select({ id: membership.id })
+			.from(membership)
+			.where(and(eq(membership.id, fromMembershipId), eq(membership.organizationId, ctx.orgId)))
+			.for('update');
+		const [donor] = await tx
+			.select({
+				ms: membership,
+				classCredits: plan.classCredits,
+				classTypeId: plan.classTypeId,
+				planName: plan.name
+			})
+			.from(membership)
+			.innerJoin(plan, eq(membership.planId, plan.id))
+			.where(
+				and(
+					eq(membership.id, fromMembershipId),
+					eq(membership.organizationId, ctx.orgId),
+					eq(membership.status, 'active'),
+					eq(plan.isPack, true),
+					isNotNull(plan.classCredits)
+				)
 			)
-		);
-	if (!donor) error(404, 'Active pack membership not found');
-	const [recipient] = to.memberId
-		? await db
-				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
-				.from(gymMember)
-				.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, to.memberId)))
-		: await db
-				.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
-				.from(gymMember)
-				.where(
-					and(
-						eq(gymMember.organizationId, ctx.orgId),
-						eq(sql`lower(${gymMember.email})`, (to.email ?? '').trim().toLowerCase())
+			.for('update', { of: membership });
+		if (!donor) error(404, 'Active pack membership not found');
+		const recipients = to.memberId
+			? await tx
+					.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+					.from(gymMember)
+					.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, to.memberId)))
+					.for('update')
+			: await tx
+					.select({ id: gymMember.id, name: gymMember.name, email: gymMember.email })
+					.from(gymMember)
+					.where(
+						and(
+							eq(gymMember.organizationId, ctx.orgId),
+							eq(sql`lower(${gymMember.email})`, (to.email ?? '').trim().toLowerCase())
+						)
 					)
-				);
-	if (!recipient) error(404, 'No member with that email at this gym');
-	if (recipient.id === donor.ms.memberId) error(400, 'That is already their pack');
-	const window = {
-		start: donor.ms.startsAt.toISOString().slice(0, 10),
-		end: (donor.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
-	};
-	const used = await creditsUsedIn(
-		ctx.orgId,
-		donor.ms.memberId,
-		donor.ms.id,
-		window,
-		donor.classTypeId
-	);
-	const remaining = donor.classCredits! + donor.ms.bonusCredits - used;
-	if (credits > remaining)
-		error(400, `Only ${remaining} class${remaining === 1 ? '' : 'es'} left on this pack`);
-	const [donorMember] = await db
-		.select({ name: gymMember.name })
-		.from(gymMember)
-		.where(eq(gymMember.id, donor.ms.memberId));
-	await db.transaction(async (tx) => {
+					.for('update');
+		const [recipient] = recipients;
+		if (!recipient) error(404, 'No member with that email at this gym');
+		if (recipient.id === donor.ms.memberId) error(400, 'That is already their pack');
+		const window = {
+			start: donor.ms.startsAt.toISOString().slice(0, 10),
+			end: (donor.ms.endsAt ?? new Date()).toISOString().slice(0, 10)
+		};
+		const used = await creditsUsedIn(ctx.orgId, null, donor.ms.id, window, donor.classTypeId, tx);
+		const remaining = donor.classCredits! + donor.ms.bonusCredits - used;
+		if (credits > remaining)
+			error(400, `Only ${remaining} class${remaining === 1 ? '' : 'es'} left on this pack`);
+		const [donorMember] = await tx
+			.select({ name: gymMember.name })
+			.from(gymMember)
+			.where(eq(gymMember.id, donor.ms.memberId));
 		await tx
 			.update(membership)
 			.set({ bonusCredits: sql`${membership.bonusCredits} - ${credits}` })
@@ -1693,6 +1707,7 @@ export async function transferPackCredits(
 				// Effective credits = plan.classCredits + bonusCredits = exactly `credits`.
 				bonusCredits: credits - donor.classCredits!
 			});
+		return { donor, recipient, donorMember, remaining };
 	});
 	const fromName = donorMember?.name ?? 'A member';
 	await emit({

@@ -1,3 +1,4 @@
+import { outboundFetch } from '#lib/server/outbound-http.ts';
 /* @license Enterprise */
 
 import { createHmac } from 'node:crypto';
@@ -81,7 +82,7 @@ async function postDoor(url: string, body: Record<string, unknown>): Promise<num
 	const text = JSON.stringify(body);
 	const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(text).digest('hex');
 	try {
-		const res = await fetch(url, {
+		const res = await outboundFetch(url, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',

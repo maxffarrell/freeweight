@@ -50,6 +50,7 @@ function rateLimit(ip: string) {
 
 /** Deletes demo users older than the TTL along with their workspaces. */
 export async function purgeExpiredDemos() {
+	if (!FREEWEIGHT_DEMO) return;
 	const stale = await db
 		.select({ id: user.id })
 		.from(user)
@@ -65,7 +66,14 @@ export async function purgeExpiredDemos() {
 		await db
 			.select({ id: member.organizationId })
 			.from(member)
-			.where(inArray(member.userId, userIds))
+			.innerJoin(organization, eq(member.organizationId, organization.id))
+			.where(
+				and(
+					inArray(member.userId, userIds),
+					eq(member.role, 'owner'),
+					like(organization.slug, 'demo-%')
+				)
+			)
 	).map((m) => m.id);
 	// Every gym table cascades on organization.
 	if (orgIds.length) await db.delete(organization).where(inArray(organization.id, orgIds));

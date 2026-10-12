@@ -1,3 +1,4 @@
+import { outer } from '#lib/server/db/schema.ts';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { charge, gymMember, gymSettings, payment } from '#lib/server/db/schema.ts';
@@ -33,12 +34,18 @@ export async function recordOnlinePayment(p: OnlinePayment) {
 		const open = await tx
 			.select({
 				id: charge.id,
-				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = "charge"."id" and p.refunded_at is null), 0)`.mapWith(
+				open: sql<number>`${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 			})
 			.from(charge)
-			.where(and(eq(charge.memberId, p.memberId), eq(charge.status, 'open')))
+			.where(
+				and(
+					eq(charge.organizationId, p.orgId),
+					eq(charge.memberId, p.memberId),
+					eq(charge.status, 'open')
+				)
+			)
 			.orderBy(asc(charge.dueDate), asc(charge.createdAt));
 		const inserted = [];
 		for (const [i, part] of allocate(p.amount, open).entries()) {

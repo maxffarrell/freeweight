@@ -44,7 +44,8 @@ import {
 	plan,
 	sessionFeedback,
 	user,
-	workoutResult
+	workoutResult,
+	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
@@ -484,7 +485,7 @@ export async function getRoster(orgId: string, sessionId: string) {
 			memberEmail: gymMember.email,
 			parqAnswers: gymMember.parqAnswers,
 			openBalance:
-				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${gymMember.id} and c.status = 'open'), 0)`.mapWith(
+				sql<number>`coalesce((select sum(c.amount - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id and p.refunded_at is null), 0)) from ${charge} c where c.member_id = ${outer(gymMember.id)} and c.organization_id = ${outer(gymMember.organizationId)} and c.status = 'open'), 0)`.mapWith(
 					Number
 				),
 			resultScore: workoutResult.score,
@@ -882,8 +883,12 @@ export async function updateSession(
 // ---------- Bookings ----------
 
 /** Every live membership a member holds — a plan plus one or more packs. */
-export async function activeMemberships(orgId: string, memberId: string) {
-	return db
+export async function activeMemberships(
+	orgId: string,
+	memberId: string,
+	q: Pick<typeof db, 'select'> = db
+) {
+	return q
 		.select({
 			membership,
 			classCredits: plan.classCredits,
@@ -1078,12 +1083,30 @@ function creditWindow(ms: ActiveMembership) {
 
 export async function creditsUsedIn(
 	orgId: string,
-	memberId: string | null,
+	_memberId: string | null,
 	membershipId: string,
 	window: { start: string; end: string },
 	classTypeId?: string | null,
 	q: Pick<typeof db, 'select'> = db
 ) {
+	const [owner] = await q
+		.select({ memberId: membership.memberId })
+		.from(membership)
+		.innerJoin(
+			gymMember,
+			and(eq(membership.memberId, gymMember.id), eq(gymMember.organizationId, orgId))
+		)
+		.where(and(eq(membership.id, membershipId), eq(membership.organizationId, orgId)));
+	if (!owner) error(404, 'Membership not found');
+	const household = q
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(
+			and(
+				eq(gymMember.organizationId, orgId),
+				or(eq(gymMember.id, owner.memberId), eq(gymMember.guardianId, owner.memberId))
+			)
+		);
 	const [{ count }] = await q
 		.select({ count: sql<number>`count(*)`.mapWith(Number) })
 		.from(booking)
@@ -1091,19 +1114,18 @@ export async function creditsUsedIn(
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
-				// null counts every booking charged to this membership — shared
-				// family packs let dependents drain a guardian's pack.
-				memberId ? eq(booking.memberId, memberId) : undefined,
 				inArray(booking.status, [...CREDIT_STATUSES]),
 				// A cancelled class gives the credit back.
 				isNull(classSession.cancelledAt),
 				or(
+					// Count the entire attributed budget, including a guardian's dependents.
 					// New bookings are attributed to the membership that granted them, so a
 					// plan + pack member only drains the entitlement that paid.
 					eq(booking.membershipId, membershipId),
 					// Pre-attribution rows still count by window (and class for a restricted pack).
 					and(
 						isNull(booking.membershipId),
+						inArray(booking.memberId, household),
 						classTypeId ? eq(classSession.classTypeId, classTypeId) : undefined,
 						gte(classSession.startsAt, new Date(`${window.start}T00:00:00Z`)),
 						lt(classSession.startsAt, new Date(`${window.end}T00:00:00Z`))
@@ -1409,6 +1431,17 @@ export async function bookSession(
 			if (src.srcClassTypeId !== s.classTypeId)
 				error(409, 'Makeup bookings must be for the same class');
 			compFrom = opts.compFrom;
+		}
+		// Serialize usage of the same credit budget across transfers and different sessions.
+		if (!input.dropIn && !compFrom) {
+			const payerId = sharedPack ? m.guardianId! : input.memberId;
+			await tx
+				.select({ id: membership.id })
+				.from(membership)
+				.where(and(eq(membership.organizationId, ctx.orgId), eq(membership.memberId, payerId)))
+				.orderBy(asc(membership.id))
+				.for('update');
+			mss = await activeMemberships(ctx.orgId, payerId, tx);
 		}
 		// Which membership pays for this booking — restricted pack for its own
 		// class first, then a plan, then an open pack. Drop-ins and makeups
