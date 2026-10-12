@@ -44,7 +44,7 @@ import {
 	sessionFeedbackInput,
 	giftCreditsInput
 } from '#lib/schemas.ts';
-import { aiAvailable, requireAi } from '#lib/server/ee/ai.ts';
+import { aiAvailable, requireAi } from '#lib/server/ai/ai.ts';
 import {
 	healthFormsEnabled,
 	PARQ_QUESTIONS,
@@ -52,7 +52,7 @@ import {
 	submitParq as hfSubmit
 } from '#lib/server/ee/health-forms.ts';
 import { memberFieldValues, setMyFieldValue } from '#lib/server/ee/custom-fields.ts';
-import { memberMonthSummary, workoutPlan } from '#lib/server/ee/ai-features.ts';
+import { memberMonthSummary, workoutPlan } from '#lib/server/ai/ai-features.ts';
 
 /** Resolves the member record the signed-in user is acting as — their own record, or a dependent billing under it. */
 async function myMember(memberId: string) {
@@ -762,7 +762,7 @@ export const addDependent = command(
 	}
 );
 
-// ------- AI workout plan (Enterprise) -------
+// ------- AI workout plan (BYOK) -------
 /** Generates a one-week workout plan for the member (or their dependent). EE + provider-gated. */
 export const aiWorkoutPlan = command(
 	v.object({
@@ -836,7 +836,7 @@ export const aiMonthSummary = command(idSchema, async (memberId) => {
 	return { summary };
 });
 
-/** Whether the portal workout-plan generator is on (Enterprise + provider configured). */
+/** Whether the portal workout-plan generator is on (provider configured). */
 export const getPortalAi = query(async () => {
 	requireUser();
 	return { configured: aiAvailable() };

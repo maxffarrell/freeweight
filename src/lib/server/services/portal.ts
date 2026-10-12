@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
+import { isEnterpriseEnabled } from '#lib/server/features.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';

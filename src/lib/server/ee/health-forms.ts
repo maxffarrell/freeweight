@@ -8,7 +8,7 @@ import { activity, gymMember, gymSettings, notificationLog } from '#lib/server/d
 import { member, user } from '#lib/server/db/auth.schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 /** Standard PAR-Q questions — indexes are stable, answers store as {"0": true, ...}. */
 export const PARQ_QUESTIONS = [

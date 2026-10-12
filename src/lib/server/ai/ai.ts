@@ -1,5 +1,3 @@
-/* @license Enterprise */
-
 import { error } from '@sveltejs/kit';
 import {
 	FREEWEIGHT_AI_PROVIDER,
@@ -11,7 +9,6 @@ import {
 	FREEWEIGHT_AI_DECISION_BASE_URL
 } from '$app/env/private';
 import * as v from 'valibot';
-import { isEnterpriseEnabled } from './license.ts';
 
 export interface AiConfig {
 	/** 'openai' (or any OpenAI-compatible endpoint) | 'anthropic'. */
@@ -23,17 +20,17 @@ export interface AiConfig {
 }
 
 /**
- * AI features need both an Enterprise license (Freeweight Cloud or a license
- * key) AND a configured model provider. The key never leaves the server —
- * remote functions only expose {licensed, configured} booleans.
+ * BYOK AI features need a configured model provider, without an enterprise license.
+ * Provider credentials stay on the server —
+ * remote functions only expose provider availability.
  */
 export function aiConfig(): AiConfig | null {
-	if (!isEnterpriseEnabled()) return null;
 	const provider = (FREEWEIGHT_AI_PROVIDER || 'openai').toLowerCase();
 	const model =
 		FREEWEIGHT_AI_MODEL || (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini');
 	const apiKey = FREEWEIGHT_AI_KEY || null;
 	if (provider === 'anthropic') {
+		if (!apiKey) return null;
 		return {
 			provider: 'anthropic',
 			model,
@@ -43,7 +40,7 @@ export function aiConfig(): AiConfig | null {
 	}
 	// Default: OpenAI-compatible chat-completions endpoint (OpenAI, Ollama,
 	// OpenRouter, LiteLLM, vLLM — anything that serves POST /v1/chat/completions).
-	if (!apiKey) return null;
+	if (!apiKey && !FREEWEIGHT_AI_BASE_URL) return null;
 	return {
 		provider: 'openai',
 		model,
@@ -60,9 +57,11 @@ export function aiConfig(): AiConfig | null {
  * value, so a single key keeps everything working.
  */
 export function aiDecisionConfig(): AiConfig | null {
-	if (!isEnterpriseEnabled()) return null;
+	// Anthropic's messages API cannot serve OpenAI-spec decision calls.
+	if (FREEWEIGHT_AI_PROVIDER?.toLowerCase() === 'anthropic' && !FREEWEIGHT_AI_DECISION_BASE_URL)
+		return null;
 	const apiKey = FREEWEIGHT_AI_DECISION_KEY || FREEWEIGHT_AI_KEY || null;
-	if (!apiKey) return null;
+	if (!apiKey && !FREEWEIGHT_AI_DECISION_BASE_URL && !FREEWEIGHT_AI_BASE_URL) return null;
 	return {
 		provider: 'openai',
 		model: FREEWEIGHT_AI_DECISION_MODEL || FREEWEIGHT_AI_MODEL || 'gpt-4o-mini',
@@ -75,28 +74,24 @@ export function aiDecisionConfig(): AiConfig | null {
 	};
 }
 
-/** True when a licensed install also has a provider configured. */
+/** True when the install has a provider configured. */
 export function aiAvailable(): boolean {
 	return !!aiConfig();
 }
 
-/** True when a licensed install also has a decision model configured. */
+/** True when the install has a decision model configured. */
 export function aiDecisionAvailable(): boolean {
 	return !!aiDecisionConfig();
 }
 
-/** Gate for AI remote functions: license first, then provider configuration. */
+/** Gate for AI remote functions: provider configuration. */
 export function requireAi() {
-	if (!isEnterpriseEnabled())
-		error(403, 'AI features require Freeweight Cloud or an Enterprise license');
 	if (!aiAvailable())
 		error(400, 'No AI provider configured — set FREEWEIGHT_AI_PROVIDER/_MODEL/_KEY on the server');
 }
 
-/** Gate for decision calls: license first, then decision-model configuration. */
+/** Gate for decision calls: decision-model configuration. */
 export function requireAiDecision() {
-	if (!isEnterpriseEnabled())
-		error(403, 'AI features require Freeweight Cloud or an Enterprise license');
 	if (!aiDecisionAvailable())
 		error(
 			400,

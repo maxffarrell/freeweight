@@ -90,7 +90,7 @@
 			<Button type="button" onclick={sso}><Building /> Continue with SSO</Button>
 		{/if}
 	</Field.Group>
-	{#if page.data.enterprise}
+	{#if page.data.security}
 		<div class="flex items-center gap-3 text-xs text-muted-foreground">
 			<Separator class="flex-1" /> or <Separator class="flex-1" />
 		</div>

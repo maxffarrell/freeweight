@@ -425,7 +425,7 @@
 	const joinablePlans = $derived(await getJoinablePlans(memberId));
 	const portalAi = $derived(await getPortalAi());
 
-	// ------- AI workout plan (Enterprise) -------
+	// ------- AI workout plan (BYOK) -------
 	let wpOpen = $state(false);
 	let wpGoal = $state('');
 	let wpDays = $state(3);

@@ -138,6 +138,7 @@
 		ssoBusy = true;
 		const r = await authClient.sso.register({
 			providerId: ssoForm.providerId.trim(),
+			organizationId: page.data.org.id,
 			domain: ssoForm.domain.trim(),
 			issuer: ssoForm.issuer.trim(),
 			oidcConfig: { clientId: ssoForm.clientId.trim(), clientSecret: ssoForm.clientSecret }

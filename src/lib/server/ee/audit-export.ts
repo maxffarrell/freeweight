@@ -27,7 +27,7 @@ import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { localDate } from '#lib/tz.ts';
 import { notificationLog } from '#lib/server/db/schema.ts';
 import { gymSettings } from '#lib/server/db/schema.ts';
-import { hasFeature } from './license.ts';
+import { hasFeature } from '../features.ts';
 
 export function auditExportEnabled(): boolean {
 	return hasFeature('audit-export');

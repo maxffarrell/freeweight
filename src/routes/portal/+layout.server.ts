@@ -4,7 +4,7 @@ import type { LayoutServerLoad } from './$types';
 import { db } from '#lib/server/db/index.ts';
 import { organization } from '#lib/server/db/auth.schema.ts';
 import { gymSettings } from '#lib/server/db/schema.ts';
-import { isEnterpriseEnabled } from '#lib/server/ee/license.ts';
+import { isEnterpriseEnabled } from '#lib/server/features.ts';
 import { portalMembers } from '#lib/server/services/members.ts';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {

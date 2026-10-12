@@ -12,7 +12,7 @@ export const variables = defineEnvVars({
 	},
 	FREEWEIGHT_ENTERPRISE_KEY: {
 		description:
-			'Enterprise license key. Unlocks SAML/OIDC SSO and passkeys on self-hosted installs.',
+			'Enterprise license key for paid administrative features. Basic SSO, passkeys and BYOK AI do not require a license.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_DEMO: {
@@ -54,36 +54,37 @@ export const variables = defineEnvVars({
 	},
 	FREEWEIGHT_AI_PROVIDER: {
 		description:
-			'Enterprise: model provider for AI features — `openai` (default; also any OpenAI-compatible endpoint like Ollama, OpenRouter or LiteLLM) or `anthropic`.',
+			'model provider for AI features — `openai` (default; also any OpenAI-compatible endpoint like Ollama, OpenRouter or LiteLLM) or `anthropic`.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_MODEL: {
 		description:
-			'Enterprise: model name for AI features. Defaults to `gpt-4o-mini` (openai) or `claude-sonnet-4-5` (anthropic).',
+			'model name for AI features. Defaults to `gpt-4o-mini` (openai) or `claude-sonnet-4-5` (anthropic).',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_KEY: {
-		description: 'Enterprise: API key for the AI provider. Required for `openai`-provider setups.',
+		description:
+			'API key for the AI provider. Optional for an explicitly configured keyless local endpoint.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_BASE_URL: {
 		description:
-			'Enterprise: override the provider endpoint, e.g. `http://localhost:11434` for Ollama or an OpenRouter/LiteLLM gateway URL.',
+			'override the provider endpoint, e.g. `http://localhost:11434` for Ollama or an OpenRouter/LiteLLM gateway URL.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_DECISION_KEY: {
 		description:
-			'Enterprise: API key for structured decision calls (JSON the app consumes). OpenAI-spec `/chat/completions` only — no anthropic path. Falls back to `FREEWEIGHT_AI_KEY`.',
+			'API key for structured decision calls (JSON the app consumes). OpenAI-spec `/chat/completions` only — no anthropic path. Falls back to `FREEWEIGHT_AI_KEY`.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_DECISION_MODEL: {
 		description:
-			'Enterprise: model for structured decision calls. Falls back to `FREEWEIGHT_AI_MODEL` (then `gpt-4o-mini`).',
+			'model for structured decision calls. Falls back to `FREEWEIGHT_AI_MODEL` (then `gpt-4o-mini`).',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_DECISION_BASE_URL: {
 		description:
-			'Enterprise: endpoint override for decision calls — must serve POST `/v1/chat/completions`. Falls back to `FREEWEIGHT_AI_BASE_URL` (then `https://api.openai.com`).',
+			'endpoint override for decision calls — must serve POST `/v1/chat/completions`. Falls back to `FREEWEIGHT_AI_BASE_URL` (then `https://api.openai.com`).',
 		schema: (value) => value || undefined
 	}
 });

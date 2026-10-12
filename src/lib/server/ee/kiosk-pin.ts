@@ -9,7 +9,7 @@ import { member, user } from '#lib/server/db/auth.schema.ts';
 import { sendEmail } from '#lib/server/email.ts';
 import { renderEmail } from '#lib/server/email-template.ts';
 import { orgBrand } from '../org-brand.ts';
-import { hasFeature } from '#lib/server/ee/license.ts';
+import { hasFeature } from '#lib/server/features.ts';
 
 /**
  * The PIN is stored HMAC'd — the plaintext never leaves the settings writer

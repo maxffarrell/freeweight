@@ -10,7 +10,7 @@ import { purgeExpiredDemos } from '#lib/server/demo-mode.ts';
 import { autoAnonymize, purgeOldData } from '#lib/server/ee/data-retention.ts';
 import { sendWeeklyExport } from '#lib/server/ee/audit-export.ts';
 import { sendMonthClose, sendWeekDigest } from '#lib/server/ee/report-digests.ts';
-import { sendWeeklyInsights } from '#lib/server/ee/ai-features.ts';
+import { sendWeeklyInsights } from '#lib/server/ai/ai-features.ts';
 import { sendParqReminders } from '#lib/server/ee/health-forms.ts';
 import {
 	sendAnniversaryGreetings,
