@@ -205,12 +205,18 @@ export async function portalOverview(memberId: string) {
 	const openCharges = await db
 		.select({
 			charge,
-			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
+			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 				Number
 			)
 		})
 		.from(charge)
-		.where(and(eq(charge.memberId, memberId), eq(charge.status, 'open')))
+		.where(
+			and(
+				eq(charge.organizationId, orgId),
+				eq(charge.memberId, memberId),
+				eq(charge.status, 'open')
+			)
+		)
 		.orderBy(asc(charge.dueDate));
 
 	const [signedWaiver] = await db
@@ -283,8 +289,15 @@ export async function portalOverview(memberId: string) {
 			chargeKind: charge.kind
 		})
 		.from(payment)
-		.leftJoin(charge, eq(payment.chargeId, charge.id))
-		.where(eq(payment.memberId, memberId))
+		.leftJoin(
+			charge,
+			and(
+				eq(payment.chargeId, charge.id),
+				eq(payment.organizationId, charge.organizationId),
+				eq(payment.memberId, charge.memberId)
+			)
+		)
+		.where(and(eq(payment.organizationId, orgId), eq(payment.memberId, memberId)))
 		.orderBy(desc(payment.paidAt))
 		.limit(10);
 
@@ -1876,7 +1889,10 @@ export async function exportMemberData(orgId: string, memberId: string) {
 			.leftJoin(plan, eq(membership.planId, plan.id))
 			.where(eq(membership.memberId, memberId)),
 		db.select().from(charge).where(eq(charge.memberId, memberId)),
-		db.select().from(payment).where(eq(payment.memberId, memberId)),
+		db
+			.select()
+			.from(payment)
+			.where(and(eq(payment.organizationId, orgId), eq(payment.memberId, memberId))),
 		db.select().from(checkIn).where(eq(checkIn.memberId, memberId)),
 		db.select().from(booking).where(eq(booking.memberId, memberId)),
 		db.select().from(personalRecord).where(eq(personalRecord.memberId, memberId)),

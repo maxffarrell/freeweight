@@ -1,3 +1,4 @@
+import { outer } from '#lib/server/db/schema.ts';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import {
@@ -1650,7 +1651,7 @@ export async function requestPaymentNotice(orgId: string, memberId: string) {
 	const [b] = await db
 		.select({
 			balance:
-				sql<number>`coalesce(sum(case when ${charge.status} = 'open' then ${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
+				sql<number>`coalesce(sum(case when ${charge.status} = 'open' then ${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.organization_id = ${orgId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 		})
@@ -1696,7 +1697,7 @@ export async function requestAllPaymentNotices(orgId: string) {
 		.where(and(eq(charge.organizationId, orgId), eq(charge.status, 'open')))
 		.groupBy(charge.memberId)
 		.having(
-			sql`sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0)) > 0`
+			sql`sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)) > 0`
 		);
 	let sent = 0;
 	for (const d of debtors) if (await requestPaymentNotice(orgId, d.memberId)) sent++;
@@ -2445,7 +2446,7 @@ export async function sendWeeklyDigest(orgId: string) {
 		);
 	const [openBalance] = await db
 		.select({
-			n: sql<number>`coalesce(sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${charge.id} and p.refunded_at is null), 0)), 0)`.mapWith(
+			n: sql<number>`coalesce(sum(${charge.amount} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)), 0)`.mapWith(
 				Number
 			)
 		})

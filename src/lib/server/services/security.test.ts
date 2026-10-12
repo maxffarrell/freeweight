@@ -24,18 +24,28 @@ import {
 	requestTrial
 } from './public.ts';
 import { createMember, listMembers, transferPackCredits, updateMember } from './members.ts';
-import { createMembership, postMembershipCharge, recordPayment } from './billing.ts';
+import {
+	createMembership,
+	listCharges,
+	memberBalance,
+	postMembershipCharge,
+	recordPayment,
+	refundPayment
+} from './billing.ts';
+import { dashboard } from './dashboard.ts';
+import { notifyCreditsGifted, notifyPaymentReceived, notifyPlanChanged } from './notifications.ts';
 import { bookSession, creditsUsedIn } from './schedule.ts';
 import { acceptSaveOffer, memberChangePlan, setClassWatch } from './portal.ts';
 
-vi.mock(
-	'./notifications.ts',
-	() =>
-		new Proxy(
-			{},
-			{ get: (_target, key) => (key === 'then' ? undefined : vi.fn(async () => undefined)) }
-		)
-);
+vi.mock('./notifications.ts', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./notifications.ts')>();
+	return Object.fromEntries(
+		Object.entries(actual).map(([key, value]) => [
+			key,
+			typeof value === 'function' ? vi.fn(async () => undefined) : value
+		])
+	);
+});
 vi.mock('./events.ts', () => ({ emit: vi.fn(async () => undefined) }));
 
 // CI supplies a migrated disposable PostgreSQL database. Fixtures never use existing tenants.
@@ -48,6 +58,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
 		let victim: typeof gymMember.$inferSelect, foreign: typeof gymMember.$inferSelect;
 		let sessionId: string;
 		beforeEach(async () => {
+			vi.clearAllMocks();
 			await db.insert(organization).values([
 				{ id: a, name: 'Gym', slug, createdAt: new Date(), metadata: 'private' },
 				{ id: b, name: 'Other', slug: `security-${b}`, createdAt: new Date() }
@@ -192,6 +203,99 @@ describe.skipIf(!process.env.DATABASE_URL)(
 			);
 			expect(result?.chargeId).toBe(ownCharge.id);
 		});
+		it('historical foreign or wrong-member payments never pay another member charge or reduce its balances', async () => {
+			const [other] = await db
+				.insert(gymMember)
+				.values({ organizationId: a, name: 'Other local member' })
+				.returning();
+			const [c] = await db
+				.insert(charge)
+				.values({
+					organizationId: a,
+					memberId: victim.id,
+					kind: 'other',
+					amount: 1000,
+					dueDate: '2026-10-01'
+				})
+				.returning();
+			await db.insert(payment).values([
+				{ organizationId: b, memberId: foreign.id, chargeId: c.id, amount: 800, method: 'cash' },
+				{ organizationId: a, memberId: other.id, chargeId: c.id, amount: 800, method: 'cash' },
+				{ organizationId: b, memberId: victim.id, chargeId: null, amount: 800, method: 'credit' }
+			]);
+			expect(await memberBalance(a, victim.id)).toBe(1000);
+			expect((await listCharges(a)).find((row) => row.charge.id === c.id)?.paid).toBe(0);
+			expect((await listMembers(a)).find((row) => row.id === victim.id)?.openBalance).toBe(1000);
+			expect((await dashboard(a)).openTotal).toBe(1000);
+			const own = await recordPayment(
+				{ orgId: a },
+				{ memberId: victim.id, chargeId: c.id, amount: 300, method: 'cash' }
+			);
+			expect(await memberBalance(a, victim.id)).toBe(700);
+			expect((await listCharges(a)).find((row) => row.charge.id === c.id)?.paid).toBe(300);
+			expect((await dashboard(a)).openTotal).toBe(700);
+			expect((await db.select().from(charge).where(eq(charge.id, c.id)))[0].status).toBe('open');
+			expect(notifyPaymentReceived).toHaveBeenCalledOnce();
+			await refundPayment({ orgId: a, userId: null } as never, own!.id);
+			expect(await memberBalance(a, victim.id)).toBe(1000);
+			expect((await listCharges(a)).find((row) => row.charge.id === c.id)?.paid).toBe(0);
+		});
+		it('refunding a historical foreign or wrong-member payment cannot reopen another member charge', async () => {
+			const [other] = await db
+				.insert(gymMember)
+				.values({ organizationId: a, name: 'Other local member' })
+				.returning();
+			const [foreignTarget, wrongMemberTarget] = await db
+				.insert(charge)
+				.values([
+					{
+						organizationId: a,
+						memberId: victim.id,
+						kind: 'other',
+						amount: 1000,
+						dueDate: '2026-10-01',
+						status: 'paid'
+					},
+					{
+						organizationId: a,
+						memberId: victim.id,
+						kind: 'other',
+						amount: 1000,
+						dueDate: '2026-10-01',
+						status: 'paid'
+					}
+				])
+				.returning();
+			const [foreignPayment, wrongMemberPayment] = await db
+				.insert(payment)
+				.values([
+					{
+						organizationId: b,
+						memberId: foreign.id,
+						chargeId: foreignTarget.id,
+						amount: 1000,
+						method: 'cash'
+					},
+					{
+						organizationId: a,
+						memberId: other.id,
+						chargeId: wrongMemberTarget.id,
+						amount: 1000,
+						method: 'cash'
+					}
+				])
+				.returning();
+			await refundPayment({ orgId: b, userId: null } as never, foreignPayment.id);
+			await refundPayment({ orgId: a, userId: null } as never, wrongMemberPayment.id);
+			expect(
+				(
+					await db
+						.select()
+						.from(charge)
+						.where(inArray(charge.id, [foreignTarget.id, wrongMemberTarget.id]))
+				).map((row) => row.status)
+			).toEqual(['paid', 'paid']);
+		});
 		it('guardian create/update stays within the tenant, including clearing a guardian', async () => {
 			await expect(
 				createMember({ orgId: a } as never, {
@@ -332,6 +436,12 @@ describe.skipIf(!process.env.DATABASE_URL)(
 				memberChangePlan(a, victim.id, next.id)
 			]);
 			expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+			expect(
+				results
+					.filter((r) => r.status === 'rejected')
+					.map((r) => (r as PromiseRejectedResult).reason.status)
+			).toEqual([409]);
+			expect(notifyPlanChanged).toHaveBeenCalledOnce();
 			expect(
 				await db
 					.select()
@@ -490,6 +600,12 @@ describe.skipIf(!process.env.DATABASE_URL)(
 				transferPackCredits({ orgId: a }, ms.id, { memberId: recipient.id }, 4)
 			]);
 			expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+			expect(
+				results
+					.filter((r) => r.status === 'rejected')
+					.map((r) => (r as PromiseRejectedResult).reason.status)
+			).toEqual([400]);
+			expect(notifyCreditsGifted).toHaveBeenCalledOnce();
 			expect(
 				(await db.select().from(membership).where(eq(membership.id, ms.id)))[0].bonusCredits
 			).toBe(-4);

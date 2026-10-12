@@ -851,7 +851,7 @@ export async function listCharges(orgId: string, status?: string, kind?: string)
 		.select({
 			charge,
 			memberName: gymMember.name,
-			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
+			paid: sql<number>`coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 				Number
 			)
 		})
@@ -1107,7 +1107,7 @@ export async function recordPayment(
 			const open = await tx
 				.select({
 					id: charge.id,
-					open: sql<number>`${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0)`.mapWith(
+					open: sql<number>`${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0)`.mapWith(
 						Number
 					)
 				})
@@ -1161,7 +1161,7 @@ export async function recordPayment(
 		await tx.execute(sql`
 			update ${charge} c set status = 'paid', updated_at = now()
 			where c.organization_id = ${ctx.orgId} and c.status = 'open'
-			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.refunded_at is null) >= c.amount
+			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.organization_id = c.organization_id and p.member_id = c.member_id and p.refunded_at is null) >= c.amount
 		`);
 		return out;
 	};
@@ -1209,9 +1209,9 @@ export async function refundPayment(ctx: OrgContext, paymentId: string) {
 		if (p.chargeId)
 			await tx.execute(sql`
 				update ${charge} c set status = 'open', updated_at = now()
-				where c.id = ${p.chargeId} and c.status = 'paid'
+				where c.id = ${p.chargeId} and c.organization_id = ${ctx.orgId} and c.member_id = ${p.memberId} and c.status = 'paid'
 				  and (select coalesce(sum(p2.amount), 0) from ${payment} p2
-				       where p2.charge_id = c.id and p2.refunded_at is null) < c.amount
+				       where p2.charge_id = c.id and p2.organization_id = c.organization_id and p2.member_id = c.member_id and p2.refunded_at is null) < c.amount
 			`);
 	});
 	await emit({
@@ -1242,7 +1242,7 @@ export async function memberBalance(orgId: string, memberId: string) {
 	const [row] = await db
 		.select({
 			balance:
-				sql<number>`coalesce(sum(case when ${outer(charge.status)} = 'open' then ${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
+				sql<number>`coalesce(sum(case when ${outer(charge.status)} = 'open' then ${outer(charge.amount)} - coalesce((select sum(p.amount) from ${payment} p where p.charge_id = ${outer(charge.id)} and p.organization_id = ${outer(charge.organizationId)} and p.member_id = ${outer(charge.memberId)} and p.refunded_at is null), 0) else 0 end), 0) - coalesce((select sum(p2.amount) from ${payment} p2 where p2.member_id = ${memberId} and p2.organization_id = ${orgId} and p2.charge_id is null and p2.refunded_at is null), 0)`.mapWith(
 					Number
 				)
 		})
