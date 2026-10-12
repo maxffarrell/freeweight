@@ -44,7 +44,8 @@ import {
 	plan,
 	sessionFeedback,
 	user,
-	workoutResult
+	workoutResult,
+	outer
 } from '#lib/server/db/schema.ts';
 import type { OrgContext } from '#lib/server/context.ts';
 import { emit } from './events.ts';
