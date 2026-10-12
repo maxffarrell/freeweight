@@ -1,8 +1,12 @@
 # Self-host Freeweight with Postgres: `BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d`
 services:
   app:
-    image: ghcr.io/maxffarrell/freeweight:latest
+    image: freeweight:local
     build: .
+    pull_policy: build
+    env_file:
+      - path: .env
+        required: false
     ports: ['3000:3000']
     environment:
       DATABASE_URL: postgres://freeweight:freeweight@db:5432/freeweight

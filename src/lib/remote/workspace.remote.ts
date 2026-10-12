@@ -1,3 +1,4 @@
+import { outboundFetch } from '#lib/server/outbound-http.ts';
 import * as v from 'valibot';
 import { randomBytes } from 'node:crypto';
 import { and, asc, desc, eq } from 'drizzle-orm';
@@ -189,7 +190,7 @@ export const testWebhook = command(idSchema, async (id) => {
 	});
 	let status: number;
 	try {
-		const res = await fetch(w.url, {
+		const res = await outboundFetch(w.url, {
 			method: 'POST',
 			headers: {
 				'content-type': 'application/json',

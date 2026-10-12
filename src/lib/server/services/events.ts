@@ -1,3 +1,4 @@
+import { outboundFetch } from '#lib/server/outbound-http.ts';
 import { createHmac } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -68,7 +69,7 @@ async function deliverWebhooks(event: FreeweightEvent) {
 				const body = JSON.stringify(event);
 				let status = 0;
 				try {
-					const res = await fetch(h.url, {
+					const res = await outboundFetch(h.url, {
 						method: 'POST',
 						headers: {
 							'content-type': 'application/json',

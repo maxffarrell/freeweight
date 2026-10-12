@@ -4290,7 +4290,13 @@ export async function notifyClassWatchers(orgId: string, sessionIds: string[]) {
 		.select({ memberId: classWatch.memberId, email: gymMember.email, name: gymMember.name })
 		.from(classWatch)
 		.innerJoin(gymMember, eq(classWatch.memberId, gymMember.id))
-		.where(eq(classWatch.classTypeId, ctId));
+		.where(
+			and(
+				eq(classWatch.classTypeId, ctId),
+				eq(classWatch.organizationId, orgId),
+				eq(gymMember.organizationId, orgId)
+			)
+		);
 	const first = sessions.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0]!;
 	const brand = await orgBrand(orgId);
 	const when = `${first.startsAt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at ${first.startsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;

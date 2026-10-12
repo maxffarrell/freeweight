@@ -1,3 +1,4 @@
+import { billingPayer } from '../member-ownership.ts';
 import { error } from '@sveltejs/kit';
 import {
 	and,
@@ -76,8 +77,8 @@ export async function listPlans(orgId: string) {
 		.orderBy(asc(plan.amount));
 }
 
-export async function getPlan(orgId: string, id: string) {
-	const [row] = await db
+export async function getPlan(orgId: string, id: string, q: Pick<typeof db, 'select'> = db) {
+	const [row] = await q
 		.select()
 		.from(plan)
 		.where(and(eq(plan.organizationId, orgId), eq(plan.id, id)));
@@ -321,6 +322,7 @@ export async function createMembership(
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
+	const payerId = await billingPayer(ctx.orgId, input.memberId, m.guardianId);
 	const p = await getPlan(ctx.orgId, input.planId);
 	await assertPlanCapacity(ctx.orgId, p);
 
@@ -346,7 +348,6 @@ export async function createMembership(
 		})
 		.returning();
 
-	const payerId = m.guardianId ?? input.memberId;
 	const forDependent = payerId !== input.memberId ? ` — ${m.name}` : '';
 	// A promo discounts the up-front total: signup fee first, then the first charge.
 	const pState = promo ? promoState(promo) : null;
@@ -420,9 +421,13 @@ export async function migratePlan(ctx: OrgContext, fromPlanId: string, toPlanId:
 	return { moved: moved.length };
 }
 
-export async function assertPlanCapacity(orgId: string, p: typeof plan.$inferSelect) {
+export async function assertPlanCapacity(
+	orgId: string,
+	p: typeof plan.$inferSelect,
+	q: Pick<typeof db, 'select'> = db
+) {
 	if (p.isPack || p.memberLimit === null) return;
-	const [{ n }] = await db
+	const [{ n }] = await q
 		.select({ n: sql<number>`count(*)`.mapWith(Number) })
 		.from(membership)
 		.where(
@@ -453,8 +458,15 @@ export async function postMembershipCharge(
 		})
 		.from(membership)
 		.innerJoin(gymMember, eq(membership.memberId, gymMember.id))
-		.where(eq(membership.id, membershipId));
-	const payerId = ms!.guardianId ?? ms!.memberId;
+		.where(
+			and(
+				eq(membership.id, membershipId),
+				eq(membership.organizationId, orgId),
+				eq(gymMember.organizationId, orgId)
+			)
+		);
+	if (!ms) error(404, 'Membership not found');
+	const payerId = await billingPayer(orgId, ms.memberId, ms.guardianId);
 	// A staff price override bills instead of the plan's list price.
 	const chargeAmount = amount ?? ms!.price ?? p.amount;
 	if (chargeAmount <= 0) return;
@@ -855,11 +867,18 @@ export async function listCharges(orgId: string, status?: string, kind?: string)
 		.orderBy(desc(charge.dueDate));
 }
 
+export type FinancialTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type FinancialOptions = {
+	tx?: FinancialTransaction;
+	afterCommit?: Array<() => Promise<void>>;
+};
+
 export async function addCharge(
 	ctx: { orgId: string; userId?: string | null },
-	input: v.InferOutput<typeof s.chargeInput>
+	input: v.InferOutput<typeof s.chargeInput>,
+	opts?: FinancialOptions
 ) {
-	const [row] = await db
+	const [row] = await (opts?.tx ?? db)
 		.insert(charge)
 		.values({
 			organizationId: ctx.orgId,
@@ -871,14 +890,18 @@ export async function addCharge(
 			cogsCents: input.cogsCents ?? null
 		})
 		.returning();
-	await emit({
-		orgId: ctx.orgId,
-		actorId: ctx.userId ?? null,
-		entityType: 'charge',
-		entityId: row!.id,
-		action: 'created',
-		summary: `Charge of ${formatMoney(input.amount)} added`
-	});
+	const effect = async () => {
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'charge',
+			entityId: row!.id,
+			action: 'created',
+			summary: `Charge of ${formatMoney(input.amount)} added`
+		});
+	};
+	if (opts?.afterCommit) opts.afterCommit.push(effect);
+	else await effect();
 	return row;
 }
 
@@ -1041,18 +1064,30 @@ export async function recordPayment(
 		method: (typeof paymentMethod.enumValues)[number];
 	},
 	/** silent: no receipt/referral emails — for internal credits that aren't money received. */
-	opts?: { silent?: boolean }
+	opts?: { silent?: boolean } & FinancialOptions
 ) {
-	const [m] = await db
+	const q = opts?.tx ?? db;
+	const [m] = await q
 		.select()
 		.from(gymMember)
 		.where(and(eq(gymMember.organizationId, ctx.orgId), eq(gymMember.id, input.memberId)));
 	if (!m) error(404, 'Member not found');
 
 	let remaining = input.amount;
-	const rows = await db.transaction(async (tx) => {
+	const allocate = async (tx: FinancialTransaction) => {
 		const out = [];
 		if (input.chargeId) {
+			const [c] = await tx
+				.select({ id: charge.id })
+				.from(charge)
+				.where(
+					and(
+						eq(charge.id, input.chargeId),
+						eq(charge.organizationId, ctx.orgId),
+						eq(charge.memberId, input.memberId)
+					)
+				);
+			if (!c) error(404, 'Charge not found');
 			const [row] = await tx
 				.insert(payment)
 				.values({
@@ -1077,7 +1112,13 @@ export async function recordPayment(
 					)
 				})
 				.from(charge)
-				.where(and(eq(charge.memberId, input.memberId), eq(charge.status, 'open')))
+				.where(
+					and(
+						eq(charge.organizationId, ctx.orgId),
+						eq(charge.memberId, input.memberId),
+						eq(charge.status, 'open')
+					)
+				)
 				.orderBy(asc(charge.dueDate), asc(charge.createdAt));
 			for (const c of open) {
 				if (remaining <= 0) break;
@@ -1123,26 +1164,31 @@ export async function recordPayment(
 			  and (select coalesce(sum(p.amount), 0) from ${payment} p where p.charge_id = c.id and p.refunded_at is null) >= c.amount
 		`);
 		return out;
-	});
-	await emit({
-		orgId: ctx.orgId,
-		actorId: ctx.userId ?? null,
-		entityType: 'payment',
-		entityId: rows[0]!.id,
-		action: 'recorded',
-		summary: `${formatMoney(input.amount)} from ${m.name}`,
-		data: { memberId: input.memberId, method: input.method }
-	});
-	if (!opts?.silent) {
-		notifyPaymentReceived(
-			ctx.orgId,
-			rows.map((r) => r.id),
-			input.amount,
-			input.method
-		).catch(() => {});
-		notifyReferralReward(ctx.orgId, input.memberId).catch(() => {});
-	}
-	unsuspendPaidUp(ctx.orgId, input.memberId).catch(() => {});
+	};
+	const rows = opts?.tx ? await allocate(opts.tx) : await db.transaction(allocate);
+	const effect = async () => {
+		await emit({
+			orgId: ctx.orgId,
+			actorId: ctx.userId ?? null,
+			entityType: 'payment',
+			entityId: rows[0]!.id,
+			action: 'recorded',
+			summary: `${formatMoney(input.amount)} from ${m.name}`,
+			data: { memberId: input.memberId, method: input.method }
+		});
+		if (!opts?.silent) {
+			notifyPaymentReceived(
+				ctx.orgId,
+				rows.map((r) => r.id),
+				input.amount,
+				input.method
+			).catch(() => {});
+			notifyReferralReward(ctx.orgId, input.memberId).catch(() => {});
+		}
+		unsuspendPaidUp(ctx.orgId, input.memberId).catch(() => {});
+	};
+	if (opts?.afterCommit) opts.afterCommit.push(effect);
+	else await effect();
 	return rows[0];
 }
 
@@ -1266,12 +1312,13 @@ export async function proratePlanChange(
 	ctx: { orgId: string; userId?: string | null },
 	ms: { memberId: string; nextChargeAt: Date | null; price: number | null },
 	oldPlan: { name: string; amount: number; interval: string },
-	newPlan: { name: string; amount: number }
+	newPlan: { name: string; amount: number },
+	opts?: FinancialOptions
 ) {
 	if (!ms.nextChargeAt) return 0;
 	const today = todayISO();
 	const periodEnd = ms.nextChargeAt.toISOString().slice(0, 10);
-	const [last] = await db
+	const [last] = await (opts?.tx ?? db)
 		.select({ periodStart: charge.periodStart })
 		.from(charge)
 		.where(
@@ -1298,13 +1345,17 @@ export async function proratePlanChange(
 		((newPlan.amount - (ms.price ?? oldPlan.amount)) * daysLeft) / daysInPeriod
 	);
 	if (diff > 0) {
-		await addCharge(ctx, {
-			memberId: ms.memberId,
-			kind: 'other',
-			description: `Plan change ${oldPlan.name} → ${newPlan.name} (${daysLeft}d remaining)`,
-			amount: diff,
-			dueDate: today
-		});
+		await addCharge(
+			ctx,
+			{
+				memberId: ms.memberId,
+				kind: 'other',
+				description: `Plan change ${oldPlan.name} → ${newPlan.name} (${daysLeft}d remaining)`,
+				amount: diff,
+				dueDate: today
+			},
+			opts
+		);
 	} else if (diff < 0) {
 		await recordPayment(
 			ctx,
@@ -1314,7 +1365,7 @@ export async function proratePlanChange(
 				method: 'credit',
 				notes: `Plan change credit ${oldPlan.name} → ${newPlan.name} (${daysLeft}d remaining)`
 			},
-			{ silent: true }
+			{ ...opts, silent: true }
 		);
 	}
 	return diff;

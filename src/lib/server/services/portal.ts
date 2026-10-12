@@ -1556,35 +1556,54 @@ export async function memberBuyPack(orgId: string, memberId: string, planId: str
  * switchable plan.
  */
 export async function memberChangePlan(orgId: string, memberId: string, planId: string) {
-	const [ms] = await db
-		.select({ membership, plan })
-		.from(membership)
-		.innerJoin(plan, eq(membership.planId, plan.id))
-		.where(
-			and(
-				eq(membership.organizationId, orgId),
-				eq(membership.memberId, memberId),
-				eq(membership.status, 'active'),
-				eq(plan.isPack, false)
+	const afterCommit: Array<() => Promise<void>> = [];
+	const { row, prorated, ms, p } = await db.transaction(async (tx) => {
+		await tx
+			.select({ id: membership.id })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.memberId, memberId),
+					eq(membership.status, 'active')
+				)
 			)
-		)
-		.limit(1);
-	if (!ms) error(409, 'No active membership to change');
-	const p = await getPlan(orgId, planId);
-	if (!p.active || !p.listed || p.isPack) error(404, 'Plan not available');
-	if (ms.plan.id === planId) error(409, 'Already on this plan');
-	await assertPlanCapacity(orgId, p);
-	const [row] = await db
-		.update(membership)
-		.set({ planId })
-		.where(eq(membership.id, ms.membership.id))
-		.returning();
-	const prorated = await proratePlanChange(
-		{ orgId },
-		ms.membership,
-		{ name: ms.plan.name, amount: ms.plan.amount, interval: ms.plan.interval },
-		p
-	);
+			.orderBy(asc(membership.id))
+			.for('update');
+		const [ms] = await tx
+			.select({ membership, plan })
+			.from(membership)
+			.innerJoin(plan, eq(membership.planId, plan.id))
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.memberId, memberId),
+					eq(membership.status, 'active'),
+					eq(plan.isPack, false)
+				)
+			)
+			.limit(1)
+			.for('update', { of: membership });
+		if (!ms) error(409, 'No active membership to change');
+		const p = await getPlan(orgId, planId, tx);
+		if (!p.active || !p.listed || p.isPack) error(404, 'Plan not available');
+		if (ms.plan.id === planId) error(409, 'Already on this plan');
+		await assertPlanCapacity(orgId, p, tx);
+		const [row] = await tx
+			.update(membership)
+			.set({ planId })
+			.where(eq(membership.id, ms.membership.id))
+			.returning();
+		const prorated = await proratePlanChange(
+			{ orgId },
+			ms.membership,
+			{ name: ms.plan.name, amount: ms.plan.amount, interval: ms.plan.interval },
+			p,
+			{ tx, afterCommit }
+		);
+		return { row, prorated, ms, p };
+	});
+	for (const effect of afterCommit) await effect();
 	await emit({
 		orgId,
 		entityType: 'membership',
@@ -1652,38 +1671,56 @@ export async function acceptSaveOffer(orgId: string, memberId: string) {
 		.where(eq(gymSettings.organizationId, orgId));
 	const pct = settings?.saveOfferPct ?? 0;
 	if (pct <= 0) error(404, 'No save offer configured');
-	const [ms] = await db
-		.select({ membership, plan })
-		.from(membership)
-		.innerJoin(plan, eq(membership.planId, plan.id))
-		.where(
-			and(
-				eq(membership.organizationId, orgId),
-				eq(membership.memberId, memberId),
-				eq(membership.status, 'active')
+	const afterCommit: Array<() => Promise<void>> = [];
+	const { ms, credit } = await db.transaction(async (tx) => {
+		await tx
+			.select({ id: membership.id })
+			.from(membership)
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.memberId, memberId),
+					eq(membership.status, 'active')
+				)
 			)
-		)
-		.orderBy(desc(membership.createdAt))
-		.limit(1);
-	if (!ms) error(404, 'No active membership');
-	if (ms.membership.saveOfferAt) error(409, 'This offer can only be used once');
-	const base = ms.membership.price ?? ms.plan.amount;
-	const credit = Math.round((base * pct) / 100);
-	if (credit <= 0) error(400, 'Nothing to discount');
-	await recordPayment(
-		{ orgId },
-		{
-			memberId,
-			amount: credit,
-			method: 'credit',
-			notes: `Stay offer — ${pct}% off ${ms.plan.name}`
-		},
-		{ silent: true }
-	);
-	await db
-		.update(membership)
-		.set({ saveOfferAt: new Date() })
-		.where(eq(membership.id, ms.membership.id));
+			.orderBy(asc(membership.id))
+			.for('update');
+		const [ms] = await tx
+			.select({ membership, plan })
+			.from(membership)
+			.innerJoin(plan, eq(membership.planId, plan.id))
+			.where(
+				and(
+					eq(membership.organizationId, orgId),
+					eq(membership.memberId, memberId),
+					eq(membership.status, 'active')
+				)
+			)
+			.orderBy(desc(membership.createdAt))
+			.limit(1)
+			.for('update', { of: membership });
+		if (!ms) error(404, 'No active membership');
+		if (ms.membership.saveOfferAt) error(409, 'This offer can only be used once');
+		const base = ms.membership.price ?? ms.plan.amount;
+		const credit = Math.round((base * pct) / 100);
+		if (credit <= 0) error(400, 'Nothing to discount');
+		await recordPayment(
+			{ orgId },
+			{
+				memberId,
+				amount: credit,
+				method: 'credit',
+				notes: `Stay offer — ${pct}% off ${ms.plan.name}`
+			},
+			{ silent: true, tx, afterCommit }
+		);
+		await tx
+			.update(membership)
+			.set({ saveOfferAt: new Date() })
+			.where(eq(membership.id, ms.membership.id));
+		return { ms, credit };
+	});
+	for (const effect of afterCommit) await effect();
 	await emit({
 		orgId,
 		entityType: 'membership',
@@ -2041,4 +2078,38 @@ export async function memberCancelAllUpcoming(
 		cancelled++;
 	}
 	return { cancelled, skipped: rows.length - cancelled };
+}
+
+/** Watch a class only within the member's own gym. */
+export async function setClassWatch(
+	orgId: string,
+	memberId: string,
+	classTypeId: string,
+	on: boolean
+) {
+	const [ct] = await db
+		.select({ id: classType.id })
+		.from(classType)
+		.where(and(eq(classType.organizationId, orgId), eq(classType.id, classTypeId)));
+	if (!ct) error(404, 'Class not found');
+	const [m] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(and(eq(gymMember.organizationId, orgId), eq(gymMember.id, memberId)));
+	if (!m) error(404, 'Member not found');
+	if (on)
+		await db
+			.insert(classWatch)
+			.values({ organizationId: orgId, memberId, classTypeId })
+			.onConflictDoNothing();
+	else
+		await db
+			.delete(classWatch)
+			.where(
+				and(
+					eq(classWatch.organizationId, orgId),
+					eq(classWatch.memberId, memberId),
+					eq(classWatch.classTypeId, classTypeId)
+				)
+			);
 }

@@ -1,3 +1,4 @@
+import { outboundFetch } from '#lib/server/outbound-http.ts';
 /* @license Enterprise */
 
 import { createHmac } from 'node:crypto';
@@ -186,7 +187,7 @@ async function postExport(orgId: string, url: string): Promise<number> {
 	try {
 		const body = JSON.stringify(await exportOrgData(orgId));
 		const signature = createHmac('sha256', BETTER_AUTH_SECRET).update(body).digest('hex');
-		const res = await fetch(url, {
+		const res = await outboundFetch(url, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', 'x-freeweight-signature': signature },
 			body,

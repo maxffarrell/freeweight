@@ -68,7 +68,14 @@ export async function getPublicGym(slug: string) {
 	const week = new Date(now.getTime() + 7 * 86400_000);
 	const sessions = await db
 		.select({
-			session: classSession,
+			session: {
+				id: classSession.id,
+				classTypeId: classSession.classTypeId,
+				locationId: classSession.locationId,
+				startsAt: classSession.startsAt,
+				endsAt: classSession.endsAt,
+				capacity: classSession.capacity
+			},
 			className: classType.name,
 			color: classType.color,
 			locationName: location.name,
@@ -105,8 +112,21 @@ export async function getPublicGym(slug: string) {
 		.limit(20);
 
 	return {
-		org,
-		settings,
+		org: { id: org.id, name: org.name, slug: org.slug },
+		settings: {
+			timezone: settings.timezone,
+			currency: settings.currency,
+			logoDocumentId: settings.logoDocumentId,
+			address: settings.address,
+			phone: settings.phone,
+			website: settings.website,
+			tagline: settings.tagline,
+			openHours: settings.openHours,
+			waiver: settings.waiver,
+			dayPassPrice: settings.dayPassPrice,
+			healthFormsRequired: settings.healthFormsRequired,
+			healthQuestions: settings.healthQuestions
+		},
 		plans,
 		sessions,
 		closures,
@@ -153,19 +173,21 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 
 	const { org, settings } = await getPublicGym(slug);
 
-	// Reuse an existing member with the same email rather than duplicating.
+	// Existing member records require an authenticated portal workflow.
 	const [existing] = input.email
 		? await db
 				.select()
 				.from(gymMember)
-				.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, input.email)))
+				.where(
+					and(
+						eq(gymMember.organizationId, org.id),
+						eq(sql`lower(${gymMember.email})`, input.email.toLowerCase())
+					)
+				)
 				.limit(1)
 		: [];
 	if (settings?.waiver && !input.agreedWaiver) error(400, 'Please agree to the waiver');
-	if (existing) {
-		await recordWaiver(org.id, existing.id, settings!.waiver);
-		return { member: existing, existing: true };
-	}
+	if (existing) error(409, 'Please sign in to the member portal or contact the gym');
 
 	// ?ref=<memberId> referral link — only counts when the referrer is a member of this gym.
 	let referrer: { id: string; name: string; email: string | null } | undefined;
@@ -233,7 +255,7 @@ export async function joinGym(slug: string, ip: string, input: v.InferOutput<typ
 		});
 		notifyReferralJoin(org.id, referrer.id, m!.id).catch(() => {});
 	}
-	return { member: m!, existing: false, checkoutUrl };
+	return { existing: false, checkoutUrl };
 }
 
 const leadRate = new Map<string, number[]>();
@@ -259,9 +281,14 @@ export async function captureLead(
 	const [existing] = await db
 		.select({ id: gymMember.id })
 		.from(gymMember)
-		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, input.email)))
+		.where(
+			and(
+				eq(gymMember.organizationId, org.id),
+				eq(sql`lower(${gymMember.email})`, input.email.toLowerCase())
+			)
+		)
 		.limit(1);
-	if (existing) return { member: existing, existing: true };
+	if (existing) return { existing: true };
 
 	const [m] = await db
 		.insert(gymMember)
@@ -288,7 +315,7 @@ export async function captureLead(
 		action: 'lead',
 		summary: `${input.name} left their info on the public page`
 	});
-	return { member: m!, existing: false };
+	return { existing: false };
 }
 
 /** First live online provider's checkout URL for a one-off amount, or null when none is ready. */
@@ -366,7 +393,7 @@ async function recordWaiver(orgId: string, memberId: string, text: string) {
 const dropInRate = new Map<string, number[]>();
 
 /**
- * Visitor books one class on the public page: member (reused by email), `dropin` charge,
+ * Visitor books one class on the public page: new member, `dropin` charge,
  * `booked` row, and — when a provider is live — a checkout link to pay for it now.
  * Without a provider the booking still lands; the member pays at the desk.
  */
@@ -386,8 +413,9 @@ export async function bookDropIn(
 	const [m] = await db
 		.select()
 		.from(gymMember)
-		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
+	if (m) error(409, 'Please sign in to the member portal or contact the gym');
 	const member =
 		m ??
 		(
@@ -485,7 +513,7 @@ export async function bookDropIn(
 		action: 'dropin',
 		summary: `${input.name} booked a drop-in for ${className}`
 	});
-	return { member, bookingId: b.id, checkoutUrl };
+	return { bookingId: b.id, checkoutUrl };
 }
 
 /**
@@ -510,8 +538,9 @@ export async function buyDayPass(
 	const [m] = await db
 		.select()
 		.from(gymMember)
-		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
+	if (m) error(409, 'Please sign in to the member portal or contact the gym');
 	const member =
 		m ??
 		(
@@ -580,12 +609,12 @@ export async function buyDayPass(
 		action: 'daypass',
 		summary: `${input.name} bought a day pass for ${today}`
 	});
-	return { member, chargeId: c.id, checkoutUrl };
+	return { chargeId: c.id, checkoutUrl };
 }
 
 /**
  * Public "book a free trial class" form on /j/[slug]/schedule — same rate-limited
- * treatment as the lead form. Creates/reuses a `lead`-tagged member and queues a
+ * treatment as the lead form. Creates a `lead`-tagged new member and queues a
  * pending trial_request; staff confirm (comp'd seat, no membership needed) or
  * decline from the member page / Needs-attention card.
  */
@@ -621,8 +650,9 @@ export async function requestTrial(
 	const [m] = await db
 		.select()
 		.from(gymMember)
-		.where(and(eq(gymMember.organizationId, org.id), eq(gymMember.email, email)))
+		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
+	if (m) error(409, 'Please sign in to the member portal or contact the gym');
 	const member =
 		m ??
 		(

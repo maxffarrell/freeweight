@@ -26,7 +26,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			? await db
 					.select({ id: gymMember.id })
 					.from(gymMember)
-					.where(and(eq(gymMember.id, m.guardianId), eq(gymMember.portalUserId, locals.user.id)))
+					.where(
+						and(
+							eq(gymMember.organizationId, m.organizationId),
+							eq(gymMember.id, m.guardianId),
+							eq(gymMember.portalUserId, locals.user.id)
+						)
+					)
 					.limit(1)
 			: [];
 		if (!guardian) error(403, 'Not your member record');
