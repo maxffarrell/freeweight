@@ -1,5 +1,15 @@
 # freeweight
 
+## 0.1.0
+
+### Minor Changes
+
+- 14d4fcf: Include basic SAML/OIDC SSO, passkeys and BYOK AI in the AGPL self-hosted core without an enterprise license. Preserve paid administrative feature gates and public demo restrictions.
+
+### Patch Changes
+
+- c909af2: Harden tenant authorization, public responses and webhook delivery; add security regressions and self-hosting readiness guidance. Basic SSO, passkeys and BYOK AI remain in the free core.
+
 ## 0.0.3
 
 ### Patch Changes
