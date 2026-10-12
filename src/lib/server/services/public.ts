@@ -416,20 +416,18 @@ export async function bookDropIn(
 		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
 	if (m) error(409, 'Please sign in to the member portal or contact the gym');
-	const member =
-		m ??
-		(
-			await db
-				.insert(gymMember)
-				.values({
-					organizationId: org.id,
-					name: input.name,
-					email,
-					phone: input.phone ?? null,
-					joinedAt: new Date().toISOString().slice(0, 10)
-				})
-				.returning()
-		)[0];
+	const member = (
+		await db
+			.insert(gymMember)
+			.values({
+				organizationId: org.id,
+				name: input.name,
+				email,
+				phone: input.phone ?? null,
+				joinedAt: new Date().toISOString().slice(0, 10)
+			})
+			.returning()
+	)[0];
 	if (settings?.waiver) await recordWaiver(org.id, member.id, settings.waiver);
 
 	const { b, className, price } = await db.transaction(async (tx) => {
@@ -541,20 +539,18 @@ export async function buyDayPass(
 		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
 	if (m) error(409, 'Please sign in to the member portal or contact the gym');
-	const member =
-		m ??
-		(
-			await db
-				.insert(gymMember)
-				.values({
-					organizationId: org.id,
-					name: input.name,
-					email,
-					phone: input.phone ?? null,
-					joinedAt: new Date().toISOString().slice(0, 10)
-				})
-				.returning()
-		)[0];
+	const member = (
+		await db
+			.insert(gymMember)
+			.values({
+				organizationId: org.id,
+				name: input.name,
+				email,
+				phone: input.phone ?? null,
+				joinedAt: new Date().toISOString().slice(0, 10)
+			})
+			.returning()
+	)[0];
 	if (!m) {
 		await db
 			.insert(memberTag)
@@ -653,20 +649,18 @@ export async function requestTrial(
 		.where(and(eq(gymMember.organizationId, org.id), eq(sql`lower(${gymMember.email})`, email)))
 		.limit(1);
 	if (m) error(409, 'Please sign in to the member portal or contact the gym');
-	const member =
-		m ??
-		(
-			await db
-				.insert(gymMember)
-				.values({
-					organizationId: org.id,
-					name: input.name,
-					email,
-					phone: input.phone ?? null,
-					joinedAt: new Date().toISOString().slice(0, 10)
-				})
-				.returning()
-		)[0]!;
+	const member = (
+		await db
+			.insert(gymMember)
+			.values({
+				organizationId: org.id,
+				name: input.name,
+				email,
+				phone: input.phone ?? null,
+				joinedAt: new Date().toISOString().slice(0, 10)
+			})
+			.returning()
+	)[0]!;
 	if (!m)
 		await db.insert(memberTag).values({ organizationId: org.id, memberId: member.id, tag: 'lead' });
 

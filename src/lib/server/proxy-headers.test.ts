@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { setClientAddress } from '../../../scripts/proxy-headers.ts';
-import type { IncomingMessage } from 'node:http';
 
 describe('forwarded IP trust boundary', () => {
-	const request = (peer: string, forwarded = '203.0.113.44') =>
-		({ headers: { 'x-forwarded-for': forwarded }, socket: { remoteAddress: peer } }) as Pick<
-			IncomingMessage,
-			'headers' | 'socket'
-		>;
+	const request = (peer: string, forwarded = '203.0.113.44') => ({
+		headers: { 'x-forwarded-for': forwarded },
+		socket: { remoteAddress: peer }
+	});
 	it('overwrites attacker supplied direct addresses, including lists', () => {
 		const req = request('198.51.100.2', '127.0.0.1, 203.0.113.44');
 		setClientAddress(req);
