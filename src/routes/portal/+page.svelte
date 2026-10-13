@@ -15,6 +15,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
+	import PortalProfile from '#lib/components/app/portal-profile.svelte';
 	import Whiteboard from '#lib/components/app/whiteboard.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -1328,6 +1329,8 @@
 			>
 		</div>
 	{/if}
+
+	<PortalProfile />
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<Card.Root class="sm:col-span-2">
