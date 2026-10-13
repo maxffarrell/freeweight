@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.1.1
+
+### Patch Changes
+
+- d429c64: Close resource permission, tenant reference, and public data exposure gaps found in the release audit.
+
 ## 0.1.0
 
 ### Minor Changes
