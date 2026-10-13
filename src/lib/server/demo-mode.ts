@@ -104,15 +104,16 @@ export async function startDemo(ip: string, view: 'staff' | 'member' = 'staff') 
 		role: 'owner',
 		org: { id: org.id, name: org.name, slug: org.slug, logo: null }
 	});
-	if (view === 'member') {
-		// The portal resolves members by portalUserId — point the first seeded
-		// member at this visitor so /portal opens straight into it.
-		const [m] = await db
-			.select({ id: gymMember.id })
-			.from(gymMember)
-			.where(eq(gymMember.organizationId, org.id))
-			.limit(1);
-		if (m)
-			await db.update(gymMember).set({ portalUserId: demoUser.id }).where(eq(gymMember.id, m.id));
-	}
+
+	// Every demo visitor can explore the portal in their own sample workspace.
+	const [profile] = await db
+		.select({ id: gymMember.id })
+		.from(gymMember)
+		.where(eq(gymMember.organizationId, org.id))
+		.limit(1);
+	if (!profile) error(500, 'Could not create demo portal profile');
+	await db
+		.update(gymMember)
+		.set({ portalUserId: demoUser.id })
+		.where(and(eq(gymMember.id, profile.id), eq(gymMember.organizationId, org.id)));
 }
