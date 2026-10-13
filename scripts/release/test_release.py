@@ -6,6 +6,12 @@ spec=importlib.util.spec_from_file_location('deploy_server',HERE/'deploy-server.
 server=importlib.util.module_from_spec(spec);spec.loader.exec_module(server)
 PAYLOAD=dict(image_digest='sha256:'+'a'*64,source_commit='b'*40,version='0.0.2',registry_user='maxffarrell',registry_token='test-only')
 class DeploymentTests(unittest.TestCase):
+ def test_session_timestamp_creation_lag_without_allowing_extension(self):
+  created='2026-10-13T00:00:00.001Z'
+  self.assertTrue(server.valid_session_lifetime(created,'2026-10-13T00:08:00.000Z'))
+  self.assertTrue(server.valid_session_lifetime(created,'2026-10-13T00:08:00.001Z'))
+  self.assertFalse(server.valid_session_lifetime(created,'2026-10-13T00:08:00.002Z'))
+  self.assertFalse(server.valid_session_lifetime(created,'2026-10-13T00:07:58.999Z'))
  def test_rejects_untrusted_image_or_version(self):
   for field,value in [('image_digest','evil/image:latest'),('source_commit',';sh'),('version','../x'),('registry_user','x;sh')]:
    with self.subTest(field=field), self.assertRaises(ValueError):server.validate('leroa',dict(PAYLOAD,**{field:value}))
