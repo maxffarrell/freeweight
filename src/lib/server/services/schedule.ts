@@ -1,3 +1,7 @@
+import {
+	assertStaffLocationReferences,
+	staffLocationReferencesValid
+} from '../staff-location-references.ts';
 import { error } from '@sveltejs/kit';
 import { customFieldsEnabled } from '../ee/custom-fields.ts';
 import {
@@ -129,8 +133,20 @@ export async function listClassTypes(orgId: string) {
 			instructorName: user.name
 		})
 		.from(classType)
-		.leftJoin(location, eq(classType.locationId, location.id))
-		.leftJoin(member, eq(classType.instructorId, member.id))
+		.leftJoin(
+			location,
+			and(
+				eq(classType.locationId, location.id),
+				eq(classType.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classType.instructorId, member.id),
+				eq(classType.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(eq(classType.organizationId, orgId))
 		.orderBy(asc(classType.name));
@@ -140,6 +156,7 @@ export async function createClassType(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.classTypeInput>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const [row] = await db
 		.insert(classType)
 		.values({
@@ -171,6 +188,7 @@ export async function updateClassType(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.classTypeUpdate>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const { id, ...set } = input;
 	const [row] = await db
 		.update(classType)
@@ -209,9 +227,27 @@ export async function listSessions(orgId: string, from: Date, to: Date) {
 			waitlisted: waitlistedCount(classSession.id)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -255,7 +291,13 @@ export async function scheduleDemandHints(orgId: string, tz: string, weeks = 6) 
 				)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -338,8 +380,20 @@ export async function myTeachingSessions(ctx: OrgContext, days = 14) {
 			waitlisted: waitlistedCount(classSession.id)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, ctx.orgId),
@@ -402,9 +456,27 @@ export async function sessionsNeedingCover(ctx: OrgContext) {
 			booked: sql<number>`(select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -436,7 +508,13 @@ export async function claimCover(ctx: OrgContext, tz: string, sessionId: string)
 			className: classType.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
 	if (s.cancelledAt) error(409, 'That session was cancelled');
@@ -467,9 +545,27 @@ export async function getSession(orgId: string, id: string) {
 			waitlisted: waitlistedCount(classSession.id)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, id)));
 	if (!row) error(404, 'Session not found');
@@ -609,7 +705,13 @@ export async function listBookings(
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.where(
 			and(
@@ -639,6 +741,10 @@ export async function createSession(
 		.from(classType)
 		.where(and(eq(classType.organizationId, ctx.orgId), eq(classType.id, input.classTypeId)));
 	if (!ct) error(404, 'Class not found');
+	await assertStaffLocationReferences(ctx.orgId, {
+		locationId: input.locationId ?? ct.locationId,
+		instructorId: input.instructorId ?? ct.instructorId
+	});
 
 	const start = zonedToUtc(input.startsAt, tz);
 	const end = new Date(start.getTime() + (input.durationMin ?? ct.durationMin) * 60_000);
@@ -686,6 +792,7 @@ export async function updateSession(
 	tz: string,
 	input: v.InferOutput<typeof s.sessionUpdate>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const { id, ...set } = input;
 	const [prev] = await db
 		.select({
@@ -932,7 +1039,13 @@ export async function markPastNoShows(orgId: string, sessionId?: string) {
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
@@ -1013,7 +1126,13 @@ export async function autoCancelUnderEnrolled(orgId: string) {
 			booked: bookedCount(classSession.id)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -1377,7 +1496,13 @@ export async function bookSession(
 				className: classType.name
 			})
 			.from(classSession)
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
 			.where(and(eq(classSession.organizationId, ctx.orgId), eq(classSession.id, input.sessionId)))
 			.for('update');
 		if (!s) error(404, 'Session not found');
@@ -1775,7 +1900,13 @@ export async function cancelBooking(
 					className: classType.name
 				})
 				.from(classSession)
-				.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+				.innerJoin(
+					classType,
+					and(
+						eq(classSession.classTypeId, classType.id),
+						eq(classSession.organizationId, classType.organizationId)
+					)
+				)
 				.where(eq(classSession.id, b.sessionId)),
 			tx
 				.select({
@@ -2003,6 +2134,8 @@ export async function instructorHandoff(
 	tz: string,
 	input: v.InferOutput<typeof s.instructorHandoffInput>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, { instructorId: input.fromId });
+	if (!input.cancel) await assertStaffLocationReferences(ctx.orgId, { instructorId: input.toId });
 	if (!input.cancel && (!input.toId || input.toId === input.fromId))
 		error(400, 'Pick a different instructor to take over');
 	const rows = await db
@@ -2069,9 +2202,27 @@ export async function listTemplates(orgId: string) {
 			instructorName: user.name
 		})
 		.from(classTemplate)
-		.innerJoin(classType, eq(classTemplate.classTypeId, classType.id))
-		.leftJoin(location, eq(classTemplate.locationId, location.id))
-		.leftJoin(member, eq(classTemplate.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classTemplate.classTypeId, classType.id),
+				eq(classTemplate.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classTemplate.locationId, location.id),
+				eq(classTemplate.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classTemplate.instructorId, member.id),
+				eq(classTemplate.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(eq(classTemplate.organizationId, orgId))
 		.orderBy(asc(classTemplate.weekday), asc(classTemplate.startTime));
@@ -2081,6 +2232,7 @@ export async function createTemplate(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.templateInput>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const [ct] = await db
 		.select({ id: classType.id, name: classType.name })
 		.from(classType)
@@ -2121,6 +2273,7 @@ export async function updateTemplate(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.templateUpdate>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const { id, ...set } = input;
 	const [ct] = await db
 		.select({ id: classType.id, name: classType.name })
@@ -2210,6 +2363,7 @@ export async function copyWeek(
 				isNull(classSession.cancelledAt)
 			)
 		);
+	for (const row of src) await assertStaffLocationReferences(ctx.orgId, row);
 	const rows = src
 		.filter((s) => !closed.has(localDate(new Date(s.startsAt.getTime() + shiftMs), tz)))
 		.map((s) => ({
@@ -2259,6 +2413,7 @@ export async function copyDay(ctx: OrgContext, tz: string, fromDate: string, toD
 				isNull(classSession.cancelledAt)
 			)
 		);
+	for (const row of src) await assertStaffLocationReferences(ctx.orgId, row);
 	const rows = closedDay
 		? []
 		: src.map((s) => ({
@@ -2375,10 +2530,16 @@ export async function materializeTemplates(orgId: string) {
 	const tz = st?.timezone ?? 'UTC';
 	const today = localDate(new Date(), tz);
 
-	const templates = await db
+	let templates = await db
 		.select({ template: classTemplate, classType })
 		.from(classTemplate)
-		.innerJoin(classType, eq(classTemplate.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classTemplate.classTypeId, classType.id),
+				eq(classTemplate.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(classTemplate.organizationId, orgId), eq(classTemplate.active, true)));
 	if (!templates.length) return 0;
 
@@ -2434,6 +2595,18 @@ export async function materializeTemplates(orgId: string) {
 		instructorId != null &&
 		offs.some((o) => o.instructorId === instructorId && day >= o.startDate && day <= o.endDate);
 
+	const safeTemplates = [];
+	for (const entry of templates) {
+		const { template: tpl, classType: ct } = entry;
+		if (
+			await staffLocationReferencesValid(orgId, {
+				locationId: tpl.locationId ?? ct.locationId,
+				instructorId: tpl.instructorId ?? ct.instructorId
+			})
+		)
+			safeTemplates.push(entry);
+	}
+	templates = safeTemplates;
 	const now = Date.now();
 	const rows = [];
 	for (let i = 0; i <= TEMPLATE_HORIZON_DAYS; i++) {
@@ -2550,7 +2723,13 @@ export async function instructorConflicts(
 			className: classType.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -2584,7 +2763,13 @@ export async function locationConflicts(
 			className: classType.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -2722,7 +2907,13 @@ export async function myRatings(ctx: OrgContext) {
 		})
 		.from(sessionFeedback)
 		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(sessionFeedback.organizationId, ctx.orgId),
@@ -3059,9 +3250,27 @@ export async function daySheet(orgId: string, date: string) {
 			guests: booking.guestCount
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.leftJoin(
 			booking,

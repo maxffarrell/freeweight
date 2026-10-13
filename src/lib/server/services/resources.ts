@@ -1,3 +1,4 @@
+import { assertStaffLocationReferences } from '../staff-location-references.ts';
 import { and, asc, eq, gt, gte, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
 import { error } from '@sveltejs/kit';
@@ -24,7 +25,13 @@ export async function listResources(orgId: string) {
 	return db
 		.select({ resource: facilityResource, locationName: location.name })
 		.from(facilityResource)
-		.leftJoin(location, eq(facilityResource.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(facilityResource.locationId, location.id),
+				eq(facilityResource.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(facilityResource.organizationId, orgId))
 		.orderBy(asc(facilityResource.name));
 }
@@ -33,6 +40,7 @@ export async function createResource(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.resourceInput>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const [row] = await db
 		.insert(facilityResource)
 		.values({
@@ -58,6 +66,7 @@ export async function updateResource(
 	ctx: OrgContext,
 	input: v.InferOutput<typeof s.resourceUpdate>
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const { id, ...set } = input;
 	const [row] = await db
 		.update(facilityResource)
@@ -286,7 +295,13 @@ export async function listEquipment(orgId: string) {
 	return db
 		.select({ equipment, locationName: location.name })
 		.from(equipment)
-		.leftJoin(location, eq(equipment.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(equipment.locationId, location.id),
+				eq(equipment.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(equipment.organizationId, orgId))
 		.orderBy(asc(equipment.name));
 }

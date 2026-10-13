@@ -162,8 +162,20 @@ export async function portalOverview(memberId: string) {
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(booking.memberId, memberId),
@@ -314,8 +326,20 @@ export async function portalOverview(memberId: string) {
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(and(eq(booking.memberId, memberId), lt(classSession.startsAt, now)))
 		.orderBy(desc(classSession.startsAt))
 		.limit(10);
@@ -554,7 +578,10 @@ export async function attendanceStats(orgId: string, memberId: string, tz: strin
 	const rows = await db
 		.select({ checkedAt: checkIn.checkedAt, locationName: location.name })
 		.from(checkIn)
-		.leftJoin(location, eq(checkIn.locationId, location.id))
+		.leftJoin(
+			location,
+			and(eq(checkIn.locationId, location.id), eq(checkIn.organizationId, location.organizationId))
+		)
 		.where(
 			and(
 				eq(checkIn.organizationId, orgId),
@@ -788,8 +815,20 @@ export async function bookableSessions(memberId: string, days = 14) {
 			>`(select b.status from ${booking} b where b.session_id = ${outer(classSession.id)} and b.member_id = ${memberId} and b.status != 'cancelled' limit 1)`
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, m.organizationId),
@@ -853,7 +892,13 @@ export async function memberBook(
 			dropInPrice: classType.dropInPrice
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!s) error(404, 'Session not found');
 	if (!s.memberBookable) error(409, 'This class is booked at the front desk');
@@ -1048,7 +1093,13 @@ export async function memberMakeups(orgId: string, memberId: string) {
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
@@ -1075,7 +1126,13 @@ export async function memberMakeups(orgId: string, memberId: string) {
 				)
 			})
 			.from(classSession)
-			.leftJoin(location, eq(classSession.locationId, location.id))
+			.leftJoin(
+				location,
+				and(
+					eq(classSession.locationId, location.id),
+					eq(classSession.organizationId, location.organizationId)
+				)
+			)
 			.where(
 				and(
 					eq(classSession.organizationId, orgId),
@@ -2016,7 +2073,13 @@ async function yearRecap(orgId: string, memberId: string) {
 			.select({ name: classType.name, n: sql<number>`count(*)`.mapWith(Number) })
 			.from(booking)
 			.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
 			.where(
 				and(
 					eq(booking.organizationId, orgId),

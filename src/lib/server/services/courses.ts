@@ -1,3 +1,4 @@
+import { assertStaffLocationReferences } from '../staff-location-references.ts';
 import { error } from '@sveltejs/kit';
 import { and, asc, eq, gt, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -108,6 +109,7 @@ export async function listCourses(orgId: string) {
  * run keeps generating sessions — and booking enrollees — until the course ends.
  */
 export async function createCourse(ctx: OrgContext, input: v.InferOutput<typeof s.courseInput>) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	if (input.endsOn < input.startsOn) error(400, 'End date must be on or after the start date');
 	const [ct] = await db
 		.select({ id: classType.id })
@@ -223,8 +225,20 @@ export async function portalCourses(orgId: string, memberId: string) {
 					instructorName: user.name
 				})
 				.from(classTemplate)
-				.leftJoin(location, eq(classTemplate.locationId, location.id))
-				.leftJoin(member, eq(classTemplate.instructorId, member.id))
+				.leftJoin(
+					location,
+					and(
+						eq(classTemplate.locationId, location.id),
+						eq(classTemplate.organizationId, location.organizationId)
+					)
+				)
+				.leftJoin(
+					member,
+					and(
+						eq(classTemplate.instructorId, member.id),
+						eq(classTemplate.organizationId, member.organizationId)
+					)
+				)
 				.leftJoin(user, eq(member.userId, user.id))
 				.where(
 					inArray(

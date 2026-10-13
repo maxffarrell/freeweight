@@ -1,3 +1,4 @@
+import { assertStaffLocationReferences } from '../staff-location-references.ts';
 import { error } from '@sveltejs/kit';
 import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -41,6 +42,7 @@ export async function clockIn(
 	ctx: OrgContext,
 	input: { locationId?: string | null; note?: string }
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const m = await staffRow(ctx);
 	const [open] = await db
 		.select({ id: shift.id })
@@ -110,7 +112,10 @@ export async function onShiftNow(orgId: string) {
 		.from(shift)
 		.innerJoin(member, eq(shift.memberId, member.id))
 		.innerJoin(user, eq(member.userId, user.id))
-		.leftJoin(location, eq(shift.locationId, location.id))
+		.leftJoin(
+			location,
+			and(eq(shift.locationId, location.id), eq(shift.organizationId, location.organizationId))
+		)
 		.where(and(eq(shift.organizationId, orgId), isNull(shift.clockedOutAt)))
 		.orderBy(asc(shift.clockedInAt));
 }
@@ -128,7 +133,10 @@ export async function listShifts(orgId: string, range: { from: string; to: strin
 		.from(shift)
 		.innerJoin(member, eq(shift.memberId, member.id))
 		.innerJoin(user, eq(member.userId, user.id))
-		.leftJoin(location, eq(shift.locationId, location.id))
+		.leftJoin(
+			location,
+			and(eq(shift.locationId, location.id), eq(shift.organizationId, location.organizationId))
+		)
 		.where(
 			and(
 				eq(shift.organizationId, orgId),
@@ -389,6 +397,11 @@ export async function deskChecklist(orgId: string) {
 /** Tick/untick a desk task for today (gym-local). Any staff member can tick. */
 export async function toggleDeskTask(ctx: OrgContext, taskId: string, done: boolean) {
 	const m = await staffRow(ctx);
+	const [task] = await db
+		.select({ label: deskTask.label })
+		.from(deskTask)
+		.where(and(eq(deskTask.id, taskId), eq(deskTask.organizationId, ctx.orgId)));
+	if (!task) error(404, 'Desk task not found');
 	const tz = await gymTz(ctx.orgId);
 	const today = localDate(new Date(), tz);
 	if (done) {
@@ -403,10 +416,6 @@ export async function toggleDeskTask(ctx: OrgContext, taskId: string, done: bool
 			.onConflictDoNothing()
 			.returning();
 		if (row) {
-			const [t] = await db
-				.select({ label: deskTask.label })
-				.from(deskTask)
-				.where(eq(deskTask.id, taskId));
 			const [who] = await db
 				.select({ name: user.name })
 				.from(user)
@@ -418,13 +427,19 @@ export async function toggleDeskTask(ctx: OrgContext, taskId: string, done: bool
 				entityType: 'desk_task',
 				entityId: taskId,
 				action: 'done',
-				summary: `${who?.name ?? 'Staff'} completed "${t?.label ?? 'task'}"`
+				summary: `${who?.name ?? 'Staff'} completed "${task.label}"`
 			});
 		}
 	} else {
 		await db
 			.delete(deskTaskDone)
-			.where(and(eq(deskTaskDone.taskId, taskId), eq(deskTaskDone.doneOn, today)));
+			.where(
+				and(
+					eq(deskTaskDone.organizationId, ctx.orgId),
+					eq(deskTaskDone.taskId, taskId),
+					eq(deskTaskDone.doneOn, today)
+				)
+			);
 	}
 }
 

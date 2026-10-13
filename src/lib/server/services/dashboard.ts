@@ -226,9 +226,27 @@ export async function dashboard(orgId: string) {
 				)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -252,7 +270,13 @@ export async function dashboard(orgId: string) {
 				)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -337,7 +361,13 @@ export async function dashboard(orgId: string) {
 				)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -419,7 +449,13 @@ export async function dashboard(orgId: string) {
 		.from(trialRequest)
 		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
 		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(trialRequest.organizationId, orgId), eq(trialRequest.status, 'pending')))
 		.orderBy(asc(classSession.startsAt))
 		.limit(50);
@@ -543,8 +579,20 @@ export async function dashboard(orgId: string) {
 			instructorName: user.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -1094,7 +1142,13 @@ export async function notifications(orgId: string, tz: string) {
 			className: classType.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),

@@ -88,9 +88,27 @@ export async function getPublicGym(slug: string) {
 				)
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -441,7 +459,13 @@ export async function bookDropIn(
 				className: classType.name
 			})
 			.from(classSession)
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
 			.where(and(eq(classSession.organizationId, org.id), eq(classSession.id, input.sessionId)))
 			.for('update');
 		if (!sess) error(404, 'Class not found');
@@ -637,7 +661,13 @@ export async function requestTrial(
 			className: classType.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(classSession.organizationId, org.id), eq(classSession.id, input.sessionId)))
 		.limit(1);
 	if (!sess || sess.cancelledAt || sess.startsAt.getTime() <= now || !sess.bookable)
