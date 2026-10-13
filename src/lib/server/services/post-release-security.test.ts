@@ -124,6 +124,7 @@ import {
 	gymMember,
 	session,
 	location,
+	course,
 	classType,
 	classSession,
 	classTemplate,
@@ -144,11 +145,14 @@ import {
 	updateTemplate,
 	instructorHandoff,
 	listClassTypes,
+	copyDay,
+	copyWeek,
 	materializeTemplates
 } from './schedule.ts';
 import { createEvent, updateEvent } from './gym-events.ts';
 import { createResource, updateResource } from './resources.ts';
 import { requestPt, memberPtRequests } from './pt.ts';
+import { createCourse } from './courses.ts';
 const orgs = [randomUUID(), randomUUID()],
 	users = [randomUUID(), randomUUID(), randomUUID()];
 const staff = [randomUUID(), randomUUID()],
@@ -320,6 +324,7 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
 					name: 'Event',
 					startsAt: future,
 					endsAt: future,
+					durationMin: 60,
 					capacity: 10,
 					memberBookable: true,
 					active: true,
@@ -363,6 +368,44 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
 					.locationId
 			).toBe(locs[0]);
 		});
+		it('course creation rejects foreign references before writes, and copies refuse poisoned sessions', async () => {
+			for (const refs of [{ locationId: locs[1] }, { instructorId: staff[1] }]) {
+				await expect(
+					createCourse(
+						ctx,
+						v.parse(s.courseInput, {
+							name: 'Unauthorized course',
+							classTypeId: types[0],
+							startsOn: wall.slice(0, 10),
+							endsOn: wall.slice(0, 10),
+							weekdays: [1],
+							startTime: '12:00',
+							...refs
+						})
+					)
+				).rejects.toMatchObject({ status: 404 });
+			}
+			expect(await db.select().from(course).where(eq(course.organizationId, orgs[0]))).toHaveLength(
+				0
+			);
+			await db
+				.update(classSession)
+				.set({ instructorId: staff[1], locationId: locs[1] })
+				.where(eq(classSession.id, sessionId));
+			await expect(
+				copyDay(
+					ctx,
+					'UTC',
+					wall.slice(0, 10),
+					new Date(+future + 86400000).toISOString().slice(0, 10)
+				)
+			).rejects.toMatchObject({ status: 404 });
+			await expect(copyWeek(ctx, 'UTC', wall.slice(0, 10))).rejects.toMatchObject({ status: 404 });
+			await db
+				.update(classSession)
+				.set({ instructorId: staff[0], locationId: locs[0] })
+				.where(eq(classSession.id, sessionId));
+		});
 		it('rejects template-only handoff and poisoned inherited defaults before propagation', async () => {
 			await expect(
 				instructorHandoff(ctx, 'UTC', { fromId: staff[0], toId: staff[1], cancel: false })
@@ -379,7 +422,15 @@ describe.runIf(Boolean(process.env.DATABASE_URL))(
 				.update(classTemplate)
 				.set({ instructorId: null })
 				.where(eq(classTemplate.id, template));
-			await expect(materializeTemplates(orgs[0])).rejects.toMatchObject({ status: 404 });
+			expect(await materializeTemplates(orgs[0])).toBe(0);
+			const goodType = randomUUID();
+			await db
+				.insert(classType)
+				.values({ id: goodType, organizationId: orgs[0], name: 'Valid', instructorId: staff[0] });
+			await db
+				.insert(classTemplate)
+				.values({ organizationId: orgs[0], classTypeId: goodType, weekday: 1, startTime: '12:00' });
+			expect(await materializeTemplates(orgs[0])).toBeGreaterThan(0);
 			const listed = await listClassTypes(orgs[0]);
 			expect(listed.find((r) => r.id === types[0])!.instructorName).toBeNull();
 			await db.insert(ptRequest).values({

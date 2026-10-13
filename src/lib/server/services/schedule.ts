@@ -1,4 +1,7 @@
-import { assertStaffLocationReferences } from '../staff-location-references.ts';
+import {
+	assertStaffLocationReferences,
+	staffLocationReferencesValid
+} from '../staff-location-references.ts';
 import { error } from '@sveltejs/kit';
 import { customFieldsEnabled } from '../ee/custom-fields.ts';
 import {
@@ -2360,6 +2363,7 @@ export async function copyWeek(
 				isNull(classSession.cancelledAt)
 			)
 		);
+	for (const row of src) await assertStaffLocationReferences(ctx.orgId, row);
 	const rows = src
 		.filter((s) => !closed.has(localDate(new Date(s.startsAt.getTime() + shiftMs), tz)))
 		.map((s) => ({
@@ -2409,6 +2413,7 @@ export async function copyDay(ctx: OrgContext, tz: string, fromDate: string, toD
 				isNull(classSession.cancelledAt)
 			)
 		);
+	for (const row of src) await assertStaffLocationReferences(ctx.orgId, row);
 	const rows = closedDay
 		? []
 		: src.map((s) => ({
@@ -2525,7 +2530,7 @@ export async function materializeTemplates(orgId: string) {
 	const tz = st?.timezone ?? 'UTC';
 	const today = localDate(new Date(), tz);
 
-	const templates = await db
+	let templates = await db
 		.select({ template: classTemplate, classType })
 		.from(classTemplate)
 		.innerJoin(
@@ -2590,12 +2595,18 @@ export async function materializeTemplates(orgId: string) {
 		instructorId != null &&
 		offs.some((o) => o.instructorId === instructorId && day >= o.startDate && day <= o.endDate);
 
-	for (const { template: tpl, classType: ct } of templates) {
-		await assertStaffLocationReferences(orgId, {
-			locationId: tpl.locationId ?? ct.locationId,
-			instructorId: tpl.instructorId ?? ct.instructorId
-		});
+	const safeTemplates = [];
+	for (const entry of templates) {
+		const { template: tpl, classType: ct } = entry;
+		if (
+			await staffLocationReferencesValid(orgId, {
+				locationId: tpl.locationId ?? ct.locationId,
+				instructorId: tpl.instructorId ?? ct.instructorId
+			})
+		)
+			safeTemplates.push(entry);
 	}
+	templates = safeTemplates;
 	const now = Date.now();
 	const rows = [];
 	for (let i = 0; i <= TEMPLATE_HORIZON_DAYS; i++) {
