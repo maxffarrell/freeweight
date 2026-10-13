@@ -18,6 +18,7 @@ import { member, organization, user } from './auth.schema.ts';
 export * from './auth.schema.ts';
 
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
+import type { SharedProfile } from '../../profile.ts';
 
 /** Table-qualified column for correlated subqueries; Drizzle omits the qualifier on single-table selects. */
 export const outer = (column: AnyPgColumn) =>
@@ -183,6 +184,8 @@ export const gymMember = pgTable(
 		organizationId: orgId(),
 		locationId: text('location_id').references(() => location.id, { onDelete: 'set null' }),
 		portalUserId: text('portal_user_id').references(() => user.id, { onDelete: 'set null' }),
+		/** Member opted this record in to Leroa Profile contact sync. */
+		profileSync: boolean('profile_sync').notNull().default(false),
 		name: text('name').notNull(),
 		email: text('email'),
 		phone: text('phone'),
@@ -1866,3 +1869,17 @@ export const memberProgram = pgTable(
 	},
 	(t) => [index('member_program_member_idx').on(t.memberId)]
 );
+
+/** Install side of Leroa Profile (FREEWEIGHT_PROFILE_URL): a local account's connection to a profile service. */
+export const profileLink = pgTable('profile_link', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	hubUrl: text('hub_url').notNull(),
+	/** Sealed with the server secret. */
+	accessToken: text('access_token').notNull(),
+	scopes: text('scopes').array().notNull(),
+	data: jsonb('data').$type<SharedProfile>().notNull(),
+	syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
+	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});

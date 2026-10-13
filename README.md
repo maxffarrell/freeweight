@@ -61,6 +61,15 @@ Open http://localhost:5173, create an account, then click **Explore with demo da
 
 Environment variables are documented in [`src/env.ts`](src/env.ts).
 
+### Leroa Profile (shared customer identity)
+
+Setting `FREEWEIGHT_PROFILE_URL` to a Leroa Profile service (any install of [Leroa](https://github.com/maxffarrell/leroa) running `LEROA_PROFILE_HUB=true`) turns on two things:
+
+- **Unified sign-in** — the login page shows "Continue with Leroa". Members sign in through the profile service and land back here as an account keyed to the same identity across the whole suite (Leroa, Tredaro, Freeweight).
+- **Shared contact profile** — portal members get a "Connect your Leroa profile" card. With one consent they grant `identity` + `contact` scopes; the app then syncs name/email/phone into their `gym_member` records at every gym where they opted in (`profile_sync` flag), on portal load and from the daily cron. Disconnecting revokes the hub grant and clears the flags.
+
+Access tokens are sealed server-side (HKDF from `BETTER_AUTH_SECRET`) and stored hashed at the hub; demo mode (`FREEWEIGHT_DEMO`) disables the feature.
+
 ### Self-hosted SSO and AI
 
 Basic SAML/OIDC SSO, passkeys and BYOK AI are included without an enterprise key or Cloud subscription. See [the configuration guide](docs/self-hosted-sso-ai.md). You supply your identity provider and any model-provider credentials; provider usage fees are separate. Credentials stay on the server. Public demos continue to block SSO/passkey configuration.

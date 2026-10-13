@@ -32,6 +32,16 @@
 		await goto(next, { invalidateAll: true });
 	}
 
+	async function suite() {
+		const { error } = await authClient.signIn.social({
+			provider: 'leroa',
+			callbackURL: next,
+			newUserCallbackURL: next,
+			errorCallbackURL: '/login'
+		});
+		if (error) toast.error(error.message ?? 'Could not sign in with Leroa');
+	}
+
 	async function sso() {
 		if (!email.includes('@')) return toast.error('Enter your work email first');
 		const { error } = await authClient.signIn.sso({ email, callbackURL: next });
@@ -90,6 +100,11 @@
 			<Button type="button" onclick={sso}><Building /> Continue with SSO</Button>
 		{/if}
 	</Field.Group>
+	{#if page.data.suite}
+		<Button type="button" variant="outline" class="w-full" onclick={suite}
+			><KeyRound /> Continue with Leroa</Button
+		>
+	{/if}
 	{#if page.data.security}
 		<div class="flex items-center gap-3 text-xs text-muted-foreground">
 			<Separator class="flex-1" /> or <Separator class="flex-1" />

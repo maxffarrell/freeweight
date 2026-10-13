@@ -15,6 +15,11 @@ export const variables = defineEnvVars({
 			'Enterprise license key for paid administrative features. Basic SSO, passkeys and BYOK AI do not require a license.',
 		schema: (value) => value || undefined
 	},
+	FREEWEIGHT_PROFILE_URL: {
+		description:
+			'Leroa Profile service origin, e.g. `https://id.leroa.com`. Enables "Continue with Leroa" unified sign-in and the portal\'s "Connect your Leroa profile" contact sync.',
+		schema: (value) => value || undefined
+	},
 	FREEWEIGHT_DEMO: {
 		description:
 			'Set to `true` for a public demo: visitors get a throwaway sample workspace (deleted after 24h), and sign-up, API access, webhooks, invites and uploads are disabled.',

@@ -11,6 +11,7 @@ import { autoAnonymize, purgeOldData } from '#lib/server/ee/data-retention.ts';
 import { sendWeeklyExport } from '#lib/server/ee/audit-export.ts';
 import { sendMonthClose, sendWeekDigest } from '#lib/server/ee/report-digests.ts';
 import { sendWeeklyInsights } from '#lib/server/ai/ai-features.ts';
+import { syncAllProfiles } from '#lib/server/profile/client.ts';
 import { sendParqReminders } from '#lib/server/ee/health-forms.ts';
 import {
 	sendAnniversaryGreetings,
@@ -370,6 +371,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		billingReminders,
 		announcements,
 		recurringAnnouncements,
+		profiles: await syncAllProfiles(),
 		packNudges,
 		waiverNudges,
 		ratingNudges: ratingNudgeCount,

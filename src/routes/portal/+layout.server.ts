@@ -6,9 +6,11 @@ import { organization } from '#lib/server/db/auth.schema.ts';
 import { gymSettings } from '#lib/server/db/schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/features.ts';
 import { portalMembers } from '#lib/server/services/members.ts';
+import { syncIfStale } from '#lib/server/profile/client.ts';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, `/login?next=${encodeURIComponent(url.pathname)}`);
+	void syncIfStale(locals.user.id);
 	const gyms = await portalMembers(locals.user.id);
 	const memberId = url.searchParams.get('m');
 	const pick = gyms.find((g) => g.member.id === memberId) ?? gyms[0];
