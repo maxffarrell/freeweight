@@ -1,3 +1,4 @@
+import { assertStaffLocationReferences } from '../staff-location-references.ts';
 import { billingPayer } from '../member-ownership.ts';
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '#lib/server/db/index.ts';
@@ -18,7 +19,13 @@ export async function listEvents(orgId: string) {
 	const events = await db
 		.select({ event: gymEvent, locationName: location.name })
 		.from(gymEvent)
-		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(gymEvent.locationId, location.id),
+				eq(gymEvent.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(gymEvent.organizationId, orgId))
 		.orderBy(asc(gymEvent.startsAt));
 	const counts = await db
@@ -46,6 +53,7 @@ export async function createEvent(
 		endsAt: Date;
 	}
 ) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const [row] = await db
 		.insert(gymEvent)
 		.values({
@@ -65,6 +73,7 @@ export async function createEvent(
 }
 
 export async function updateEvent(ctx: OrgContext, input: v.InferOutput<typeof s.eventUpdate>) {
+	await assertStaffLocationReferences(ctx.orgId, input);
 	const { id, ...set } = input;
 	const [row] = await db
 		.update(gymEvent)
@@ -81,7 +90,13 @@ export async function memberEvents(orgId: string, memberId: string) {
 	const events = await db
 		.select({ event: gymEvent, locationName: location.name })
 		.from(gymEvent)
-		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(gymEvent.locationId, location.id),
+				eq(gymEvent.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(gymEvent.organizationId, orgId),

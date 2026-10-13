@@ -1,3 +1,4 @@
+import { assertStaffLocationReferences } from '../staff-location-references.ts';
 import { and, desc, eq } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { db } from '#lib/server/db/index.ts';
@@ -28,7 +29,13 @@ export async function listPtRequests(orgId: string) {
 		})
 		.from(ptRequest)
 		.innerJoin(gymMember, eq(gymMember.id, ptRequest.memberId))
-		.leftJoin(member, eq(member.id, ptRequest.instructorId))
+		.leftJoin(
+			member,
+			and(
+				eq(member.id, ptRequest.instructorId),
+				eq(member.organizationId, ptRequest.organizationId)
+			)
+		)
 		.leftJoin(user, eq(user.id, member.userId))
 		.where(and(eq(ptRequest.organizationId, orgId), eq(ptRequest.status, 'pending')))
 		.orderBy(ptRequest.preferredAt);
@@ -49,7 +56,13 @@ export async function memberPtRequests(orgId: string, memberId: string) {
 	return db
 		.select({ request: ptRequest, instructorName: user.name })
 		.from(ptRequest)
-		.leftJoin(member, eq(member.id, ptRequest.instructorId))
+		.leftJoin(
+			member,
+			and(
+				eq(member.id, ptRequest.instructorId),
+				eq(member.organizationId, ptRequest.organizationId)
+			)
+		)
 		.leftJoin(user, eq(user.id, member.userId))
 		.where(and(eq(ptRequest.organizationId, orgId), eq(ptRequest.memberId, memberId)))
 		.orderBy(desc(ptRequest.createdAt))
@@ -63,6 +76,7 @@ export async function requestPt(
 	preferredAt: Date,
 	note: string | undefined
 ) {
+	await assertStaffLocationReferences(orgId, { instructorId });
 	if (preferredAt.getTime() < Date.now() + 30 * 60_000)
 		error(400, 'Pick a time at least 30 minutes out');
 	const [row] = await db

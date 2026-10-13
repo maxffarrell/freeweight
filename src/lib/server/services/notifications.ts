@@ -222,7 +222,13 @@ export async function notifyWaitlistPromoted(orgId: string, bookingId: string) {
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(booking.id, bookingId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'waitlist_promoted', bookingId, row.email))) return;
@@ -257,7 +263,13 @@ export async function notifyBookingConfirmed(orgId: string, bookingId: string) {
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(booking.id, bookingId));
 	if (!row?.email) return;
 	const waitlisted = row.status === 'waitlisted';
@@ -299,7 +311,13 @@ export async function notifyResourceBooked(orgId: string, resourceBookingId: str
 		.from(resourceBooking)
 		.innerJoin(gymMember, eq(resourceBooking.memberId, gymMember.id))
 		.innerJoin(facilityResource, eq(resourceBooking.resourceId, facilityResource.id))
-		.leftJoin(location, eq(facilityResource.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(facilityResource.locationId, location.id),
+				eq(facilityResource.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(resourceBooking.id, resourceBookingId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'resource_booked', resourceBookingId, row.email))) return;
@@ -335,7 +353,13 @@ export async function notifyEventRegistered(orgId: string, registrationId: strin
 		.from(eventRegistration)
 		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
 		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
-		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(gymEvent.locationId, location.id),
+				eq(gymEvent.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(eventRegistration.id, registrationId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'event_registered', registrationId, row.email))) return;
@@ -989,7 +1013,13 @@ export async function notifySessionCancelled(orgId: string, sessionId: string) {
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(
 			and(eq(booking.sessionId, sessionId), inArray(booking.status, ['booked', 'waitlisted']))
 		);
@@ -1032,8 +1062,20 @@ export async function notifyBookingCancelled(orgId: string, bookingId: string) {
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(booking.id, bookingId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'booking_cancelled', bookingId, row.email))) return;
@@ -1066,7 +1108,13 @@ export async function notifyInstructorChanged(orgId: string, sessionId: string) 
 			startsAt: classSession.startsAt
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(classSession.id, sessionId));
 	if (!sess) return;
 	const [instr] = sess.instructorId
@@ -1128,8 +1176,20 @@ export async function notifySessionChanged(orgId: string, sessionId: string) {
 			locationName: location.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(classSession.id, sessionId));
 	if (!sess) return;
 	const rows = await db
@@ -1190,8 +1250,20 @@ export async function sendClassReminders(orgId: string) {
 		.from(booking)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(booking.organizationId, orgId),
@@ -1242,7 +1314,13 @@ export async function sendEventReminders(orgId: string) {
 		.from(eventRegistration)
 		.innerJoin(gymMember, eq(eventRegistration.memberId, gymMember.id))
 		.innerJoin(gymEvent, eq(eventRegistration.eventId, gymEvent.id))
-		.leftJoin(location, eq(gymEvent.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(gymEvent.locationId, location.id),
+				eq(gymEvent.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(eventRegistration.organizationId, orgId),
@@ -1293,7 +1371,13 @@ export async function sendResourceReminders(orgId: string) {
 		.from(resourceBooking)
 		.innerJoin(gymMember, eq(resourceBooking.memberId, gymMember.id))
 		.innerJoin(facilityResource, eq(resourceBooking.resourceId, facilityResource.id))
-		.leftJoin(location, eq(facilityResource.locationId, location.id))
+		.leftJoin(
+			location,
+			and(
+				eq(facilityResource.locationId, location.id),
+				eq(facilityResource.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(resourceBooking.organizationId, orgId),
@@ -2639,8 +2723,20 @@ export async function sendStaffBriefing(orgId: string) {
 				instructorName: user.name
 			})
 			.from(classSession)
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-			.leftJoin(member, eq(classSession.instructorId, member.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
+			.leftJoin(
+				member,
+				and(
+					eq(classSession.instructorId, member.id),
+					eq(classSession.organizationId, member.organizationId)
+				)
+			)
 			.leftJoin(user, eq(member.userId, user.id))
 			.where(
 				and(
@@ -2688,8 +2784,20 @@ export async function sendStaffBriefing(orgId: string) {
 				instructorName: user.name
 			})
 			.from(classSession)
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-			.leftJoin(member, eq(classSession.instructorId, member.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
+			.leftJoin(
+				member,
+				and(
+					eq(classSession.instructorId, member.id),
+					eq(classSession.organizationId, member.organizationId)
+				)
+			)
 			.leftJoin(user, eq(member.userId, user.id))
 			.where(
 				and(
@@ -3312,8 +3420,20 @@ export async function sendInstructorRosters(orgId: string) {
 			locationName: location.name
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(
 			and(
 				eq(classSession.organizationId, orgId),
@@ -3405,7 +3525,13 @@ export async function sendInstructorFeedbackDigests(orgId: string) {
 		})
 		.from(sessionFeedback)
 		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
 		.where(
 			and(
@@ -3601,9 +3727,27 @@ export async function sendCoverRequests(orgId: string, sessionId: string, flagge
 			booked: sql<number>`(select count(*)::int + coalesce(sum(b.guest_count), 0)::int from ${booking} b where b.session_id = ${classSession.id} and b.status = 'booked')`
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(and(eq(classSession.organizationId, orgId), eq(classSession.id, sessionId)));
 	if (!row) return;
@@ -3673,7 +3817,13 @@ export async function ratingNudges(orgId: string) {
 		})
 		.from(booking)
 		.innerJoin(classSession, eq(booking.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.innerJoin(gymMember, eq(booking.memberId, gymMember.id))
 		.leftJoin(
 			sessionFeedback,
@@ -3733,8 +3883,20 @@ export async function notifyLowRating(orgId: string, sessionId: string, memberId
 		.from(sessionFeedback)
 		.innerJoin(gymMember, eq(sessionFeedback.memberId, gymMember.id))
 		.innerJoin(classSession, eq(sessionFeedback.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(member, eq(classSession.instructorId, member.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			member,
+			and(
+				eq(classSession.instructorId, member.id),
+				eq(classSession.organizationId, member.organizationId)
+			)
+		)
 		.leftJoin(user, eq(member.userId, user.id))
 		.where(
 			and(
@@ -3998,7 +4160,13 @@ export async function notifyTrialRequested(orgId: string, requestId: string) {
 		.from(trialRequest)
 		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
 		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(trialRequest.id, requestId));
 	if (!row) return;
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
@@ -4038,8 +4206,20 @@ export async function notifyTrialConfirmed(orgId: string, requestId: string) {
 		.from(trialRequest)
 		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
 		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
-		.leftJoin(location, eq(classSession.locationId, location.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
+		.leftJoin(
+			location,
+			and(
+				eq(classSession.locationId, location.id),
+				eq(classSession.organizationId, location.organizationId)
+			)
+		)
 		.where(eq(trialRequest.id, requestId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'trial_confirmed', requestId, row.email))) return;
@@ -4071,7 +4251,13 @@ export async function notifyTrialDeclined(orgId: string, requestId: string) {
 		.from(trialRequest)
 		.innerJoin(gymMember, eq(trialRequest.memberId, gymMember.id))
 		.innerJoin(classSession, eq(trialRequest.sessionId, classSession.id))
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(trialRequest.id, requestId));
 	if (!row?.email) return;
 	if (!(await logOnce(orgId, 'trial_declined', requestId, row.email))) return;
@@ -4134,7 +4320,13 @@ export async function notifyClassFull(orgId: string, sessionId: string) {
 			capacity: classSession.capacity
 		})
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(eq(classSession.id, sessionId));
 	if (!row) return;
 	const [name, tz] = await Promise.all([orgBrand(orgId), orgTimezone(orgId)]);
@@ -4223,7 +4415,13 @@ export async function sendUsualClassNudges(orgId: string) {
 					)
 			})
 			.from(classSession)
-			.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+			.innerJoin(
+				classType,
+				and(
+					eq(classSession.classTypeId, classType.id),
+					eq(classSession.organizationId, classType.organizationId)
+				)
+			)
 			.where(
 				and(
 					eq(classSession.organizationId, orgId),
@@ -4276,7 +4474,13 @@ export async function notifyClassWatchers(orgId: string, sessionIds: string[]) {
 	const sessions = await db
 		.select({ id: classSession.id, startsAt: classSession.startsAt, className: classType.name })
 		.from(classSession)
-		.innerJoin(classType, eq(classSession.classTypeId, classType.id))
+		.innerJoin(
+			classType,
+			and(
+				eq(classSession.classTypeId, classType.id),
+				eq(classSession.organizationId, classType.organizationId)
+			)
+		)
 		.where(and(eq(classSession.organizationId, orgId), inArray(classSession.id, sessionIds)));
 	if (!sessions.length) return;
 	const ctId = (
