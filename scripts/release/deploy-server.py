@@ -21,6 +21,12 @@ class Timer(html.parser.HTMLParser):
  def handle_data(self,data):
   if self.active:self.value+=data
 
+def valid_session_lifetime(created, expires):
+ parse=lambda s:datetime.fromisoformat(s.replace('Z','+00:00'))
+ # Better Auth creates these timestamps separately; observed creation lag is 1 ms.
+ # Allow a subsecond shorter lifetime, never an extension beyond eight minutes.
+ return 479 <= (parse(expires)-parse(created)).total_seconds() <= 480
+
 def verify(app):
  base=f'https://{app}.173.249.220.229.nip.io'
  jar=http.cookiejar.CookieJar();client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
@@ -32,8 +38,7 @@ def verify(app):
  with client.open(request,timeout=60) as r:
   if not r.geturl().endswith('/dashboard'):raise RuntimeError('Demo creation failed')
  session=json.loads(get('/api/auth/get-session')[1])['session']
- parse=lambda s:datetime.fromisoformat(s.replace('Z','+00:00'))
- if (parse(session['expiresAt'])-parse(session['createdAt'])).total_seconds()!=480:raise RuntimeError('Session lifetime changed')
+ if not valid_session_lifetime(session['createdAt'],session['expiresAt']):raise RuntimeError('Session lifetime changed')
  def timer():
   url,body=get('/dashboard');p=Timer();p.feed(body)
   if not url.endswith('/dashboard') or not re.fullmatch(r'\d+:\d{2}',p.value.strip()):raise RuntimeError('Demo countdown missing')
