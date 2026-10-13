@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.1.2
+
+### Patch Changes
+
+- 2fa96a7: Link every public demo account to a sample portal profile in its own workspace so the admin sidebar portal opens successfully.
+
 ## 0.1.1
 
 ### Patch Changes
