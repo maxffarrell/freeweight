@@ -56,8 +56,7 @@
 		<div class="space-y-1">
 			<h2 class="font-semibold">Try it first — no sign-up needed</h2>
 			<p class="text-sm text-muted-foreground">
-				Open a private sample gym with realistic data. Staff view opens the workspace; member view
-				opens the member portal. Sessions last 8 minutes and are deleted within 24 hours.
+				Explore a seeded demo — staff or member view. Sessions last 8 minutes.
 			</p>
 		</div>
 		<Button type="submit" class="w-full"><Sparkles /> Staff view</Button>
