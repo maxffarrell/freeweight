@@ -18,9 +18,7 @@
 			<blockquote class="text-2xl leading-snug font-medium text-white">
 				The gym, minus the busywork.
 			</blockquote>
-			<p class="mt-4 text-sm text-neutral-400">
-				Members, memberships, bookings and check-ins.
-			</p>
+			<p class="mt-4 text-sm text-neutral-400">Members, memberships, bookings and check-ins.</p>
 		</div>
 	</div>
 </div>
