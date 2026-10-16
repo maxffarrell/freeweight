@@ -10,20 +10,24 @@ const stamp = (d: Date) =>
 		.replace(/[-:]/g, '')
 		.replace(/\.\d{3}/, '');
 const esc = (s: string) =>
-	s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+	s
+		.replace(/\\/g, '\\\\')
+		.replace(/;/g, '\\;')
+		.replace(/,/g, '\\,')
+		.replace(/\r\n|\r|\n/g, '\\n');
 
 /** Personal iCal feed of a member's upcoming bookings — subscribe via the portal's "Sync to calendar" link. */
 export const GET: RequestHandler = async ({ url }) => {
 	const memberId = url.searchParams.get('m') ?? '';
 	const token = url.searchParams.get('t') ?? '';
 	if (!memberId || !validCalendarToken(memberId, token))
-		return new Response('Invalid calendar link', { status: 403 });
+		return new Response('Not found', { status: 404 });
 
 	const [m] = await db
 		.select({ orgId: gymMember.organizationId })
 		.from(gymMember)
 		.where(eq(gymMember.id, memberId));
-	if (!m) return new Response('Invalid calendar link', { status: 403 });
+	if (!m) return new Response('Not found', { status: 404 });
 
 	const rows = await db
 		.select({

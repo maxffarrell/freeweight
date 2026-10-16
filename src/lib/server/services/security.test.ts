@@ -34,6 +34,7 @@ import {
 	refundPayment
 } from './billing.ts';
 import { dashboard } from './dashboard.ts';
+import { getReports } from './reports.ts';
 import { notifyCreditsGifted, notifyPaymentReceived, notifyPlanChanged } from './notifications.ts';
 import { bookSession, creditsUsedIn } from './schedule.ts';
 import {
@@ -214,6 +215,16 @@ describe.skipIf(!process.env.DATABASE_URL)(
 			expect(result.sessions[0].session).not.toHaveProperty('note');
 			expect(result.settings.waiver).toBe('Terms');
 			expect(result.sessions[0].session.id).toBe(sessionId);
+		});
+		it('runs timezone-bound reporting and positional grouping against PostgreSQL', async () => {
+			await db
+				.update(gymSettings)
+				.set({ timezone: 'America/Chicago' })
+				.where(eq(gymSettings.organizationId, a));
+			const result = await getReports(a);
+			expect(result.hours).toHaveLength(24);
+			expect(result.weekdays).toHaveLength(7);
+			expect(result.heatmap).toEqual([]);
 		});
 		it('email case variants cannot sign victim waivers or post victim charges and trial requests', async () => {
 			const input = {

@@ -5,10 +5,10 @@ import { gymMember, organization } from '#lib/server/db/schema.ts';
 import { validUnsubscribeToken } from '#lib/server/services/notifications.ts';
 import type { RequestHandler } from './$types';
 
-const page = (heading: string, body: string) =>
+const page = (heading: string, body: string, status = 200) =>
 	new Response(
 		`<!doctype html><html><body style="margin:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#18181b;display:grid;place-items:center;min-height:100vh"><main style="max-width:420px;background:#fff;border-radius:12px;padding:32px;text-align:center"><h1 style="font-size:20px;margin:0 0 12px">${escapeHtml(heading)}</h1><p style="font-size:14px;color:#52525b;margin:0">${escapeHtml(body)}</p></main></body></html>`,
-		{ headers: { 'content-type': 'text/html' } }
+		{ status, headers: { 'content-type': 'text/html', 'cache-control': 'no-store' } }
 	);
 
 /** Signed unsubscribe link from member-facing email footers. */
@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	const memberId = url.searchParams.get('m') ?? '';
 	const token = url.searchParams.get('t') ?? '';
 	if (!memberId || !validUnsubscribeToken(memberId, token))
-		return page('Invalid link', 'This unsubscribe link is invalid or has been tampered with.');
+		return page('Invalid link', 'This unsubscribe link is invalid or has been tampered with.', 404);
 
 	const [m] = await db
 		.select({ id: gymMember.id, orgName: organization.name })
@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		.innerJoin(organization, eq(gymMember.organizationId, organization.id))
 		.where(eq(gymMember.id, memberId));
 	if (!m)
-		return page('Invalid link', 'This unsubscribe link is invalid or has been tampered with.');
+		return page('Invalid link', 'This unsubscribe link is invalid or has been tampered with.', 404);
 
 	await db.update(gymMember).set({ unsubscribedAt: new Date() }).where(eq(gymMember.id, memberId));
 	return page(
