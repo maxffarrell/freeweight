@@ -490,7 +490,21 @@ export const saleInput = v.object({
 });
 
 export const settingsInput = v.object({
-	timezone: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+	timezone: v.optional(
+		v.pipe(
+			v.string(),
+			v.trim(),
+			v.maxLength(60),
+			v.check((value) => {
+				try {
+					new Intl.DateTimeFormat('en', { timeZone: value });
+					return true;
+				} catch {
+					return false;
+				}
+			}, 'Use a valid IANA timezone')
+		)
+	),
 	currency: v.optional(v.pipe(v.string(), v.trim(), v.toLowerCase(), v.length(3))),
 	publicPage: v.optional(v.boolean()),
 	tagline: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(300))),

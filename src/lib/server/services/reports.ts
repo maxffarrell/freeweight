@@ -425,10 +425,8 @@ async function fillByWeekday(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
-	// The tz must be embedded as a literal: a ${tz} param gives SELECT and
-	// GROUP BY different param slots ($1 vs $5), which Postgres treats as
-	// different expressions and rejects the GROUP BY.
-	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
+	// Group by the selected position so the bound timezone is not repeated in another slot.
+	const tzLit = sql`${tz}`;
 	const rows = await db
 		.select({
 			dow: sql<number>`extract(dow from ${classSession.startsAt} at time zone ${tzLit})`.mapWith(
@@ -449,7 +447,7 @@ async function fillByWeekday(orgId: string) {
 				lt(classSession.startsAt, new Date())
 			)
 		)
-		.groupBy(sql`extract(dow from ${classSession.startsAt} at time zone ${tzLit})`);
+		.groupBy(sql`1`);
 	const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	const byDow = new Map(rows.map((r) => [r.dow, r]));
 	return [1, 2, 3, 4, 5, 6, 0].map((d) => ({
@@ -1133,7 +1131,7 @@ async function checkInsByHour(orgId: string) {
 		.from(gymSettings)
 		.where(eq(gymSettings.organizationId, orgId));
 	const tz = s?.timezone ?? 'UTC';
-	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
+	const tzLit = sql`${tz}`;
 	const rows = await db
 		.select({
 			hour: sql<number>`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})`.mapWith(
@@ -1149,7 +1147,7 @@ async function checkInsByHour(orgId: string) {
 				isNull(checkIn.guestName)
 			)
 		)
-		.groupBy(sql`extract(hour from ${checkIn.checkedAt} at time zone ${tzLit})`);
+		.groupBy(sql`1`);
 	const byHour = new Map(rows.map((r) => [r.hour, r.count]));
 	return Array.from({ length: 24 }, (_, hour) => ({ hour, count: byHour.get(hour) ?? 0 }));
 }
@@ -2329,7 +2327,7 @@ async function checkinHeatmap(orgId: string) {
 		.where(eq(gymSettings.organizationId, orgId))
 		.limit(1);
 	const tz = s?.timezone ?? 'UTC';
-	const tzLit = sql.raw(`'${tz.replaceAll("'", "''")}'`);
+	const tzLit = sql`${tz}`;
 	const since = new Date(Date.now() - 90 * 86_400_000);
 	return db
 		.select({

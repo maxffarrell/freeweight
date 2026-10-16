@@ -7,6 +7,7 @@ Freeweight runs on any Hostinger **VPS** using the Docker Manager (Docker Compos
    `https://raw.githubusercontent.com/maxffarrell/freeweight/main/docker-compose.yml`
 3. Set environment variables:
    - `BETTER_AUTH_SECRET` – output of `openssl rand -hex 32`
+   - `POSTGRES_PASSWORD` – a separate output of `openssl rand -hex 32`; keep it persistent. For existing database volumes use their current password, not a newly generated one.
    - `ORIGIN` – your public URL, e.g. `https://gym.example.com`
 4. Deploy. Freeweight listens on port 3000; point your domain at the VPS and enable HTTPS from **Domains → SSL**.
 

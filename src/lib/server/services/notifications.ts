@@ -1,5 +1,5 @@
 import { outer } from '#lib/server/db/schema.ts';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { memberLinkToken, validMemberLinkToken } from '#lib/server/member-link-token.ts';
 import { error } from '@sveltejs/kit';
 import {
 	and,
@@ -80,16 +80,11 @@ async function orgTimezone(orgId: string) {
 
 /** Signed token behind the Unsubscribe footer link in member-facing emails. */
 export function unsubscribeToken(memberId: string) {
-	return createHmac('sha256', BETTER_AUTH_SECRET)
-		.update(`unsub:${memberId}`)
-		.digest('hex')
-		.slice(0, 32);
+	return memberLinkToken('unsub', memberId, BETTER_AUTH_SECRET);
 }
 
 export function validUnsubscribeToken(memberId: string, token: string) {
-	const a = Buffer.from(unsubscribeToken(memberId));
-	const b = Buffer.from(token);
-	return a.length === b.length && timingSafeEqual(a, b);
+	return validMemberLinkToken('unsub', memberId, token, BETTER_AUTH_SECRET);
 }
 
 const unsubscribeUrl = (memberId: string) =>
@@ -97,16 +92,11 @@ const unsubscribeUrl = (memberId: string) =>
 
 /** Signed token behind the portal's "Sync to calendar" .ics feed URL. */
 export function calendarToken(memberId: string) {
-	return createHmac('sha256', BETTER_AUTH_SECRET)
-		.update(`ical:${memberId}`)
-		.digest('hex')
-		.slice(0, 32);
+	return memberLinkToken('ical', memberId, BETTER_AUTH_SECRET);
 }
 
 export function validCalendarToken(memberId: string, token: string) {
-	const a = Buffer.from(calendarToken(memberId));
-	const b = Buffer.from(token);
-	return a.length === b.length && timingSafeEqual(a, b);
+	return validMemberLinkToken('ical', memberId, token, BETTER_AUTH_SECRET);
 }
 
 /**
@@ -186,16 +176,11 @@ async function logOnce(orgId: string, kind: string, entityId: string, recipient:
 
 /** Signed token behind the 1x1 email-open pixel stamped onto a notification_log row. */
 export function openToken(logId: string) {
-	return createHmac('sha256', BETTER_AUTH_SECRET)
-		.update(`open:${logId}`)
-		.digest('hex')
-		.slice(0, 32);
+	return memberLinkToken('open', logId, BETTER_AUTH_SECRET);
 }
 
 export function validOpenToken(logId: string, token: string) {
-	const a = Buffer.from(openToken(logId));
-	const b = Buffer.from(token);
-	return a.length === b.length && timingSafeEqual(a, b);
+	return validMemberLinkToken('open', logId, token, BETTER_AUTH_SECRET);
 }
 
 /** Stamps openedAt on a notification_log row — the email-open pixel endpoint. */
@@ -4594,7 +4579,7 @@ export async function sendOwnerInsights(orgId: string) {
 			.where(
 				and(
 					eq(gymMember.organizationId, orgId),
-					sql`to_char(${gymMember.createdAt} at time zone ${sql.raw(`'${tz}'`)}, 'YYYY-MM') = ${lastMonth.slice(0, 7)}`
+					sql`to_char(${gymMember.createdAt} at time zone ${tz}, 'YYYY-MM') = ${lastMonth.slice(0, 7)}`
 				)
 			),
 		db

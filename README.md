@@ -15,6 +15,8 @@ Members, memberships, class scheduling, QR check-ins and billing, plus a member 
 
 </div>
 
+Freeweight is open core: the core is licensed under [AGPL-3.0](LICENSE-AGPL.txt), with separately licensed enterprise features. Copy [.env.example](.env.example) to `.env` for self-hosted setup. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
+
 ## Features
 
 - **Members**: searchable roster, statuses, locations, per-member balances and portal invite links
@@ -34,8 +36,9 @@ Out of scope by design: payroll, workout programming, and access-control hardwar
 ## Quick start
 
 ```sh
-cp .env.example .env           # set a persistent random BETTER_AUTH_SECRET (32+ characters)
-# In .env set DATABASE_URL=postgres://freeweight:freeweight@localhost:5432/freeweight
+cp .env.example .env
+# In .env set BETTER_AUTH_SECRET and POSTGRES_PASSWORD to separate outputs of openssl rand -hex 32.
+# Set DATABASE_URL=postgres://freeweight:<POSTGRES_PASSWORD>@localhost:5432/freeweight
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
 pnpm install
 node --env-file=.env scripts/migrate.ts
@@ -48,7 +51,7 @@ Open http://localhost:5173, create an account, then click **Explore with demo da
 
 | Target       | How                                                                                                            |
 | ------------ | -------------------------------------------------------------------------------------------------------------- |
-| Docker       | `BETTER_AUTH_SECRET=$(openssl rand -hex 32) docker compose up -d`                                              |
+| Docker       | Configure persistent secrets in `.env` (see quick start), then `docker compose up -d`.                         |
 | Railway      | Button above. Uses `railway.json` + `Dockerfile` with a Postgres plugin.                                       |
 | Vercel       | Button above. Uses `@sveltejs/adapter-vercel` automatically when `VERCEL=1`. Migrations run during the build.  |
 | Render       | Button above. `render.yaml` provisions a Docker web service and a Postgres database.                           |
@@ -94,7 +97,7 @@ Webhooks (Settings → Webhooks) are signed with HMAC-SHA256 in `x-freeweight-si
 
 ## License
 
-AGPLv3 for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.
+[AGPL-3.0](LICENSE-AGPL.txt) for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.
 
 Existing members use the member portal for bookings and purchases; public forms are for new visitors.
 
@@ -107,3 +110,5 @@ This is pre-1.0 software. Start with a disposable evaluation and check your work
 For Docker self-hosting, create `.env` once and keep its authentication secret across upgrades. Optional SSO/AI/provider settings in `.env` are passed to the application container. Use `docker compose up -d --build` when building this checkout; published images use version tags rather than an unversioned `latest` tag.
 
 The source Compose setup builds this checkout and requires Docker Compose 2.24 or newer for its optional `.env` file. Rebuild after updating source to pick up security fixes.
+
+Compose requires an explicit `POSTGRES_PASSWORD`; no shared database password is supplied. For an existing volume, set it to the database's current password before upgrading. Changing `.env` alone does not rotate an initialized database: coordinate any password change with PostgreSQL and update all clients. Back up before upgrading, and keep both secrets persistent.

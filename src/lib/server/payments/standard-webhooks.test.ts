@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { secretList, signStandardWebhook, verifyStandardWebhook } from './standard-webhooks.ts';
 
-const secret = `whsec_${Buffer.from('test-signing-key-0123456789').toString('base64')}`;
-const other = `whsec_${Buffer.from('another-signing-key').toString('base64')}`;
+// Standard Webhooks requires base64 key material; these encode only explicit dummy text.
+const secret = `whsec_${Buffer.from('test_not_real_signing_key').toString('base64')}`;
+const other = `whsec_${Buffer.from('test_not_real_other_key').toString('base64')}`;
 const body = '{"type":"checkout.session.completed"}';
 const now = 1_800_000_000_000;
 const ts = now / 1000;

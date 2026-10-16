@@ -86,6 +86,7 @@ jobs:
     services:
       postgres:
         image: postgres:18-alpine
+        # Disposable runner-local test database, never production credentials.
         env:
           POSTGRES_USER: demo_test
           POSTGRES_PASSWORD: runner-test-only
@@ -104,6 +105,7 @@ jobs:
         with:
           node-version: '26'
       - name: Validate application and release safeguards
+        # Isolated CI-only database/auth fixtures; real credentials use secrets contexts.
         env:
           DATABASE_URL: postgres://demo_test:runner-test-only@localhost:5432/demo_test
           BETTER_AUTH_SECRET: runner-test-only

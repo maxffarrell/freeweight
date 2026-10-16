@@ -1,12 +1,16 @@
-node_modules
+node_modules/
 
 # Output
 .output
 .vercel
 .netlify
 .wrangler
-/.svelte-kit
-/build
+/.svelte-kit/
+/build/
+/coverage/
+/data/uploads/
+*.log
+__pycache__/
 
 # OS
 .DS_Store
@@ -16,7 +20,12 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-!.env.test
+
+# Local migration experiments (keep versioned drizzle migrations and metadata).
+/drizzle/*.local.sql
+/drizzle/*.tmp.sql
+/drizzle/scratch/
+/scripts/_tmp-*
 
 # Vite
 vite.config.js.timestamp-*
