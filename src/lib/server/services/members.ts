@@ -837,7 +837,7 @@ export async function getMember(orgId: string, id: string) {
 
 	// "Usually visits" — top dow/hour combos from the member's check-in history
 	// (org timezone so 6pm means 6pm at the gym).
-	const tzLit = sql.raw(`'${(stz?.tz ?? 'UTC').replace(/'/g, "''")}'`);
+	const tzLit = sql`${stz?.tz ?? 'UTC'}`;
 	const usualTimes = await db
 		.select({
 			dow: sql<number>`extract(dow from ${checkIn.checkedAt} at time zone ${tzLit})`.mapWith(
@@ -1413,7 +1413,7 @@ export async function membersLeaderboard(orgId: string, memberId: string, tz: st
 				eq(checkIn.organizationId, orgId),
 				isNull(checkIn.guestName),
 				ne(gymMember.name, 'Former member'),
-				sql`to_char(${checkIn.checkedAt} at time zone ${sql.raw(`'${tz.replace(/'/g, '')}'`)}, 'YYYY-MM') = ${month}`
+				sql`to_char(${checkIn.checkedAt} at time zone ${tz}, 'YYYY-MM') = ${month}`
 			)
 		)
 		.groupBy(gymMember.id, gymMember.name)

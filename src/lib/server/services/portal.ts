@@ -1,7 +1,21 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createPortalToken, readPortalToken } from '#lib/server/portal-token.ts';
 import { isEnterpriseEnabled } from '#lib/server/features.ts';
 import { healthFormsEnabled } from '#lib/server/ee/health-forms.ts';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gt,
+	gte,
+	inArray,
+	isNotNull,
+	isNull,
+	lt,
+	ne,
+	or,
+	sql
+} from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { BETTER_AUTH_SECRET } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
@@ -70,16 +84,15 @@ import {
 import { addDays, localDate } from '#lib/tz.ts';
 import { formatMoney, loyaltyTier, todayISO } from '#lib/format.ts';
 
-const TTL_MS = 14 * 86400_000;
-
-function sign(payload: string) {
-	return createHmac('sha256', BETTER_AUTH_SECRET).update(`portal:${payload}`).digest('base64url');
-}
-
 /** A signed, expiring link that lets a member attach their login to their member record. */
 export function portalToken(memberId: string) {
-	const payload = `${memberId}.${Date.now() + TTL_MS}`;
-	return `${Buffer.from(payload).toString('base64url')}.${sign(payload)}`;
+	return createPortalToken(memberId, BETTER_AUTH_SECRET);
+}
+
+export function portalTokenMemberId(token: string) {
+	const memberId = readPortalToken(token, BETTER_AUTH_SECRET);
+	if (!memberId) error(404, 'Not found');
+	return memberId;
 }
 
 export async function hasPortalMembership(userId: string) {
@@ -92,22 +105,18 @@ export async function hasPortalMembership(userId: string) {
 }
 
 export async function claimPortal(token: string, userId: string) {
-	const [encoded, sig] = token.split('.');
-	if (!encoded || !sig) error(400, 'Invalid link');
-	const payload = Buffer.from(encoded, 'base64url').toString();
-	const expected = Buffer.from(sign(payload));
-	const given = Buffer.from(sig);
-	if (expected.length !== given.length || !timingSafeEqual(expected, given))
-		error(400, 'Invalid link');
-	const [memberId, exp] = payload.split('.');
-	if (!memberId || Number(exp) < Date.now())
-		error(410, 'This link has expired. Ask your gym for a new one.');
+	const memberId = portalTokenMemberId(token);
 	const [m] = await db
 		.update(gymMember)
 		.set({ portalUserId: userId })
-		.where(eq(gymMember.id, memberId))
-		.returning();
-	if (!m) error(404, 'Member not found');
+		.where(
+			and(
+				eq(gymMember.id, memberId),
+				or(isNull(gymMember.portalUserId), eq(gymMember.portalUserId, userId))
+			)
+		)
+		.returning({ id: gymMember.id });
+	if (!m) error(404, 'Not found');
 	return m;
 }
 

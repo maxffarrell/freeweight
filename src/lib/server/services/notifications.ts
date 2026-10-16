@@ -4594,7 +4594,7 @@ export async function sendOwnerInsights(orgId: string) {
 			.where(
 				and(
 					eq(gymMember.organizationId, orgId),
-					sql`to_char(${gymMember.createdAt} at time zone ${sql.raw(`'${tz}'`)}, 'YYYY-MM') = ${lastMonth.slice(0, 7)}`
+					sql`to_char(${gymMember.createdAt} at time zone ${tz}, 'YYYY-MM') = ${lastMonth.slice(0, 7)}`
 				)
 			),
 		db

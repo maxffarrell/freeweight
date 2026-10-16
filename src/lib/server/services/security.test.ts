@@ -13,7 +13,8 @@ import {
 	organization,
 	payment,
 	plan,
-	waiver
+	waiver,
+	user
 } from '#lib/server/db/schema.ts';
 import {
 	bookDropIn,
@@ -35,7 +36,13 @@ import {
 import { dashboard } from './dashboard.ts';
 import { notifyCreditsGifted, notifyPaymentReceived, notifyPlanChanged } from './notifications.ts';
 import { bookSession, creditsUsedIn } from './schedule.ts';
-import { acceptSaveOffer, memberChangePlan, setClassWatch } from './portal.ts';
+import {
+	acceptSaveOffer,
+	claimPortal,
+	portalToken,
+	memberChangePlan,
+	setClassWatch
+} from './portal.ts';
 
 const notificationSpies = vi.hoisted(() => new Map<string, ReturnType<typeof vi.fn>>());
 
@@ -154,6 +161,49 @@ describe.skipIf(!process.env.DATABASE_URL)(
 		});
 		afterEach(async () => {
 			await db.delete(organization).where(inArray(organization.id, [a, b]));
+		});
+		it('claims only unbound or same-owner records and returns a minimal DTO', async () => {
+			const first = crypto.randomUUID(),
+				second = crypto.randomUUID();
+			await db.insert(user).values([
+				{
+					id: first,
+					name: 'First',
+					email: `${first}@example.test`,
+					emailVerified: false,
+					createdAt: new Date(),
+					updatedAt: new Date()
+				},
+				{
+					id: second,
+					name: 'Second',
+					email: `${second}@example.test`,
+					emailVerified: false,
+					createdAt: new Date(),
+					updatedAt: new Date()
+				}
+			]);
+			try {
+				const token = portalToken(victim.id);
+				expect(await claimPortal(token, first)).toEqual({ id: victim.id });
+				expect(await claimPortal(token, first)).toEqual({ id: victim.id });
+				await expect(claimPortal(token, second)).rejects.toMatchObject({
+					status: 404,
+					body: { message: 'Not found' }
+				});
+				await expect(claimPortal(portalToken(crypto.randomUUID()), first)).rejects.toMatchObject({
+					status: 404,
+					body: { message: 'Not found' }
+				});
+				await expect(claimPortal('malformed', first)).rejects.toMatchObject({ status: 404 });
+				const [stored] = await db
+					.select({ owner: gymMember.portalUserId })
+					.from(gymMember)
+					.where(eq(gymMember.id, victim.id));
+				expect(stored.owner).toBe(first);
+			} finally {
+				await db.delete(user).where(inArray(user.id, [first, second]));
+			}
 		});
 		it('public pages disclose only schedule and public settings fields', async () => {
 			const result = await getPublicGym(slug);
