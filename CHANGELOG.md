@@ -1,5 +1,12 @@
 # freeweight
 
+## 0.1.3
+
+### Patch Changes
+
+- 44a6d34: Fix demo deployment for releases merged by a GitHub App account.
+- d91f2ca: Validate portal claim and persistent member links before database access, bind tenant timezones in SQL, and require explicit self-hosted database credentials.
+
 ## 0.1.2
 
 ### Patch Changes
