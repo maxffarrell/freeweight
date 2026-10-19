@@ -15,7 +15,7 @@ Members, memberships, class scheduling, QR check-ins and billing, plus a member 
 
 </div>
 
-Freeweight is open core: the core is licensed under [AGPL-3.0](LICENSE-AGPL.txt), with separately licensed enterprise features. Copy [.env.example](.env.example) to `.env` for self-hosted setup. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
+Freeweight is open core: the core is licensed under [MIT](LICENSE-MIT.txt), with separately licensed enterprise features. Copy [.env.example](.env.example) to `.env` for self-hosted setup. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 
 ## Features
 
@@ -97,7 +97,7 @@ Webhooks (Settings → Webhooks) are signed with HMAC-SHA256 in `x-freeweight-si
 
 ## License
 
-[AGPL-3.0](LICENSE-AGPL.txt) for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.
+[MIT](LICENSE-MIT.txt) for the core, including basic SSO, passkeys and BYOK AI. Files under `src/lib/server/ee/` or marked `/* @license Enterprise */` use the Freeweight Enterprise License in `ee/LICENSE`; production use of those paid administrative features requires a valid subscription or Freeweight Cloud. `packages/sdk` is MIT.
 
 Existing members use the member portal for bookings and purchases; public forms are for new visitors.
 
