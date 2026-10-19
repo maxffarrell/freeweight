@@ -1,6 +1,6 @@
 # Self-hosted SSO and BYOK AI
 
-Basic SAML/OIDC SSO, passkeys and BYOK AI are part of the AGPLv3 core. They do
+Basic SAML/OIDC SSO, passkeys and BYOK AI are part of the MIT core. They do
 not require `FREEWEIGHT_ENTERPRISE_KEY` or a Cloud subscription.
 
 ## Sign-in
