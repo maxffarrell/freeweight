@@ -54,15 +54,14 @@
 {#if page.data.demo}
 	<form method="POST" action="/demo" class="mb-8 space-y-3 rounded-xl border bg-muted/40 p-4">
 		<div class="space-y-1">
-			<h2 class="font-semibold">Try the live demo</h2>
+			<h2 class="font-semibold">Try it first — no sign-up needed</h2>
 			<p class="text-sm text-muted-foreground">
-				Get a private sample gym with members, memberships, classes, bookings and check-ins. No
-				sign-up. Sessions end after 8 minutes. Sample workspaces are deleted after 24 hours.
+				Explore a seeded demo — staff or member view. Sessions last 8 minutes.
 			</p>
 		</div>
-		<Button type="submit" class="w-full"><Sparkles /> Staff view — open demo workspace</Button>
+		<Button type="submit" class="w-full"><Sparkles /> Staff view</Button>
 		<Button type="submit" formaction="/demo?view=member" variant="outline" class="w-full"
-			>Member view — open the member portal</Button
+			><Sparkles /> Member view</Button
 		>
 	</form>
 {/if}
@@ -70,7 +69,7 @@
 <form class="flex flex-col gap-6" onsubmit={submit}>
 	<div class="space-y-1">
 		<h1 class="text-2xl font-semibold tracking-tight">Welcome back</h1>
-		<p class="text-sm text-muted-foreground">Sign in to your workspace.</p>
+		<p class="text-sm text-muted-foreground">Sign in to your gym.</p>
 	</div>
 	<Field.Group>
 		<Field.Field>
@@ -100,23 +99,25 @@
 			<Button type="button" onclick={sso}><Building /> Continue with SSO</Button>
 		{/if}
 	</Field.Group>
-	{#if page.data.suite}
-		<Button type="button" variant="outline" class="w-full" onclick={suite}
-			><KeyRound /> Continue with Leroa</Button
-		>
-	{/if}
-	{#if page.data.security}
+	{#if page.data.security || page.data.suite}
 		<div class="flex items-center gap-3 text-xs text-muted-foreground">
 			<Separator class="flex-1" /> or <Separator class="flex-1" />
 		</div>
 		<div class="grid gap-2">
-			<Button type="button" variant="outline" onclick={passkey}
-				><KeyRound /> Sign in with a passkey</Button
-			>
-			<Button type="button" variant="outline" onclick={() => (showSso = !showSso)}>
-				<Building />
-				{showSso ? 'Use a password instead' : 'Single sign-on (SAML / OIDC)'}
-			</Button>
+			{#if page.data.suite}
+				<Button type="button" variant="outline" onclick={suite}
+					><KeyRound /> Continue with Leroa</Button
+				>
+			{/if}
+			{#if page.data.security}
+				<Button type="button" variant="outline" onclick={passkey}
+					><KeyRound /> Sign in with a passkey</Button
+				>
+				<Button type="button" variant="outline" onclick={() => (showSso = !showSso)}>
+					<Building />
+					{showSso ? 'Use a password instead' : 'Single sign-on (SAML / OIDC)'}
+				</Button>
+			{/if}
 		</div>
 	{/if}
 	{#if !page.data.demo}<p class="text-center text-sm text-muted-foreground">

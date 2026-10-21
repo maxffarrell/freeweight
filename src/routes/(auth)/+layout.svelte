@@ -16,12 +16,9 @@
 		<div class="max-w-md px-10 text-neutral-200">
 			<Logo class="mb-6 size-10 text-white" />
 			<blockquote class="text-2xl leading-snug font-medium text-white">
-				The class is full again and the money just works.
+				The gym, minus the busywork.
 			</blockquote>
-			<p class="mt-4 text-sm text-neutral-400">
-				Members, memberships, bookings and check-ins — one workspace, self-hosted on your own
-				infrastructure.
-			</p>
+			<p class="mt-4 text-sm text-neutral-400">Members, memberships, bookings and check-ins.</p>
 		</div>
 	</div>
 </div>
