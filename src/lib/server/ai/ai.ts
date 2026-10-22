@@ -137,7 +137,7 @@ export async function aiComplete(messages: AiMessage[], maxTokens = 1200): Promi
 		headers: {
 			'content-type': 'application/json',
 			'x-api-key': cfg.apiKey ?? '',
-			'anthropic-version': '2023-06-01'
+			'anthropic-version': '2026-10-21'
 		},
 		body: JSON.stringify({
 			model: cfg.model,
