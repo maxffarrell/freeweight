@@ -1,4 +1,4 @@
-// Node bundles Brotli: CVE-2026-111497 is fixed in these security releases.
+// CVE-2026-111497 is fixed in these Node.js security releases.
 const [major, minor, patch] = process.versions.node.split('.').map(Number);
 const minimum = new Map([
 	[24, [22, 1]],
@@ -11,6 +11,6 @@ if (
 	(minor === minimum[0] && patch < minimum[1])
 ) {
 	throw new Error(
-		'CVE-2026-111497: upgrade Node.js to 24.22.1+, or 26.12.1+ on the corresponding supported major.'
+		'CVE-2026-111497: use Node.js 26.12.1+ on the 26.x line (or patched Node.js 24.22.1+ where Vercel requires 24.x).'
 	);
 }
