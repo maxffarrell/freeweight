@@ -29,7 +29,7 @@ jobs:
           ref: ${{ github.event.inputs.release_ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '26.12.1'
       - id: plan
         run: node scripts/release/plan.mjs
   version:
@@ -48,7 +48,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '26.12.1'
       - run: npm install -g pnpm@12.4.1
       - uses: changesets/action@v1
         with:
@@ -103,7 +103,7 @@ jobs:
           ref: ${{ needs.plan.outputs.commit }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '26.12.1'
       - name: Validate application and release safeguards
         # Isolated CI-only database/auth fixtures; real credentials use secrets contexts.
         env:

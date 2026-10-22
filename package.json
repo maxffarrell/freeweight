@@ -21,7 +21,8 @@
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
 		"start": "node scripts/migrate.ts && PROTOCOL_HEADER=x-forwarded-proto node scripts/server.ts",
 		"changeset": "pnpm dlx @changesets/cli@2.31.1",
-		"release:version": "pnpm changeset version && pnpm install --ignore-scripts && pnpm exec prettier --write package.json pnpm-lock.yaml CHANGELOG.md .changeset"
+		"release:version": "pnpm changeset version && pnpm install --ignore-scripts && pnpm exec prettier --write package.json pnpm-lock.yaml CHANGELOG.md .changeset",
+		"preinstall": "node scripts/check-node.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -84,5 +85,8 @@
 		"qrcode": "^1.5.4",
 		"stripe": "~23.0.0",
 		"valibot": "^1.5.0"
+	},
+	"engines": {
+		"node": "^24.22.1 || ^26.12.1"
 	}
 }
