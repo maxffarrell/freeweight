@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.1.4
+
+### Patch Changes
+
+- 5134345: Require patched Node.js runtimes for CVE-2026-111497 and rebuild containers with Node.js 26.12.1.
+
 ## 0.1.3
 
 ### Patch Changes
