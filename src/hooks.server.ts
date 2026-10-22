@@ -1,3 +1,4 @@
+import '../scripts/check-node.mjs';
 import type { Handle } from '@sveltejs/kit/hooks';
 import { building } from '$app/env';
 import { svelteKitHandler } from 'better-auth/svelte-kit';

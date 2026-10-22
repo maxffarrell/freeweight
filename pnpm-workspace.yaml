@@ -8,3 +8,6 @@ allowBuilds:
 overrides:
   # drizzle-kit's deprecated @esbuild-kit loader pins esbuild <0.25 (GHSA-67mh-4wv8-2f99).
   '@esbuild-kit/core-utils>esbuild': ^0.25.12
+
+# Reject Node runtimes without the CVE-2026-111497 security fix.
+engineStrict: true
