@@ -75,6 +75,7 @@
 		"@better-auth/passkey": "^1.7.23",
 		"@better-auth/sso": "^1.7.23",
 		"@freeweight/sdk": "workspace:*",
+		"@shadcn-svelte/primitives": "^0.0.1",
 		"@sveltejs/adapter-vercel": "^7.0.3",
 		"@types/d3-scale": "^4.0.9",
 		"better-auth": "^1.7.23",
@@ -83,6 +84,7 @@
 		"nodemailer": "^10.5.0",
 		"postgres": "^4.1.1",
 		"qrcode": "^1.5.4",
+		"shiki": "^4.6.0",
 		"stripe": "~23.1.0",
 		"valibot": "^1.5.0"
 	},
