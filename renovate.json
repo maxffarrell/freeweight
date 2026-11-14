@@ -11,17 +11,17 @@
 		{
 			"matchUpdateTypes": ["minor", "patch", "pin", "digest"],
 			"automerge": true,
-			"automergeType": "branch"
+			"automergeType": "pr"
 		},
 		{
 			"matchDepTypes": ["devDependencies"],
 			"automerge": true,
-			"automergeType": "branch"
+			"automergeType": "pr"
 		},
 		{
 			"matchUpdateTypes": ["minor", "patch"],
 			"groupName": "weekly-minor-patch-updates"
 		}
 	],
-	"platformAutomerge": true
+	"platformAutomerge": false
 }
