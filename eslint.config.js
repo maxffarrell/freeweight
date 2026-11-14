@@ -42,7 +42,9 @@ export default defineConfig(
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
-			]
+			],
+			// The app always serves at the root path, so resolve() is identity here.
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	}
 );
