@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import Logo from '#lib/components/app/logo.svelte';
@@ -221,14 +221,14 @@
 		</div>
 	</main>
 
-	<Dialog.Root bind:open={trialOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Free trial — {trialTitle}</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={trialOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Free trial — {trialTitle}</Modal.Title>
+				<Modal.Description>
 					Leave your details and the gym will confirm your free class.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			{#if tDone}
 				<div class="space-y-3 py-2 text-sm">
 					<p class="font-medium">Request sent.</p>
@@ -252,13 +252,13 @@
 						>
 						<Input id="t-phone" type="tel" bind:value={tPhone} autocomplete="tel" />
 					</Field.Field>
-					<Dialog.Footer>
+					<Modal.Footer>
 						<Button type="submit" disabled={tPending}
 							>{tPending ? 'Sending…' : 'Request free trial'}</Button
 						>
-					</Dialog.Footer>
+					</Modal.Footer>
 				</form>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 </div>

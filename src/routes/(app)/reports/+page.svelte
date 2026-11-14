@@ -3,7 +3,7 @@
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -2606,15 +2606,15 @@
 	</Card.Root>
 </div>
 
-<Dialog.Root bind:open={emailOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Email at-risk members</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={emailOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Email at-risk members</Modal.Title>
+			<Modal.Description>
 				Goes to the {r.atRisk.length} member{r.atRisk.length === 1 ? '' : 's'} in the list — a "we miss
 				you" nudge to bring them back.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitWinBack}>
 			<Field.Field>
 				<Field.Label for="w-subject">Subject</Field.Label>
@@ -2630,11 +2630,11 @@
 					placeholder="We miss you at the gym — your next class is on us…"
 				/>
 			</Field.Field>
-			<Dialog.Footer
+			<Modal.Footer
 				><Button type="submit" disabled={emailPending}>
 					{emailPending ? 'Sending…' : 'Send'}
-				</Button></Dialog.Footer
+				</Button></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>

@@ -6,7 +6,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -1470,16 +1470,16 @@
 	</Tabs.Root>
 </div>
 
-<Dialog.Root bind:open={sellOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Sell {sellItemRow?.name ?? 'item'}</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={sellOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Sell {sellItemRow?.name ?? 'item'}</Modal.Title>
+			<Modal.Description>
 				{#if sellItemRow}{formatMoney(sellItemRow.price, currency)} each{#if sellItemRow.stock !== null}
 						· {sellItemRow.stock} in stock{/if}.{/if}
 				Posts a charge to the member — or mark it paid now.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitSale}>
 			<Field.Field>
 				<Field.Label>Member</Field.Label>
@@ -1521,7 +1521,7 @@
 					</Select.Root>
 				</Field.Field>
 			{/if}
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending || !sellMemberId || !sellItemId}>
 					{sellItemRow && sellQty
 						? sellPayNow
@@ -1529,17 +1529,17 @@
 							: `Charge ${formatMoney(sellItemRow.price * sellQty, currency)}`
 						: 'Sell'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={payOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Record payment</Dialog.Title>
-			<Dialog.Description>Applied to the member's open charges oldest-first.</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={payOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Record payment</Modal.Title>
+			<Modal.Description>Applied to the member's open charges oldest-first.</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPayment}>
 			<Field.Field>
 				<Field.Label>Member</Field.Label>
@@ -1575,20 +1575,20 @@
 					bind:value={payNotes}
 				/></Field.Field
 			>
-			<Dialog.Footer
+			<Modal.Footer
 				><Button type="submit" disabled={pending || !payMemberId || !payAmount}>Record</Button
-				></Dialog.Footer
+				></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={chargeOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>New charge</Dialog.Title>
-			<Dialog.Description>One-off charges for drop-ins, fees, or anything else.</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={chargeOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>New charge</Modal.Title>
+			<Modal.Description>One-off charges for drop-ins, fees, or anything else.</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitCharge}>
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 				<div>
@@ -1642,24 +1642,24 @@
 					<Input id="c-due" type="date" bind:value={cDue} />
 				</Field.Field>
 			</div>
-			<Dialog.Footer
+			<Modal.Footer
 				><Button type="submit" disabled={pending || !cAmount || (cAll ? !cDesc.trim() : !cMemberId)}
 					>{cAll ? `Post to ${activeCount} members` : 'Add charge'}</Button
-				></Dialog.Footer
+				></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={gcOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Sell a gift card</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={gcOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Sell a gift card</Modal.Title>
+			<Modal.Description>
 				Posts the card's face value as a charge on the buyer. Hand them the code — the recipient
 				redeems it in their portal and it pays down their charges, any leftover becoming credit.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitGiftCard}>
 			<Field.Field>
 				<Field.Label>Buyer</Field.Label>
@@ -1682,11 +1682,11 @@
 				<Field.Label for="gc-note">Note — optional</Field.Label>
 				<Input id="gc-note" bind:value={gcNote} placeholder="Birthday gift for Sam" />
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending || !gcAmount || !gcMemberId}>
 					{gcAmount ? `Sell for ${formatMoney(gcAmount, currency)}` : 'Sell card'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>

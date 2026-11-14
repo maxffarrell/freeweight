@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { authClient } from '#lib/auth-client.ts';
+	import DemoBanner from '#lib/components/app/demo-banner.svelte';
 	import Logo from '#lib/components/app/logo.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
@@ -8,7 +9,14 @@
 	let { children, data } = $props();
 </script>
 
-<div class="min-h-svh bg-muted/30">
+<div class="relative min-h-svh bg-muted/30">
+	{#if data.demo && data.demoExpiresAt}
+		<DemoBanner
+			expiresAt={data.demoExpiresAt}
+			serverNow={data.demoServerNow}
+			deployUrl="https://github.com/maxffarrell/freeweight#quick-start"
+		/>
+	{/if}
 	<header class="border-b bg-background">
 		<div class="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
 			{#if data.brand.whiteLabel}

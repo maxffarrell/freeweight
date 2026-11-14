@@ -3,7 +3,7 @@
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -390,14 +390,14 @@
 	</Card.Root>
 </div>
 
-<Dialog.Root bind:open={promoOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>New promo code</Dialog.Title>
-			<Dialog.Description
-				>Applies to the signup fee (and pack price) on the public join page.</Dialog.Description
+<Modal.Root bind:open={promoOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>New promo code</Modal.Title>
+			<Modal.Description
+				>Applies to the signup fee (and pack price) on the public join page.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPromo}>
 			<Field.Field
 				><Field.Label for="pc-code">Code</Field.Label><Input
@@ -451,20 +451,20 @@
 					<Input id="pc-exp" type="date" bind:value={pcExpires} />
 				</Field.Field>
 			</div>
-			<Dialog.Footer
-				><Button type="submit" disabled={pending || !pcCode}>Create code</Button></Dialog.Footer
+			<Modal.Footer
+				><Button type="submit" disabled={pending || !pcCode}>Create code</Button></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root open={!!migFrom} onOpenChange={(o) => !o && (migFrom = null)}>
-	<Dialog.Content class="max-w-sm">
-		<Dialog.Title>Move members from {migFrom?.name}</Dialog.Title>
-		<Dialog.Description>
+<Modal.Root open={!!migFrom} onOpenChange={(o) => !o && (migFrom = null)}>
+	<Modal.Content class="max-w-sm">
+		<Modal.Title>Move members from {migFrom?.name}</Modal.Title>
+		<Modal.Description>
 			Every active and paused membership switches to the new plan — pricing and billing dates are
 			kept.
-		</Dialog.Description>
+		</Modal.Description>
 		<Field.Field>
 			<Field.Label>To plan</Field.Label>
 			<NativeSelect bind:value={migTarget}>
@@ -476,25 +476,25 @@
 				{/each}
 			</NativeSelect>
 		</Field.Field>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button variant="outline" onclick={() => (migFrom = null)}>Cancel</Button>
 			<Button disabled={!migTarget || migBusy} onclick={doMigrate}>
 				{migBusy ? 'Moving…' : 'Move members'}
 			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>{editing ? `Edit ${editing.name}` : 'New plan'}</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>{editing ? `Edit ${editing.name}` : 'New plan'}</Modal.Title>
+			<Modal.Description
 				>{editing
 					? 'Changes apply to new memberships only.'
-					: 'Shown on your public page when "listed" is on.'}</Dialog.Description
+					: 'Shown on your public page when "listed" is on.'}</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submit}>
 			<Field.Field
 				><Field.Label for="p-name">Name</Field.Label><Input
@@ -652,11 +652,11 @@
 					<Switch bind:checked={grandfather} />
 				</div>
 			{/if}
-			<Dialog.Footer
+			<Modal.Footer
 				><Button type="submit" disabled={pending || amount == null}
 					>{editing ? 'Save' : 'Create plan'}</Button
-				></Dialog.Footer
+				></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>

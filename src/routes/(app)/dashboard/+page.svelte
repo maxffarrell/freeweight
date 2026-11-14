@@ -40,7 +40,7 @@
 		addDeskTask,
 		removeDeskTask
 	} from '#lib/remote/shifts.remote.ts';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -776,14 +776,14 @@
 	</div>
 </div>
 
-<Dialog.Root bind:open={logOpen}>
-	<Dialog.Content class="sm:max-w-2xl">
-		<Dialog.Header>
-			<Dialog.Title>Shift log — last 30 days</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={logOpen}>
+	<Modal.Content class="sm:max-w-2xl">
+		<Modal.Header>
+			<Modal.Title>Shift log — last 30 days</Modal.Title>
+			<Modal.Description>
 				Staff clock-ins. Admins can close, correct, or delete entries.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<div class="max-h-96 overflow-y-auto rounded-lg border">
 			<Table.Root>
 				<Table.Header>
@@ -935,5 +935,5 @@
 				{/if}
 			</div>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
