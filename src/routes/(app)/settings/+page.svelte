@@ -8,7 +8,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import MoneyInput from '#lib/components/app/money-input.svelte';
@@ -2245,12 +2245,12 @@
 		</Tabs.Content>
 	</Tabs.Root>
 
-	<Dialog.Root bind:open={digestPrevOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>{digestPrev?.heading ?? 'Digest preview'}</Dialog.Title>
-				<Dialog.Description>Exactly what the next digest email will say.</Dialog.Description>
-			</Dialog.Header>
+	<Modal.Root bind:open={digestPrevOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>{digestPrev?.heading ?? 'Digest preview'}</Modal.Title>
+				<Modal.Description>Exactly what the next digest email will say.</Modal.Description>
+			</Modal.Header>
 			{#if digestPrev}
 				<ul class="list-inside list-disc space-y-1 text-sm">
 					{#each digestPrev.lines as line (line)}
@@ -2258,13 +2258,13 @@
 					{/each}
 				</ul>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
-	<Dialog.Root bind:open={cfOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>{cfEditId ? 'Edit field' : 'New member field'}</Dialog.Title>
-			</Dialog.Header>
+		</Modal.Content>
+	</Modal.Root>
+	<Modal.Root bind:open={cfOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>{cfEditId ? 'Edit field' : 'New member field'}</Modal.Title>
+			</Modal.Header>
 			<div class="space-y-3 py-2">
 				<Field.Field>
 					<Field.Label>Name</Field.Label>
@@ -2300,18 +2300,18 @@
 					<Checkbox bind:checked={cfRoster} /> Show on the class roster
 				</label>
 			</div>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
 					>{cfBusy ? 'Saving…' : 'Save field'}</Button
 				>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+			</Modal.Footer>
+		</Modal.Content>
+	</Modal.Root>
 </div>
 
-<Dialog.Root bind:open={locOpen}>
-	<Dialog.Content>
-		<Dialog.Header><Dialog.Title>Add location</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={locOpen}>
+	<Modal.Content>
+		<Modal.Header><Modal.Title>Add location</Modal.Title></Modal.Header>
 		<form class="space-y-4" onsubmit={addLocation}>
 			<Field.Field
 				><Field.Label for="loc-name">Name</Field.Label><Input
@@ -2322,10 +2322,10 @@
 					autofocus
 				/></Field.Field
 			>
-			<Dialog.Footer><Button type="submit" disabled={pending}>Add</Button></Dialog.Footer>
+			<Modal.Footer><Button type="submit" disabled={pending}>Add</Button></Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
 <div id="join-poster-print" class="hidden print:block">
 	<div class="mx-auto max-w-sm p-8 text-center">

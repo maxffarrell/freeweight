@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -3505,15 +3505,15 @@
 		</Card.Content>
 	</Card.Root>
 
-	<Dialog.Root bind:open={depOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Add a family member</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={depOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Add a family member</Modal.Title>
+				<Modal.Description>
 					They'll show up in your member switcher — you can book classes and sign waivers for them,
 					and their charges bill under your account.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			<form class="space-y-4" onsubmit={submitDependent}>
 				<div class="space-y-1.5">
 					<label class="text-sm font-medium" for="dep-name">Name</label>
@@ -3525,23 +3525,23 @@
 					</label>
 					<Input id="dep-bday" type="date" bind:value={depBirthday} />
 				</div>
-				<Dialog.Footer>
+				<Modal.Footer>
 					<Button type="submit" disabled={depPending}
 						>{depPending ? 'Adding…' : 'Add family member'}</Button
 					>
-				</Dialog.Footer>
+				</Modal.Footer>
 			</form>
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root bind:open={wpOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Generate a workout plan</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={wpOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Generate a workout plan</Modal.Title>
+				<Modal.Description>
 					Answer a couple of questions — the AI writes a one-week plan for you.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			<form class="space-y-4" onsubmit={submitWorkoutPlan}>
 				<Field.Field>
 					<Field.Label for="wp-goal">Your goal</Field.Label>
@@ -3575,27 +3575,27 @@
 						placeholder="e.g. bad knees, no barbell"
 					/>
 				</Field.Field>
-				<Dialog.Footer>
+				<Modal.Footer>
 					<Button type="submit" disabled={wpPending}
 						>{wpPending ? 'Generating…' : 'Generate plan'}</Button
 					>
-				</Dialog.Footer>
+				</Modal.Footer>
 			</form>
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root bind:open={moveOpen}>
-		<Dialog.Content class="sm:max-w-md">
-			<Dialog.Header>
-				<Dialog.Title>Move your spot</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={moveOpen}>
+		<Modal.Content class="sm:max-w-md">
+			<Modal.Header>
+				<Modal.Title>Move your spot</Modal.Title>
+				<Modal.Description>
 					{#if moveFrom}
 						{moveFrom.className} · {localDate(moveFrom.session.startsAt, tz)}
 						{localTime(moveFrom.session.startsAt, tz)} → pick a new session. Your old spot frees the moment
 						the new one is yours.
 					{/if}
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			{#if moveTargets.length}
 				<div class="max-h-80 divide-y overflow-y-auto rounded-lg border">
 					{#each moveTargets as c (c.session.id)}
@@ -3629,15 +3629,15 @@
 					No open sessions to move into — full classes only take waitlist joins.
 				</p>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root open={!!rateFor} onOpenChange={(o) => !o && (rateFor = null)}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Rate {rateFor?.className}</Dialog.Title>
-				<Dialog.Description>How was the class?</Dialog.Description>
-			</Dialog.Header>
+	<Modal.Root open={!!rateFor} onOpenChange={(o) => !o && (rateFor = null)}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Rate {rateFor?.className}</Modal.Title>
+				<Modal.Description>How was the class?</Modal.Description>
+			</Modal.Header>
 			<div class="flex items-center gap-1.5 py-2">
 				{#each [1, 2, 3, 4, 5] as n (n)}
 					<button
@@ -3659,19 +3659,19 @@
 				maxlength={500}
 				bind:value={rateComment}
 			/>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button variant="outline" onclick={() => (rateFor = null)}>Cancel</Button>
 				<Button onclick={submitRating} disabled={rateBusy || !rateValue}>Submit</Button>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+			</Modal.Footer>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root open={!!resultFor} onOpenChange={(o) => !o && (resultFor = null)}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Log your score — {resultFor?.className}</Dialog.Title>
-				<Dialog.Description>How did the workout go? e.g. "12:34" or "185 lb"</Dialog.Description>
-			</Dialog.Header>
+	<Modal.Root open={!!resultFor} onOpenChange={(o) => !o && (resultFor = null)}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Log your score — {resultFor?.className}</Modal.Title>
+				<Modal.Description>How did the workout go? e.g. "12:34" or "185 lb"</Modal.Description>
+			</Modal.Header>
 			<Field.Field>
 				<Field.Label for="result-score">Score</Field.Label>
 				<Input id="result-score" bind:value={resultScore} maxlength={120} />
@@ -3680,21 +3680,21 @@
 				<Checkbox checked={resultRx} onCheckedChange={(v) => (resultRx = v === true)} />
 				As prescribed (Rx)
 			</label>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button variant="outline" onclick={() => (resultFor = null)}>Cancel</Button>
 				<Button onclick={submitResult} disabled={resultBusy || !resultScore.trim()}>
 					Save score
 				</Button>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+			</Modal.Footer>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root open={!!signFor} onOpenChange={(o) => !o && (signFor = null)}>
-		<Dialog.Content class="sm:max-w-lg">
-			<Dialog.Header>
-				<Dialog.Title>{signFor?.title}</Dialog.Title>
-				<Dialog.Description>Read the document, then type your name to sign.</Dialog.Description>
-			</Dialog.Header>
+	<Modal.Root open={!!signFor} onOpenChange={(o) => !o && (signFor = null)}>
+		<Modal.Content class="sm:max-w-lg">
+			<Modal.Header>
+				<Modal.Title>{signFor?.title}</Modal.Title>
+				<Modal.Description>Read the document, then type your name to sign.</Modal.Description>
+			</Modal.Header>
 			<p
 				class="max-h-64 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap text-muted-foreground"
 			>
@@ -3704,23 +3704,23 @@
 				<Field.Label for="sign-name">Sign as</Field.Label>
 				<Input id="sign-name" placeholder="Your full name" bind:value={signName} />
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button variant="outline" onclick={() => (signFor = null)}>Cancel</Button>
 				<Button onclick={doSign} disabled={signBusy || signName.trim().length < 2}>
 					{signBusy ? 'Signing…' : 'Sign document'}
 				</Button>
-			</Dialog.Footer>
-		</Dialog.Content>
-	</Dialog.Root>
+			</Modal.Footer>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root bind:open={giftOpen}>
-		<Dialog.Content class="sm:max-w-md">
-			<Dialog.Header>
-				<Dialog.Title>Gift classes to a friend</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={giftOpen}>
+		<Modal.Content class="sm:max-w-md">
+			<Modal.Header>
+				<Modal.Title>Gift classes to a friend</Modal.Title>
+				<Modal.Description>
 					Move classes off your pack to another member. They need an account at your gym already.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			<form class="space-y-4" onsubmit={sendGift}>
 				<Field.Field>
 					<Field.Label for="gift-email">Their email</Field.Label>
@@ -3740,6 +3740,6 @@
 					{giftPending ? 'Sending…' : 'Gift classes'}
 				</Button>
 			</form>
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 </div>

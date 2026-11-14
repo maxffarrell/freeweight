@@ -28,7 +28,7 @@
 </script>
 
 <div
-	class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-primary px-4 py-1.5 text-center text-xs text-primary-foreground"
+	class="absolute top-2 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full bg-primary/95 px-4 py-1.5 text-center text-xs text-primary-foreground shadow-lg backdrop-blur"
 >
 	<span>
 		Private demo · {remaining > 0 ? 'Session ends in' : 'Session ended'}

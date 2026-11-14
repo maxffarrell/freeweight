@@ -17,7 +17,7 @@
 		getDependents
 	} from '#lib/remote/members.remote.ts';
 	import { getRoster, checkInRoster } from '#lib/remote/schedule.remote.ts';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
 	import { getLocations, getSettings } from '#lib/remote/workspace.remote.ts';
@@ -736,15 +736,15 @@
 	{/if}
 </div>
 
-<Dialog.Root bind:open={walkInOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Register walk-in</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={walkInOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Register walk-in</Modal.Title>
+			<Modal.Description>
 				Creates a member record and checks them in. They can claim the portal later from their
 				member page.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-3" onsubmit={saveWalkIn}>
 			<div class="space-y-1">
 				<Label for="w-name">Name</Label>
@@ -758,52 +758,52 @@
 				<Label for="w-email">Email</Label>
 				<Input id="w-email" type="email" bind:value={wEmail} autocomplete="off" />
 			</div>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={wPending || !wName.trim()}>
 					{wPending ? 'Saving…' : 'Add & check in'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={guestOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>{guestFor?.name}'s guest</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={guestOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>{guestFor?.name}'s guest</Modal.Title>
+			<Modal.Description>
 				Logs a guest visit — counted against {guestFor?.name}'s monthly guest passes.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-3" onsubmit={saveGuest}>
 			<div class="space-y-1">
 				<Label for="g-name">Guest name</Label>
 				<Input id="g-name" bind:value={guestName} autocomplete="off" required />
 			</div>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={gPending || !guestName.trim()}>
 					{gPending ? 'Checking in…' : 'Check in guest'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={rosterOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>
+<Modal.Root bind:open={rosterOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>
 				{rosterSess?.className} — {rosterSess ? localTime(rosterSess.session.startsAt, tz) : ''}
-			</Dialog.Title>
-			<Dialog.Description>
+			</Modal.Title>
+			<Modal.Description>
 				Check in the booked members as they arrive.
 				{#if rosterSess?.session.checkinCode}
 					Class code for self check-in: <code class="font-mono"
 						>{rosterSess.session.checkinCode}</code
 					>
 				{/if}
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<div class="divide-y rounded-lg border">
 			{#each sessRoster as r (r.booking.id)}
 				<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
@@ -829,11 +829,11 @@
 			{/each}
 		</div>
 		{#if sessRoster.some((r) => r.booking.status === 'booked')}
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button size="sm" disabled={rosterBusy === 'all'} onclick={checkInAll}>
 					{rosterBusy === 'all' ? 'Checking in…' : 'Check in all'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
