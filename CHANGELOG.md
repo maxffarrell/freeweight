@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.2.1
+
+### Patch Changes
+
+- 4b99f02: Fix deploy tooling (known_hosts resolution) and lint on print pages.
+
 ## 0.2.0
 
 ### Minor Changes
