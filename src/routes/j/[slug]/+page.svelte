@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
@@ -587,14 +587,14 @@
 		{/if}
 	</main>
 
-	<Dialog.Root bind:open={dropOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Drop in — {dropTitle}</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={dropOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Drop in — {dropTitle}</Modal.Title>
+				<Modal.Description>
 					One class, {formatMoney(dropPrice, currency)}. No membership needed.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			{#if dropDone}
 				<div class="space-y-3 py-2 text-sm">
 					<p class="font-medium">You're booked in.</p>
@@ -636,24 +636,24 @@
 							</label>
 						</div>
 					{/if}
-					<Dialog.Footer>
+					<Modal.Footer>
 						<Button type="submit" disabled={dPending}
 							>{dPending ? 'Booking…' : 'Book this class'}</Button
 						>
-					</Dialog.Footer>
+					</Modal.Footer>
 				</form>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root bind:open={passOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Day pass — {org.name}</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={passOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Day pass — {org.name}</Modal.Title>
+				<Modal.Description>
 					{formatMoney(settings.dayPassPrice ?? 0, currency)} for today's visit. No membership needed.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			{#if passDone}
 				<div class="space-y-3 py-2 text-sm">
 					<p class="font-medium">You're set for today.</p>
@@ -695,24 +695,24 @@
 							</label>
 						</div>
 					{/if}
-					<Dialog.Footer>
+					<Modal.Footer>
 						<Button type="submit" disabled={passPending}
 							>{passPending ? 'Buying…' : `Buy a day pass`}</Button
 						>
-					</Dialog.Footer>
+					</Modal.Footer>
 				</form>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
-	<Dialog.Root bind:open={leadOpen}>
-		<Dialog.Content>
-			<Dialog.Header>
-				<Dialog.Title>Keep me posted</Dialog.Title>
-				<Dialog.Description>
+	<Modal.Root bind:open={leadOpen}>
+		<Modal.Content>
+			<Modal.Header>
+				<Modal.Title>Keep me posted</Modal.Title>
+				<Modal.Description>
 					Not ready to join yet — leave your info and {org.name} will reach out.
-				</Dialog.Description>
-			</Dialog.Header>
+				</Modal.Description>
+			</Modal.Header>
 			{#if leadDone}
 				<div class="space-y-3 py-2 text-sm">
 					<p class="font-medium">Thanks — we'll be in touch.</p>
@@ -756,13 +756,13 @@
 						class="hidden"
 						bind:value={lWebsite}
 					/>
-					<Dialog.Footer>
+					<Modal.Footer>
 						<Button type="submit" disabled={lPending}
 							>{lPending ? 'Sending…' : 'Send my info'}</Button
 						>
-					</Dialog.Footer>
+					</Modal.Footer>
 				</form>
 			{/if}
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 </div>

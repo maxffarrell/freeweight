@@ -5,7 +5,7 @@
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -1106,14 +1106,14 @@
 	</Card.Root>
 </div>
 
-<Dialog.Root bind:open={tagOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Tag {selected.size} member{selected.size === 1 ? '' : 's'}</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={tagOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Tag {selected.size} member{selected.size === 1 ? '' : 's'}</Modal.Title>
+			<Modal.Description>
 				The tag is added to every selected member — existing tags are kept.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={applyBulkTag}>
 			<Field.Field>
 				<Field.Label for="bulk-tag">Tag</Field.Label>
@@ -1124,48 +1124,48 @@
 					{/each}
 				</datalist>
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={tagPending}>
 					{tagPending ? 'Tagging…' : 'Add tag'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={compOpen}>
-	<Dialog.Content class="sm:max-w-sm">
-		<Dialog.Header>
-			<Dialog.Title
-				>Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}</Dialog.Title
+<Modal.Root bind:open={compOpen}>
+	<Modal.Content class="sm:max-w-sm">
+		<Modal.Header>
+			<Modal.Title
+				>Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}</Modal.Title
 			>
-			<Dialog.Description>
+			<Modal.Description>
 				Adds bonus class credits to each selected member's active membership — on top of their plan
 				or pack.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={applyBulkComp}>
 			<Field.Field>
 				<Field.Label for="bulk-comp">Classes to grant</Field.Label>
 				<Input id="bulk-comp" type="number" min="1" max="100" bind:value={compCount} required />
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={compPending || compCount < 1}>
 					{compPending ? 'Granting…' : 'Grant'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Add member</Dialog.Title>
-			<Dialog.Description
-				>A name is enough to start — contact details are optional.</Dialog.Description
+<Modal.Root bind:open>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Add member</Modal.Title>
+			<Modal.Description
+				>A name is enough to start — contact details are optional.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submit}>
 			<Field.Field>
 				<Field.Label for="m-name">Name</Field.Label>
@@ -1193,22 +1193,22 @@
 				<Field.Label for="n-birthday">Birthday (optional)</Field.Label>
 				<Input id="n-birthday" type="date" bind:value={birthday} />
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Adding…' : 'Add member'}</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={importOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Import members</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={importOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Import members</Modal.Title>
+			<Modal.Description>
 				Paste CSV or pick a file — columns: name, email, phone (header row optional). Members whose
 				email is already in use are skipped.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<div class="space-y-3">
 			<Input type="file" accept=".csv,text/csv,text/plain" onchange={onImportFile} />
 			<Textarea
@@ -1223,23 +1223,23 @@
 				</p>
 			{/if}
 		</div>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button variant="outline" onclick={() => (importOpen = false)}>Cancel</Button>
 			<Button onclick={runImport} disabled={importPending || !importRows.length}>
 				{importPending ? 'Importing…' : `Import ${importRows.length || ''}`}
 			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={emailOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Email members</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={emailOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Email members</Modal.Title>
+			<Modal.Description>
 				Goes to active members with an email on file — closures, schedule changes, news.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if emailTemplates.length}
 			<div class="flex items-center gap-2">
 				<NativeSelect size="sm" class="w-auto" bind:value={templatePick}>
@@ -1454,7 +1454,7 @@
 					class="h-64 w-full rounded-md border bg-white"
 				></iframe>
 			{/if}
-			<Dialog.Footer class="items-center justify-between sm:justify-between">
+			<Modal.Footer class="items-center justify-between sm:justify-between">
 				<span class="text-xs text-muted-foreground">
 					{audienceCount == null
 						? ''
@@ -1490,20 +1490,20 @@
 										? `Send to ${selected.size} selected`
 										: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
 					</Button>
-				</div></Dialog.Footer
+				</div></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={chalOpen}>
-	<Dialog.Content class="sm:max-w-xl">
-		<Dialog.Header>
-			<Dialog.Title>Challenges</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={chalOpen}>
+	<Modal.Content class="sm:max-w-xl">
+		<Modal.Header>
+			<Modal.Title>Challenges</Modal.Title>
+			<Modal.Description>
 				Members join in the portal — progress counts their check-ins inside the window.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if challenges.length}
 			<div class="mb-4 space-y-3">
 				{#each challenges as c (c.challenge.id)}
@@ -1592,24 +1592,24 @@
 					<Input id="c-end" type="date" required bind:value={cEnd} />
 				</Field.Field>
 			</div>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={cPending || !cName.trim() || !cEnd}
 					>{cPending ? 'Creating…' : 'Create challenge'}</Button
 				>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={levelsOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>Progression levels</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={levelsOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>Progression levels</Modal.Title>
+			<Modal.Description
 				>Belts, ranks, skill tiers — whatever your gym calls them. Set a member's level on their
-				page.</Dialog.Description
+				page.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="flex items-center gap-2" onsubmit={addLevelSubmit}>
 			<Input placeholder="Blue belt" bind:value={newLevelName} required />
 			<Input placeholder="#3b82f6" class="w-24" bind:value={newLevelColor} />
@@ -1640,5 +1640,5 @@
 				</li>
 			{/each}
 		</ul>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>

@@ -4,7 +4,6 @@
 	import { getSettings } from '#lib/remote/workspace.remote.ts';
 	import { formatDate, formatMoney } from '#lib/format.ts';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as Table from '#lib/components/ui/table/index.js';
 	import Printer from '@lucide/svelte/icons/printer';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
@@ -24,9 +23,11 @@
 			dropin: 'Drop-in',
 			other: 'Other'
 		})[k] ?? k;
+
+	const billedTo = [m.member.name, m.member.email].filter(Boolean) as string[];
 </script>
 
-<div class="mx-auto max-w-3xl space-y-6 p-6">
+<div class="mx-auto max-w-4xl space-y-6 p-6 print:p-0">
 	<div class="flex items-center justify-between print:hidden">
 		<Button variant="ghost" size="sm" href="/members/{m.member.id}"
 			><ArrowLeft /> Back to member</Button
@@ -34,80 +35,95 @@
 		<Button size="sm" onclick={() => window.print()}><Printer /> Print / save as PDF</Button>
 	</div>
 
-	<div class="rounded-lg border p-8">
-		<div class="mb-6 flex items-start justify-between gap-4">
+	<div class="bg-white px-14 py-14 print:px-0 print:py-0">
+		<header class="flex items-start justify-between">
 			<div>
-				<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-					{m.orgName}
-				</p>
-				<h1 class="text-2xl font-semibold">Statement</h1>
-				<p class="mt-1 text-sm text-muted-foreground">
-					{m.member.name}{#if m.member.email}
-						· {m.member.email}{/if}
-				</p>
+				<p class="text-lg font-semibold">{m.orgName}</p>
+				<p class="mt-1 text-neutral-500">Member statement</p>
 			</div>
-			<div class="text-right text-sm text-muted-foreground">
-				<p>Generated {formatDate(new Date())}</p>
-				<p class="mt-1 text-base font-semibold text-foreground">
-					Balance due: {formatMoney(balance, currency)}
-				</p>
-			</div>
-		</div>
+			<dl class="w-72 space-y-5">
+				<div class="grid grid-cols-[8rem_1fr] gap-x-4">
+					<dt class="text-sm text-neutral-400">From</dt>
+					<dd class="text-sm">{m.orgName}</dd>
+				</div>
+				<div class="grid grid-cols-[8rem_1fr] gap-x-4">
+					<dt class="text-sm text-neutral-400">Billed to</dt>
+					<dd class="text-sm">
+						{#each billedTo as line (line)}
+							{line}<br />
+						{/each}
+					</dd>
+				</div>
+				<div class="grid grid-cols-[8rem_1fr] gap-x-4">
+					<dt class="text-sm text-neutral-400">Generated</dt>
+					<dd class="text-sm">{formatDate(new Date())}</dd>
+					<dt class="text-sm text-neutral-400">Balance due</dt>
+					<dd class="text-sm font-semibold">{formatMoney(balance, currency)}</dd>
+				</div>
+			</dl>
+		</header>
 
-		<h2 class="mb-2 text-sm font-semibold tracking-wide uppercase">Charges</h2>
-		<Table.Root class="mb-6">
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>Due</Table.Head>
-					<Table.Head>Item</Table.Head>
-					<Table.Head>Status</Table.Head>
-					<Table.Head class="text-right">Amount</Table.Head>
-					<Table.Head class="text-right">Paid</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
+		<h1 class="mt-16 text-right text-7xl font-bold tracking-tight">Statement</h1>
+
+		<p class="mt-14 text-sm font-medium">Charges</p>
+		<table class="mt-2 w-full border-t border-neutral-200 text-sm">
+			<thead>
+				<tr>
+					<th class="w-32 py-3 text-left font-medium">Due</th>
+					<th class="py-3 text-left font-medium">Item</th>
+					<th class="w-24 py-3 text-left font-medium">Status</th>
+					<th class="w-28 py-3 text-right font-medium">Amount</th>
+					<th class="w-28 py-3 text-right font-medium">Paid</th>
+				</tr>
+			</thead>
+			<tbody>
 				{#each charges as c (c.charge.id)}
-					<Table.Row>
-						<Table.Cell>{c.charge.dueDate}</Table.Cell>
-						<Table.Cell>{c.charge.description ?? kindLabel(c.charge.kind)}</Table.Cell>
-						<Table.Cell class="capitalize">{c.charge.status}</Table.Cell>
-						<Table.Cell class="text-right">{formatMoney(c.charge.amount, currency)}</Table.Cell>
-						<Table.Cell class="text-right">{formatMoney(c.paid, currency)}</Table.Cell>
-					</Table.Row>
+					<tr>
+						<td class="py-2">{c.charge.dueDate}</td>
+						<td class="py-2">{c.charge.description ?? kindLabel(c.charge.kind)}</td>
+						<td class="py-2 text-neutral-500 capitalize">{c.charge.status}</td>
+						<td class="py-2 text-right tabular-nums">{formatMoney(c.charge.amount, currency)}</td>
+						<td class="py-2 text-right tabular-nums">{formatMoney(c.paid, currency)}</td>
+					</tr>
 				{:else}
-					<Table.Row
-						><Table.Cell colspan={5} class="text-muted-foreground">No charges.</Table.Cell
-						></Table.Row
-					>
+					<tr><td colspan={5} class="py-2 text-neutral-500">No charges.</td></tr>
 				{/each}
-			</Table.Body>
-		</Table.Root>
+			</tbody>
+		</table>
 
-		<h2 class="mb-2 text-sm font-semibold tracking-wide uppercase">Payments</h2>
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>Date</Table.Head>
-					<Table.Head>Method</Table.Head>
-					<Table.Head>Status</Table.Head>
-					<Table.Head class="text-right">Amount</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
+		<p class="mt-12 text-sm font-medium">Payments</p>
+		<table class="mt-2 w-full border-t border-neutral-200 text-sm">
+			<thead>
+				<tr>
+					<th class="w-32 py-3 text-left font-medium">Date</th>
+					<th class="py-3 text-left font-medium">Method</th>
+					<th class="w-24 py-3 text-left font-medium">Status</th>
+					<th class="w-28 py-3 text-right font-medium">Amount</th>
+				</tr>
+			</thead>
+			<tbody>
 				{#each payments as p (p.id)}
-					<Table.Row>
-						<Table.Cell>{formatDate(p.paidAt)}</Table.Cell>
-						<Table.Cell class="capitalize">{p.method}</Table.Cell>
-						<Table.Cell>{p.refundedAt ? 'Refunded' : 'Paid'}</Table.Cell>
-						<Table.Cell class="text-right">{formatMoney(p.amount, currency)}</Table.Cell>
-					</Table.Row>
+					<tr>
+						<td class="py-2">{formatDate(p.paidAt)}</td>
+						<td class="py-2 text-neutral-500 capitalize">{p.method}</td>
+						<td class="py-2 text-neutral-500">{p.refundedAt ? 'Refunded' : 'Paid'}</td>
+						<td class="py-2 text-right tabular-nums">{formatMoney(p.amount, currency)}</td>
+					</tr>
 				{:else}
-					<Table.Row
-						><Table.Cell colspan={4} class="text-muted-foreground">No payments.</Table.Cell
-						></Table.Row
-					>
+					<tr><td colspan={4} class="py-2 text-neutral-500">No payments.</td></tr>
 				{/each}
-			</Table.Body>
-		</Table.Root>
+			</tbody>
+		</table>
+
+		<div class="mt-10 flex justify-end">
+			<dl class="w-72 text-sm">
+				<div class="grid grid-cols-2 gap-x-4 border-t border-neutral-200 pt-2 text-lg">
+					<dt>Balance {currency.toUpperCase()}</dt>
+					<dd class="text-right font-semibold tabular-nums">
+						{formatMoney(balance, currency)}
+					</dd>
+				</div>
+			</dl>
+		</div>
 	</div>
 </div>

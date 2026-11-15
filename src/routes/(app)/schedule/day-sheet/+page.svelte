@@ -18,7 +18,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-3xl space-y-6 p-6">
+<div class="mx-auto max-w-4xl space-y-6 p-6 print:p-0">
 	<div class="flex flex-wrap items-center justify-between gap-2 print:hidden">
 		<Button variant="ghost" size="sm" href="/schedule"><ArrowLeft /> Back to schedule</Button>
 		<div class="flex items-center gap-2">
@@ -27,20 +27,26 @@
 		</div>
 	</div>
 
-	<div class="rounded-lg border p-8">
-		<div class="mb-6 flex items-start justify-between gap-4">
+	<div class="bg-white px-14 py-14 text-neutral-900 print:px-0 print:py-0">
+		<header class="flex items-start justify-between">
 			<div>
-				<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-					{join.name}
-				</p>
-				<h1 class="text-2xl font-semibold">Day sheet — {formatDate(`${sheet.date}T12:00:00Z`)}</h1>
-				<p class="mt-1 text-sm text-muted-foreground">
-					{sheet.sessions.length} session{sheet.sessions.length === 1 ? '' : 's'} · printed {formatDate(
-						new Date()
-					)}
-				</p>
+				<p class="text-lg font-semibold">{join.name}</p>
+				<p class="mt-1 text-neutral-500">Day sheet</p>
 			</div>
-		</div>
+			<dl class="w-72 space-y-5">
+				<div class="grid grid-cols-[8rem_1fr] gap-x-4">
+					<dt class="text-sm text-neutral-400">Date</dt>
+					<dd class="text-sm">{formatDate(`${sheet.date}T12:00:00Z`)}</dd>
+					<dt class="text-sm text-neutral-400">Sessions</dt>
+					<dd class="text-sm">{sheet.sessions.length}</dd>
+					<dt class="text-sm text-neutral-400">Printed</dt>
+					<dd class="text-sm">{formatDate(new Date())}</dd>
+				</div>
+			</dl>
+		</header>
+
+		<h1 class="mt-16 text-right text-7xl font-bold tracking-tight">Day sheet</h1>
+		<div class="mt-14"></div>
 
 		{#each sheet.sessions as sess (sess.id)}
 			<div class="mb-6 break-inside-avoid">

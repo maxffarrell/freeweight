@@ -1,4 +1,4 @@
-import { gzipSync } from 'node:zlib';
+import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { EventEmitter } from 'node:events';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,6 +48,7 @@ beforeEach(() => {
 					statusCode: state.status,
 					headers: {
 						'content-type': 'application/json',
+						'content-length': String(Buffer.byteLength(state.body)),
 						...(state.encoding ? { 'content-encoding': state.encoding } : {})
 					},
 					destroy: () => {}
@@ -156,5 +157,27 @@ it('decodes compressed JSON responses for integration consumers', async () => {
 });
 it('rejects invalid response status without escaping the request promise', async () => {
 	state.status = 999;
+	await expect(outboundFetch('https://example.com')).rejects.toThrow();
+});
+
+it('decodes Brotli JSON responses and removes encoded response headers', async () => {
+	state.encoding = 'br';
+	state.body = brotliCompressSync(Buffer.from('{"ok":true}'));
+	const response = await outboundFetch('https://example.com');
+	expect(await response.json()).toEqual({ ok: true });
+	expect(response.headers.has('content-encoding')).toBe(false);
+	expect(response.headers.has('content-length')).toBe(false);
+});
+it.each([Buffer.from([0xff]), brotliCompressSync(Buffer.from('{"ok":true}')).subarray(0, 2)])(
+	'rejects malformed or truncated Brotli responses (%j)',
+	async (body) => {
+		state.encoding = 'br';
+		state.body = body;
+		await expect(outboundFetch('https://example.com')).rejects.toThrow();
+	}
+);
+it('bounds decoded Brotli response bytes', async () => {
+	state.encoding = 'br';
+	state.body = brotliCompressSync(Buffer.alloc(16 * 1024 * 1024 + 1));
 	await expect(outboundFetch('https://example.com')).rejects.toThrow();
 });

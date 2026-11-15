@@ -7,6 +7,7 @@ import { gymSettings } from '#lib/server/db/schema.ts';
 import { isEnterpriseEnabled } from '#lib/server/features.ts';
 import { portalMembers } from '#lib/server/services/members.ts';
 import { syncIfStale } from '#lib/server/profile/client.ts';
+import { isDemo } from '#lib/server/demo-mode.ts';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(303, `/login?next=${encodeURIComponent(url.pathname)}`);
@@ -37,5 +38,11 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			orgName: o[0]?.name ?? pick.orgName
 		};
 	}
-	return { user: { name: locals.user.name, email: locals.user.email }, brand };
+	return {
+		demo: isDemo(),
+		demoExpiresAt: isDemo() ? (locals.session?.expiresAt.getTime() ?? null) : null,
+		demoServerNow: Date.now(),
+		user: { name: locals.user.name, email: locals.user.email },
+		brand
+	};
 };

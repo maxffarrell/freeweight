@@ -5,7 +5,7 @@
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -2612,14 +2612,14 @@
 	</Card.Root>
 </div>
 
-<Dialog.Root bind:open={pauseOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Pause membership</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={pauseOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Pause membership</Modal.Title>
+			<Modal.Description>
 				The member can't book while paused. Optionally pick a date to resume automatically.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPause}>
 			<Field.Field
 				><Field.Label for="pause-until">Resume on (optional)</Field.Label><Input
@@ -2628,23 +2628,23 @@
 					bind:value={pauseResumeAt}
 				/></Field.Field
 			>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Pause membership</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={planOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Change plan or price</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={planOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Change plan or price</Modal.Title>
+			<Modal.Description>
 				Changes apply from the next charge — turn on proration to also settle the price difference
 				for the rest of this period now. Set a custom price to bill this member something other than
 				the plan's list price.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPlanChange}>
 			<Field.Field>
 				<Field.Label>New plan</Field.Label>
@@ -2677,27 +2677,27 @@
 					</span>
 				</label>
 			{/if}
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button
 					type="submit"
 					disabled={pending ||
 						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}>Save</Button
 				>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={guestOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Log a guest visit</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={guestOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Log a guest visit</Modal.Title>
+			<Modal.Description
 				>{m.guestPasses
 					? `${m.member.name} has ${m.guestPasses - m.guestsUsed} guest passes left this month.`
-					: `${m.member.name}'s plan doesn't include guest passes.`}</Dialog.Description
+					: `${m.member.name}'s plan doesn't include guest passes.`}</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={logGuest}>
 			<Field.Field
 				><Field.Label for="guest-name">Guest name</Field.Label><Input
@@ -2707,17 +2707,17 @@
 					autofocus
 				/></Field.Field
 			>
-			<Dialog.Footer
+			<Modal.Footer
 				><Button type="submit" disabled={pending || !guestName.trim()}>Check in guest</Button
-				></Dialog.Footer
+				></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={editOpen}>
-	<Dialog.Content>
-		<Dialog.Header><Dialog.Title>Edit member</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={editOpen}>
+	<Modal.Content>
+		<Modal.Header><Modal.Title>Edit member</Modal.Title></Modal.Header>
 		<form class="space-y-4" onsubmit={saveMember}>
 			<Field.Field
 				><Field.Label for="e-name">Name</Field.Label><Input
@@ -2799,19 +2799,19 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Dialog.Footer><Button type="submit" disabled={pending}>Save</Button></Dialog.Footer>
+			<Modal.Footer><Button type="submit" disabled={pending}>Save</Button></Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={memOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>New membership</Dialog.Title>
-			<Dialog.Description
-				>Posts the signup fee and the first period charge immediately.</Dialog.Description
+<Modal.Root bind:open={memOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>New membership</Modal.Title>
+			<Modal.Description
+				>Posts the signup fee and the first period charge immediately.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={addMembership}>
 			<Field.Field>
 				<Field.Label>Plan</Field.Label>
@@ -2832,20 +2832,19 @@
 				<Field.Label for="m-start">Starts</Field.Label>
 				<Input id="m-start" type="date" required bind:value={startsAt} />
 			</Field.Field>
-			<Dialog.Footer
-				><Button type="submit" disabled={pending || !planId}>Start membership</Button
-				></Dialog.Footer
+			<Modal.Footer
+				><Button type="submit" disabled={pending || !planId}>Start membership</Button></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={emailOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Email {m.member.name}</Dialog.Title>
-			<Dialog.Description>Goes to {m.member.email}.</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={emailOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Email {m.member.name}</Modal.Title>
+			<Modal.Description>Goes to {m.member.email}.</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={sendEmailToMember}>
 			<Field.Field>
 				<Field.Label for="mm-subject">Subject</Field.Label>
@@ -2862,7 +2861,7 @@
 				/>
 				<Field.Description>Personalize with {'{name}'} or {'{first_name}'}.</Field.Description>
 			</Field.Field>
-			<Dialog.Footer class="gap-2 sm:justify-between">
+			<Modal.Footer class="gap-2 sm:justify-between">
 				{#if ai.configured}
 					<Button
 						type="button"
@@ -2874,14 +2873,14 @@
 					>
 				{/if}
 				<Button type="submit" disabled={pending}>Send</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={payOpen}>
-	<Dialog.Content>
-		<Dialog.Header><Dialog.Title>Record payment</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={payOpen}>
+	<Modal.Content>
+		<Modal.Header><Modal.Title>Record payment</Modal.Title></Modal.Header>
 		<form class="space-y-4" onsubmit={submitPayment}>
 			<Field.Field>
 				<Field.Label>Amount</Field.Label>
@@ -2904,37 +2903,37 @@
 					bind:value={notes}
 				/></Field.Field
 			>
-			<Dialog.Footer
-				><Button type="submit" disabled={pending || !payAmount}>Record</Button></Dialog.Footer
+			<Modal.Footer
+				><Button type="submit" disabled={pending || !payAmount}>Record</Button></Modal.Footer
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={compOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Grant comp classes</Dialog.Title>
-			<Dialog.Description
-				>Adds to {m.member.name}'s class-credit cap for the current period (or this pack).</Dialog.Description
+<Modal.Root bind:open={compOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Grant comp classes</Modal.Title>
+			<Modal.Description
+				>Adds to {m.member.name}'s class-credit cap for the current period (or this pack).</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitComp}>
 			<Field.Field>
 				<Field.Label for="comp-count">Classes</Field.Label>
 				<Input id="comp-count" type="number" min="1" max="50" required bind:value={compCount} />
 			</Field.Field>
-			<Dialog.Footer><Button type="submit" disabled={!compCount}>Grant</Button></Dialog.Footer>
+			<Modal.Footer><Button type="submit" disabled={!compCount}>Grant</Button></Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={cardOpen}>
-	<Dialog.Content class="sm:max-w-xs">
-		<Dialog.Header>
-			<Dialog.Title>Member card</Dialog.Title>
-			<Dialog.Description>Print a check-in card for {m.member.name}.</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={cardOpen}>
+	<Modal.Content class="sm:max-w-xs">
+		<Modal.Header>
+			<Modal.Title>Member card</Modal.Title>
+			<Modal.Description>Print a check-in card for {m.member.name}.</Modal.Description>
+		</Modal.Header>
 		<div class="mx-auto w-64 rounded-xl border p-4 text-center">
 			<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">{m.orgName}</p>
 			<p class="mt-1 text-lg font-semibold">{m.member.name}</p>
@@ -2945,23 +2944,23 @@
 			{/if}
 			<p class="mt-2 text-xs text-muted-foreground">Show at the front desk to check in</p>
 		</div>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button variant="outline" onclick={() => window.print()} disabled={!cardQr}
 				><Printer class="mr-1 h-3.5 w-3.5" /> Print card</Button
 			>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={seriesOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Book into a series</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={seriesOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Book into a series</Modal.Title>
+			<Modal.Description
 				>Book {m.member.name} into every upcoming session of a class — full sessions go to the waitlist,
-				ones they're already in are skipped.</Dialog.Description
+				ones they're already in are skipped.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitSeries}>
 			<Field.Field>
 				<Field.Label>Class</Field.Label>
@@ -2992,21 +2991,21 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={!seriesTypeId || seriesPending}>Book series</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={bookOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Book {m.member.name} into a class</Dialog.Title>
-			<Dialog.Description
-				>Upcoming sessions in the next two weeks — full sessions go to the waitlist.</Dialog.Description
+<Modal.Root bind:open={bookOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Book {m.member.name} into a class</Modal.Title>
+			<Modal.Description
+				>Upcoming sessions in the next two weeks — full sessions go to the waitlist.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<label class="flex items-center gap-2 pb-2 text-sm">
 			<span class="text-muted-foreground">Bringing guests</span>
 			<NativeSelect bind:value={bookGuests}>
@@ -3050,19 +3049,19 @@
 				<p class="py-6 text-center text-sm text-muted-foreground">No upcoming sessions to book.</p>
 			{/each}
 		</div>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={mergeOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Merge a duplicate into {m.member.name}</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={mergeOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Merge a duplicate into {m.member.name}</Modal.Title>
+			<Modal.Description>
 				Pick the duplicate record — its memberships, bookings, check-ins, charges, payments, tags,
 				notes and documents move onto this member, then the duplicate is deleted. This can't be
 				undone.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<Input placeholder="Search members…" bind:value={mergeQ} oninput={searchMerge} autofocus />
 		<div class="max-h-52 overflow-y-auto rounded-md border">
 			{#each mergeResults as r (r.id)}
@@ -3081,22 +3080,22 @@
 				<p class="px-3 py-4 text-sm text-muted-foreground">No members match.</p>
 			{/each}
 		</div>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button variant="destructive" disabled={!mergePick || mergePending} onclick={doMerge}>
 				{mergePending ? 'Merging…' : 'Merge and delete duplicate'}
 			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={incOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Log incident</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={incOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Log incident</Modal.Title>
+			<Modal.Description>
 				Record an injury or incident involving {m.member.name} — kept on their record for follow-up.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={addIncident}>
 			<Field.Field>
 				<Field.Label>Type</Field.Label>
@@ -3127,24 +3126,24 @@
 					bind:value={incDesc}
 				/>
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={incPending || !incDesc.trim() || !incDate}>
 					{incPending ? 'Saving…' : 'Log incident'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={srOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Request signature</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={srOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Request signature</Modal.Title>
+			<Modal.Description>
 				The member gets an email and signs this in their portal — release forms, consents,
 				agreements.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if signTemplates.length}
 			<div class="flex items-center gap-2">
 				<NativeSelect size="sm" class="w-auto" bind:value={srTemplatePick}>
@@ -3171,7 +3170,7 @@
 				<Field.Label for="sr-body">Document text</Field.Label>
 				<Textarea id="sr-body" rows={8} placeholder="I agree to…" bind:value={srBody} />
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button
 					type="button"
 					variant="ghost"
@@ -3182,14 +3181,14 @@
 				<Button type="submit" disabled={srPending || !srTitle.trim() || !srBody.trim()}>
 					{srPending ? 'Sending…' : 'Send for signature'}
 				</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
-<Dialog.Root bind:open={woOpen}>
-	<Dialog.Content>
-		<Dialog.Header
-			><Dialog.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Dialog.Title></Dialog.Header
+	</Modal.Content>
+</Modal.Root>
+<Modal.Root bind:open={woOpen}>
+	<Modal.Content>
+		<Modal.Header
+			><Modal.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Modal.Title></Modal.Header
 		>
 		<form class="space-y-4" onsubmit={saveWorkout}>
 			<Field.Field>
@@ -3210,17 +3209,17 @@
 				>{pending ? 'Saving…' : woId ? 'Save' : 'Assign'}</Button
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={trOpen}>
-	<Dialog.Content>
-		<Dialog.Header
-			><Dialog.Title>Gift pack classes</Dialog.Title>
-			<Dialog.Description
-				>Move classes off this pack to another member. {trRemaining} left to give.</Dialog.Description
+<Modal.Root bind:open={trOpen}>
+	<Modal.Content>
+		<Modal.Header
+			><Modal.Title>Gift pack classes</Modal.Title>
+			<Modal.Description
+				>Move classes off this pack to another member. {trRemaining} left to give.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={sendTransfer}>
 			<Field.Field>
 				<Field.Label>To member</Field.Label>
@@ -3237,12 +3236,12 @@
 				>{pending ? 'Moving…' : 'Gift classes'}</Button
 			>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={assignOpen}>
-	<Dialog.Content class="max-w-md">
-		<Dialog.Header><Dialog.Title>Assign a program</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={assignOpen}>
+	<Modal.Content class="max-w-md">
+		<Modal.Header><Modal.Title>Assign a program</Modal.Title></Modal.Header>
 		<form
 			class="space-y-4"
 			onsubmit={async (e) => {
@@ -3273,12 +3272,12 @@
 			</Field.Field>
 			<Button type="submit" class="w-full" disabled={!assignProgramId}>Assign</Button>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={libOpen}>
-	<Dialog.Content class="max-w-2xl">
-		<Dialog.Header><Dialog.Title>Program library</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={libOpen}>
+	<Modal.Content class="max-w-2xl">
+		<Modal.Header><Modal.Title>Program library</Modal.Title></Modal.Header>
 		{#if libEditing}
 			<form
 				class="space-y-3"
@@ -3417,8 +3416,8 @@
 				>
 			</div>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
 <div id="member-card-print" class="hidden print:block">
 	<div class="mx-auto w-80 rounded-xl border-2 border-black p-6 text-center">
@@ -3449,29 +3448,29 @@
 	</style>
 </svelte:head>
 
-<Dialog.Root bind:open={aiSumOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>{aiSumTitle}</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={aiSumOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>{aiSumTitle}</Modal.Title>
+			<Modal.Description
 				>{aiSumTitle === 'Ops brief'
 					? 'AI note for staff — plan, attendance, billing and notes.'
-					: 'AI note for staff — check-ins, records and tenure.'}</Dialog.Description
+					: 'AI note for staff — check-ins, records and tenure.'}</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		{#if aiSumBusy}
 			<p class="text-sm text-muted-foreground">Summarizing…</p>
 		{:else}
 			<p class="text-sm whitespace-pre-line">{aiSumText}</p>
 		{/if}
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button
 				variant="outline"
 				disabled={aiSumBusy}
 				onclick={() => runAiSummary(aiSumTitle === 'Ops brief' ? 'brief' : 'progress')}
 				>Regenerate</Button
 			>
-			<Dialog.Close>Close</Dialog.Close>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+			<Button variant="outline" onclick={() => (aiSumOpen = false)}>Close</Button>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>

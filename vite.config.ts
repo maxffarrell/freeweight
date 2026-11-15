@@ -15,7 +15,7 @@ export default defineConfig({
 				experimental: { async: true }
 			},
 			// Vercel sets VERCEL=1 during builds; everything else (Docker, Railway, Hostinger) uses Node.
-			adapter: process.env.VERCEL ? adapterVercel() : adapterNode(),
+			adapter: process.env.VERCEL ? adapterVercel({ runtime: 'nodejs24.x' }) : adapterNode(),
 			experimental: { remoteFunctions: true }
 		})
 	],

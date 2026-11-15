@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { markTourSeen } from '#lib/remote/workspace.remote.ts';
 	import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
@@ -79,8 +79,8 @@
 	const current = $derived(steps[step]!);
 </script>
 
-<Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-md">
+<Modal.Root bind:open>
+	<Modal.Content class="sm:max-w-md">
 		<div class="flex flex-col items-center gap-4 py-2 text-center">
 			<div class="rounded-xl bg-primary/10 p-3 text-primary">
 				<current.icon class="h-7 w-7" />
@@ -119,5 +119,5 @@
 			class="absolute top-4 left-4 text-xs text-muted-foreground underline-offset-4 hover:underline"
 			onclick={() => (open = false)}>Skip tour</button
 		>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>

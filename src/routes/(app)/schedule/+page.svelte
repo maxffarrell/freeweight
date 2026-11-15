@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import PageHeader from '#lib/components/app/page-header.svelte';
 	import StatusBadge from '#lib/components/app/status-badge.svelte';
-	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Modal from '#lib/components/ui/modal/index.js';
 	import * as Sheet from '#lib/components/ui/sheet/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -1717,24 +1717,24 @@
 	</Sheet.Content>
 </Sheet.Root>
 
-<Dialog.Root bind:open={aiRosterOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>Class brief</Dialog.Title>
-			<Dialog.Description>Who is coming — first-timers and health flags.</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={aiRosterOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>Class brief</Modal.Title>
+			<Modal.Description>Who is coming — first-timers and health flags.</Modal.Description>
+		</Modal.Header>
 		<p class="text-sm leading-6 whitespace-pre-wrap">{aiRosterText}</p>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={copyDayOpen}>
-	<Dialog.Content class="sm:max-w-xs">
-		<Dialog.Header>
-			<Dialog.Title>Copy a day</Dialog.Title>
-			<Dialog.Description
-				>Duplicate every session from one day onto another — same times, rooms and instructors.</Dialog.Description
+<Modal.Root bind:open={copyDayOpen}>
+	<Modal.Content class="sm:max-w-xs">
+		<Modal.Header>
+			<Modal.Title>Copy a day</Modal.Title>
+			<Modal.Description
+				>Duplicate every session from one day onto another — same times, rooms and instructors.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<div class="grid grid-cols-2 gap-3">
 			<Field.Field>
 				<Field.Label>From</Field.Label>
@@ -1745,7 +1745,7 @@
 				<Input type="date" bind:value={copyTo} />
 			</Field.Field>
 		</div>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button
 				disabled={pending || !copyFrom || !copyTo}
 				onclick={async () => {
@@ -1768,19 +1768,19 @@
 					pending = false;
 				}}>Copy</Button
 			>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
 
 {#if focus}
-	<Dialog.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
-		<Dialog.Content class="sm:max-w-sm">
-			<Dialog.Header>
-				<Dialog.Title>Move to another session</Dialog.Title>
-				<Dialog.Description
-					>Same class ({focus?.className}) — pick the new session in view.</Dialog.Description
+	<Modal.Root open={moveFor != null} onOpenChange={(o) => !o && (moveFor = null)}>
+		<Modal.Content class="sm:max-w-sm">
+			<Modal.Header>
+				<Modal.Title>Move to another session</Modal.Title>
+				<Modal.Description
+					>Same class ({focus?.className}) — pick the new session in view.</Modal.Description
 				>
-			</Dialog.Header>
+			</Modal.Header>
 			<div class="max-h-64 divide-y overflow-auto">
 				{#each moveTargets as t (t.session.id)}
 					<button
@@ -1798,8 +1798,8 @@
 					</p>
 				{/each}
 			</div>
-		</Dialog.Content>
-	</Dialog.Root>
+		</Modal.Content>
+	</Modal.Root>
 
 	<div id="roster-print" class="hidden print:block">
 		<h1 class="text-2xl font-bold">{focus.className}</h1>
@@ -1866,14 +1866,14 @@
 	</style>
 </svelte:head>
 
-<Dialog.Root bind:open={editOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Edit {focus?.className ?? 'session'}</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={editOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Edit {focus?.className ?? 'session'}</Modal.Title>
+			<Modal.Description>
 				Booked members are emailed when the instructor or time/location changes.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitEdit}>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
@@ -2004,19 +2004,19 @@
 					maxlength={500}
 				/>
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save changes'}</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={sessOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Schedule a class</Dialog.Title>
-			<Dialog.Description>Times are in the workspace timezone ({tz}).</Dialog.Description>
-		</Dialog.Header>
+<Modal.Root bind:open={sessOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Schedule a class</Modal.Title>
+			<Modal.Description>Times are in the workspace timezone ({tz}).</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitSession}>
 			<Field.Field>
 				<Field.Label>Class type</Field.Label>
@@ -2119,18 +2119,18 @@
 				/>
 				<Field.Description>Prefilled from the class type's default.</Field.Description>
 			</Field.Field>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending || !sessTypeId}
 					>{pending ? 'Scheduling…' : 'Schedule'}</Button
 				>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={typeOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header><Dialog.Title>Class types</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={typeOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header><Modal.Title>Class types</Modal.Title></Modal.Header>
 		{#if classTypes.length}
 			<div class="mb-4 divide-y rounded-lg border">
 				{#each classTypes as c (c.id)}
@@ -2366,12 +2366,12 @@
 					<Switch bind:checked={tActive} />
 				</div>
 			{/if}
-			<Dialog.Footer>
+			<Modal.Footer>
 				{#if editTypeId}
 					<Button type="button" variant="ghost" onclick={resetTypeForm}>Cancel edit</Button>
 				{/if}
 				<Button type="submit" disabled={pending}>{editTypeId ? 'Save' : 'Create'}</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
 		{#if editTypeId}
 			<div class="mt-4 border-t pt-4">
@@ -2410,12 +2410,12 @@
 				</div>
 			</div>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={tplOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header><Dialog.Title>Recurring templates</Dialog.Title></Dialog.Header>
+<Modal.Root bind:open={tplOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header><Modal.Title>Recurring templates</Modal.Title></Modal.Header>
 		<p class="text-sm text-muted-foreground">
 			Templates generate real sessions about two weeks ahead, every day. Editing or cancelling a
 			generated session only changes that one session.
@@ -2517,19 +2517,19 @@
 		{:else}
 			<p class="text-sm text-muted-foreground">No templates yet.</p>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={msgOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>{msgEventId ? 'Message registrants' : 'Message attendees'}</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={msgOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>{msgEventId ? 'Message registrants' : 'Message attendees'}</Modal.Title>
+			<Modal.Description
 				>Emails {msgEventId
 					? `everyone registered for ${events.find((e) => e.event.id === msgEventId)?.event.name ?? 'this event'}`
-					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.</Dialog.Description
+					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitMsg}>
 			<Field.Field>
 				<Field.Label for="msg-subject">Subject</Field.Label>
@@ -2546,18 +2546,18 @@
 			</Field.Field>
 			<Button type="submit" class="w-full" disabled={pending}>Send to attendees</Button>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={hoOpen}>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>Instructor handoff</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={hoOpen}>
+	<Modal.Content>
+		<Modal.Header>
+			<Modal.Title>Instructor handoff</Modal.Title>
+			<Modal.Description
 				>Reassign or cancel every upcoming session an instructor teaches — their recurring templates
-				are updated too, and attendees get the usual emails.</Dialog.Description
+				are updated too, and attendees get the usual emails.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitHandoff}>
 			<Field.Field>
 				<Field.Label for="ho-from">Instructor</Field.Label>
@@ -2614,17 +2614,17 @@
 				{hoAction === 'cancel' ? 'Cancel sessions' : 'Reassign sessions'}
 			</Button>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={resOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Amenities</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={resOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header>
+			<Modal.Title>Amenities</Modal.Title>
+			<Modal.Description>
 				Bookable resources — sauna, court, child care. Members pick a slot in the portal.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if resources.length}
 			<div class="mb-4 divide-y rounded-lg border">
 				{#each resources as r (r.resource.id)}
@@ -2774,21 +2774,21 @@
 					</NativeSelect>
 				</Field.Field>
 			{/if}
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Add amenity</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={evOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Events</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={evOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header>
+			<Modal.Title>Events</Modal.Title>
+			<Modal.Description>
 				One-off workshops, comps, bring-a-friend days. Members register in the portal.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if events.length}
 			<div class="mb-4 divide-y rounded-lg border">
 				{#each events as ev (ev.event.id)}
@@ -2948,22 +2948,22 @@
 					</Field.Field>
 				{/if}
 			</div>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Create event</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={slotsOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>Publish open slots</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={slotsOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>Publish open slots</Modal.Title>
+			<Modal.Description>
 				Fill an instructor's weekly availability windows with bookable sessions — PT, assessments,
 				office hours. Already-scheduled times are skipped, so re-running is safe.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={publishSlots}>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
@@ -2999,23 +2999,23 @@
 				Slot length comes from the class type. The instructor needs weekly availability set under My
 				classes → Availability.
 			</Field.Description>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Publish slots</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={coursesOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Courses</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={coursesOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header>
+			<Modal.Title>Courses</Modal.Title>
+			<Modal.Description>
 				Multi-week programs ("6-week beginner lifting"). A course generates its own weekly sessions
 				until it ends; enrolling books the member into all of them — a paid course posts one signup
 				charge.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if courses.length}
 			<div class="mb-4 divide-y rounded-lg border">
 				{#each courses as c (c.course.id)}
@@ -3207,22 +3207,22 @@
 			<label class="flex items-center gap-2 text-sm">
 				<Switch bind:checked={cBookable} /> Members can enroll in the portal
 			</label>
-			<Dialog.Footer>
+			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Create course</Button>
-			</Dialog.Footer>
+			</Modal.Footer>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={hintsOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>Demand hints</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={hintsOpen}>
+	<Modal.Content class="sm:max-w-md">
+		<Modal.Header>
+			<Modal.Title>Demand hints</Modal.Title>
+			<Modal.Description>
 				Class/weekday pairs that consistently fill or empty over the last 6 weeks — where to add
 				sessions and where to trim.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if hints.length}
 			<div class="max-h-96 divide-y overflow-y-auto rounded-lg border">
 				{#each hints as h (h.classTypeId + ':' + h.weekday)}
@@ -3265,17 +3265,17 @@
 				No strong signals yet — hints appear once a class/weekday runs 3+ times in the last 6 weeks.
 			</p>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={eqOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Equipment</Dialog.Title>
-			<Dialog.Description>
+<Modal.Root bind:open={eqOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header>
+			<Modal.Title>Equipment</Modal.Title>
+			<Modal.Description>
 				Machines and gear the gym tracks — status, notes, and service dates.
-			</Dialog.Description>
-		</Dialog.Header>
+			</Modal.Description>
+		</Modal.Header>
 		{#if equipment.length}
 			<div class="mb-4 max-h-72 divide-y overflow-y-auto rounded-lg border">
 				{#each equipment as row (row.equipment.id)}
@@ -3382,18 +3382,18 @@
 			</Field.Field>
 			<Button type="submit" class="col-span-2" disabled={pending}>Add equipment</Button>
 		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	</Modal.Content>
+</Modal.Root>
 
-<Dialog.Root bind:open={bulkOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Bulk cancel sessions</Dialog.Title>
-			<Dialog.Description
+<Modal.Root bind:open={bulkOpen}>
+	<Modal.Content class="sm:max-w-lg">
+		<Modal.Header>
+			<Modal.Title>Bulk cancel sessions</Modal.Title>
+			<Modal.Description
 				>Cancel several sessions this week at once — booked members get the usual email, credits and
-				drop-in voids.</Dialog.Description
+				drop-in voids.</Modal.Description
 			>
-		</Dialog.Header>
+		</Modal.Header>
 		<ul class="max-h-80 divide-y overflow-y-auto">
 			{#each bulkSessions as s (s.session.id)}
 				<li class="flex items-center gap-3 py-2.5 text-sm">
@@ -3415,7 +3415,7 @@
 				<li class="py-6 text-sm text-muted-foreground">No live sessions this week.</li>
 			{/each}
 		</ul>
-		<Dialog.Footer>
+		<Modal.Footer>
 			<Button variant="outline" onclick={() => (bulkOpen = false)}>Close</Button>
 			<Button
 				variant="destructive"
@@ -3423,6 +3423,6 @@
 				onclick={runBulkCancel}
 				>{bulkPending ? 'Cancelling…' : `Cancel ${bulkChecked.size || ''} selected`}</Button
 			>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>
