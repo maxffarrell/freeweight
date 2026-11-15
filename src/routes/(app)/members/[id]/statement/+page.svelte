@@ -49,7 +49,7 @@
 				<div class="grid grid-cols-[8rem_1fr] gap-x-4">
 					<dt class="text-sm text-neutral-400">Billed to</dt>
 					<dd class="text-sm">
-						{#each billedTo as line}
+						{#each billedTo as line (line)}
 							{line}<br />
 						{/each}
 					</dd>

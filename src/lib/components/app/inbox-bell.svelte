@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Bell from '@lucide/svelte/icons/bell';
-	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Popover from '#lib/components/ui/popover/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { getNotifications } from '#lib/remote/workspace.remote.ts';
