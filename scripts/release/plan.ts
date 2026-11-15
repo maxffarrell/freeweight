@@ -4,7 +4,7 @@ const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Release version must be stable semver');
 let deploy = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
 if (process.env.GITHUB_EVENT_NAME === 'push') {
-	const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+	const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH!, 'utf8'));
 	if (event.before && !/^0+$/.test(event.before)) {
 		const previous = JSON.parse(
 			execFileSync('git', ['show', `${event.before}:package.json`], { encoding: 'utf8' })
@@ -27,10 +27,14 @@ if (deploy) {
 		}).trim();
 		if (tagged !== commit) throw new Error('Version already released from a different commit');
 	} catch (error) {
-		if (!error.status || process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') throw error;
+		if (
+			!(error as { status?: number }).status ||
+			process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+		)
+			throw error;
 	}
 }
 appendFileSync(
-	process.env.GITHUB_OUTPUT,
+	process.env.GITHUB_OUTPUT!,
 	`deploy=${deploy}\nversion=${version}\ncommit=${commit}\n`
 );

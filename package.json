@@ -22,7 +22,7 @@
 		"start": "node scripts/migrate.ts && PROTOCOL_HEADER=x-forwarded-proto node scripts/server.ts",
 		"changeset": "pnpm dlx @changesets/cli@2.31.1",
 		"release:version": "pnpm changeset version && pnpm install --ignore-scripts && pnpm exec prettier --write package.json pnpm-lock.yaml CHANGELOG.md .changeset",
-		"preinstall": "node scripts/check-node.mjs"
+		"preinstall": "node scripts/check-node.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
