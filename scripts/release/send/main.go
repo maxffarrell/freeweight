@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -30,6 +32,8 @@ func run(env func(string) string, ssh func([]string, string) error) error {
 	if err := os.WriteFile(key, []byte(strings.TrimRight(env("DEMO_SSH_KEY"), "\n")+"\n"), 0o600); err != nil {
 		return err
 	}
+	_, src, _, _ := runtime.Caller(0)
+	knownHosts := filepath.Join(filepath.Dir(src), "..", "known_hosts")
 	payload, err := json.Marshal(map[string]string{
 		"image_digest":   env("IMAGE_DIGEST"),
 		"registry_user":  env("GITHUB_REPOSITORY_OWNER"),
@@ -45,7 +49,7 @@ func run(env func(string) string, ssh func([]string, string) error) error {
 		"-o", "BatchMode=yes",
 		"-o", "IdentitiesOnly=yes",
 		"-o", "StrictHostKeyChecking=yes",
-		"-o", "UserKnownHostsFile=scripts/release/known_hosts",
+		"-o", "UserKnownHostsFile=" + knownHosts,
 		"-o", "ConnectTimeout=15",
 		"root@173.249.220.229", "deploy",
 	}, string(payload))
