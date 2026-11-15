@@ -1,4 +1,4 @@
-import './check-node.mjs';
+import './check-node.ts';
 // Production entry for Docker/Railway/Hostinger. adapter-node assumes https unless a proxy
 // sends a protocol header, so derive it from ORIGIN to support plain-http self-hosting too.
 import { createServer } from 'node:http';

@@ -7,7 +7,7 @@ WORKDIR /app
 FROM base AS build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY packages ./packages
-COPY scripts/check-node.mjs ./scripts/check-node.mjs
+COPY scripts/check-node.ts ./scripts/check-node.ts
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 COPY . .
 # Placeholders satisfy route analysis at build time; real values are validated when the server starts.
