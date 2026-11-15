@@ -1,5 +1,17 @@
 # freeweight
 
+## 0.2.0
+
+### Minor Changes
+
+- 1d08c96: Vendor the new shadcn-svelte chat/AI components (trace, code-block, message-scroller, highlighter, use-highlighted-code) for parity with the suite's shared component set.
+- bc278e2: Reorganize the member portal into tabs (Home, Book, Programs, Activity, Account) instead of one long crowded page.
+- e9eb86e: Float the demo banner as an absolute-positioned pill, add it to the customer portal, and convert dialogs to the responsive Modal (dialog on desktop, drawer on mobile).
+
+### Patch Changes
+
+- 5134345: Require patched Node.js runtimes for CVE-2026-111497 and rebuild containers with Node.js 26.12.1.
+
 ## 0.1.3
 
 ### Patch Changes
