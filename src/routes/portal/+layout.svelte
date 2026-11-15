@@ -43,7 +43,11 @@
 			>
 		</div>
 	</header>
-	<main class="mx-auto max-w-3xl space-y-6 p-4 py-8">
+	<main
+		class="mx-auto max-w-3xl space-y-6 p-4 py-8 {data.demo && data.demoExpiresAt
+			? 'max-sm:pt-14'
+			: ''}"
+	>
 		<svelte:boundary>
 			{@render children()}
 			{#snippet pending()}<Skeleton class="h-40 w-full" />{/snippet}
