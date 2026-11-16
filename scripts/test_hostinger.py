@@ -10,6 +10,7 @@ import re
 import shlex
 import subprocess
 import unittest
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = json.loads((ROOT / "package.json").read_text())["name"]
@@ -31,6 +32,17 @@ def config(values):
 
 
 class HostingerStack(unittest.TestCase):
+    def test_button_targets_standalone_stack(self):
+        readme = (ROOT / "README.md").read_text()
+        match = re.search(r"\[!\[Deploy on Hostinger\]\([^)]*\)\]\(([^)]+)\)", readme)
+        self.assertIsNotNone(match)
+        target = urlsplit(match.group(1))
+        self.assertEqual(target.scheme, "https")
+        self.assertEqual(target.netloc, "www.hostinger.com")
+        self.assertEqual(target.path, "/docker-hosting")
+        self.assertEqual(parse_qs(target.query), {"compose_url": [f"https://raw.githubusercontent.com/maxffarrell/{APP}/main/docker-compose.hostinger.yml"]})
+        self.assertIn("untested on the provider", readme)
+
     def test_required_settings_fail_closed(self):
         for key in FIXTURES:
             with self.subTest(key=key):

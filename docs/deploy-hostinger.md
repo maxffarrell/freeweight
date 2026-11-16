@@ -3,15 +3,20 @@
 ## Status
 
 `docker-compose.hostinger.yml` is a full app-plus-PostgreSQL deployment candidate,
-not a verified Hostinger one-click deployment. The README button stays disabled
-until a fresh Hostinger Docker Manager deployment has passed the checks below.
+not a verified Hostinger one-click deployment. The README button is provided as
+an **untested deployment shortcut**, not a guarantee of a working deployment.
+It imports the stack, but users still select/provision a VPS, configure DNS and
+set persistent secrets before deploying.
 No Hostinger account, purchase, or production deployment was used to validate it.
 
 The [documented button](https://www.hostinger.com/support/deploy-on-hostinger-button/)
 uses `https://www.hostinger.com/docker-hosting?compose_url=COMPOSE_FILE_URL`, not
-`compose=`. The eventual URL is
+`compose=`. The button targets
 `https://raw.githubusercontent.com/maxffarrell/freeweight/main/docker-compose.hostinger.yml`
-(after this file is merged). It must be a standalone Compose document.
+on main. When testing unpublished changes, use the raw file URL from the review
+branch instead; the button always uses the merged main-branch configuration.
+It must be a standalone Compose document. The button may take new customers through Hostinger checkout; VPS
+charges depend on the selected plan.
 
 ## What the stack provisions
 
@@ -44,7 +49,7 @@ uses `https://www.hostinger.com/docker-hosting?compose_url=COMPOSE_FILE_URL`, no
    stale AAAA records if the VPS has no reachable IPv6 address.
 5. Deploy the whole project. The app builds from source, then migrates the new DB.
 
-## Required acceptance checks before restoring the button
+## Remaining runtime acceptance checks
 
 Hostinger documents Compose import and environment configuration, and Docker
 [documents remote Git build contexts](https://docs.docker.com/reference/compose-file/build/).
