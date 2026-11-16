@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as v from 'valibot';
 
 const env = vi.hoisted(() => ({}) as Record<string, string | undefined>);
 vi.mock('$app/env/private', () => env);
@@ -9,6 +10,7 @@ beforeEach(() => {
 		FREEWEIGHT_AI_KEY: undefined,
 		FREEWEIGHT_AI_MODEL: 'test-model',
 		FREEWEIGHT_AI_BASE_URL: undefined,
+		FREEWEIGHT_AI_DECISION_PROVIDER: undefined,
 		FREEWEIGHT_AI_DECISION_KEY: undefined,
 		FREEWEIGHT_AI_DECISION_MODEL: undefined,
 		FREEWEIGHT_AI_DECISION_BASE_URL: undefined,
@@ -58,15 +60,35 @@ describe('BYOK AI without a Cloud flag or enterprise key', () => {
 		expect(ai.aiDecisionAvailable()).toBe(true);
 	});
 
-	it('requires an Anthropic key and an explicit OpenAI-compatible decision endpoint', async () => {
+	it('drives decision calls through Anthropic when the provider is anthropic', async () => {
 		env.FREEWEIGHT_AI_PROVIDER = 'anthropic';
 		const ai = await import('./ai.ts');
 		expect(ai.aiAvailable()).toBe(false);
+		expect(ai.aiDecisionAvailable()).toBe(false);
 		env.FREEWEIGHT_AI_KEY = 'anthropic-key';
 		expect(ai.aiAvailable()).toBe(true);
-		expect(ai.aiDecisionAvailable()).toBe(false);
-		env.FREEWEIGHT_AI_DECISION_BASE_URL = 'http://localhost:11434';
 		expect(ai.aiDecisionAvailable()).toBe(true);
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(Response.json({ content: [{ type: 'text', text: '{"ok":true}' }] }));
+		vi.stubGlobal('fetch', fetchMock);
+		const out = await ai.aiDecision(v.object({ ok: v.boolean() }), [
+			{ role: 'user', content: 'hello' }
+		]);
+		expect(out).toEqual({ ok: true });
+		expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages');
+	});
+
+	it('lets decision calls use a different provider than features', async () => {
+		env.FREEWEIGHT_AI_PROVIDER = 'anthropic';
+		env.FREEWEIGHT_AI_KEY = 'anthropic-key';
+		env.FREEWEIGHT_AI_DECISION_PROVIDER = 'openai';
+		env.FREEWEIGHT_AI_DECISION_BASE_URL = 'http://localhost:11434';
+		const ai = await import('./ai.ts');
+		expect(ai.aiAvailable()).toBe(true);
+		expect(ai.aiDecisionAvailable()).toBe(true);
+		expect(ai.aiDecisionConfig()?.provider).toBe('openai');
+		expect(ai.aiDecisionConfig()?.baseUrl).toBe('http://localhost:11434');
 	});
 
 	it('reports missing provider configuration instead of requiring a license', async () => {
