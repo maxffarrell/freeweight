@@ -1,5 +1,15 @@
 # freeweight
 
+## 0.3.0
+
+### Minor Changes
+
+- f17b0c3: Add `FREEWEIGHT_AI_DECISION_PROVIDER` so decision calls can run on the Anthropic Messages API independently of feature calls; features already supported `openai`/`anthropic`.
+
+### Patch Changes
+
+- f17b0c3: Fix deploy tooling (known_hosts resolution) and lint on print pages.
+
 ## 0.2.1
 
 ### Patch Changes
