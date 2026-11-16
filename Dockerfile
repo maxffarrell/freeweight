@@ -1,5 +1,5 @@
-# syntax=docker/dockerfile:1
-FROM node:26.12.1-alpine AS base
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+FROM node:26.12.1-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS base
 # Node 25+ no longer bundles Corepack.
 RUN npm install -g pnpm@12.4.1 && npm cache clean --force
 WORKDIR /app
