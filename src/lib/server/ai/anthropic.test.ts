@@ -33,6 +33,7 @@ describe('Anthropic Messages API contract', () => {
 			await aiComplete(
 				[
 					{ role: 'system', content: 'Be concise' },
+					{ role: 'system', content: 'Safety first — sensible volume and progressions.' },
 					{ role: 'user', content: 'Hello' },
 					{ role: 'assistant', content: 'Hi' },
 					{ role: 'user', content: 'Continue' }
@@ -52,7 +53,7 @@ describe('Anthropic Messages API contract', () => {
 		expect(JSON.parse(request.body)).toEqual({
 			model: 'test-model',
 			max_tokens: 321,
-			system: 'Be concise',
+			system: 'Be concise\n\nSafety first — sensible volume and progressions.',
 			messages: [
 				{ role: 'user', content: 'Hello' },
 				{ role: 'assistant', content: 'Hi' },

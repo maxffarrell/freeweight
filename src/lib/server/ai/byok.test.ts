@@ -89,6 +89,60 @@ describe('BYOK AI without a Cloud flag or enterprise key', () => {
 		expect(ai.aiDecisionAvailable()).toBe(true);
 		expect(ai.aiDecisionConfig()?.provider).toBe('openai');
 		expect(ai.aiDecisionConfig()?.baseUrl).toBe('http://localhost:11434');
+		expect(ai.aiDecisionConfig()?.model).toBe('gpt-4o-mini');
+		expect(ai.aiDecisionConfig()?.apiKey).toBeNull();
+	});
+
+	it.each([
+		['openai', 'anthropic', 'https://api.anthropic.com', 'claude-sonnet-4-5'],
+		['anthropic', 'openai', 'https://api.openai.com', 'gpt-4o-mini']
+	])('isolates decision routing from %s to %s', async (feature, decision, baseUrl, model) => {
+		env.FREEWEIGHT_AI_PROVIDER = feature;
+		env.FREEWEIGHT_AI_MODEL = 'feature-model';
+		env.FREEWEIGHT_AI_KEY = 'feature-key';
+		env.FREEWEIGHT_AI_BASE_URL = 'https://feature.example';
+		env.FREEWEIGHT_AI_DECISION_PROVIDER = decision;
+		env.FREEWEIGHT_AI_DECISION_KEY = 'decision-key';
+		const ai = await import('./ai.ts');
+		expect(ai.aiDecisionConfig()).toEqual({
+			provider: decision,
+			baseUrl,
+			model,
+			apiKey: 'decision-key'
+		});
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(
+				Response.json(
+					decision === 'anthropic'
+						? { content: [{ type: 'text', text: '{"ok":true}' }] }
+						: { choices: [{ message: { content: '{"ok":true}' } }] }
+				)
+			);
+		vi.stubGlobal('fetch', fetchMock);
+		expect(
+			await ai.aiDecision(v.object({ ok: v.boolean() }), [
+				{ role: 'system', content: 'Safety first — sensible volume and progressions.' },
+				{ role: 'user', content: 'Design a workout' }
+			])
+		).toEqual({ ok: true });
+		expect(fetchMock.mock.calls[0][0]).toBe(
+			baseUrl + (decision === 'anthropic' ? '/v1/messages' : '/v1/chat/completions')
+		);
+		const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+		expect(body.model).toBe(model);
+		if (decision === 'anthropic') {
+			expect(body.system).toBe(
+				'Respond with valid JSON only — no prose, no markdown fences.\n\nSafety first — sensible volume and progressions.'
+			);
+		}
+	});
+
+	it('does not treat a keyless feature endpoint as configured Anthropic decisions', async () => {
+		env.FREEWEIGHT_AI_BASE_URL = 'http://localhost:11434';
+		env.FREEWEIGHT_AI_DECISION_PROVIDER = 'anthropic';
+		const ai = await import('./ai.ts');
+		expect(ai.aiDecisionAvailable()).toBe(false);
 	});
 
 	it('reports missing provider configuration instead of requiring a license', async () => {
