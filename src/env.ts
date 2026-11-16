@@ -77,19 +77,23 @@ export const variables = defineEnvVars({
 			'override the provider endpoint, e.g. `http://localhost:11434` for Ollama or an OpenRouter/LiteLLM gateway URL.',
 		schema: (value) => value || undefined
 	},
+	FREEWEIGHT_AI_DECISION_PROVIDER: {
+		description:
+			'provider API for structured decision calls — `openai` or `anthropic`. Falls back to `FREEWEIGHT_AI_PROVIDER`.',
+		schema: (value) => value || undefined
+	},
 	FREEWEIGHT_AI_DECISION_KEY: {
 		description:
-			'API key for structured decision calls (JSON the app consumes). OpenAI-spec `/chat/completions` only — no anthropic path. Falls back to `FREEWEIGHT_AI_KEY`.',
+			'API key for structured decision calls (JSON the app consumes). Falls back to `FREEWEIGHT_AI_KEY`.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_DECISION_MODEL: {
-		description:
-			'model for structured decision calls. Falls back to `FREEWEIGHT_AI_MODEL` (then `gpt-4o-mini`).',
+		description: 'model for structured decision calls. Falls back to `FREEWEIGHT_AI_MODEL`.',
 		schema: (value) => value || undefined
 	},
 	FREEWEIGHT_AI_DECISION_BASE_URL: {
 		description:
-			'endpoint override for decision calls — must serve POST `/v1/chat/completions`. Falls back to `FREEWEIGHT_AI_BASE_URL` (then `https://api.openai.com`).',
+			'endpoint override for decision calls — `/chat/completions` (openai) or `/v1/messages` (anthropic). Falls back to `FREEWEIGHT_AI_BASE_URL` then the provider default.',
 		schema: (value) => value || undefined
 	}
 });

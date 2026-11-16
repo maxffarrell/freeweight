@@ -4,6 +4,7 @@ import {
 	FREEWEIGHT_AI_MODEL,
 	FREEWEIGHT_AI_KEY,
 	FREEWEIGHT_AI_BASE_URL,
+	FREEWEIGHT_AI_DECISION_PROVIDER,
 	FREEWEIGHT_AI_DECISION_MODEL,
 	FREEWEIGHT_AI_DECISION_KEY,
 	FREEWEIGHT_AI_DECISION_BASE_URL
@@ -51,19 +52,34 @@ export function aiConfig(): AiConfig | null {
 
 /**
  * Decision calls — features that return structured JSON the app consumes —
- * run on a separate OpenAI-spec-only config so installs can point them at a
+ * run on a separate config so installs can point them at a
  * cheaper/different model than the freeform feature calls. Each
  * FREEWEIGHT_AI_DECISION_* var falls back to the corresponding FREEWEIGHT_AI_*
  * value, so a single key keeps everything working.
  */
 export function aiDecisionConfig(): AiConfig | null {
-	// Anthropic's messages API cannot serve OpenAI-spec decision calls.
-	if (FREEWEIGHT_AI_PROVIDER?.toLowerCase() === 'anthropic' && !FREEWEIGHT_AI_DECISION_BASE_URL)
-		return null;
+	const provider = (
+		(FREEWEIGHT_AI_DECISION_PROVIDER || FREEWEIGHT_AI_PROVIDER || 'openai').toLowerCase() ===
+		'anthropic'
+			? 'anthropic'
+			: 'openai'
+	) as AiConfig['provider'];
 	const apiKey = FREEWEIGHT_AI_DECISION_KEY || FREEWEIGHT_AI_KEY || null;
 	if (!apiKey && !FREEWEIGHT_AI_DECISION_BASE_URL && !FREEWEIGHT_AI_BASE_URL) return null;
+	if (provider === 'anthropic') {
+		return {
+			provider,
+			model: FREEWEIGHT_AI_DECISION_MODEL || FREEWEIGHT_AI_MODEL || 'claude-sonnet-4-5',
+			apiKey,
+			baseUrl: (
+				FREEWEIGHT_AI_DECISION_BASE_URL ||
+				FREEWEIGHT_AI_BASE_URL ||
+				'https://api.anthropic.com'
+			).replace(/\/$/, '')
+		};
+	}
 	return {
-		provider: 'openai',
+		provider,
 		model: FREEWEIGHT_AI_DECISION_MODEL || FREEWEIGHT_AI_MODEL || 'gpt-4o-mini',
 		apiKey,
 		baseUrl: (
@@ -126,11 +142,12 @@ async function chatCompletions(
 	return choices?.[0]?.message?.content?.trim() ?? '';
 }
 
-/** One-shot completion — the small primitive every AI feature shares. */
-export async function aiComplete(messages: AiMessage[], maxTokens = 1200): Promise<string> {
-	const cfg = aiConfig();
-	if (!cfg) throw new Error('AI is not configured');
-	if (cfg.provider === 'openai') return chatCompletions(cfg, messages, maxTokens);
+/** POST /v1/messages against the Anthropic API — system is a top-level param. */
+async function anthropicMessages(
+	cfg: AiConfig,
+	messages: AiMessage[],
+	maxTokens: number
+): Promise<string> {
 	const system = messages.find((m) => m.role === 'system')?.content;
 	const res = await fetch(`${cfg.baseUrl}/v1/messages`, {
 		method: 'POST',
@@ -154,6 +171,14 @@ export async function aiComplete(messages: AiMessage[], maxTokens = 1200): Promi
 	return content?.find((b) => b.type === 'text')?.text?.trim() ?? '';
 }
 
+/** One-shot completion — the small primitive every AI feature shares. */
+export async function aiComplete(messages: AiMessage[], maxTokens = 1200): Promise<string> {
+	const cfg = aiConfig();
+	if (!cfg) throw new Error('AI is not configured');
+	if (cfg.provider === 'openai') return chatCompletions(cfg, messages, maxTokens);
+	return anthropicMessages(cfg, messages, maxTokens);
+}
+
 /**
  * Typesafe decision call: asks the decision model for JSON, parses it
  * leniently (strips code fences and surrounding prose that chat models love
@@ -167,7 +192,8 @@ export async function aiDecision<S extends v.GenericSchema>(
 ): Promise<v.InferOutput<S>> {
 	const cfg = aiDecisionConfig();
 	if (!cfg) throw new Error('AI decision model is not configured');
-	const raw = await chatCompletions(
+	const complete = cfg.provider === 'anthropic' ? anthropicMessages : chatCompletions;
+	const raw = await complete(
 		cfg,
 		[
 			{
