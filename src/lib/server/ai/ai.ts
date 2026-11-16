@@ -36,7 +36,7 @@ export function aiConfig(): AiConfig | null {
 			provider: 'anthropic',
 			model,
 			apiKey,
-			baseUrl: FREEWEIGHT_AI_BASE_URL || 'https://api.anthropic.com'
+			baseUrl: (FREEWEIGHT_AI_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '')
 		};
 	}
 	// Default: OpenAI-compatible chat-completions endpoint (OpenAI, Ollama,
@@ -51,41 +51,31 @@ export function aiConfig(): AiConfig | null {
 }
 
 /**
- * Decision calls — features that return structured JSON the app consumes —
- * run on a separate config so installs can point them at a
- * cheaper/different model than the freeform feature calls. Each
- * FREEWEIGHT_AI_DECISION_* var falls back to the corresponding FREEWEIGHT_AI_*
- * value, so a single key keeps everything working.
+ * Decision calls inherit feature configuration only for the same provider.
+ * Switching providers uses that provider's defaults unless explicitly overridden.
  */
 export function aiDecisionConfig(): AiConfig | null {
-	const provider = (
-		(FREEWEIGHT_AI_DECISION_PROVIDER || FREEWEIGHT_AI_PROVIDER || 'openai').toLowerCase() ===
-		'anthropic'
+	const featureProvider =
+		(FREEWEIGHT_AI_PROVIDER || 'openai').toLowerCase() === 'anthropic' ? 'anthropic' : 'openai';
+	const provider =
+		(FREEWEIGHT_AI_DECISION_PROVIDER || featureProvider).toLowerCase() === 'anthropic'
 			? 'anthropic'
-			: 'openai'
-	) as AiConfig['provider'];
-	const apiKey = FREEWEIGHT_AI_DECISION_KEY || FREEWEIGHT_AI_KEY || null;
-	if (!apiKey && !FREEWEIGHT_AI_DECISION_BASE_URL && !FREEWEIGHT_AI_BASE_URL) return null;
-	if (provider === 'anthropic') {
-		return {
-			provider,
-			model: FREEWEIGHT_AI_DECISION_MODEL || FREEWEIGHT_AI_MODEL || 'claude-sonnet-4-5',
-			apiKey,
-			baseUrl: (
-				FREEWEIGHT_AI_DECISION_BASE_URL ||
-				FREEWEIGHT_AI_BASE_URL ||
-				'https://api.anthropic.com'
-			).replace(/\/$/, '')
-		};
-	}
+			: 'openai';
+	const sameProvider = provider === featureProvider;
+	const apiKey =
+		FREEWEIGHT_AI_DECISION_KEY || (sameProvider ? FREEWEIGHT_AI_KEY : undefined) || null;
+	const baseUrl =
+		FREEWEIGHT_AI_DECISION_BASE_URL || (sameProvider ? FREEWEIGHT_AI_BASE_URL : undefined);
+	if (provider === 'anthropic' ? !apiKey : !apiKey && !baseUrl) return null;
 	return {
 		provider,
-		model: FREEWEIGHT_AI_DECISION_MODEL || FREEWEIGHT_AI_MODEL || 'gpt-4o-mini',
+		model:
+			FREEWEIGHT_AI_DECISION_MODEL ||
+			(sameProvider ? FREEWEIGHT_AI_MODEL : undefined) ||
+			(provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini'),
 		apiKey,
 		baseUrl: (
-			FREEWEIGHT_AI_DECISION_BASE_URL ||
-			FREEWEIGHT_AI_BASE_URL ||
-			'https://api.openai.com'
+			baseUrl || (provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com')
 		).replace(/\/$/, '')
 	};
 }
@@ -148,13 +138,16 @@ async function anthropicMessages(
 	messages: AiMessage[],
 	maxTokens: number
 ): Promise<string> {
-	const system = messages.find((m) => m.role === 'system')?.content;
+	const system = messages
+		.filter((m) => m.role === 'system')
+		.map((m) => m.content)
+		.join('\n\n');
 	const res = await fetch(`${cfg.baseUrl}/v1/messages`, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/json',
 			'x-api-key': cfg.apiKey ?? '',
-			'anthropic-version': '2023-06-01'
+			'anthropic-version': '2026-10-21'
 		},
 		body: JSON.stringify({
 			model: cfg.model,
