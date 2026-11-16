@@ -9,7 +9,6 @@ Members, memberships, class scheduling, QR check-ins and billing, plus a member 
 [![Deploy on Vercel](https://img.shields.io/badge/Deploy%20on-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmaxffarrell%2Ffreeweight&env=DATABASE_URL,BETTER_AUTH_SECRET&envDescription=Postgres%20URL%20and%20a%2032%2B%20char%20random%20secret&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
 [![Deploy on Render](https://img.shields.io/badge/Deploy%20on-Render-46E3B7?logo=render&logoColor=black)](https://render.com/deploy?repo=https://github.com/maxffarrell/freeweight)
 [![Deploy on DigitalOcean](https://img.shields.io/badge/Deploy%20on-DigitalOcean-0080FF?logo=digitalocean&logoColor=white)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/maxffarrell/freeweight/tree/main)
-[![Deploy to Cloudflare](https://img.shields.io/badge/Deploy%20to-Cloudflare-F38020?logo=cloudflare&logoColor=white)](https://deploy.workers.cloudflare.com/?url=https://github.com/maxffarrell/freeweight)
 
 </div>
 
@@ -47,18 +46,18 @@ Open http://localhost:5173, create an account, then click **Explore with demo da
 
 ### Self-hosting
 
-| Target       | How                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------- |
-| Docker       | Configure persistent secrets in `.env` (see quick start), then `docker compose up -d`.                         |
-| Railway | Manual setup: deploy the `Dockerfile` with `railway.json`, add PostgreSQL, and configure `DATABASE_URL` and `BETTER_AUTH_SECRET`. |
-| Vercel       | Button above. Uses `@sveltejs/adapter-vercel` automatically when `VERCEL=1`. Migrations run during the build.  |
-| Render       | Button above. `render.yaml` provisions a Docker web service and a Postgres database.                           |
-| Koyeb | Manual setup: deploy the `Dockerfile`, add PostgreSQL, and configure `DATABASE_URL` and `BETTER_AUTH_SECRET`. |
-| DigitalOcean | Button above. `.do/deploy.template.yaml` creates the app and a dev Postgres on App Platform.                   |
-| Hostinger | Manual VPS Docker Manager setup: [deployment guide](docs/deploy-hostinger.md). |
-| Any VPS      | [docs/deploy-vps.md](docs/deploy-vps.md) — same compose file on a ~$4 Hetzner VM or Oracle's always-free tier. |
-| Fly.io       | [docs/deploy-fly.md](docs/deploy-fly.md) — `fly launch` using `fly.toml`, scales to zero when idle.            |
-| PikaPods     | Not yet in their app catalog — once submitted, a `Run on PikaPods` badge goes here (~$1.50/mo managed).        |
+| Target       | How                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Docker       | Configure persistent secrets in `.env` (see quick start), then `docker compose up -d`.                                            |
+| Railway      | Manual setup: deploy the `Dockerfile` with `railway.json`, add PostgreSQL, and configure `DATABASE_URL` and `BETTER_AUTH_SECRET`. |
+| Vercel       | Button above. Uses `@sveltejs/adapter-vercel` automatically when `VERCEL=1`. Migrations run during the build.                     |
+| Render       | Button above. `render.yaml` provisions a Docker web service and a Postgres database.                                              |
+| Koyeb        | Manual setup: deploy the `Dockerfile`, add PostgreSQL, and configure `DATABASE_URL` and `BETTER_AUTH_SECRET`.                     |
+| DigitalOcean | Button above. `.do/deploy.template.yaml` creates the app and a dev Postgres on App Platform.                                      |
+| Hostinger    | Manual VPS Docker Manager setup: [deployment guide](docs/deploy-hostinger.md).                                                    |
+| Any VPS      | [docs/deploy-vps.md](docs/deploy-vps.md) — same compose file on a ~$4 Hetzner VM or Oracle's always-free tier.                    |
+| Fly.io       | [docs/deploy-fly.md](docs/deploy-fly.md) — `fly launch` using `fly.toml`, scales to zero when idle.                               |
+| PikaPods     | Not yet in their app catalog — once submitted, a `Run on PikaPods` badge goes here (~$1.50/mo managed).                           |
 
 Environment variables are documented in [`src/env.ts`](src/env.ts).
 
