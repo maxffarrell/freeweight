@@ -2,7 +2,8 @@
 
 Status: template setup specification, not a published or end-to-end verified deploy button.
 A repository import alone does not provision PostgreSQL. Do not restore a README
-button until a real Railway template contains both services and passes the checks below.
+button until a real Railway template contains both services. A button may be
+published without a live deployment test, but label that status explicitly.
 
 ## Maintainer setup
 
@@ -60,9 +61,15 @@ says new services cannot opt into it and existing files stop being read on
 December 1, 2026. A `.railway/railway.ts` file is a CLI-applied project definition,
 not a substitute for a template URL in a deploy button.
 
-## Release gate
+## Button publication and optional live verification
 
-Before adding a button, use an authorized disposable project with a clean database:
+Creating the template and obtaining its share URL requires an authenticated Railway
+workspace. Live testing is not a prerequisite for publishing an explicitly untested
+button. Do not use an invented ID or a repository-import URL as a substitute.
+
+Once the real template exists, use its generated share URL for the README badge
+and state that hosted deployment is untested. When live verification is authorized,
+use a disposable project with a clean database:
 
 1. Open the actual template URL in the deploy flow. Confirm both services and the
    persistent database volume are included, all references resolve, and users do
@@ -74,8 +81,8 @@ Before adding a button, use an authorized disposable project with a clean databa
 4. Restart/redeploy the app and database without replacing the volumes. Confirm
    the record remains, migration reruns succeed, and the auth secret is unchanged.
 5. Verify the app domain and `ORIGIN` agree and the database is not exposed publicly.
-6. Only then use Railway's generated share URL for the README badge. Never invent
-   a template ID or replace the template link with `/new?template=<repository>`.
+6. Record the verified template revision and app commit before removing the
+   untested notice from the README.
 
 Live deployment incurs provider charges and requires account access. No live
 deployment or persistence test is implied by checking this file into the repository.
