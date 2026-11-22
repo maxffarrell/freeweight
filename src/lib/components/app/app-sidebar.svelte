@@ -58,9 +58,9 @@
 							<Logo />
 							<span class="grid flex-1 text-left leading-tight">
 								<span class="truncate font-semibold">{org.name}</span>
-								{#if !whiteLabel}<span class="truncate text-xs text-muted-foreground"
-										>Freeweight</span
-									>{/if}
+								{#if !whiteLabel}<span class="truncate text-xs text-muted-foreground">
+										Freeweight
+									</span>{/if}
 							</span>
 						</a>
 					{/snippet}
@@ -105,9 +105,9 @@
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton tooltipContent="Member portal">
 						{#snippet child({ props })}
-							<a href="/portal" target="_blank" {...props}
-								><ExternalLink /><span>Member portal</span></a
-							>
+							<a href="/portal" target="_blank" {...props}>
+								<ExternalLink /><span>Member portal</span>
+							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>

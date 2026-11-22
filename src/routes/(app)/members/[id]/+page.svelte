@@ -1117,16 +1117,17 @@
 								toast.error(errMsg(err, 'Could not update'));
 							}
 						}}
-						>{m.member.doorBlocked ? 'Unblock at the door' : 'Block at the door'}</DropdownMenu.Item
 					>
+						{m.member.doorBlocked ? 'Unblock at the door' : 'Block at the door'}
+					</DropdownMenu.Item>
 				{/if}
-				<DropdownMenu.Item onclick={() => (guestOpen = true)}
-					><UserPlus /> Book a guest</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={() => (guestOpen = true)}>
+					<UserPlus /> Book a guest
+				</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={openCard}><Printer /> Print member card</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => goto(`/members/${m.member.id}/statement`)}
-					><FileText /> Statement</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={() => goto(`/members/${m.member.id}/statement`)}>
+					<FileText /> Statement
+				</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={copyPortalLink}><Link /> Copy portal link</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={openMerge}>Merge into another member…</DropdownMenu.Item>
@@ -1139,8 +1140,10 @@
 							} catch (err) {
 								toast.error(errMsg(err, 'Could not push to door'));
 							}
-						}}>Push to door</DropdownMenu.Item
+						}}
 					>
+						Push to door
+					</DropdownMenu.Item>
 				{/if}
 				{#if entitlements.dataRetention}
 					<DropdownMenu.Item
@@ -1154,13 +1157,15 @@
 							a.href = URL.createObjectURL(blob);
 							a.download = `member-${m.member.name.replace(/\s+/g, '-')}-data.json`;
 							a.click();
-						}}>Export member data</DropdownMenu.Item
+						}}
 					>
+						Export member data
+					</DropdownMenu.Item>
 				{/if}
 				{#if ai.configured}
-					<DropdownMenu.Item onclick={() => runAiSummary('progress')}
-						>AI progress summary</DropdownMenu.Item
-					>
+					<DropdownMenu.Item onclick={() => runAiSummary('progress')}>
+						AI progress summary
+					</DropdownMenu.Item>
 					<DropdownMenu.Item onclick={() => runAiSummary('brief')}>AI ops brief</DropdownMenu.Item>
 				{/if}
 				{#if entitlements.dataRetention}
@@ -1181,14 +1186,15 @@
 								toast.error(errMsg(err, 'Could not update'));
 							}
 						}}
-						>{m.member.retentionExempt
-							? 'Remove retention exemption'
-							: 'Exempt from retention sweeps'}</DropdownMenu.Item
 					>
+						{m.member.retentionExempt
+							? 'Remove retention exemption'
+							: 'Exempt from retention sweeps'}
+					</DropdownMenu.Item>
 				{/if}
-				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive"
-					>Anonymize personal data…</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={doAnonymize} class="text-destructive">
+					Anonymize personal data…
+				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}
@@ -1214,8 +1220,9 @@
 					{:else}
 						<span
 							class="flex size-12 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
-							>{initials}</span
 						>
+							{initials}
+						</span>
 					{/if}
 				</button>
 				<input
@@ -1265,8 +1272,10 @@
 									navigator.clipboard
 										.writeText(m.member.email!)
 										.then(() => toast.success('Email copied'))
-										.catch(() => toast.error('Could not copy'))}>Copy</Button
+										.catch(() => toast.error('Could not copy'))}
 							>
+								Copy
+							</Button>
 						{/if}
 					</span>
 				</div>
@@ -1275,34 +1284,34 @@
 				</div>
 				{#if m.member.emergencyName || m.member.emergencyPhone}
 					<div class="flex justify-between">
-						<span class="text-muted-foreground">Emergency</span><span class="truncate"
-							>{m.member.emergencyName ?? ''}{m.member.emergencyName && m.member.emergencyPhone
+						<span class="text-muted-foreground">Emergency</span><span class="truncate">
+							{m.member.emergencyName ?? ''}{m.member.emergencyName && m.member.emergencyPhone
 								? ' · '
-								: ''}{m.member.emergencyPhone ?? ''}</span
-						>
+								: ''}{m.member.emergencyPhone ?? ''}
+						</span>
 					</div>
 				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Location</span><span>{m.locationName ?? '—'}</span>
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground">Joined</span><span
-						>{formatDate(m.member.joinedAt)}{memberMonths > 0 ? ` · ${memberMonths} mo` : ''}</span
-					>
+					<span class="text-muted-foreground">Joined</span><span>
+						{formatDate(m.member.joinedAt)}{memberMonths > 0 ? ` · ${memberMonths} mo` : ''}
+					</span>
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground">Source</span><span
-						>{m.member.referralSource ?? '—'}</span
-					>
+					<span class="text-muted-foreground">Source</span><span>
+						{m.member.referralSource ?? '—'}
+					</span>
 				</div>
 				{#if m.referredBy || m.referralCount}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Referrals</span>
 						<span class="text-right">
 							{#if m.referredBy}
-								Joined via <a class="underline" href="/members/{m.referredBy.id}"
-									>{m.referredBy.name}</a
-								>{m.referralCount ? ' · ' : ''}
+								Joined via <a class="underline" href="/members/{m.referredBy.id}">
+									{m.referredBy.name}
+								</a>{m.referralCount ? ' · ' : ''}
 							{/if}
 							{#if m.referralCount}referred {m.referralCount}{/if}
 						</span>
@@ -1317,45 +1326,47 @@
 							navigator.clipboard
 								.writeText(`${location.origin}/j/${m.orgSlug}?ref=${m.member.id}`)
 								.then(() => toast.success('Referral link copied'))
-								.catch(() => toast.error('Could not copy'))}>Copy</Button
+								.catch(() => toast.error('Could not copy'))}
 					>
+						Copy
+					</Button>
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground">Birthday</span><span
-						>{m.member.birthday ? formatDate(m.member.birthday) : '—'}</span
-					>
+					<span class="text-muted-foreground">Birthday</span><span>
+						{m.member.birthday ? formatDate(m.member.birthday) : '—'}
+					</span>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Waiver</span>
 					{#if m.signedWaiver && settings.waiver && m.signedWaiver.text !== settings.waiver}
-						<span class="text-amber-600"
-							>Signed older version {formatDate(m.signedWaiver.signedAt)}</span
-						>
+						<span class="text-amber-600">
+							Signed older version {formatDate(m.signedWaiver.signedAt)}
+						</span>
 					{:else}
-						<span
-							>{m.signedWaiver
-								? `Signed ${formatDate(m.signedWaiver.signedAt)}`
-								: 'Not signed'}</span
-						>
+						<span>
+							{m.signedWaiver ? `Signed ${formatDate(m.signedWaiver.signedAt)}` : 'Not signed'}
+						</span>
 					{/if}
 				</div>
 				{#if entitlements.healthForms}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Health form</span>
-						<span
-							>{m.member.parqSignedAt
+						<span>
+							{m.member.parqSignedAt
 								? `PAR-Q signed ${formatDate(m.member.parqSignedAt)}`
 								: 'PAR-Q not signed'}{#if parqExpired}<span class="font-medium text-amber-600">
-									— expired</span
-								>{/if}{#if m.member.parqAnswers && Object.values(m.member.parqAnswers).some(Boolean)}<span
+									— expired
+								</span>{/if}{#if m.member.parqAnswers && Object.values(m.member.parqAnswers).some(Boolean)}<span
 									class="font-medium text-amber-600"
 									title="Answered yes to a health question"
 								>
-									— medical flag</span
-								>{/if}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
+									— medical flag
+								</span>{/if}{#if m.member.parqAnswers && Object.keys(m.member.parqAnswers).length}&nbsp;<button
 									class="underline"
-									onclick={() => (parqOpen = !parqOpen)}>{parqOpen ? 'hide' : 'view'}</button
-								>{/if}{#if m.member.email}&nbsp;<button
+									onclick={() => (parqOpen = !parqOpen)}
+								>
+									{parqOpen ? 'hide' : 'view'}
+								</button>{/if}{#if m.member.email}&nbsp;<button
 									class="underline"
 									disabled={parqReqBusy}
 									onclick={async () => {
@@ -1368,17 +1379,19 @@
 										} finally {
 											parqReqBusy = false;
 										}
-									}}>re-sign</button
-								>{/if}</span
-						>
+									}}
+								>
+									re-sign
+								</button>{/if}
+						</span>
 					</div>
 					{#if parqOpen && m.member.parqAnswers}
 						<div class="space-y-0.5 border-l-2 pl-3 text-xs">
 							{#each Object.entries(m.member.parqAnswers) as [q, a] (q)}
 								<div class="flex justify-between gap-2">
-									<span class="text-muted-foreground"
-										>{isNaN(Number(q)) ? q : `Q${Number(q) + 1}`}</span
-									>
+									<span class="text-muted-foreground">
+										{isNaN(Number(q)) ? q : `Q${Number(q) + 1}`}
+									</span>
 									<span class={a ? 'text-amber-600' : ''}>{a ? 'Yes' : 'No'}</span>
 								</div>
 							{/each}
@@ -1406,11 +1419,11 @@
 				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Guest passes</span>
-					<span
-						>{m.guestPasses
+					<span>
+						{m.guestPasses
 							? `${m.guestsUsed}/${m.guestPasses} used this month`
-							: 'None on this plan'}</span
-					>
+							: 'None on this plan'}
+					</span>
 				</div>
 				{#if m.guardian}
 					<div class="flex justify-between">
@@ -1431,15 +1444,15 @@
 				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Visits</span>
-					<span class="tabular-nums"
-						>{m.attendance.thisMonth} this month · {m.attendance.visits} total</span
-					>
+					<span class="tabular-nums">
+						{m.attendance.thisMonth} this month · {m.attendance.visits} total
+					</span>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Classes booked</span>
-					<span class="tabular-nums"
-						>{m.attendance.bookedWeek} this week · {m.attendance.bookedMonth} this month</span
-					>
+					<span class="tabular-nums">
+						{m.attendance.bookedWeek} this week · {m.attendance.bookedMonth} this month
+					</span>
 				</div>
 				{#if m.attendance.waitlisted > 0}
 					<div class="flex justify-between">
@@ -1465,31 +1478,31 @@
 				{#if nextSess}
 					<div class="flex justify-between gap-2">
 						<span class="text-muted-foreground">Next session</span>
-						<span class="text-right tabular-nums"
-							>{nextSess.className} — {formatDate(nextSess.startsAt)}</span
-						>
+						<span class="text-right tabular-nums">
+							{nextSess.className} — {formatDate(nextSess.startsAt)}
+						</span>
 					</div>
 				{/if}
 				{#if m.attendance.usualTimes.length}
 					<div class="flex justify-between gap-2">
 						<span class="text-muted-foreground">Usually visits</span>
-						<span class="text-right tabular-nums"
-							>{m.attendance.usualTimes
+						<span class="text-right tabular-nums">
+							{m.attendance.usualTimes
 								.map(
 									(t) =>
 										`${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][t.dow]} ${t.hour % 12 || 12}${t.hour < 12 ? 'a' : 'p'}`
 								)
-								.join(' · ')}</span
-						>
+								.join(' · ')}
+						</span>
 					</div>
 				{/if}
 				{@const nextMile = [10, 25, 50, 100, 250, 500, 1000].find((n) => n > m.attendance.visits)}
 				{#if nextMile}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Next milestone</span>
-						<span class="text-muted-foreground tabular-nums"
-							>{nextMile} ({nextMile - m.attendance.visits} to go)</span
-						>
+						<span class="text-muted-foreground tabular-nums">
+							{nextMile} ({nextMile - m.attendance.visits} to go)
+						</span>
 					</div>
 				{/if}
 				{#if m.loyalty}
@@ -1507,26 +1520,26 @@
 				{#if m.weekStreak > 0}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Streak</span>
-						<span class="tabular-nums"
-							>{m.weekStreak} week{m.weekStreak === 1 ? '' : 's'} in a row</span
-						>
+						<span class="tabular-nums">
+							{m.weekStreak} week{m.weekStreak === 1 ? '' : 's'} in a row
+						</span>
 					</div>
 				{/if}
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">No-shows</span>
-					<span class="tabular-nums"
-						>{m.attendance.noShows}{m.attendance.showRate != null
+					<span class="tabular-nums">
+						{m.attendance.noShows}{m.attendance.showRate != null
 							? ` · ${m.attendance.showRate}% show rate`
 							: ''}{#if m.bookings.some((b) => b.booking.status === 'no_show')}
 							{@const lastNs = m.bookings
 								.filter((b) => b.booking.status === 'no_show')
 								.map((b) => new Date(b.startsAt).getTime())
 								.reduce((a, t) => Math.max(a, t), 0)}
-							<span class="text-xs text-muted-foreground"
-								>· last {formatDate(new Date(lastNs))}</span
-							>
-						{/if}</span
-					>
+							<span class="text-xs text-muted-foreground">
+								· last {formatDate(new Date(lastNs))}
+							</span>
+						{/if}
+					</span>
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Open balance</span>
@@ -1534,9 +1547,9 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Lifetime paid</span>
-					<span class="text-muted-foreground tabular-nums"
-						>{formatMoney(lifetimePaid, currency)}</span
-					>
+					<span class="text-muted-foreground tabular-nums">
+						{formatMoney(lifetimePaid, currency)}
+					</span>
 				</div>
 				<div class="flex items-center justify-between gap-2">
 					<span class="text-muted-foreground">Level</span>
@@ -1560,8 +1573,10 @@
 							<span class="font-medium">{memberLocker.label}</span>
 							<button
 								class="text-xs text-muted-foreground underline-offset-2 hover:underline"
-								onclick={releaseMemberLocker}>release</button
+								onclick={releaseMemberLocker}
 							>
+								release
+							</button>
 						{:else if freeLockers.length}
 							<NativeSelect size="sm" class="w-auto" bind:value={lockerPick}>
 								<option value="">assign…</option>
@@ -1590,8 +1605,10 @@
 										} catch (err) {
 											toast.error(errMsg(err, 'Could not return'));
 										}
-									}}>×</button
+									}}
 								>
+									×
+								</button>
 							</Badge>
 						{:else}
 							<span class="text-muted-foreground">—</span>
@@ -1615,8 +1632,10 @@
 								<button
 									class="text-muted-foreground hover:text-foreground"
 									onclick={() => removeTag(t)}
-									aria-label="Remove tag {t}">×</button
+									aria-label="Remove tag {t}"
 								>
+									×
+								</button>
 							</Badge>
 						{:else}
 							<span class="text-muted-foreground">—</span>
@@ -1637,22 +1656,24 @@
 				</div>
 			</Card.Content>
 			<Card.Footer>
-				<Button variant="outline" size="sm" class="w-full" onclick={() => void sellPass()}
-					>Sell day pass</Button
-				>
+				<Button variant="outline" size="sm" class="w-full" onclick={() => void sellPass()}>
+					Sell day pass
+				</Button>
 			</Card.Footer>
 			{#if balance > 0}
 				<Card.Footer class="flex-col gap-2">
-					<Button class="w-full" onclick={() => ((payAmount = balance), (payOpen = true))}
-						>Record payment</Button
-					>
+					<Button class="w-full" onclick={() => ((payAmount = balance), (payOpen = true))}>
+						Record payment
+					</Button>
 					{#if m.member.email}
 						<Button
 							class="w-full"
 							variant="outline"
 							disabled={pending}
-							onclick={requestPaymentFromMember}>Email payment request</Button
+							onclick={requestPaymentFromMember}
 						>
+							Email payment request
+						</Button>
 					{/if}
 				</Card.Footer>
 			{/if}
@@ -1669,23 +1690,27 @@
 						<div class="flex items-center justify-between gap-2 py-1.5 text-sm">
 							<span class="min-w-0 truncate font-medium">{t.className}</span>
 							<span class="flex shrink-0 items-center gap-1.5">
-								<span class="text-xs text-muted-foreground"
-									>{formatDate(t.startsAt)} · {localTime(t.startsAt, tz)}</span
-								>
+								<span class="text-xs text-muted-foreground">
+									{formatDate(t.startsAt)} · {localTime(t.startsAt, tz)}
+								</span>
 								<Button
 									size="sm"
 									variant="outline"
 									class="h-7 px-2"
 									disabled={trialBusy === t.request.id}
-									onclick={() => trialDecision(t.request.id, true)}>Confirm</Button
+									onclick={() => trialDecision(t.request.id, true)}
 								>
+									Confirm
+								</Button>
 								<Button
 									size="sm"
 									variant="ghost"
 									class="h-7 px-2 text-destructive"
 									disabled={trialBusy === t.request.id}
-									onclick={() => trialDecision(t.request.id, false)}>Decline</Button
+									onclick={() => trialDecision(t.request.id, false)}
 								>
+									Decline
+								</Button>
 							</span>
 						</div>
 					{/each}
@@ -1773,15 +1798,18 @@
 													)
 												)
 												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
-										>{mm.membership.autoRenew ? 'Auto-renew ✓' : 'Auto-renew'}</Button
 									>
+										{mm.membership.autoRenew ? 'Auto-renew ✓' : 'Auto-renew'}
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
 										title="Move pack classes to another member"
-										onclick={() => void openTransfer(mm.membership.id)}>Gift</Button
+										onclick={() => void openTransfer(mm.membership.id)}
 									>
+										Gift
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -1806,8 +1834,10 @@
 													}
 												}
 											});
-										}}>Extend</Button
+										}}
 									>
+										Extend
+									</Button>
 								{:else}
 									<Button
 										variant="ghost"
@@ -1825,8 +1855,9 @@
 													)
 												)
 												.catch((e) => toast.error(errMsg(e, 'Could not update')))}
-										>{mm.membership.noBill ? 'Comp’d ✓' : 'Comp'}</Button
 									>
+										{mm.membership.noBill ? 'Comp’d ✓' : 'Comp'}
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -1839,27 +1870,35 @@
 											(planChangeHadPrice = mm.membership.price != null),
 											(planChangeProrate = false),
 											(planOpen = true)
-										)}>Plan</Button
+										)}
 									>
+										Plan
+									</Button>
 								{/if}
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs"
-									onclick={() => ((pauseId = mm.membership.id), (pauseOpen = true))}>Pause</Button
+									onclick={() => ((pauseId = mm.membership.id), (pauseOpen = true))}
 								>
+									Pause
+								</Button>
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs text-destructive"
-									onclick={() => setMembership(mm.membership.id, 'suspended')}>Suspend</Button
+									onclick={() => setMembership(mm.membership.id, 'suspended')}
 								>
+									Suspend
+								</Button>
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs text-destructive"
-									onclick={() => setMembership(mm.membership.id, 'cancelled')}>Cancel</Button
+									onclick={() => setMembership(mm.membership.id, 'cancelled')}
 								>
+									Cancel
+								</Button>
 								{#if mm.membership.pauseRequestedAt}
 									<Button
 										variant="ghost"
@@ -1870,29 +1909,37 @@
 												mm.membership.id,
 												'paused',
 												mm.membership.pauseUntil ?? undefined
-											)}>Approve pause</Button
+											)}
 									>
+										Approve pause
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => dismissPauseRequest(mm.membership.id)}>Dismiss</Button
+										onclick={() => dismissPauseRequest(mm.membership.id)}
 									>
+										Dismiss
+									</Button>
 								{:else if mm.membership.cancelRequestedAt}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => dismissCancelRequest(mm.membership.id)}>Dismiss</Button
+										onclick={() => dismissCancelRequest(mm.membership.id)}
 									>
+										Dismiss
+									</Button>
 								{/if}
 							{:else if mm.membership.status === 'paused' || mm.membership.status === 'suspended'}
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs"
-									onclick={() => setMembership(mm.membership.id, 'active')}>Resume</Button
+									onclick={() => setMembership(mm.membership.id, 'active')}
 								>
+									Resume
+								</Button>
 							{/if}
 						</div>
 					</div>
@@ -1910,8 +1957,10 @@
 							variant="ghost"
 							size="sm"
 							class="h-6 px-2 text-xs"
-							onclick={() => (compOpen = true)}>Grant comp classes</Button
+							onclick={() => (compOpen = true)}
 						>
+							Grant comp classes
+						</Button>
 					</div>
 				{/if}
 			</Card.Content>
@@ -1950,8 +1999,10 @@
 								size="sm"
 								class="h-7 px-1.5 text-destructive"
 								onclick={() => removeDoc(doc.id, doc.name)}
-								aria-label="Delete {doc.name}"><Trash2 class="size-3.5" /></Button
+								aria-label="Delete {doc.name}"
 							>
+								<Trash2 class="size-3.5" />
+							</Button>
 						</div>
 					</div>
 				{:else}
@@ -1979,9 +2030,9 @@
 						<div class="min-w-0">
 							<span class="truncate font-medium">{r.title}</span>
 							{#if r.status === 'signed'}
-								<span class="block text-xs text-muted-foreground"
-									>Signed by {r.signedName} · {formatRelative(r.signedAt!)}</span
-								>
+								<span class="block text-xs text-muted-foreground">
+									Signed by {r.signedName} · {formatRelative(r.signedAt!)}
+								</span>
 							{/if}
 						</div>
 						<div class="flex shrink-0 items-center gap-2">
@@ -1990,15 +2041,19 @@
 									? 'secondary'
 									: r.status === 'pending'
 										? 'outline'
-										: 'destructive'}>{r.status}</Badge
+										: 'destructive'}
 							>
+								{r.status}
+							</Badge>
 							{#if r.status === 'pending'}
 								<Button
 									size="sm"
 									variant="ghost"
 									class="h-7 px-1.5 text-destructive"
-									onclick={() => voidRequest(r.id)}>Void</Button
+									onclick={() => voidRequest(r.id)}
 								>
+									Void
+								</Button>
 							{/if}
 						</div>
 					</div>
@@ -2031,15 +2086,19 @@
 											variant="ghost"
 											class="h-7 px-1.5"
 											disabled={aiDraftBusy}
-											onclick={() => draftIssueReplyEmail(i.id)}>Reply</Button
+											onclick={() => draftIssueReplyEmail(i.id)}
 										>
+											Reply
+										</Button>
 									{/if}
 									<Button
 										size="sm"
 										variant="ghost"
 										class="h-7 px-1.5"
-										onclick={() => resolveIssue(i.id)}>Resolve</Button
+										onclick={() => resolveIssue(i.id)}
 									>
+										Resolve
+									</Button>
 								{:else}
 									<Badge variant="secondary">resolved</Badge>
 								{/if}
@@ -2065,9 +2124,9 @@
 					<div class="py-1.5 text-sm">
 						<div class="flex items-center justify-between gap-2">
 							<span class="min-w-0 truncate">
-								<Badge variant={i.kind === 'injury' ? 'destructive' : 'outline'} class="mr-1.5"
-									>{i.kind}</Badge
-								>
+								<Badge variant={i.kind === 'injury' ? 'destructive' : 'outline'} class="mr-1.5">
+									{i.kind}
+								</Badge>
 								{i.description}
 							</span>
 							<span class="flex shrink-0 items-center gap-2">
@@ -2077,8 +2136,10 @@
 										size="sm"
 										variant="ghost"
 										class="h-7 px-1.5"
-										onclick={() => closeIncident(i.id)}>Close</Button
+										onclick={() => closeIncident(i.id)}
 									>
+										Close
+									</Button>
 								{:else}
 									<Badge variant="secondary">closed</Badge>
 								{/if}
@@ -2110,8 +2171,10 @@
 							size="sm"
 							class="h-7 shrink-0 px-1.5 text-destructive"
 							onclick={() => removeNote(n.id)}
-							aria-label="Delete note"><Trash2 class="size-3.5" /></Button
+							aria-label="Delete note"
 						>
+							<Trash2 class="size-3.5" />
+						</Button>
 					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground">
@@ -2141,9 +2204,9 @@
 			<Card.Content class="px-4">
 				{#each m.measurements as e (e.id)}
 					<div class="flex items-baseline gap-2 py-1 text-sm">
-						<span class="w-16 shrink-0 text-xs text-muted-foreground capitalize"
-							>{e.kind.replaceAll('_', ' ')}</span
-						>
+						<span class="w-16 shrink-0 text-xs text-muted-foreground capitalize">
+							{e.kind.replaceAll('_', ' ')}
+						</span>
 						<span class="font-medium tabular-nums">{e.value} {e.unit}</span>
 						<span class="ml-auto shrink-0 text-xs text-muted-foreground">{e.recordedAt}</span>
 					</div>
@@ -2164,13 +2227,13 @@
 				<Card.Content class="px-4">
 					{#each m.scores as s (s.result.id)}
 						<div class="flex items-baseline gap-2 py-1 text-sm">
-							<span class="w-28 shrink-0 text-xs text-muted-foreground"
-								>{localDate(s.startsAt, tz)}</span
-							>
+							<span class="w-28 shrink-0 text-xs text-muted-foreground">
+								{localDate(s.startsAt, tz)}
+							</span>
 							<span class="min-w-0 truncate">{s.className}</span>
-							<span class="ml-auto shrink-0 font-medium"
-								>{s.result.score}{s.result.asRx ? ' Rx' : ''}</span
-							>
+							<span class="ml-auto shrink-0 font-medium">
+								{s.result.score}{s.result.asRx ? ' Rx' : ''}
+							</span>
 						</div>
 					{/each}
 				</Card.Content>
@@ -2230,14 +2293,18 @@
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs"
-									onclick={() => openWorkout(w)}>Edit</Button
+									onclick={() => openWorkout(w)}
 								>
+									Edit
+								</Button>
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs text-destructive"
-									onclick={() => void removeWorkout(w.id)}>Remove</Button
+									onclick={() => void removeWorkout(w.id)}
 								>
+									Remove
+								</Button>
 							</span>
 						</div>
 						<p class="mt-1 whitespace-pre-wrap text-muted-foreground">{w.body}</p>
@@ -2252,15 +2319,15 @@
 			<Card.Header class="flex-row items-center justify-between">
 				<div>
 					<Card.Title class="text-base">Workout program</Card.Title>
-					<Card.Description
-						>Reusable multi-week plans — the member's portal shows today's day</Card.Description
-					>
+					<Card.Description>
+						Reusable multi-week plans — the member's portal shows today's day
+					</Card.Description>
 				</div>
 				<span class="flex gap-1">
 					<Button size="sm" variant="ghost" onclick={() => (libOpen = true)}>Library</Button>
-					<Button size="sm" variant="outline" onclick={() => (assignOpen = true)}
-						><Plus /> Assign</Button
-					>
+					<Button size="sm" variant="outline" onclick={() => (assignOpen = true)}>
+						<Plus /> Assign
+					</Button>
 				</span>
 			</Card.Header>
 			<Card.Content class="space-y-2 px-4">
@@ -2270,14 +2337,14 @@
 							<p class="truncate font-medium">
 								{mp.program.name}
 								<span class="font-normal text-muted-foreground">
-									· {mp.program.weeks}w · starts {mp.assignment.startDate}</span
-								>
+									· {mp.program.weeks}w · starts {mp.assignment.startDate}
+								</span>
 							</p>
 						</div>
 						<span class="flex shrink-0 items-center gap-1">
-							<Badge variant={mp.assignment.status === 'active' ? 'default' : 'secondary'}
-								>{mp.assignment.status}</Badge
-							>
+							<Badge variant={mp.assignment.status === 'active' ? 'default' : 'secondary'}>
+								{mp.assignment.status}
+							</Badge>
 							{#if mp.assignment.status === 'active'}
 								<Button
 									variant="ghost"
@@ -2290,8 +2357,10 @@
 											status: 'done'
 										});
 										toast.success('Marked done');
-									}}>Done</Button
+									}}
 								>
+									Done
+								</Button>
 								<Button
 									variant="ghost"
 									size="sm"
@@ -2302,8 +2371,10 @@
 											memberId: id,
 											status: 'stopped'
 										});
-									}}>Stop</Button
+									}}
 								>
+									Stop
+								</Button>
 							{/if}
 						</span>
 					</div>
@@ -2322,19 +2393,21 @@
 				{#each memberChallenges as c (c.challenge.id)}
 					<div class="flex items-center justify-between gap-2 py-1 text-sm">
 						<span class="min-w-0 truncate font-medium">{c.challenge.name}</span>
-						<span class="shrink-0 text-xs text-muted-foreground"
-							>{c.mine!.count}/{c.challenge.goal} check-ins</span
-						>
-						<Badge variant={c.state === 'live' ? 'default' : 'outline'} class="shrink-0"
-							>{c.state}</Badge
-						>
+						<span class="shrink-0 text-xs text-muted-foreground">
+							{c.mine!.count}/{c.challenge.goal} check-ins
+						</span>
+						<Badge variant={c.state === 'live' ? 'default' : 'outline'} class="shrink-0">
+							{c.state}
+						</Badge>
 						<Button
 							size="sm"
 							variant="ghost"
 							class="h-6 px-2 text-xs text-muted-foreground"
 							disabled={chalPending === c.challenge.id}
-							onclick={() => dropChallenge(c.challenge.id)}>Remove</Button
+							onclick={() => dropChallenge(c.challenge.id)}
 						>
+							Remove
+						</Button>
 					</div>
 				{/each}
 				{#each joinableChallenges as c (c.challenge.id)}
@@ -2344,16 +2417,18 @@
 							<span class="text-xs">
 								· {c.challenge.goal} check-ins · {formatDate(c.challenge.startDate)} – {formatDate(
 									c.challenge.endDate
-								)}</span
-							>
+								)}
+							</span>
 						</span>
 						<Button
 							size="sm"
 							variant="outline"
 							class="h-6 shrink-0 px-2 text-xs"
 							disabled={chalPending === c.challenge.id}
-							onclick={() => enrollChallenge(c.challenge.id)}>Enroll</Button
+							onclick={() => enrollChallenge(c.challenge.id)}
 						>
+							Enroll
+						</Button>
 					</div>
 				{/each}
 				{#if !memberChallenges.length && !joinableChallenges.length}
@@ -2366,22 +2441,22 @@
 			<Card.Header>
 				<Card.Title class="text-base">Emails sent</Card.Title>
 				{#if m.emailStats.sent}
-					<Card.Description
-						>{m.emailStats.opened} of {m.emailStats.sent} opened ({Math.round(
+					<Card.Description>
+						{m.emailStats.opened} of {m.emailStats.sent} opened ({Math.round(
 							(m.emailStats.opened / m.emailStats.sent) * 100
-						)}%)</Card.Description
-					>
+						)}%)
+					</Card.Description>
 				{/if}
 			</Card.Header>
 			<Card.Content class="px-4">
 				{#each m.emails as e (e.id)}
 					<div class="flex items-center justify-between gap-2 py-1 text-sm">
 						<span class="capitalize">{e.kind.replaceAll('_', ' ')}</span>
-						<span class="shrink-0 text-xs text-muted-foreground"
-							>{#if e.openedAt}
+						<span class="shrink-0 text-xs text-muted-foreground">
+							{#if e.openedAt}
 								<Badge variant="secondary" class="mr-1">opened</Badge>
-							{/if}{formatRelative(e.createdAt)}</span
-						>
+							{/if}{formatRelative(e.createdAt)}
+						</span>
 					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground">
@@ -2439,11 +2514,10 @@
 		<Tabs.Root value="charges">
 			<Card.Header>
 				<Tabs.List>
-					<Tabs.Trigger value="charges"
-						>Charges{#if openChargesCount}
-							<Badge variant="destructive" class="ml-1">{openChargesCount} open</Badge
-							>{/if}</Tabs.Trigger
-					>
+					<Tabs.Trigger value="charges">
+						Charges{#if openChargesCount}
+							<Badge variant="destructive" class="ml-1">{openChargesCount} open</Badge>{/if}
+					</Tabs.Trigger>
 					<Tabs.Trigger value="payments">Payments</Tabs.Trigger>
 					<Tabs.Trigger value="bookings">Bookings</Tabs.Trigger>
 					<Tabs.Trigger value="checkins">Check-ins</Tabs.Trigger>
@@ -2468,18 +2542,17 @@
 									<Table.Cell>{c.charge.description ?? c.charge.kind}</Table.Cell>
 									<Table.Cell>{formatDate(c.charge.dueDate)}</Table.Cell>
 									<Table.Cell><StatusBadge status={c.charge.status} /></Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(c.charge.amount, currency)}</Table.Cell
-									>
-									<Table.Cell class="text-right text-muted-foreground tabular-nums"
-										>{formatMoney(c.paid, currency)}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(c.charge.amount, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-right text-muted-foreground tabular-nums">
+										{formatMoney(c.paid, currency)}
+									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={5} class="text-muted-foreground">No charges.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={5} class="text-muted-foreground">No charges.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -2499,29 +2572,30 @@
 								<Table.Row class={p.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>{formatDate(p.paidAt)}</Table.Cell>
 									<Table.Cell class="capitalize">{p.method}</Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(p.amount, currency)}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(p.amount, currency)}
+									</Table.Cell>
 									<Table.Cell class="text-right">
 										{#if p.refundedAt}
-											<span class="text-xs text-muted-foreground"
-												>refunded {formatDate(p.refundedAt)}</span
-											>
+											<span class="text-xs text-muted-foreground">
+												refunded {formatDate(p.refundedAt)}
+											</span>
 										{:else}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => refund(p.id, p.amount)}>Refund</Button
+												onclick={() => refund(p.id, p.amount)}
 											>
+												Refund
+											</Button>
 										{/if}
 									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={4} class="text-muted-foreground">No payments.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={4} class="text-muted-foreground">No payments.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -2531,9 +2605,9 @@
 						<Button size="sm" variant="outline" onclick={() => void openBook()}>
 							Book a class…
 						</Button>
-						<Button size="sm" variant="outline" onclick={() => (seriesOpen = true)}
-							>Book into a series…</Button
-						>
+						<Button size="sm" variant="outline" onclick={() => (seriesOpen = true)}>
+							Book into a series…
+						</Button>
 					</div>
 					<div class="mb-2 flex justify-end">
 						<Button
@@ -2556,8 +2630,10 @@
 								a.download = `bookings-${m.member.name.replaceAll(' ', '-')}.csv`;
 								a.click();
 								URL.revokeObjectURL(a.href);
-							}}>Export CSV</Button
+							}}
 						>
+							Export CSV
+						</Button>
 					</div>
 					<Table.Root>
 						<Table.Header>
@@ -2571,16 +2647,16 @@
 							{#each m.bookings as b (b.booking.id)}
 								<Table.Row>
 									<Table.Cell>{b.className}</Table.Cell>
-									<Table.Cell class="text-muted-foreground"
-										>{localDate(b.startsAt, tz)} {localTime(b.startsAt, tz)}</Table.Cell
-									>
+									<Table.Cell class="text-muted-foreground">
+										{localDate(b.startsAt, tz)}
+										{localTime(b.startsAt, tz)}
+									</Table.Cell>
 									<Table.Cell><StatusBadge status={b.booking.status} /></Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={3} class="text-muted-foreground">No bookings.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={3} class="text-muted-foreground">No bookings.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -2596,16 +2672,16 @@
 						<Table.Body>
 							{#each m.checkIns as c (c.id)}
 								<Table.Row>
-									<Table.Cell class="text-muted-foreground"
-										>{localDate(c.checkedAt, tz)} {localTime(c.checkedAt, tz)}</Table.Cell
-									>
+									<Table.Cell class="text-muted-foreground">
+										{localDate(c.checkedAt, tz)}
+										{localTime(c.checkedAt, tz)}
+									</Table.Cell>
 									<Table.Cell class="uppercase">{c.method}</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={3} class="text-muted-foreground">No check-ins.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={3} class="text-muted-foreground">No check-ins.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -2624,25 +2700,24 @@
 							{#each memberGiftCards as g (g.card.id)}
 								<Table.Row>
 									<Table.Cell class="font-mono text-xs">{g.card.code}</Table.Cell>
-									<Table.Cell class="tabular-nums"
-										>{formatMoney(g.card.amount, currency)}</Table.Cell
-									>
-									<Table.Cell class="tabular-nums"
-										>{formatMoney(g.card.balance, currency)}</Table.Cell
-									>
-									<Table.Cell class="text-muted-foreground"
-										>{g.card.redeemedAt
+									<Table.Cell class="tabular-nums">
+										{formatMoney(g.card.amount, currency)}
+									</Table.Cell>
+									<Table.Cell class="tabular-nums">
+										{formatMoney(g.card.balance, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-muted-foreground">
+										{g.card.redeemedAt
 											? `redeemed ${formatDate(g.card.redeemedAt)}`
 											: g.card.purchaserMemberId === id
 												? 'purchased — unused'
-												: 'unused'}</Table.Cell
-									>
+												: 'unused'}
+									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={4} class="text-muted-foreground">No gift cards.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={4} class="text-muted-foreground">No gift cards.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -2661,13 +2736,13 @@
 			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPause}>
-			<Field.Field
-				><Field.Label for="pause-until">Resume on (optional)</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="pause-until">Resume on (optional)</Field.Label><Input
 					id="pause-until"
 					type="date"
 					bind:value={pauseResumeAt}
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
 			<Modal.Footer>
 				<Button type="submit" disabled={pending}>Pause membership</Button>
 			</Modal.Footer>
@@ -2694,9 +2769,9 @@
 					</Select.Trigger>
 					<Select.Content>
 						{#each plans.filter((p) => p.active && !p.isPack && p.id !== planChangeCurrent) as p (p.id)}
-							<Select.Item value={p.id}
-								>{p.name} — {formatMoney(p.amount, currency)}/{p.interval}</Select.Item
-							>
+							<Select.Item value={p.id}>
+								{p.name} — {formatMoney(p.amount, currency)}/{p.interval}
+							</Select.Item>
 						{/each}
 					</Select.Content>
 				</Select.Root>
@@ -2721,8 +2796,10 @@
 				<Button
 					type="submit"
 					disabled={pending ||
-						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}>Save</Button
+						(!planChangePlanId && planChangePrice == null && !planChangeHadPrice)}
 				>
+					Save
+				</Button>
 			</Modal.Footer>
 		</form>
 	</Modal.Content>
@@ -2732,25 +2809,24 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Log a guest visit</Modal.Title>
-			<Modal.Description
-				>{m.guestPasses
+			<Modal.Description>
+				{m.guestPasses
 					? `${m.member.name} has ${m.guestPasses - m.guestsUsed} guest passes left this month.`
-					: `${m.member.name}'s plan doesn't include guest passes.`}</Modal.Description
-			>
+					: `${m.member.name}'s plan doesn't include guest passes.`}
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={logGuest}>
-			<Field.Field
-				><Field.Label for="guest-name">Guest name</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="guest-name">Guest name</Field.Label><Input
 					id="guest-name"
 					required
 					bind:value={guestName}
 					autofocus
-				/></Field.Field
-			>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !guestName.trim()}>Check in guest</Button
-				></Modal.Footer
-			>
+				/>
+			</Field.Field>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !guestName.trim()}>Check in guest</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -2759,67 +2835,58 @@
 	<Modal.Content>
 		<Modal.Header><Modal.Title>Edit member</Modal.Title></Modal.Header>
 		<form class="space-y-4" onsubmit={saveMember}>
-			<Field.Field
-				><Field.Label for="e-name">Name</Field.Label><Input
-					id="e-name"
-					required
-					bind:value={name}
-				/></Field.Field
-			>
-			<Field.Field
-				><Field.Label for="e-email">Email</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="e-name">Name</Field.Label><Input id="e-name" required bind:value={name} />
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="e-email">Email</Field.Label><Input
 					id="e-email"
 					type="email"
 					bind:value={email}
-				/></Field.Field
-			>
-			<Field.Field
-				><Field.Label for="e-phone">Phone</Field.Label><Input
-					id="e-phone"
-					bind:value={phone}
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="e-phone">Phone</Field.Label><Input id="e-phone" bind:value={phone} />
+			</Field.Field>
 			<div class="grid grid-cols-2 gap-2">
-				<Field.Field
-					><Field.Label for="e-emname">Emergency contact</Field.Label><Input
+				<Field.Field>
+					<Field.Label for="e-emname">Emergency contact</Field.Label><Input
 						id="e-emname"
 						placeholder="Name"
 						bind:value={emName}
-					/></Field.Field
-				>
-				<Field.Field
-					><Field.Label for="e-emphone">&nbsp;</Field.Label><Input
+					/>
+				</Field.Field>
+				<Field.Field>
+					<Field.Label for="e-emphone">&nbsp;</Field.Label><Input
 						id="e-emphone"
 						placeholder="Phone"
 						bind:value={emPhone}
-					/></Field.Field
-				>
+					/>
+				</Field.Field>
 			</div>
-			<Field.Field
-				><Field.Label for="e-birthday">Birthday (optional)</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="e-birthday">Birthday (optional)</Field.Label><Input
 					id="e-birthday"
 					type="date"
 					bind:value={birthday}
-				/></Field.Field
-			>
-			<Field.Field
-				><Field.Label for="e-desk">Front-desk flag (optional)</Field.Label><Input
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="e-desk">Front-desk flag (optional)</Field.Label><Input
 					id="e-desk"
 					bind:value={deskNote}
 					maxlength={120}
 					placeholder="e.g. Owes $50 · Injury: no jumping"
-				/><Field.Description>Shown at the kiosk when this member checks in.</Field.Description
-				></Field.Field
-			>
+				/><Field.Description>Shown at the kiosk when this member checks in.</Field.Description>
+			</Field.Field>
 			<Field.Field>
 				<Field.Label>Guardian (household payer)</Field.Label>
 				<Select.Root type="single" bind:value={guardianId}>
-					<Select.Trigger class="w-full"
-						>{guardianId === 'none'
+					<Select.Trigger class="w-full">
+						{guardianId === 'none'
 							? 'Bills to this member'
-							: (m.memberOptions.find((o) => o.id === guardianId)?.name ??
-								'Choose')}</Select.Trigger
-					>
+							: (m.memberOptions.find((o) => o.id === guardianId)?.name ?? 'Choose')}
+					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="none">Bills to this member</Select.Item>
 						{#each m.memberOptions as o (o.id)}
@@ -2848,22 +2915,22 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>New membership</Modal.Title>
-			<Modal.Description
-				>Posts the signup fee and the first period charge immediately.</Modal.Description
-			>
+			<Modal.Description>
+				Posts the signup fee and the first period charge immediately.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={addMembership}>
 			<Field.Field>
 				<Field.Label>Plan</Field.Label>
 				<Select.Root type="single" bind:value={planId}>
-					<Select.Trigger class="w-full"
-						>{plans.find((p) => p.id === planId)?.name ?? 'Choose a plan'}</Select.Trigger
-					>
+					<Select.Trigger class="w-full">
+						{plans.find((p) => p.id === planId)?.name ?? 'Choose a plan'}
+					</Select.Trigger>
 					<Select.Content>
 						{#each plans.filter((p) => p.active) as p (p.id)}
-							<Select.Item value={p.id}
-								>{p.name} · {formatMoney(p.amount, currency)}/{p.interval}</Select.Item
-							>
+							<Select.Item value={p.id}>
+								{p.name} · {formatMoney(p.amount, currency)}/{p.interval}
+							</Select.Item>
 						{/each}
 					</Select.Content>
 				</Select.Root>
@@ -2872,9 +2939,9 @@
 				<Field.Label for="m-start">Starts</Field.Label>
 				<Input id="m-start" type="date" required bind:value={startsAt} />
 			</Field.Field>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !planId}>Start membership</Button></Modal.Footer
-			>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !planId}>Start membership</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -2909,8 +2976,9 @@
 						size="sm"
 						disabled={aiDraftBusy}
 						onclick={draftWinBackEmail}
-						><Sparkles class="mr-1 h-4 w-4" />{aiDraftBusy ? 'Drafting…' : 'Draft win-back'}</Button
 					>
+						<Sparkles class="mr-1 h-4 w-4" />{aiDraftBusy ? 'Drafting…' : 'Draft win-back'}
+					</Button>
 				{/if}
 				<Button type="submit" disabled={pending}>Send</Button>
 			</Modal.Footer>
@@ -2937,15 +3005,12 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Field.Field
-				><Field.Label for="pay-notes">Note</Field.Label><Input
-					id="pay-notes"
-					bind:value={notes}
-				/></Field.Field
-			>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !payAmount}>Record</Button></Modal.Footer
-			>
+			<Field.Field>
+				<Field.Label for="pay-notes">Note</Field.Label><Input id="pay-notes" bind:value={notes} />
+			</Field.Field>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !payAmount}>Record</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -2954,9 +3019,9 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Grant comp classes</Modal.Title>
-			<Modal.Description
-				>Adds to {m.member.name}'s class-credit cap for the current period (or this pack).</Modal.Description
-			>
+			<Modal.Description>
+				Adds to {m.member.name}'s class-credit cap for the current period (or this pack).
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitComp}>
 			<Field.Field>
@@ -2985,9 +3050,9 @@
 			<p class="mt-2 text-xs text-muted-foreground">Show at the front desk to check in</p>
 		</div>
 		<Modal.Footer>
-			<Button variant="outline" onclick={() => window.print()} disabled={!cardQr}
-				><Printer class="mr-1 h-3.5 w-3.5" /> Print card</Button
-			>
+			<Button variant="outline" onclick={() => window.print()} disabled={!cardQr}>
+				<Printer class="mr-1 h-3.5 w-3.5" /> Print card
+			</Button>
 		</Modal.Footer>
 	</Modal.Content>
 </Modal.Root>
@@ -2996,19 +3061,18 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Book into a series</Modal.Title>
-			<Modal.Description
-				>Book {m.member.name} into every upcoming session of a class — full sessions go to the waitlist,
-				ones they're already in are skipped.</Modal.Description
-			>
+			<Modal.Description>
+				Book {m.member.name} into every upcoming session of a class — full sessions go to the waitlist,
+				ones they're already in are skipped.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitSeries}>
 			<Field.Field>
 				<Field.Label>Class</Field.Label>
 				<Select.Root type="single" bind:value={seriesTypeId}>
-					<Select.Trigger class="w-full"
-						>{classTypes.find((ct) => ct.id === seriesTypeId)?.name ??
-							'Pick a class…'}</Select.Trigger
-					>
+					<Select.Trigger class="w-full">
+						{classTypes.find((ct) => ct.id === seriesTypeId)?.name ?? 'Pick a class…'}
+					</Select.Trigger>
 					<Select.Content>
 						{#each classTypes as ct (ct.id)}
 							<Select.Item value={ct.id}>{ct.name}</Select.Item>
@@ -3042,9 +3106,9 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Book {m.member.name} into a class</Modal.Title>
-			<Modal.Description
-				>Upcoming sessions in the next two weeks — full sessions go to the waitlist.</Modal.Description
-			>
+			<Modal.Description>
+				Upcoming sessions in the next two weeks — full sessions go to the waitlist.
+			</Modal.Description>
 		</Modal.Header>
 		<label class="flex items-center gap-2 pb-2 text-sm">
 			<span class="text-muted-foreground">Bringing guests</span>
@@ -3067,23 +3131,21 @@
 				>
 					<span class="min-w-0">
 						<span class="block truncate font-medium">{s.className}</span>
-						<span class="text-xs text-muted-foreground"
-							>{localDate(s.session.startsAt, tz)}
-							{localTime(s.session.startsAt, tz)}{s.locationName
-								? ` · ${s.locationName}`
-								: ''}</span
-						>
+						<span class="text-xs text-muted-foreground">
+							{localDate(s.session.startsAt, tz)}
+							{localTime(s.session.startsAt, tz)}{s.locationName ? ` · ${s.locationName}` : ''}
+						</span>
 					</span>
-					<span class="shrink-0 text-right text-xs text-muted-foreground tabular-nums"
-						>{s.booked}/{s.session.capacity}{s.waitlisted ? ` (+${s.waitlisted} wl)` : ''}
+					<span class="shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+						{s.booked}/{s.session.capacity}{s.waitlisted ? ` (+${s.waitlisted} wl)` : ''}
 						{#if !hasActiveMembership}
-							<span class="block font-medium text-amber-600 dark:text-amber-400"
-								>{s.dropInPrice
+							<span class="block font-medium text-amber-600 dark:text-amber-400">
+								{s.dropInPrice
 									? `drop-in ${formatMoney(s.dropInPrice, currency)}`
-									: 'no drop-in price'}</span
-							>
-						{/if}</span
-					>
+									: 'no drop-in price'}
+							</span>
+						{/if}
+					</span>
 				</button>
 			{:else}
 				<p class="py-6 text-center text-sm text-muted-foreground">No upcoming sessions to book.</p>
@@ -3144,9 +3206,9 @@
 					value={incKind}
 					onValueChange={(v) => (incKind = v as 'injury' | 'incident')}
 				>
-					<Select.Trigger class="w-full"
-						>{incKind === 'injury' ? 'Injury' : 'Incident'}</Select.Trigger
-					>
+					<Select.Trigger class="w-full">
+						{incKind === 'injury' ? 'Injury' : 'Incident'}
+					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="injury">Injury</Select.Item>
 						<Select.Item value="incident">Incident</Select.Item>
@@ -3196,8 +3258,10 @@
 					<button
 						type="button"
 						class="text-xs text-muted-foreground hover:underline"
-						onclick={removeSrTemplate}>Delete "{srTemplateApplied.name}"</button
+						onclick={removeSrTemplate}
 					>
+						Delete "{srTemplateApplied.name}"
+					</button>
 				{/if}
 			</div>
 		{/if}
@@ -3216,8 +3280,10 @@
 					variant="ghost"
 					size="sm"
 					onclick={saveSrTemplate}
-					disabled={!srTitle.trim() || !srBody.trim()}>Save template</Button
+					disabled={!srTitle.trim() || !srBody.trim()}
 				>
+					Save template
+				</Button>
 				<Button type="submit" disabled={srPending || !srTitle.trim() || !srBody.trim()}>
 					{srPending ? 'Sending…' : 'Send for signature'}
 				</Button>
@@ -3227,9 +3293,9 @@
 </Modal.Root>
 <Modal.Root bind:open={woOpen}>
 	<Modal.Content>
-		<Modal.Header
-			><Modal.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Modal.Title></Modal.Header
-		>
+		<Modal.Header>
+			<Modal.Title>{woId ? 'Edit workout' : 'Assign a workout'}</Modal.Title>
+		</Modal.Header>
 		<form class="space-y-4" onsubmit={saveWorkout}>
 			<Field.Field>
 				<Field.Label for="wo-title">Title</Field.Label>
@@ -3245,20 +3311,20 @@
 					required
 				/>
 			</Field.Field>
-			<Button type="submit" class="w-full" disabled={pending}
-				>{pending ? 'Saving…' : woId ? 'Save' : 'Assign'}</Button
-			>
+			<Button type="submit" class="w-full" disabled={pending}>
+				{pending ? 'Saving…' : woId ? 'Save' : 'Assign'}
+			</Button>
 		</form>
 	</Modal.Content>
 </Modal.Root>
 
 <Modal.Root bind:open={trOpen}>
 	<Modal.Content>
-		<Modal.Header
-			><Modal.Title>Gift pack classes</Modal.Title>
-			<Modal.Description
-				>Move classes off this pack to another member. {trRemaining} left to give.</Modal.Description
-			>
+		<Modal.Header>
+			<Modal.Title>Gift pack classes</Modal.Title>
+			<Modal.Description>
+				Move classes off this pack to another member. {trRemaining} left to give.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={sendTransfer}>
 			<Field.Field>
@@ -3272,9 +3338,9 @@
 				<Field.Label for="tr-n">Classes</Field.Label>
 				<Input id="tr-n" type="number" min="1" max={trRemaining} bind:value={trCredits} required />
 			</Field.Field>
-			<Button type="submit" class="w-full" disabled={pending || !trTo}
-				>{pending ? 'Moving…' : 'Gift classes'}</Button
-			>
+			<Button type="submit" class="w-full" disabled={pending || !trTo}>
+				{pending ? 'Moving…' : 'Gift classes'}
+			</Button>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -3300,9 +3366,9 @@
 				<NativeSelect bind:value={assignProgramId} required>
 					<option value="" disabled>Pick a program…</option>
 					{#each programs as p (p.program.id)}
-						<option value={p.program.id}
-							>{p.program.name} — {p.program.weeks}w, {p.days.length} days</option
-						>
+						<option value={p.program.id}>
+							{p.program.name} — {p.program.weeks}w, {p.days.length} days
+						</option>
 					{/each}
 				</NativeSelect>
 			</Field.Field>
@@ -3354,8 +3420,9 @@
 							size="sm"
 							disabled={aiProgramBusy || !aiProgramGoal.trim()}
 							onclick={generateProgramDays}
-							><Sparkles class="mr-1 h-4 w-4" />{aiProgramBusy ? 'Working…' : 'Generate'}</Button
 						>
+							<Sparkles class="mr-1 h-4 w-4" />{aiProgramBusy ? 'Working…' : 'Generate'}
+						</Button>
 					</div>
 				{/if}
 				<div class="grid grid-cols-[1fr_5rem] gap-2">
@@ -3387,8 +3454,10 @@
 									onclick={() => {
 										libEditing!.days.splice(i, 1);
 										libEditing!.days.forEach((d2, j) => (d2.dayNo = j + 1));
-									}}>Remove</Button
+									}}
 								>
+									Remove
+								</Button>
 							</div>
 							<Textarea
 								bind:value={day.body}
@@ -3408,8 +3477,10 @@
 								dayNo: libEditing!.days.length + 1,
 								title: '',
 								body: ''
-							})}>Add day</Button
+							})}
 					>
+						Add day
+					</Button>
 				</div>
 				<div class="flex justify-end gap-2">
 					<Button type="button" variant="outline" onclick={() => (libEditing = null)}>Back</Button>
@@ -3434,8 +3505,10 @@
 								variant="ghost"
 								size="sm"
 								class="h-7 px-2 text-xs"
-								onclick={() => openProgram(p)}>Edit</Button
+								onclick={() => openProgram(p)}
 							>
+								Edit
+							</Button>
 							<Button
 								variant="ghost"
 								size="sm"
@@ -3448,16 +3521,18 @@
 											toast.success('Deleted');
 										}
 									});
-								}}>Delete</Button
+								}}
 							>
+								Delete
+							</Button>
 						</span>
 					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground">No programs yet.</p>
 				{/each}
-				<Button size="sm" variant="outline" class="w-full" onclick={() => openProgram()}
-					><Plus /> New program</Button
-				>
+				<Button size="sm" variant="outline" class="w-full" onclick={() => openProgram()}>
+					<Plus /> New program
+				</Button>
 			</div>
 		{/if}
 	</Modal.Content>
@@ -3496,11 +3571,11 @@
 	<Modal.Content class="sm:max-w-md">
 		<Modal.Header>
 			<Modal.Title>{aiSumTitle}</Modal.Title>
-			<Modal.Description
-				>{aiSumTitle === 'Ops brief'
+			<Modal.Description>
+				{aiSumTitle === 'Ops brief'
 					? 'AI note for staff — plan, attendance, billing and notes.'
-					: 'AI note for staff — check-ins, records and tenure.'}</Modal.Description
-			>
+					: 'AI note for staff — check-ins, records and tenure.'}
+			</Modal.Description>
 		</Modal.Header>
 		{#if aiSumBusy}
 			<p class="text-sm text-muted-foreground">Summarizing…</p>
@@ -3512,8 +3587,9 @@
 				variant="outline"
 				disabled={aiSumBusy}
 				onclick={() => runAiSummary(aiSumTitle === 'Ops brief' ? 'brief' : 'progress')}
-				>Regenerate</Button
 			>
+				Regenerate
+			</Button>
 			<Button variant="outline" onclick={() => (aiSumOpen = false)}>Close</Button>
 		</Modal.Footer>
 	</Modal.Content>

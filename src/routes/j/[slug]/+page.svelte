@@ -222,9 +222,10 @@
 			{/if}
 			<span class="truncate font-semibold">{org.name}</span>
 			{#if settings.address}
-				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex"
-					><MapPin class="size-3.5" /> {settings.address}</span
-				>
+				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
+					<MapPin class="size-3.5" />
+					{settings.address}
+				</span>
 			{/if}
 		</div>
 	</header>
@@ -234,18 +235,20 @@
 			<h1 class="text-3xl font-semibold tracking-tight">{org.name}</h1>
 			{#if settings.tagline}<p class="text-lg text-muted-foreground">{settings.tagline}</p>{/if}
 			<div class="flex flex-wrap gap-3 text-sm text-muted-foreground">
-				{#if settings.address}<span class="flex items-center gap-1"
-						><MapPin class="size-3.5" />{settings.address}</span
-					>{/if}
-				{#if settings.phone}<span class="flex items-center gap-1"
-						><Phone class="size-3.5" />{settings.phone}</span
-					>{/if}
+				{#if settings.address}<span class="flex items-center gap-1">
+						<MapPin class="size-3.5" />{settings.address}
+					</span>{/if}
+				{#if settings.phone}<span class="flex items-center gap-1">
+						<Phone class="size-3.5" />{settings.phone}
+					</span>{/if}
 				{#if settings.website}<a
 						class="flex items-center gap-1 underline-offset-4 hover:underline"
 						href={settings.website.startsWith('http')
 							? settings.website
-							: `https://${settings.website}`}><Globe class="size-3.5" />Website</a
-					>{/if}
+							: `https://${settings.website}`}
+					>
+						<Globe class="size-3.5" />Website
+					</a>{/if}
 			</div>
 		</div>
 
@@ -262,31 +265,33 @@
 							<Card.Content class="space-y-2 px-6">
 								<p class="text-2xl font-semibold tabular-nums">
 									{formatMoney(p.amount, currency)}{#if p.isPack}<span
-											class="text-sm font-normal text-muted-foreground">one-time</span
-										>{:else}<span class="text-sm font-normal text-muted-foreground"
-											>/{p.interval}</span
-										>{/if}
+											class="text-sm font-normal text-muted-foreground"
+										>
+											one-time
+										</span>{:else}<span class="text-sm font-normal text-muted-foreground">
+											/{p.interval}
+										</span>{/if}
 								</p>
 								<div class="flex flex-wrap gap-1.5">
 									{#if p.memberLimit !== null && !p.isPack}
-										<Badge variant={planFull(p) ? 'destructive' : 'secondary'}
-											>{planFull(p) ? 'Full' : `${p.activeMembers}/${p.memberLimit} spots`}</Badge
-										>
+										<Badge variant={planFull(p) ? 'destructive' : 'secondary'}>
+											{planFull(p) ? 'Full' : `${p.activeMembers}/${p.memberLimit} spots`}
+										</Badge>
 									{/if}
-									{#if p.signupFee > 0}<Badge variant="outline"
-											>{formatMoney(p.signupFee, currency)} signup</Badge
-										>{/if}
-									{#if p.classCredits}<Badge variant="outline"
-											>{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}</Badge
-										>{/if}
-									{#if p.isPack && p.packClassName}<Badge variant="outline"
-											>{p.packClassName} only</Badge
-										>{/if}
-									{#if p.commitmentMonths}<Badge variant="outline"
-											>{p.commitmentMonths}-mo minimum{p.earlyCancelFeeCents
+									{#if p.signupFee > 0}<Badge variant="outline">
+											{formatMoney(p.signupFee, currency)} signup
+										</Badge>{/if}
+									{#if p.classCredits}<Badge variant="outline">
+											{p.classCredits} classes{p.isPack ? '' : `/${p.interval}`}
+										</Badge>{/if}
+									{#if p.isPack && p.packClassName}<Badge variant="outline">
+											{p.packClassName} only
+										</Badge>{/if}
+									{#if p.commitmentMonths}<Badge variant="outline">
+											{p.commitmentMonths}-mo minimum{p.earlyCancelFeeCents
 												? ` · ${formatMoney(p.earlyCancelFeeCents, currency)} early cancel`
-												: ''}</Badge
-										>{/if}
+												: ''}
+										</Badge>{/if}
 								</div>
 							</Card.Content>
 						</Card.Root>
@@ -309,8 +314,9 @@
 					<a
 						href="/j/{org.slug}/schedule"
 						class="text-sm font-normal text-muted-foreground underline-offset-4 hover:underline"
-						>Timetable</a
 					>
+						Timetable
+					</a>
 				</h2>
 				<div class="divide-y rounded-lg border">
 					{#each sessions as s (s.session.id)}
@@ -318,18 +324,18 @@
 							<div class="flex min-w-0 items-center gap-2">
 								<span class="size-2 shrink-0 rounded-full" style:background={s.color}></span>
 								<span class="truncate font-medium">{s.className}</span>
-								{#if s.locationName}<span class="hidden text-muted-foreground sm:inline"
-										>· {s.locationName}</span
-									>{/if}
+								{#if s.locationName}<span class="hidden text-muted-foreground sm:inline">
+										· {s.locationName}
+									</span>{/if}
 							</div>
 							<span class="flex shrink-0 items-center gap-2 text-muted-foreground">
 								<span>
 									{localDate(s.session.startsAt, tz)} · {localTime(s.session.startsAt, tz)}
 								</span>
 								{#if s.booked < s.session.capacity && s.session.capacity - s.booked <= 5}
-									<Badge variant="secondary" class="text-amber-700 dark:text-amber-400"
-										>{s.session.capacity - s.booked} left</Badge
-									>
+									<Badge variant="secondary" class="text-amber-700 dark:text-amber-400">
+										{s.session.capacity - s.booked} left
+									</Badge>
 								{/if}
 								{#if s.dropInPrice}
 									{#if s.booked >= s.session.capacity}
@@ -356,9 +362,9 @@
 						<p class="font-medium">Just visiting?</p>
 						<p class="text-sm text-muted-foreground">Train for a day — no membership needed.</p>
 					</div>
-					<Button variant="outline" onclick={() => (passOpen = true)}
-						>Day pass · {formatMoney(settings.dayPassPrice, currency)}</Button
-					>
+					<Button variant="outline" onclick={() => (passOpen = true)}>
+						Day pass · {formatMoney(settings.dayPassPrice, currency)}
+					</Button>
 				</Card.Content>
 			</Card.Root>
 		{/if}
@@ -366,9 +372,9 @@
 		<section class="space-y-3">
 			<h2 class="text-lg font-semibold">
 				Join{#if invitedBy}
-					<span class="ml-2 text-sm font-normal text-muted-foreground"
-						>— invited by {invitedBy}</span
-					>
+					<span class="ml-2 text-sm font-normal text-muted-foreground">
+						— invited by {invitedBy}
+					</span>
 				{/if}
 			</h2>
 			{#if dropPaid}
@@ -453,11 +459,11 @@
 											<Select.Content>
 												<Select.Item value="">Choose later</Select.Item>
 												{#each plans as p (p.id)}
-													<Select.Item value={p.id} disabled={planFull(p)}
-														>{p.name} — {formatMoney(p.amount, currency)}{p.isPack
+													<Select.Item value={p.id} disabled={planFull(p)}>
+														{p.name} — {formatMoney(p.amount, currency)}{p.isPack
 															? ' one-time'
-															: `/${p.interval}`}{planFull(p) ? ' · FULL' : ''}</Select.Item
-													>
+															: `/${p.interval}`}{planFull(p) ? ' · FULL' : ''}
+													</Select.Item>
 												{/each}
 											</Select.Content>
 										</Select.Root>
@@ -477,16 +483,14 @@
 							</div>
 							{#each joinFields as f (f.id)}
 								<div class="space-y-1.5">
-									<Field.Label for="jf-{f.id}"
-										>{f.name}{#if f.requireOnJoin}<span class="text-destructive">
-												*</span
-											>{/if}</Field.Label
-									>
+									<Field.Label for="jf-{f.id}">
+										{f.name}{#if f.requireOnJoin}<span class="text-destructive"> *</span>{/if}
+									</Field.Label>
 									{#if f.kind === 'select'}
 										<Select.Root type="single" bind:value={customValues[f.id]}>
-											<Select.Trigger class="w-full"
-												>{customValues[f.id] || 'Select'}</Select.Trigger
-											>
+											<Select.Trigger class="w-full">
+												{customValues[f.id] || 'Select'}
+											</Select.Trigger>
 											<Select.Content>
 												{#each f.options
 													.split(/[\n,]/)
@@ -520,15 +524,19 @@
 													class="rounded-md border px-2.5 py-1 text-xs {parqAnswers[i] === true
 														? 'bg-primary text-primary-foreground'
 														: ''}"
-													onclick={() => (parqAnswers[i] = true)}>Yes</button
+													onclick={() => (parqAnswers[i] = true)}
 												>
+													Yes
+												</button>
 												<button
 													type="button"
 													class="rounded-md border px-2.5 py-1 text-xs {parqAnswers[i] === false
 														? 'bg-primary text-primary-foreground'
 														: ''}"
-													onclick={() => (parqAnswers[i] = false)}>No</button
+													onclick={() => (parqAnswers[i] = false)}
 												>
+													No
+												</button>
 											</div>
 										</div>
 									{/each}
@@ -580,9 +588,9 @@
 
 		{#if !whiteLabel}
 			<p class="pb-4 text-center text-xs text-muted-foreground">
-				Powered by <a href="https://github.com/maxffarrell/freeweight" class="underline"
-					>Freeweight</a
-				>
+				Powered by <a href="https://github.com/maxffarrell/freeweight" class="underline">
+					Freeweight
+				</a>
 			</p>
 		{/if}
 	</main>
@@ -600,9 +608,9 @@
 					<p class="font-medium">You're booked in.</p>
 					{#if dropCheckoutUrl}
 						<p class="text-muted-foreground">Pay now to lock it in:</p>
-						<Button class="w-full" href={dropCheckoutUrl}
-							>Pay {formatMoney(dropPrice, currency)}</Button
-						>
+						<Button class="w-full" href={dropCheckoutUrl}>
+							Pay {formatMoney(dropPrice, currency)}
+						</Button>
 					{:else}
 						<p class="text-muted-foreground">Pay at the front desk when you arrive.</p>
 					{/if}
@@ -618,9 +626,9 @@
 						<Input id="d-email" type="email" required bind:value={dEmail} autocomplete="email" />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="d-phone"
-							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
-						>
+						<Field.Label for="d-phone">
+							Phone <span class="text-muted-foreground">(optional)</span>
+						</Field.Label>
 						<Input id="d-phone" type="tel" bind:value={dPhone} autocomplete="tel" />
 					</Field.Field>
 					{#if settings.waiver}
@@ -637,9 +645,9 @@
 						</div>
 					{/if}
 					<Modal.Footer>
-						<Button type="submit" disabled={dPending}
-							>{dPending ? 'Booking…' : 'Book this class'}</Button
-						>
+						<Button type="submit" disabled={dPending}>
+							{dPending ? 'Booking…' : 'Book this class'}
+						</Button>
 					</Modal.Footer>
 				</form>
 			{/if}
@@ -659,9 +667,9 @@
 					<p class="font-medium">You're set for today.</p>
 					{#if passCheckoutUrl}
 						<p class="text-muted-foreground">Pay now to lock it in:</p>
-						<Button class="w-full" href={passCheckoutUrl}
-							>Pay {formatMoney(settings.dayPassPrice ?? 0, currency)}</Button
-						>
+						<Button class="w-full" href={passCheckoutUrl}>
+							Pay {formatMoney(settings.dayPassPrice ?? 0, currency)}
+						</Button>
 					{:else}
 						<p class="text-muted-foreground">Pay at the front desk when you arrive.</p>
 					{/if}
@@ -677,9 +685,9 @@
 						<Input id="p-email" type="email" required bind:value={dEmail} autocomplete="email" />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="p-phone"
-							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
-						>
+						<Field.Label for="p-phone">
+							Phone <span class="text-muted-foreground">(optional)</span>
+						</Field.Label>
 						<Input id="p-phone" type="tel" bind:value={dPhone} autocomplete="tel" />
 					</Field.Field>
 					{#if settings.waiver}
@@ -696,9 +704,9 @@
 						</div>
 					{/if}
 					<Modal.Footer>
-						<Button type="submit" disabled={passPending}
-							>{passPending ? 'Buying…' : `Buy a day pass`}</Button
-						>
+						<Button type="submit" disabled={passPending}>
+							{passPending ? 'Buying…' : `Buy a day pass`}
+						</Button>
 					</Modal.Footer>
 				</form>
 			{/if}
@@ -731,16 +739,15 @@
 						<Input id="l-email" type="email" required bind:value={lEmail} autocomplete="email" />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="l-phone"
-							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
-						>
+						<Field.Label for="l-phone">
+							Phone <span class="text-muted-foreground">(optional)</span>
+						</Field.Label>
 						<Input id="l-phone" type="tel" bind:value={lPhone} autocomplete="tel" />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="l-interest"
-							>What are you interested in? <span class="text-muted-foreground">(optional)</span
-							></Field.Label
-						>
+						<Field.Label for="l-interest">
+							What are you interested in? <span class="text-muted-foreground">(optional)</span>
+						</Field.Label>
 						<Input
 							id="l-interest"
 							bind:value={lInterest}
@@ -757,9 +764,9 @@
 						bind:value={lWebsite}
 					/>
 					<Modal.Footer>
-						<Button type="submit" disabled={lPending}
-							>{lPending ? 'Sending…' : 'Send my info'}</Button
-						>
+						<Button type="submit" disabled={lPending}>
+							{lPending ? 'Sending…' : 'Send my info'}
+						</Button>
 					</Modal.Footer>
 				</form>
 			{/if}

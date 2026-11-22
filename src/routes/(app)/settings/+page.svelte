@@ -648,9 +648,9 @@
 										alt="Gym logo"
 										class="h-12 w-auto rounded-md border bg-muted object-contain p-1"
 									/>
-									<Button variant="ghost" size="sm" disabled={logoBusy} onclick={clearLogo}
-										>Remove</Button
-									>
+									<Button variant="ghost" size="sm" disabled={logoBusy} onclick={clearLogo}>
+										Remove
+									</Button>
 								{/if}
 								<Input
 									id="logo"
@@ -713,9 +713,9 @@
 			<Card.Root class="mt-4 max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Booking policies</Card.Title>
-					<Card.Description
-						>How far ahead members can book, cancel and join waitlists.</Card.Description
-					>
+					<Card.Description>
+						How far ahead members can book, cancel and join waitlists.
+					</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<form class="space-y-4" onsubmit={saveSettings}>
@@ -779,9 +779,9 @@
 									bind:value={occupancyCap}
 									placeholder="No cap"
 								/>
-								<Field.Description
-									>Max people inside at once — the kiosk warns past this.</Field.Description
-								>
+								<Field.Description>
+									Max people inside at once — the kiosk warns past this.
+								</Field.Description>
 							</Field.Field>
 						</div>
 						<Button type="submit" disabled={pending}>Save</Button>
@@ -799,17 +799,17 @@
 						<Field.Field>
 							<Field.Label>No-show fee</Field.Label>
 							<MoneyInput bind:value={noShowFee} />
-							<Field.Description
-								>Charged to the member for every class they skip without checking in.</Field.Description
-							>
+							<Field.Description>
+								Charged to the member for every class they skip without checking in.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label>Late-cancel fee</Field.Label>
 							<MoneyInput bind:value={lateCancelFee} />
-							<Field.Description
-								>When set, members can cancel inside the cancel cutoff — for this fee. Leave empty
-								to block late cancels entirely.</Field.Description
-							>
+							<Field.Description>
+								When set, members can cancel inside the cancel cutoff — for this fee. Leave empty to
+								block late cancels entirely.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-late-free">Free late cancels / month</Field.Label>
@@ -820,17 +820,17 @@
 								bind:value={lateCancelFreebies}
 								placeholder="0"
 							/>
-							<Field.Description
-								>Each member's first N late cancels a month skip the fee — a goodwill budget, not a
-								loophole.</Field.Description
-							>
+							<Field.Description>
+								Each member's first N late cancels a month skip the fee — a goodwill budget, not a
+								loophole.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label>Day pass price</Field.Label>
 							<MoneyInput bind:value={dayPassPrice} />
-							<Field.Description
-								>Sells a one-day visit on your public join page. Leave empty to hide it.</Field.Description
-							>
+							<Field.Description>
+								Sells a one-day visit on your public join page. Leave empty to hide it.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-suspend">Suspend membership after days overdue</Field.Label>
@@ -841,10 +841,10 @@
 								bind:value={suspendAfterDays}
 								placeholder="Never"
 							/>
-							<Field.Description
-								>Members this many days behind on a charge lose class bookings until they pay up;
-								billing keeps accruing meanwhile.</Field.Description
-							>
+							<Field.Description>
+								Members this many days behind on a charge lose class bookings until they pay up;
+								billing keeps accruing meanwhile.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-refcredits">Referral reward (credits)</Field.Label>
@@ -855,17 +855,17 @@
 								bind:value={referralCredits}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Class credits granted to a member the first time someone who joined through their
-								referral link makes a payment. Leave empty for no reward.</Field.Description
-							>
+							<Field.Description>
+								Class credits granted to a member the first time someone who joined through their
+								referral link makes a payment. Leave empty for no reward.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label>Freeze fee</Field.Label>
 							<MoneyInput bind:value={freezeFee} />
-							<Field.Description
-								>One-time charge posted when a membership is paused. Leave empty to freeze free.</Field.Description
-							>
+							<Field.Description>
+								One-time charge posted when a membership is paused. Leave empty to freeze free.
+							</Field.Description>
 						</Field.Field>
 						<Button type="submit" disabled={pending}>Save</Button>
 					</form>
@@ -875,9 +875,9 @@
 			<Card.Root class="mt-4 max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Rewards &amp; retention</Card.Title>
-					<Card.Description
-						>Win-back offers, milestone rewards, review nudges and member self-freeze.</Card.Description
-					>
+					<Card.Description>
+						Win-back offers, milestone rewards, review nudges and member self-freeze.
+					</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<form class="space-y-4" onsubmit={saveSettings}>
@@ -891,19 +891,19 @@
 								bind:value={saveOfferPct}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Shown inside the member's cancellation form — "Stay instead, N% off your next
-								bill". Applies a one-time account credit; each membership can take it once. Leave
-								empty for no offer.</Field.Description
-							>
+							<Field.Description>
+								Shown inside the member's cancellation form — "Stay instead, N% off your next bill".
+								Applies a one-time account credit; each membership can take it once. Leave empty for
+								no offer.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label>Monthly revenue target</Field.Label>
 							<MoneyInput bind:value={revenueTarget} />
-							<Field.Description
-								>Reports shows this month's collected revenue as a progress bar against the target.
-								Leave empty for no target.</Field.Description
-							>
+							<Field.Description>
+								Reports shows this month's collected revenue as a progress bar against the target.
+								Leave empty for no target.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-review-url">Review link</Field.Label>
@@ -913,9 +913,9 @@
 								bind:value={reviewUrl}
 								placeholder="https://g.page/r/your-gym/review"
 							/>
-							<Field.Description
-								>Google/Yelp review URL sent to loyal members — leave empty to never ask.</Field.Description
-							>
+							<Field.Description>
+								Google/Yelp review URL sent to loyal members — leave empty to never ask.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-review-after">Ask for a review after N visits</Field.Label>
@@ -926,10 +926,10 @@
 								bind:value={reviewAfterVisits}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Once a member's lifetime check-ins reach this, they get one review-request email
-								(never twice).</Field.Description
-							>
+							<Field.Description>
+								Once a member's lifetime check-ins reach this, they get one review-request email
+								(never twice).
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-reward">Milestone reward — comp classes</Field.Label>
@@ -940,10 +940,10 @@
 								bind:value={rewardCredits}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Comp classes granted when a member hits a check-in milestone (10, 25, 50, …) —
-								blank or 0 = off.</Field.Description
-							>
+							<Field.Description>
+								Comp classes granted when a member hits a check-in milestone (10, 25, 50, …) — blank
+								or 0 = off.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-streak-reward">Streak reward — comp classes</Field.Label>
@@ -954,10 +954,10 @@
 								bind:value={streakRewardCredits}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Comp classes granted at week-streak milestones (4, 8, 13, 26, 52) — each streak
-								pays once.</Field.Description
-							>
+							<Field.Description>
+								Comp classes granted at week-streak milestones (4, 8, 13, 26, 52) — each streak pays
+								once.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-bday-comp">Birthday treat — comp classes</Field.Label>
@@ -968,10 +968,10 @@
 								bind:value={birthdayCompCredits}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Comp classes banked on each member's birthday — sent with the birthday email. Blank
-								or 0 = off.</Field.Description
-							>
+							<Field.Description>
+								Comp classes banked on each member's birthday — sent with the birthday email. Blank
+								or 0 = off.
+							</Field.Description>
 						</Field.Field>
 						<Field.Field>
 							<Field.Label for="s-self-freeze">Member self-freeze — days/year</Field.Label>
@@ -983,10 +983,10 @@
 								bind:value={selfFreezeDays}
 								placeholder="Off"
 							/>
-							<Field.Description
-								>Let members pause their own plan in the portal up to this many days per calendar
-								year (no freeze fee, no approval needed). Blank or 0 = staff only.</Field.Description
-							>
+							<Field.Description>
+								Let members pause their own plan in the portal up to this many days per calendar
+								year (no freeze fee, no approval needed). Blank or 0 = staff only.
+							</Field.Description>
 						</Field.Field>
 						<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
 							<div>
@@ -1100,15 +1100,15 @@
 											} finally {
 												anonBusy = false;
 											}
-										}}>Preview</Button
+										}}
 									>
+										Preview
+									</Button>
 									{#if anonPreview !== null}
-										<span class="text-xs text-muted-foreground" title={anonNames.join(', ')}
-											>{anonPreview} member{anonPreview === 1 ? '' : 's'} would be scrubbed{#if anonNames.length}
-												({anonNames.slice(0, 3).join(', ')}{anonNames.length > 3
-													? '…'
-													: ''}){/if}</span
-										>
+										<span class="text-xs text-muted-foreground" title={anonNames.join(', ')}>
+											{anonPreview} member{anonPreview === 1 ? '' : 's'} would be scrubbed{#if anonNames.length}
+												({anonNames.slice(0, 3).join(', ')}{anonNames.length > 3 ? '…' : ''}){/if}
+										</span>
 									{/if}
 									<Button
 										type="button"
@@ -1132,8 +1132,10 @@
 													}
 												}
 											});
-										}}>Anonymize</Button
+										}}
 									>
+										Anonymize
+									</Button>
 								</div>
 							</div>
 						{/if}
@@ -1199,8 +1201,10 @@
 												}
 											}
 										});
-									}}>Re-sign all</Button
+									}}
 								>
+									Re-sign all
+								</Button>
 							</div>
 						{/if}
 						{#if entitlements.doorAccess}
@@ -1228,8 +1232,10 @@
 											} finally {
 												doorBusy = false;
 											}
-										}}>Test</Button
+										}}
 									>
+										Test
+									</Button>
 									<Button
 										type="button"
 										variant="outline"
@@ -1245,8 +1251,10 @@
 											} finally {
 												doorBusy = false;
 											}
-										}}>Sync roster</Button
+										}}
 									>
+										Sync roster
+									</Button>
 								</div>
 							</div>
 							<div
@@ -1316,8 +1324,10 @@
 										} finally {
 											doorLogBusy = false;
 										}
-									}}>Download door log</Button
+									}}
 								>
+									Download door log
+								</Button>
 							</div>
 						{/if}
 						{#if entitlements.auditExport}
@@ -1344,8 +1354,10 @@
 											} finally {
 												exportSendBusy = false;
 											}
-										}}>Send now</Button
+										}}
 									>
+										Send now
+									</Button>
 								</div>
 							</div>
 							{#if settings.exportLastAt}
@@ -1384,8 +1396,10 @@
 											} finally {
 												digestBusy = false;
 											}
-										}}>Email me a preview</Button
+										}}
 									>
+										Email me a preview
+									</Button>
 									<Button
 										type="button"
 										variant="outline"
@@ -1410,8 +1424,10 @@
 													}
 												}
 											});
-										}}>Send now</Button
+										}}
 									>
+										Send now
+									</Button>
 								</div>
 							</div>
 							<div class="flex items-center justify-between gap-4">
@@ -1447,8 +1463,10 @@
 											} finally {
 												digestPrevBusy = false;
 											}
-										}}>Preview</Button
+										}}
 									>
+										Preview
+									</Button>
 									<Switch bind:checked={digestWeekly} />
 								</div>
 							</div>
@@ -1472,9 +1490,9 @@
 			<Card.Root class="mt-4 max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Opening hours</Card.Title>
-					<Card.Description
-						>Shown on the gym's public timetable. Saved with the General settings above.</Card.Description
-					>
+					<Card.Description>
+						Shown on the gym's public timetable. Saved with the General settings above.
+					</Card.Description>
 				</Card.Header>
 				<Card.Content class="space-y-2">
 					{#each hourDays as d, i (d)}
@@ -1539,9 +1557,9 @@
 									<p class="font-medium">{formatDate(c.date)}</p>
 									{#if c.reason}<p class="text-xs text-muted-foreground">{c.reason}</p>{/if}
 								</div>
-								<Button variant="ghost" size="icon" onclick={() => delClosure(c.id)}
-									><Trash class="size-4" /></Button
-								>
+								<Button variant="ghost" size="icon" onclick={() => delClosure(c.id)}>
+									<Trash class="size-4" />
+								</Button>
 							</li>
 						{:else}
 							<p class="py-2 text-sm text-muted-foreground">No closures scheduled.</p>
@@ -1572,23 +1590,27 @@
 								</p>
 							{/if}
 							<div class="flex flex-wrap gap-2">
-								<Button size="sm" variant="outline" onclick={() => copyJoinLink()}
-									><Copy /> Copy link</Button
-								>
-								<Button size="sm" variant="outline" onclick={() => copyJoinLink(true)}
-									>Timetable link</Button
-								>
+								<Button size="sm" variant="outline" onclick={() => copyJoinLink()}>
+									<Copy /> Copy link
+								</Button>
+								<Button size="sm" variant="outline" onclick={() => copyJoinLink(true)}>
+									Timetable link
+								</Button>
 								<Button
 									size="sm"
 									variant="outline"
-									onclick={() => window.open(joinInfo.url, '_blank')}><ExternalLink /> Open</Button
+									onclick={() => window.open(joinInfo.url, '_blank')}
 								>
+									<ExternalLink /> Open
+								</Button>
 								<Button
 									size="sm"
 									variant="outline"
 									onclick={() => window.print()}
-									disabled={!joinQr}><Printer /> Print poster</Button
+									disabled={!joinQr}
 								>
+									<Printer /> Print poster
+								</Button>
 							</div>
 						</div>
 					</div>
@@ -1639,16 +1661,18 @@
 													}
 												}
 											});
-										}}>Delete</Button
+										}}
 									>
+										Delete
+									</Button>
 								</div>
 							</div>
 						{:else}
 							<p class="text-sm text-muted-foreground">No fields yet.</p>
 						{/each}
-						<Button size="sm" variant="outline" onclick={() => openCfField()}
-							><Plus class="mr-1 h-4 w-4" /> Add field</Button
-						>
+						<Button size="sm" variant="outline" onclick={() => openCfField()}>
+							<Plus class="mr-1 h-4 w-4" /> Add field
+						</Button>
 					{/if}
 				</Card.Content>
 			</Card.Root>
@@ -1718,8 +1742,9 @@
 									size="sm"
 									class="h-7 px-2 text-xs"
 									onclick={() => archiveLocation(l.id, !l.archivedAt)}
-									>{l.archivedAt ? 'Restore' : 'Archive'}</Button
 								>
+									{l.archivedAt ? 'Restore' : 'Archive'}
+								</Button>
 							</li>
 						{:else}
 							<li class="py-6 text-sm text-muted-foreground">
@@ -1756,8 +1781,10 @@
 											onclick={async () => {
 												await releaseLocker({ id: l.locker.id, memberId: l.locker.memberId! });
 												toast.success('Released');
-											}}>Release</Button
+											}}
 										>
+											Release
+										</Button>
 									{:else}
 										<span class="text-muted-foreground">free</span>
 										<Button
@@ -1767,8 +1794,10 @@
 											onclick={async () => {
 												await removeLocker(l.locker.id);
 												toast.success('Removed');
-											}}>Remove</Button
+											}}
 										>
+											Remove
+										</Button>
 									{/if}
 								</span>
 							</li>
@@ -1783,9 +1812,9 @@
 				<Card.Header class="flex-row items-center justify-between">
 					<div>
 						<Card.Title class="text-base">Loanable kit</Card.Title>
-						<Card.Description
-							>Ropes, bands, mats members can borrow — lent out on their page.</Card.Description
-						>
+						<Card.Description>
+							Ropes, bands, mats members can borrow — lent out on their page.
+						</Card.Description>
 					</div>
 					<form class="flex items-center gap-2" onsubmit={addKitSubmit}>
 						<Input placeholder="Skipping rope" class="h-8 w-36" bind:value={newKit} required />
@@ -1807,8 +1836,10 @@
 										onclick={async () => {
 											await removeLoanable(k.item.id);
 											toast.success('Removed');
-										}}>Remove</Button
+										}}
 									>
+										Remove
+									</Button>
 								</span>
 							</li>
 						{:else}
@@ -1836,15 +1867,18 @@
 								<div class="flex items-center gap-2">
 									<Badge
 										variant={s.role === 'owner' || s.role === 'admin' ? 'default' : 'secondary'}
-										>{s.role}</Badge
 									>
+										{s.role}
+									</Badge>
 									{#if s.role !== 'owner'}
 										<Button
 											variant="ghost"
 											size="icon"
 											class="size-7"
-											onclick={() => removeStaff(s.id)}><Trash class="size-4" /></Button
+											onclick={() => removeStaff(s.id)}
 										>
+											<Trash class="size-4" />
+										</Button>
 									{/if}
 								</div>
 							</li>
@@ -1873,9 +1907,9 @@
 				<Card.Root>
 					<Card.Header>
 						<Card.Title class="text-base">Passkeys</Card.Title>
-						<Card.Description
-							>Your sign-in passkeys — fingerprint/face unlock on this device.</Card.Description
-						>
+						<Card.Description>
+							Your sign-in passkeys — fingerprint/face unlock on this device.
+						</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-2">
 						{#each passkeys as k (k.id)}
@@ -1887,8 +1921,10 @@
 									onclick={async () => {
 										await authClient.passkey.deletePasskey({ id: k.id });
 										passkeys = passkeys.filter((x) => x.id !== k.id);
-									}}>Remove</Button
+									}}
 								>
+									Remove
+								</Button>
 							</div>
 						{:else}
 							<p class="text-sm text-muted-foreground">No passkeys on this account yet.</p>
@@ -1911,8 +1947,10 @@
 										passkeyBusy = false;
 									}
 								});
-							}}>{passkeyBusy ? 'Working…' : 'Add passkey'}</Button
+							}}
 						>
+							{passkeyBusy ? 'Working…' : 'Add passkey'}
+						</Button>
 					</Card.Content>
 				</Card.Root>
 			{/if}
@@ -1943,8 +1981,10 @@
 										});
 										if (r.error) toast.error(r.error.message ?? 'Delete failed');
 										else ssoProviders = ssoProviders.filter((x) => x.providerId !== p.providerId);
-									}}>Remove</Button
+									}}
 								>
+									Remove
+								</Button>
 							</div>
 						{:else}
 							<p class="text-sm text-muted-foreground">No SSO providers configured.</p>
@@ -1973,8 +2013,10 @@
 								!ssoForm.issuer.trim() ||
 								!ssoForm.clientId.trim() ||
 								!ssoForm.clientSecret}
-							onclick={registerSso}>{ssoBusy ? 'Adding…' : 'Add provider'}</Button
+							onclick={registerSso}
 						>
+							{ssoBusy ? 'Adding…' : 'Add provider'}
+						</Button>
 						<p class="text-xs text-muted-foreground">
 							Staff sign in from the login page with their work email — the provider handles
 							passwords and MFA.
@@ -2024,8 +2066,9 @@
 										size="icon"
 										class="size-7"
 										onclick={() => copy(`${page.url.origin}${p.webhookPath}`)}
-										><Copy class="size-3.5" /></Button
 									>
+										<Copy class="size-3.5" />
+									</Button>
 								</div>
 								<p class="text-xs">Events: {p.webhookEvents.join(', ')}. {p.webhookNote ?? ''}</p>
 								{#if p.canConnect && !p.ready}
@@ -2035,8 +2078,10 @@
 										onclick={async () => {
 											const res = await connectProvider(p.id);
 											if (res?.url) location.href = res.url;
-										}}><ExternalLink /> Connect {p.name} account</Button
+										}}
 									>
+										<ExternalLink /> Connect {p.name} account
+									</Button>
 								{/if}
 								{#if p.accountId && !p.accountReady}
 									<Button
@@ -2045,8 +2090,10 @@
 										onclick={async () => {
 											await refreshProvider(p.id);
 											providerList = await getPaymentProviders();
-										}}>Refresh status</Button
+										}}
 									>
+										Refresh status
+									</Button>
 								{/if}
 							{/if}
 						</Card.Content>
@@ -2071,9 +2118,9 @@
 								class="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3"
 							>
 								<code class="min-w-0 flex-1 truncate font-mono text-xs">{newKey}</code>
-								<Button variant="ghost" size="icon" class="size-7" onclick={() => copy(newKey!)}
-									><Copy class="size-3.5" /></Button
-								>
+								<Button variant="ghost" size="icon" class="size-7" onclick={() => copy(newKey!)}>
+									<Copy class="size-3.5" />
+								</Button>
 							</div>
 						{/if}
 						<Table.Root>
@@ -2081,25 +2128,27 @@
 								{#each apiKeys as k (k.id)}
 									<Table.Row>
 										<Table.Cell class="font-medium">{k.name}</Table.Cell>
-										<Table.Cell class="font-mono text-xs text-muted-foreground"
-											>{k.start ?? k.prefix}…</Table.Cell
-										>
-										<Table.Cell class="text-xs text-muted-foreground"
-											>{formatDate(k.createdAt)}</Table.Cell
-										>
+										<Table.Cell class="font-mono text-xs text-muted-foreground">
+											{k.start ?? k.prefix}…
+										</Table.Cell>
+										<Table.Cell class="text-xs text-muted-foreground">
+											{formatDate(k.createdAt)}
+										</Table.Cell>
 										<Table.Cell class="text-right">
 											<Button
 												variant="ghost"
 												size="icon"
 												class="size-7"
-												onclick={() => removeKey(k.id)}><Trash class="size-4" /></Button
+												onclick={() => removeKey(k.id)}
 											>
+												<Trash class="size-4" />
+											</Button>
 										</Table.Cell>
 									</Table.Row>
 								{:else}
-									<Table.Row
-										><Table.Cell class="text-muted-foreground">No keys yet.</Table.Cell></Table.Row
-									>
+									<Table.Row>
+										<Table.Cell class="text-muted-foreground">No keys yet.</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
@@ -2136,9 +2185,9 @@
 					<Card.Header>
 						<Card.Title class="text-base">Webhooks</Card.Title>
 						<Card.Description>
-							Signed POSTs (HMAC header <code class="rounded bg-muted px-1"
-								>x-freeweight-signature</code
-							>) for workspace events.
+							Signed POSTs (HMAC header <code class="rounded bg-muted px-1">
+								x-freeweight-signature
+							</code>) for workspace events.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-4 px-6">
@@ -2152,15 +2201,15 @@
 												? ` · last ${w.lastDeliveryStatus || '✕'}`
 												: ''}
 										</Table.Cell>
-										<Table.Cell
-											><Switch
+										<Table.Cell>
+											<Switch
 												checked={w.enabled}
 												onCheckedChange={async (v) => {
 													await toggleWebhook({ id: w.id, enabled: v });
 													webhooks = await getWebhooks();
 												}}
-											/></Table.Cell
-										>
+											/>
+										</Table.Cell>
 										<Table.Cell class="text-right">
 											<div class="flex items-center justify-end gap-1">
 												<Button
@@ -2179,8 +2228,10 @@
 														} catch (err) {
 															toast.error(errMsg(err, 'Test failed'));
 														}
-													}}>Test</Button
+													}}
 												>
+													Test
+												</Button>
 												<Button
 													variant="ghost"
 													size="icon"
@@ -2188,15 +2239,17 @@
 													onclick={async () => {
 														await deleteWebhook(w.id);
 														webhooks = await getWebhooks();
-													}}><Trash class="size-4" /></Button
+													}}
 												>
+													<Trash class="size-4" />
+												</Button>
 											</div>
 										</Table.Cell>
 									</Table.Row>
 								{:else}
-									<Table.Row
-										><Table.Cell class="text-muted-foreground">No webhooks.</Table.Cell></Table.Row
-									>
+									<Table.Row>
+										<Table.Cell class="text-muted-foreground">No webhooks.</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
@@ -2214,9 +2267,9 @@
 							<Field.Field>
 								<Field.Label for="hook-events">Events (comma-separated, or *)</Field.Label>
 								<Input id="hook-events" bind:value={hookEvents} />
-								<Field.Description
-									>e.g. member.created, charge.created, payment.recorded</Field.Description
-								>
+								<Field.Description>
+									e.g. member.created, charge.created, payment.recorded
+								</Field.Description>
 							</Field.Field>
 							<Button type="submit" variant="secondary" disabled={pending}>Add webhook</Button>
 						</form>
@@ -2229,10 +2282,10 @@
 			<Card.Root class="max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Demo data</Card.Title>
-					<Card.Description
-						>Load a realistic sample gym — members, plans, a week of classes, check-ins and
-						payments. Only on an empty workspace.</Card.Description
-					>
+					<Card.Description>
+						Load a realistic sample gym — members, plans, a week of classes, check-ins and payments.
+						Only on an empty workspace.
+					</Card.Description>
 				</Card.Header>
 				<Card.Content class="px-6">
 					<Button
@@ -2248,22 +2301,24 @@
 								toast.error(errMsg(err, 'Could not seed'));
 							}
 							pending = false;
-						}}><Sparkles /> Load demo data</Button
+						}}
 					>
+						<Sparkles /> Load demo data
+					</Button>
 				</Card.Content>
 			</Card.Root>
 
 			<Card.Root class="mt-4 max-w-2xl">
 				<Card.Header>
 					<Card.Title class="text-base">Product tour</Card.Title>
-					<Card.Description
-						>The guided walkthrough from your first login — replay it anytime.</Card.Description
-					>
+					<Card.Description>
+						The guided walkthrough from your first login — replay it anytime.
+					</Card.Description>
 				</Card.Header>
 				<Card.Content class="px-6">
-					<Button variant="secondary" onclick={() => (tour.open = true)}
-						><Map /> Take the tour</Button
-					>
+					<Button variant="secondary" onclick={() => (tour.open = true)}>
+						<Map /> Take the tour
+					</Button>
 				</Card.Content>
 			</Card.Root>
 		</Tabs.Content>
@@ -2325,9 +2380,9 @@
 				</label>
 			</div>
 			<Modal.Footer>
-				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}
-					>{cfBusy ? 'Saving…' : 'Save field'}</Button
-				>
+				<Button onclick={saveCfField} disabled={cfBusy || !cfName.trim()}>
+					{cfBusy ? 'Saving…' : 'Save field'}
+				</Button>
 			</Modal.Footer>
 		</Modal.Content>
 	</Modal.Root>
@@ -2337,15 +2392,15 @@
 	<Modal.Content>
 		<Modal.Header><Modal.Title>Add location</Modal.Title></Modal.Header>
 		<form class="space-y-4" onsubmit={addLocation}>
-			<Field.Field
-				><Field.Label for="loc-name">Name</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="loc-name">Name</Field.Label><Input
 					id="loc-name"
 					required
 					bind:value={locName}
 					placeholder="Downtown"
 					autofocus
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
 			<Modal.Footer><Button type="submit" disabled={pending}>Add</Button></Modal.Footer>
 		</form>
 	</Modal.Content>

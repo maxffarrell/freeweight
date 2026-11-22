@@ -29,9 +29,9 @@
 
 <div class="mx-auto max-w-4xl space-y-6 p-6 print:p-0">
 	<div class="flex items-center justify-between print:hidden">
-		<Button variant="ghost" size="sm" href="/members/{m.member.id}"
-			><ArrowLeft /> Back to member</Button
-		>
+		<Button variant="ghost" size="sm" href="/members/{m.member.id}">
+			<ArrowLeft /> Back to member
+		</Button>
 		<Button size="sm" onclick={() => window.print()}><Printer /> Print / save as PDF</Button>
 	</div>
 

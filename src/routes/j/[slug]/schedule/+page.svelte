@@ -115,9 +115,10 @@
 			{/if}
 			<span class="truncate font-semibold">{org.name}</span>
 			{#if settings.address}
-				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex"
-					><MapPin class="size-3.5" /> {settings.address}</span
-				>
+				<span class="ml-auto hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
+					<MapPin class="size-3.5" />
+					{settings.address}
+				</span>
 			{/if}
 		</div>
 	</header>
@@ -143,10 +144,10 @@
 				class="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border px-4 py-3 text-xs text-muted-foreground"
 			>
 				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as d, i (d)}
-					<span
-						><span class="font-medium text-foreground">{d}</span>
-						{hours[String(i)] || 'Closed'}</span
-					>
+					<span>
+						<span class="font-medium text-foreground">{d}</span>
+						{hours[String(i)] || 'Closed'}
+					</span>
 				{/each}
 			</div>
 		{/if}
@@ -167,9 +168,9 @@
 								: ''}"
 						>
 							<div class="flex min-w-0 items-center gap-2.5">
-								<span class="w-12 shrink-0 text-muted-foreground tabular-nums"
-									>{localTime(s.session.startsAt, tz)}</span
-								>
+								<span class="w-12 shrink-0 text-muted-foreground tabular-nums">
+									{localTime(s.session.startsAt, tz)}
+								</span>
 								<span class="size-2 shrink-0 rounded-full" style:background={s.color}></span>
 								<span class="min-w-0">
 									<span class="block truncate font-medium">{s.className}</span>
@@ -187,9 +188,9 @@
 								</span>
 							</div>
 							<span class="flex shrink-0 items-center gap-2">
-								{#if s.dropInPrice}<span class="hidden text-xs text-muted-foreground sm:inline"
-										>{formatMoney(s.dropInPrice, currency)} drop-in</span
-									>{/if}
+								{#if s.dropInPrice}<span class="hidden text-xs text-muted-foreground sm:inline">
+										{formatMoney(s.dropInPrice, currency)} drop-in
+									</span>{/if}
 								<Badge variant={spots <= 0 ? 'outline' : 'secondary'}>
 									{spots <= 0 ? 'Full' : `${spots} spot${spots === 1 ? '' : 's'} left`}
 								</Badge>
@@ -197,9 +198,9 @@
 									{#if trialRequested.has(s.session.id)}
 										<Badge variant="secondary">Requested</Badge>
 									{:else}
-										<Button size="sm" variant="outline" onclick={() => openTrial(s)}
-											>Free trial</Button
-										>
+										<Button size="sm" variant="outline" onclick={() => openTrial(s)}>
+											Free trial
+										</Button>
 									{/if}
 								{/if}
 							</span>
@@ -247,15 +248,15 @@
 						<Input id="t-email" type="email" required bind:value={tEmail} autocomplete="email" />
 					</Field.Field>
 					<Field.Field>
-						<Field.Label for="t-phone"
-							>Phone <span class="text-muted-foreground">(optional)</span></Field.Label
-						>
+						<Field.Label for="t-phone">
+							Phone <span class="text-muted-foreground">(optional)</span>
+						</Field.Label>
 						<Input id="t-phone" type="tel" bind:value={tPhone} autocomplete="tel" />
 					</Field.Field>
 					<Modal.Footer>
-						<Button type="submit" disabled={tPending}
-							>{tPending ? 'Sending…' : 'Request free trial'}</Button
-						>
+						<Button type="submit" disabled={tPending}>
+							{tPending ? 'Sending…' : 'Request free trial'}
+						</Button>
 					</Modal.Footer>
 				</form>
 			{/if}

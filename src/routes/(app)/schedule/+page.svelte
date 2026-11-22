@@ -1133,12 +1133,12 @@
 
 <PageHeader title="Schedule">
 	{#snippet actions()}
-		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}
-			><Flame /> Demand{#if hints.length}
-				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-					>{hints.length}</span
-				>{/if}</Button
-		>
+		<Button variant="outline" size="sm" onclick={() => (hintsOpen = true)}>
+			<Flame /> Demand{#if hints.length}
+				<span class="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+					{hints.length}
+				</span>{/if}
+		</Button>
 		<Button size="sm" onclick={() => (sessOpen = true)}><Plus /> Session</Button>
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -1149,13 +1149,13 @@
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="end" class="min-w-48">
-				<DropdownMenu.Item onclick={() => (tplOpen = true)}
-					><Repeat /> Recurring templates</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={() => (tplOpen = true)}>
+					<Repeat /> Recurring templates
+				</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => (typeOpen = true)}><Plus /> Class type</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => (hoOpen = true)}
-					><ArrowRightLeft /> Instructor handoff</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={() => (hoOpen = true)}>
+					<ArrowRightLeft /> Instructor handoff
+				</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => (slotsOpen = true)}>Open slots</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={() => (resOpen = true)}>Amenities</DropdownMenu.Item>
@@ -1164,9 +1164,9 @@
 				<DropdownMenu.Item onclick={() => (coursesOpen = true)}>Courses</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={() => (bulkOpen = true)}>Bulk cancel…</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => goto('/schedule/day-sheet')}
-					><Printer /> Day sheet</DropdownMenu.Item
-				>
+				<DropdownMenu.Item onclick={() => goto('/schedule/day-sheet')}>
+					<Printer /> Day sheet
+				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}
@@ -1178,23 +1178,27 @@
 			variant="outline"
 			size="icon"
 			onclick={async () => ((weekStart = addDays(weekStart, -7)), await reload())}
-			><ChevronLeft /></Button
 		>
+			<ChevronLeft />
+		</Button>
 		<Button
 			variant="outline"
 			size="sm"
 			onclick={async () => ((weekStart = localDate(new Date(), tz)), await reload())}
-			>This week</Button
 		>
+			This week
+		</Button>
 		<Button
 			variant="outline"
 			size="icon"
 			onclick={async () => ((weekStart = addDays(weekStart, 7)), await reload())}
-			><ChevronRight /></Button
 		>
+			<ChevronRight />
+		</Button>
 		<span
 			class="order-last basis-full text-sm text-muted-foreground sm:order-none sm:ml-2 sm:basis-auto"
-			>Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
+		>
+			Week of {weekStart} · {sessions.filter((r) => !r.session.cancelledAt).length} classes · {sessions.filter(
 				(s) => !s.session.instructorId && !s.session.cancelledAt
 			).length} unstaffed{sessions.filter((r) => r.session.cancelledAt).length
 				? ` · ${sessions.filter((r) => r.session.cancelledAt).length} cancelled`
@@ -1212,8 +1216,8 @@
 						sessions.reduce((a, r) => a + (r.session.capacity ?? 0), 0)
 					)) *
 					100
-			)}% full</span
-		>
+			)}% full
+		</span>
 		<Button
 			variant="outline"
 			size="sm"
@@ -1233,8 +1237,10 @@
 					toast.error(errMsg(err, 'Could not copy week'));
 				}
 				pending = false;
-			}}><Copy /> Copy week</Button
+			}}
 		>
+			<Copy /> Copy week
+		</Button>
 		<Button
 			variant="outline"
 			size="sm"
@@ -1242,8 +1248,10 @@
 				copyFrom = localDate(new Date(), tz);
 				copyTo = localDate(new Date(Date.now() + 86400_000), tz);
 				copyDayOpen = true;
-			}}><Copy /> Copy day…</Button
+			}}
 		>
+			<Copy /> Copy day…
+		</Button>
 		<div class="ml-auto flex flex-wrap items-center gap-2">
 			<NativeSelect bind:value={fType}>
 				<option value="">All classes</option>
@@ -1269,11 +1277,12 @@
 			<div class="space-y-2">
 				<p class="text-xs font-medium text-muted-foreground">
 					{day.label} <span class="tabular-nums">{day.date.slice(5)}</span>
-					{#if dayBooked(day)}<span class="font-normal tabular-nums">· {dayBooked(day)} booked</span
-						>{/if}
-					{#if dayWaitlisted(day)}<span class="font-normal tabular-nums"
-							>· {dayWaitlisted(day)} waiting</span
-						>{/if}
+					{#if dayBooked(day)}<span class="font-normal tabular-nums">
+							· {dayBooked(day)} booked
+						</span>{/if}
+					{#if dayWaitlisted(day)}<span class="font-normal tabular-nums">
+							· {dayWaitlisted(day)} waiting
+						</span>{/if}
 				</p>
 				{#each day.sessions as s (s.session.id)}
 					<button
@@ -1292,27 +1301,36 @@
 						</p>
 						<div class="mt-2 flex items-center gap-1">
 							<Badge variant="secondary" class="text-xs">{s.booked}/{s.session.capacity}</Badge>
-							{#if s.waitlisted > 0}<Badge variant="outline" class="text-xs">+{s.waitlisted}</Badge
-								>{/if}
-							{#if s.session.cancelledAt}<Badge variant="destructive" class="text-xs"
-									>cancelled</Badge
-								>{/if}
+							{#if s.waitlisted > 0}<Badge variant="outline" class="text-xs">
+									+{s.waitlisted}
+								</Badge>{/if}
+							{#if s.session.cancelledAt}<Badge variant="destructive" class="text-xs">
+									cancelled
+								</Badge>{/if}
 							{#if !s.session.instructorId && !s.session.cancelledAt}<Badge
 									variant="outline"
-									class="border-amber-500/60 text-xs text-amber-600">unstaffed</Badge
-								>{/if}
+									class="border-amber-500/60 text-xs text-amber-600"
+								>
+									unstaffed
+								</Badge>{/if}
 							{#if s.session.coverRequestedAt && !s.session.cancelledAt}<Badge
 									variant="outline"
-									class="border-amber-500/60 text-xs text-amber-600">cover</Badge
-								>{/if}
+									class="border-amber-500/60 text-xs text-amber-600"
+								>
+									cover
+								</Badge>{/if}
 							{#if s.session.bookingClosed && !s.session.cancelledAt}<Badge
 									variant="outline"
-									class="text-xs text-muted-foreground">closed</Badge
-								>{/if}
+									class="text-xs text-muted-foreground"
+								>
+									closed
+								</Badge>{/if}
 							{#if s.memberBookable === false && !s.session.cancelledAt}<Badge
 									variant="outline"
-									class="text-xs text-muted-foreground">staff only</Badge
-								>{/if}
+									class="text-xs text-muted-foreground"
+								>
+									staff only
+								</Badge>{/if}
 						</div>
 					</button>
 				{:else}
@@ -1333,15 +1351,13 @@
 					></span>{focus.className}
 					· {focus ? localTime(focus.session.startsAt, tz) : ''}{/if}
 			</Sheet.Title>
-			<Sheet.Description
-				>Roster — booked first, waitlist below.{#if rosterOutcome}
-					<span class="tabular-nums"
-						>· {rosterOutcome.attended} attended · {rosterOutcome.no_show} no-show · {rosterOutcome.cancelled}
-						cancelled{rosterOutcome.waitlisted
-							? ` · ${rosterOutcome.waitlisted} waitlisted`
-							: ''}</span
-					>{/if}</Sheet.Description
-			>
+			<Sheet.Description>
+				Roster — booked first, waitlist below.{#if rosterOutcome}
+					<span class="tabular-nums">
+						· {rosterOutcome.attended} attended · {rosterOutcome.no_show} no-show · {rosterOutcome.cancelled}
+						cancelled{rosterOutcome.waitlisted ? ` · ${rosterOutcome.waitlisted} waitlisted` : ''}
+					</span>{/if}
+			</Sheet.Description>
 			{#if entitlements.ai && focus}
 				<Button
 					variant="ghost"
@@ -1359,19 +1375,21 @@
 						} finally {
 							aiRosterBusy = false;
 						}
-					}}>{aiRosterBusy ? 'Writing…' : 'AI brief'}</Button
+					}}
 				>
+					{aiRosterBusy ? 'Writing…' : 'AI brief'}
+				</Button>
 			{/if}
 		</Sheet.Header>
 		{#if recentFill.length}
 			<div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2">
 				<span class="text-xs text-muted-foreground">Recent:</span>
 				{#each recentFill as rs (rs.id)}
-					<Badge variant="outline" class="text-xs tabular-nums"
-						>{localDate(rs.startsAt, tz).slice(5)}{rs.cancelledAt
+					<Badge variant="outline" class="text-xs tabular-nums">
+						{localDate(rs.startsAt, tz).slice(5)}{rs.cancelledAt
 							? ' cancelled'
-							: ` ${rs.booked}/${rs.capacity}`}</Badge
-					>
+							: ` ${rs.booked}/${rs.capacity}`}
+					</Badge>
 				{/each}
 			</div>
 		{/if}
@@ -1391,9 +1409,9 @@
 		{#if focus?.session.checkinCode}
 			<p class="border-b px-4 py-2 text-sm text-muted-foreground">
 				Announce check-in code
-				<span class="font-mono font-semibold tracking-widest text-foreground"
-					>{focus.session.checkinCode}</span
-				>
+				<span class="font-mono font-semibold tracking-widest text-foreground">
+					{focus.session.checkinCode}
+				</span>
 				— members enter it in the portal to mark themselves attended.
 			</p>
 		{/if}
@@ -1408,17 +1426,17 @@
 									<Badge variant="secondary" class="ml-1">1st visit</Badge>
 								{/if}
 								{#if entitlements.healthForms && r.parqAnswers && Object.values(r.parqAnswers).some(Boolean)}
-									<Badge variant="outline" class="ml-1 border-amber-500 text-amber-600"
-										>medical flag</Badge
-									>
+									<Badge variant="outline" class="ml-1 border-amber-500 text-amber-600">
+										medical flag
+									</Badge>
 								{/if}
 								{#each r.fields ?? [] as f (f.label)}
 									<Badge variant="secondary" class="ml-1">{f.label}: {f.value}</Badge>
 								{/each}
 								{#if r.openBalance > 0}
-									<Badge variant="destructive" class="ml-1"
-										>owes {formatMoney(r.openBalance, currency)}</Badge
-									>
+									<Badge variant="destructive" class="ml-1">
+										owes {formatMoney(r.openBalance, currency)}
+									</Badge>
 								{/if}
 								{#if r.booking.guestCount}
 									<Badge variant="outline" class="ml-1">+{r.booking.guestCount}</Badge>
@@ -1426,13 +1444,15 @@
 								{#if r.booking.memberNote}
 									<span
 										class="ml-1 text-xs font-normal text-muted-foreground italic"
-										title="Member's own note">· “{r.booking.memberNote}”</span
+										title="Member's own note"
 									>
+										· “{r.booking.memberNote}”
+									</span>
 								{/if}
 								{#if r.resultScore}
-									<span class="ml-1 text-xs font-normal text-muted-foreground"
-										>· {r.resultScore}{r.resultRx ? ' Rx' : ''}</span
-									>
+									<span class="ml-1 text-xs font-normal text-muted-foreground">
+										· {r.resultScore}{r.resultRx ? ' Rx' : ''}
+									</span>
 								{/if}
 								<input
 									class="ml-1 w-20 border-0 bg-transparent text-xs text-muted-foreground outline-none placeholder:italic focus:text-foreground sm:w-28"
@@ -1473,9 +1493,9 @@
 							<Table.Cell>
 								<StatusBadge status={r.booking.status} />
 								{#if r.booking.status === 'waitlisted'}
-									<span class="ml-1 text-xs text-muted-foreground"
-										>#{waitlistPos.get(r.booking.id)}</span
-									>
+									<span class="ml-1 text-xs text-muted-foreground">
+										#{waitlistPos.get(r.booking.id)}
+									</span>
 								{/if}
 							</Table.Cell>
 							<Table.Cell class="text-right">
@@ -1484,30 +1504,38 @@
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => setBooking(r.booking.id, 'attended')}>Attended</Button
+										onclick={() => setBooking(r.booking.id, 'attended')}
 									>
+										Attended
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => setBooking(r.booking.id, 'no_show')}>No-show</Button
+										onclick={() => setBooking(r.booking.id, 'no_show')}
 									>
+										No-show
+									</Button>
 								{/if}
 								{#if r.booking.status === 'booked' || r.booking.status === 'waitlisted'}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => (moveFor = r.booking.id)}>Move</Button
+										onclick={() => (moveFor = r.booking.id)}
 									>
+										Move
+									</Button>
 								{/if}
 								{#if r.booking.status === 'waitlisted'}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-7 px-2 text-xs"
-										onclick={() => setBooking(r.booking.id, 'booked')}>Promote</Button
+										onclick={() => setBooking(r.booking.id, 'booked')}
 									>
+										Promote
+									</Button>
 								{/if}
 								{#if r.booking.status === 'no_show'}
 									<Button
@@ -1523,21 +1551,25 @@
 											} catch (err) {
 												toast.error(errMsg(err, 'Could not forgive'));
 											}
-										}}>Forgive</Button
+										}}
 									>
+										Forgive
+									</Button>
 								{/if}
 								<Button
 									variant="ghost"
 									size="sm"
 									class="h-7 px-2 text-xs text-destructive"
-									onclick={() => setBooking(r.booking.id, 'cancelled')}>Cancel</Button
+									onclick={() => setBooking(r.booking.id, 'cancelled')}
 								>
+									Cancel
+								</Button>
 							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell class="text-muted-foreground">No bookings yet.</Table.Cell></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell class="text-muted-foreground">No bookings yet.</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1549,11 +1581,13 @@
 					onclick={() => {
 						msgEventId = '';
 						msgOpen = true;
-					}}><Mail class="mr-1 h-3.5 w-3.5" /> Message attendees</Button
+					}}
 				>
-				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}
-					><Printer class="mr-1 h-3.5 w-3.5" /> Print roster</Button
-				>
+					<Mail class="mr-1 h-3.5 w-3.5" /> Message attendees
+				</Button>
+				<Button variant="ghost" size="sm" class="h-7 px-2 text-xs" onclick={() => window.print()}>
+					<Printer class="mr-1 h-3.5 w-3.5" /> Print roster
+				</Button>
 				<Button
 					variant="ghost"
 					size="sm"
@@ -1601,8 +1635,10 @@
 						)}.csv`;
 						a.click();
 						URL.revokeObjectURL(a.href);
-					}}>CSV</Button
+					}}
 				>
+					CSV
+				</Button>
 				{#if focus && new Date(focus.session.endsAt).getTime() < Date.now() && roster.some((r) => r.booking.status === 'booked')}
 					<Button
 						variant="ghost"
@@ -1616,8 +1652,10 @@
 							} catch (err) {
 								toast.error(errMsg(err, 'Could not mark no-shows'));
 							}
-						}}>Mark no-shows</Button
+						}}
 					>
+						Mark no-shows
+					</Button>
 				{/if}
 			</div>
 			<div class="flex gap-2 border-t pt-4">
@@ -1627,10 +1665,10 @@
 					</Select.Trigger>
 					<Select.Content>
 						{#each memberList.filter((mm) => mm.status === 'active') as mm (mm.id)}
-							<Select.Item value={mm.id}
-								>{mm.name}{#if !mm.planName}
-									({mm.guardianPlanName ? 'family' : 'drop-in'}){/if}</Select.Item
-							>
+							<Select.Item value={mm.id}>
+								{mm.name}{#if !mm.planName}
+									({mm.guardianPlanName ? 'family' : 'drop-in'}){/if}
+							</Select.Item>
 						{/each}
 					</Select.Content>
 				</Select.Root>
@@ -1644,9 +1682,9 @@
 					</Select.Trigger>
 					<Select.Content>
 						{#each [0, 1, 2, 3] as n (n)}
-							<Select.Item value={String(n)}
-								>{n === 0 ? 'No guests' : `+${n} guest${n > 1 ? 's' : ''}`}</Select.Item
-							>
+							<Select.Item value={String(n)}>
+								{n === 0 ? 'No guests' : `+${n} guest${n > 1 ? 's' : ''}`}
+							</Select.Item>
 						{/each}
 					</Select.Content>
 				</Select.Root>
@@ -1655,8 +1693,10 @@
 					disabled={!bookMemberId ||
 						(!memberList.find((mm) => mm.id === bookMemberId)?.planName &&
 							!memberList.find((mm) => mm.id === bookMemberId)?.guardianPlanName &&
-							!focus?.dropInPrice)}>Book</Button
+							!focus?.dropInPrice)}
 				>
+					Book
+				</Button>
 			</div>
 			{#if bookMemberId && !memberList.find((mm) => mm.id === bookMemberId)?.planName}
 				{@const bk = memberList.find((mm) => mm.id === bookMemberId)}
@@ -1684,8 +1724,10 @@
 						sessStart = addDays(localDate(focus.session.startsAt, tz), 7);
 						sessStartTime = localTime(focus.session.startsAt, tz);
 						sessOpen = true;
-					}}>Duplicate next week</Button
+					}}
 				>
+					Duplicate next week
+				</Button>
 				<Button
 					variant="outline"
 					class="w-full"
@@ -1767,9 +1809,9 @@
 	<Modal.Content class="sm:max-w-xs">
 		<Modal.Header>
 			<Modal.Title>Copy a day</Modal.Title>
-			<Modal.Description
-				>Duplicate every session from one day onto another — same times, rooms and instructors.</Modal.Description
-			>
+			<Modal.Description>
+				Duplicate every session from one day onto another — same times, rooms and instructors.
+			</Modal.Description>
 		</Modal.Header>
 		<div class="grid grid-cols-2 gap-3">
 			<Field.Field>
@@ -1802,8 +1844,10 @@
 						toast.error(errMsg(err, 'Could not copy day'));
 					}
 					pending = false;
-				}}>Copy</Button
+				}}
 			>
+				Copy
+			</Button>
 		</Modal.Footer>
 	</Modal.Content>
 </Modal.Root>
@@ -1813,9 +1857,9 @@
 		<Modal.Content class="sm:max-w-sm">
 			<Modal.Header>
 				<Modal.Title>Move to another session</Modal.Title>
-				<Modal.Description
-					>Same class ({focus?.className}) — pick the new session in view.</Modal.Description
-				>
+				<Modal.Description>
+					Same class ({focus?.className}) — pick the new session in view.
+				</Modal.Description>
 			</Modal.Header>
 			<div class="max-h-64 divide-y overflow-auto">
 				{#each moveTargets as t (t.session.id)}
@@ -1824,9 +1868,9 @@
 						onclick={() => doMove(t.session.id)}
 					>
 						<span class="font-medium">{localTime(t.session.startsAt, tz)}</span>
-						<span class="text-xs text-muted-foreground"
-							>{localDate(t.session.startsAt, tz)} · {t.booked}/{t.session.capacity}</span
-						>
+						<span class="text-xs text-muted-foreground">
+							{localDate(t.session.startsAt, tz)} · {t.booked}/{t.session.capacity}
+						</span>
 					</button>
 				{:else}
 					<p class="py-3 text-sm text-muted-foreground">
@@ -1849,8 +1893,8 @@
 			· {focus.session.capacity} spots{#if rosterGuests}
 				· {rosterGuests} guest{rosterGuests === 1 ? '' : 's'}{/if}{#if focus.payRate}
 				<span class="text-muted-foreground">
-					· pay {formatMoney(focus.payRate, currency)}</span
-				>{/if}
+					· pay {formatMoney(focus.payRate, currency)}
+				</span>{/if}
 		</p>
 		{#if focus.session.note}<p class="mt-1 text-sm italic">{focus.session.note}</p>{/if}
 		<table class="mt-6 w-full border-collapse text-left text-sm">
@@ -2017,8 +2061,10 @@
 								} finally {
 									wodAiBusy = false;
 								}
-							}}>{wodAiBusy ? 'Writing…' : 'Write with AI'}</Button
+							}}
 						>
+							{wodAiBusy ? 'Writing…' : 'Write with AI'}
+						</Button>
 					{/if}
 				</div>
 				<Textarea
@@ -2156,9 +2202,9 @@
 				<Field.Description>Prefilled from the class type's default.</Field.Description>
 			</Field.Field>
 			<Modal.Footer>
-				<Button type="submit" disabled={pending || !sessTypeId}
-					>{pending ? 'Scheduling…' : 'Schedule'}</Button
-				>
+				<Button type="submit" disabled={pending || !sessTypeId}>
+					{pending ? 'Scheduling…' : 'Schedule'}
+				</Button>
 			</Modal.Footer>
 		</form>
 	</Modal.Content>
@@ -2178,11 +2224,11 @@
 							></span>
 							<span class="truncate">
 								{c.name}
-								<span class="text-muted-foreground"
-									>· {c.durationMin}m · {c.capacity} seats{c.dropInPrice
+								<span class="text-muted-foreground">
+									· {c.durationMin}m · {c.capacity} seats{c.dropInPrice
 										? ` · $${(c.dropInPrice / 100).toFixed(2)} drop-in`
-										: ''}</span
-								>
+										: ''}
+								</span>
 							</span>
 							{#if !c.active}<Badge variant="outline">inactive</Badge>{/if}
 							{#if editTypeId === c.id}<Badge variant="secondary">editing</Badge>{/if}
@@ -2200,30 +2246,34 @@
 								} catch (err) {
 									toast.error(errMsg(err, 'Could not copy'));
 								}
-							}}><Copy class="size-3.5" /></Button
+							}}
 						>
+							<Copy class="size-3.5" />
+						</Button>
 						<Button
 							variant="ghost"
 							size="sm"
 							class="h-7 shrink-0 px-2 text-xs"
-							onclick={() => editType(c)}>Edit</Button
+							onclick={() => editType(c)}
 						>
+							Edit
+						</Button>
 					</div>
 				{/each}
 			</div>
 		{/if}
 		<form class="space-y-4" onsubmit={submitType}>
-			<Field.Field
-				><Field.Label for="t-name">Name</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="t-name">Name</Field.Label><Input
 					id="t-name"
 					required
 					bind:value={tName}
 					placeholder="HIIT, Yoga, Open gym…"
 					autofocus
-				/></Field.Field
-			>
-			<Field.Field
-				><Field.Label for="t-desc">Description</Field.Label>
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="t-desc">Description</Field.Label>
 				<div class="flex items-center gap-2">
 					<Input id="t-desc" class="flex-1" bind:value={tDescription} />
 					{#if ai.configured}
@@ -2234,11 +2284,12 @@
 							class="h-8 shrink-0 px-2 text-xs"
 							disabled={aiDescBusy || !tName.trim()}
 							onclick={aiFillDescription}
-							><Sparkles class="mr-1 h-3.5 w-3.5" />{aiDescBusy ? 'Working…' : 'AI'}</Button
 						>
+							<Sparkles class="mr-1 h-3.5 w-3.5" />{aiDescBusy ? 'Working…' : 'AI'}
+						</Button>
 					{/if}
-				</div></Field.Field
-			>
+				</div>
+			</Field.Field>
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label for="t-color">Color</Field.Label>
@@ -2390,8 +2441,10 @@
 								onclick={() => {
 									if (tQuals.has(st.id)) tQuals.delete(st.id);
 									else tQuals.add(st.id);
-								}}>{st.name}</button
+								}}
 							>
+								{st.name}
+							</button>
 						{/each}
 					</div>
 				</Field.Field>
@@ -2421,14 +2474,18 @@
 							href={v.video.url}
 							target="_blank"
 							rel="noreferrer"
-							class="min-w-0 flex-1 truncate hover:underline">{v.video.title}</a
+							class="min-w-0 flex-1 truncate hover:underline"
 						>
+							{v.video.title}
+						</a>
 						<Button
 							size="sm"
 							variant="ghost"
 							class="h-7 px-1.5 text-destructive"
-							onclick={() => removeVideo(v.video.id)}><Trash2 class="size-3.5" /></Button
+							onclick={() => removeVideo(v.video.id)}
 						>
+							<Trash2 class="size-3.5" />
+						</Button>
 					</div>
 				{:else}
 					<p class="text-sm text-muted-foreground">No videos yet.</p>
@@ -2441,8 +2498,10 @@
 						size="sm"
 						variant="outline"
 						disabled={vidPending || !vidTitle.trim() || !vidUrl.trim()}
-						onclick={addVideo}>Add</Button
+						onclick={addVideo}
 					>
+						Add
+					</Button>
 				</div>
 			</div>
 		{/if}
@@ -2512,8 +2571,10 @@
 							tplTypeId = '';
 							tplCapacity = null;
 							tplUntil = '';
-						}}>Cancel edit</Button
+						}}
 					>
+						Cancel edit
+					</Button>
 				{/if}
 			</div>
 		</form>
@@ -2538,14 +2599,18 @@
 								variant="ghost"
 								size="icon"
 								class="h-7 w-7 text-muted-foreground"
-								onclick={() => editTemplate(t)}><Pencil class="h-4 w-4" /></Button
+								onclick={() => editTemplate(t)}
 							>
+								<Pencil class="h-4 w-4" />
+							</Button>
 							<Button
 								variant="ghost"
 								size="icon"
 								class="h-7 w-7 text-muted-foreground"
-								onclick={() => removeTemplate(t.template.id)}><Trash2 class="h-4 w-4" /></Button
+								onclick={() => removeTemplate(t.template.id)}
 							>
+								<Trash2 class="h-4 w-4" />
+							</Button>
 						</div>
 					</div>
 				{/each}
@@ -2560,11 +2625,11 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>{msgEventId ? 'Message registrants' : 'Message attendees'}</Modal.Title>
-			<Modal.Description
-				>Emails {msgEventId
+			<Modal.Description>
+				Emails {msgEventId
 					? `everyone registered for ${events.find((e) => e.event.id === msgEventId)?.event.name ?? 'this event'}`
-					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.</Modal.Description
-			>
+					: `everyone booked or waitlisted on ${focus?.className ?? 'this session'}`}.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitMsg}>
 			<Field.Field>
@@ -2589,10 +2654,10 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Instructor handoff</Modal.Title>
-			<Modal.Description
-				>Reassign or cancel every upcoming session an instructor teaches — their recurring templates
-				are updated too, and attendees get the usual emails.</Modal.Description
-			>
+			<Modal.Description>
+				Reassign or cancel every upcoming session an instructor teaches — their recurring templates
+				are updated too, and attendees get the usual emails.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitHandoff}>
 			<Field.Field>
@@ -2621,9 +2686,9 @@
 					<Field.Label for="ho-to">Taken over by</Field.Label>
 					<NativeSelect id="ho-to" required bind:value={hoTo}>
 						<option value="" disabled>Pick the new instructor</option>
-						{#each instructors.filter((i) => i.id !== hoFrom) as i (i.id)}<option value={i.id}
-								>{i.name}</option
-							>{/each}
+						{#each instructors.filter((i) => i.id !== hoFrom) as i (i.id)}<option value={i.id}>
+								{i.name}
+							</option>{/each}
 					</NativeSelect>
 				</Field.Field>
 			{/if}
@@ -2736,8 +2801,8 @@
 							<span class="font-medium">{b.memberName}</span>
 							<span class="text-muted-foreground">
 								· {b.resourceName} · {localDate(b.booking.startsAt, tz)}
-								{localTime(b.booking.startsAt, tz)}–{localTime(b.booking.endsAt, tz)}</span
-							>
+								{localTime(b.booking.startsAt, tz)}–{localTime(b.booking.endsAt, tz)}
+							</span>
 						</div>
 						<Button
 							size="xs"
@@ -2750,8 +2815,10 @@
 								} catch (err) {
 									toast.error(errMsg(err, 'Could not cancel'));
 								}
-							}}>Cancel</Button
+							}}
 						>
+							Cancel
+						</Button>
 					</div>
 				{/each}
 			</div>
@@ -2840,8 +2907,8 @@
 								{/if}
 								{#if ev.event.price}
 									<span class="text-muted-foreground">
-										· {formatMoney(ev.event.price, currency)}</span
-									>
+										· {formatMoney(ev.event.price, currency)}
+									</span>
 								{/if}
 								<p class="text-xs text-muted-foreground">
 									{formatDate(ev.event.startsAt)} · {localTime(ev.event.startsAt, tz)}
@@ -2863,34 +2930,40 @@
 										onclick={() => {
 											msgEventId = ev.event.id;
 											msgOpen = true;
-										}}><Mail class="mr-1 h-3 w-3" /> Message</Button
+										}}
 									>
+										<Mail class="mr-1 h-3 w-3" /> Message
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs"
 										title="Same event, same time next week"
-										onclick={() => duplicateEvent(ev)}>Duplicate</Button
+										onclick={() => duplicateEvent(ev)}
 									>
+										Duplicate
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs text-destructive"
-										onclick={() => cancelWholeEvent(ev.event.id)}>Cancel event</Button
+										onclick={() => cancelWholeEvent(ev.event.id)}
 									>
+										Cancel event
+									</Button>
 								</div>
 							{/if}
 							<div class="mt-2 rounded-md border p-2">
 								{#each evRoster.rows as r (r.registration.id)}
 									<div class="flex items-center justify-between py-1 text-sm">
-										<span class="flex items-center gap-2"
-											>{r.memberName}
+										<span class="flex items-center gap-2">
+											{r.memberName}
 											{#if r.registration.waitlisted}
 												<Badge variant="outline">Waitlist</Badge>
 											{:else if r.registration.status === 'attended'}
 												<Badge variant="secondary">Attended</Badge>
-											{/if}</span
-										>
+											{/if}
+										</span>
 										<div>
 											{#if !r.registration.waitlisted}
 												<Button
@@ -2902,15 +2975,19 @@
 															ev.event.id,
 															r.registration.id,
 															r.registration.status !== 'attended'
-														)}>{r.registration.status === 'attended' ? 'Undo' : 'Attended'}</Button
+														)}
 												>
+													{r.registration.status === 'attended' ? 'Undo' : 'Attended'}
+												</Button>
 											{/if}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-6 px-2 text-xs"
-												onclick={() => cancelReg(r.registration.id)}>Cancel</Button
+												onclick={() => cancelReg(r.registration.id)}
 											>
+												Cancel
+											</Button>
 										</div>
 									</div>
 								{:else}
@@ -2929,9 +3006,9 @@
 												{/each}
 											</Select.Content>
 										</Select.Root>
-										<Button size="sm" class="h-8" disabled={!evMemberId} onclick={registerMember}
-											>Add</Button
-										>
+										<Button size="sm" class="h-8" disabled={!evMemberId} onclick={registerMember}>
+											Add
+										</Button>
 									</div>
 								{/if}
 							</div>
@@ -3064,8 +3141,8 @@
 								<span class="font-medium">{c.course.name}</span>
 								{#if c.course.priceCents}
 									<span class="text-muted-foreground">
-										· {formatMoney(c.course.priceCents, currency)}</span
-									>
+										· {formatMoney(c.course.priceCents, currency)}
+									</span>
 								{/if}
 								{#if !c.course.memberBookable}
 									<Badge variant="outline" class="text-xs">staff enroll only</Badge>
@@ -3088,29 +3165,35 @@
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs text-destructive"
-										onclick={() => removeCourseRow(c.course.id)}>Remove course</Button
+										onclick={() => removeCourseRow(c.course.id)}
 									>
+										Remove course
+									</Button>
 								</div>
 							{/if}
 							<div class="mt-2 rounded-md border p-2">
 								{#if cRoster}
 									{#each cRoster as r (r.enrollment.id)}
 										<div class="flex items-center justify-between py-1 text-sm">
-											<span class="flex min-w-0 items-center gap-1.5"
-												><span class="truncate">{r.memberName}</span
-												>{#if r.enrollment.waitlisted}<Badge variant="outline">waitlist</Badge
-													>{/if}</span
-											>
+											<span class="flex min-w-0 items-center gap-1.5">
+												<span class="truncate">
+													{r.memberName}
+												</span>{#if r.enrollment.waitlisted}<Badge variant="outline">
+														waitlist
+													</Badge>{/if}
+											</span>
 											<span class="flex shrink-0 items-center gap-1">
-												<span class="text-xs text-muted-foreground"
-													>{localDate(r.enrollment.createdAt, tz)}</span
-												>
+												<span class="text-xs text-muted-foreground">
+													{localDate(r.enrollment.createdAt, tz)}
+												</span>
 												<Button
 													variant="ghost"
 													size="sm"
 													class="h-6 px-1.5 text-xs text-destructive"
-													onclick={() => unenrollRow(r.enrollment.id, r.memberName)}>Remove</Button
+													onclick={() => unenrollRow(r.enrollment.id, r.memberName)}
 												>
+													Remove
+												</Button>
 											</span>
 										</div>
 									{:else}
@@ -3135,8 +3218,10 @@
 												size="sm"
 												class="h-8"
 												disabled={!cMemberId}
-												onclick={enrollCourseMember}>Enroll</Button
+												onclick={enrollCourseMember}
 											>
+												Enroll
+											</Button>
 										</div>
 									{/if}
 								{:else}
@@ -3193,9 +3278,9 @@
 						bind:value={cInstallments}
 						placeholder="1"
 					/>
-					<Field.Description
-						>Split the price into monthly charges (1 = pay up front).</Field.Description
-					>
+					<Field.Description>
+						Split the price into monthly charges (1 = pay up front).
+					</Field.Description>
 				</Field.Field>
 			</div>
 			<Field.Field>
@@ -3270,8 +3355,8 @@
 							></span>
 							<span class="font-medium">{h.className}</span>
 							<span class="text-muted-foreground">
-								· {WEEKDAYS[h.weekday]}s {h.time} · {h.sessions} sessions</span
-							>
+								· {WEEKDAYS[h.weekday]}s {h.time} · {h.sessions} sessions
+							</span>
 							<p class="text-xs text-muted-foreground">
 								{#if h.kind === 'add'}
 									Avg {h.avgFill}% full — consider adding another {h.className} that day.
@@ -3282,8 +3367,9 @@
 						</div>
 						<div class="flex shrink-0 items-center gap-1.5">
 							{#if h.kind === 'add'}
-								<Button size="xs" variant="outline" onclick={() => scheduleHint(h)}>Schedule</Button
-								>
+								<Button size="xs" variant="outline" onclick={() => scheduleHint(h)}>
+									Schedule
+								</Button>
 							{/if}
 							<span
 								class="rounded-full px-2 py-0.5 text-xs font-medium {h.kind === 'add'
@@ -3333,8 +3419,9 @@
 							{#if eq.nextServiceOn && eq.nextServiceOn <= today}
 								<span
 									class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-									>service due</span
 								>
+									service due
+								</span>
 							{/if}
 							<NativeSelect
 								size="sm"
@@ -3353,8 +3440,9 @@
 								variant="ghost"
 								title="Log a service today"
 								onclick={() => setEquipment(eq.id, { servicedOn: today, status: 'operational' })}
-								>Serviced</Button
 							>
+								Serviced
+							</Button>
 							<Button
 								size="xs"
 								variant="ghost"
@@ -3370,8 +3458,10 @@
 										confirm: { text: 'Save' },
 										onConfirm: (d) => setEquipment(eq.id, { nextServiceOn: d.trim() || null })
 									});
-								}}><Pencil /></Button
+								}}
 							>
+								<Pencil />
+							</Button>
 							<Button
 								size="xs"
 								variant="ghost"
@@ -3389,8 +3479,10 @@
 											}
 										}
 									});
-								}}><Trash2 /></Button
+								}}
 							>
+								<Trash2 />
+							</Button>
 						</div>
 					</div>
 				{/each}
@@ -3433,10 +3525,10 @@
 	<Modal.Content class="sm:max-w-lg">
 		<Modal.Header>
 			<Modal.Title>Bulk cancel sessions</Modal.Title>
-			<Modal.Description
-				>Cancel several sessions this week at once — booked members get the usual email, credits and
-				drop-in voids.</Modal.Description
-			>
+			<Modal.Description>
+				Cancel several sessions this week at once — booked members get the usual email, credits and
+				drop-in voids.
+			</Modal.Description>
 		</Modal.Header>
 		<ul class="max-h-80 divide-y overflow-y-auto">
 			{#each bulkSessions as s (s.session.id)}
@@ -3465,8 +3557,9 @@
 				variant="destructive"
 				disabled={bulkPending || !bulkChecked.size}
 				onclick={runBulkCancel}
-				>{bulkPending ? 'Cancelling…' : `Cancel ${bulkChecked.size || ''} selected`}</Button
 			>
+				{bulkPending ? 'Cancelling…' : `Cancel ${bulkChecked.size || ''} selected`}
+			</Button>
 		</Modal.Footer>
 	</Modal.Content>
 </Modal.Root>

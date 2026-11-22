@@ -69,14 +69,14 @@
 					<tbody>
 						{#each sess.roster as r (r.name + r.status)}
 							<tr class="border-b border-dashed last:border-0">
-								<td class="w-6 py-1 align-top"
-									><span class="inline-block h-3 w-3 rounded-sm border"></span></td
-								>
+								<td class="w-6 py-1 align-top">
+									<span class="inline-block h-3 w-3 rounded-sm border"></span>
+								</td>
 								<td class="py-1">
 									{r.name}{#if r.guests}
 										<span class="text-muted-foreground">
-											+{r.guests} guest{r.guests > 1 ? 's' : ''}</span
-										>{/if}
+											+{r.guests} guest{r.guests > 1 ? 's' : ''}
+										</span>{/if}
 								</td>
 								<td class="py-1 text-right text-xs text-muted-foreground capitalize">
 									{r.status === 'no_show' ? 'no-show' : r.status}

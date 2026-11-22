@@ -60,9 +60,9 @@
 			</p>
 		</div>
 		<Button type="submit" class="w-full"><Sparkles /> Staff view</Button>
-		<Button type="submit" formaction="/demo?view=member" variant="outline" class="w-full"
-			><Sparkles /> Member view</Button
-		>
+		<Button type="submit" formaction="/demo?view=member" variant="outline" class="w-full">
+			<Sparkles /> Member view
+		</Button>
 	</form>
 {/if}
 
@@ -105,14 +105,14 @@
 		</div>
 		<div class="grid gap-2">
 			{#if page.data.suite}
-				<Button type="button" variant="outline" onclick={suite}
-					><KeyRound /> Continue with Leroa</Button
-				>
+				<Button type="button" variant="outline" onclick={suite}>
+					<KeyRound /> Continue with Leroa
+				</Button>
 			{/if}
 			{#if page.data.security}
-				<Button type="button" variant="outline" onclick={passkey}
-					><KeyRound /> Sign in with a passkey</Button
-				>
+				<Button type="button" variant="outline" onclick={passkey}>
+					<KeyRound /> Sign in with a passkey
+				</Button>
 				<Button type="button" variant="outline" onclick={() => (showSso = !showSso)}>
 					<Building />
 					{showSso ? 'Use a password instead' : 'Single sign-on (SAML / OIDC)'}
@@ -123,7 +123,9 @@
 	{#if !page.data.demo}<p class="text-center text-sm text-muted-foreground">
 			New to Freeweight? <a
 				href="/signup{page.url.search}"
-				class="font-medium text-foreground underline-offset-4 hover:underline">Create an account</a
+				class="font-medium text-foreground underline-offset-4 hover:underline"
 			>
+				Create an account
+			</a>
 		</p>{/if}
 </form>

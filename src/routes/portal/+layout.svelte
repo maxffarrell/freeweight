@@ -40,8 +40,10 @@
 				onclick={async () => {
 					await authClient.signOut();
 					await goto('/login', { invalidateAll: true });
-				}}>Sign out</Button
+				}}
 			>
+				Sign out
+			</Button>
 		</div>
 	</header>
 	<main class="mx-auto max-w-3xl space-y-6 p-4 py-8">

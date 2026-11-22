@@ -700,31 +700,34 @@
 
 <PageHeader title="Members">
 	{#snippet actions()}
-		<Button size="sm" variant="outline" onclick={() => (importOpen = true)}
-			><Upload /> Import</Button
-		>
-		<span class="self-center text-sm text-muted-foreground"
-			>{formatMoney(
+		<Button size="sm" variant="outline" onclick={() => (importOpen = true)}>
+			<Upload /> Import
+		</Button>
+		<span class="self-center text-sm text-muted-foreground">
+			{formatMoney(
 				members.reduce((a, x) => a + x.openBalance, 0),
 				currency
-			)} open</span
-		>
-		<Button size="sm" variant="outline" onclick={exportCsv}
-			><Download /> Export{selected.size ? ` (${selected.size})` : ''}</Button
-		>
+			)} open
+		</span>
+		<Button size="sm" variant="outline" onclick={exportCsv}>
+			<Download /> Export{selected.size ? ` (${selected.size})` : ''}
+		</Button>
 		<Button
 			size="sm"
 			variant="outline"
 			onclick={() => {
 				emailAudience = selected.size ? '__sel' : '__all';
 				emailOpen = true;
-			}}><Mail /> Email</Button
+			}}
 		>
-		<Button size="sm" variant="outline" onclick={() => (chalOpen = true)}
-			><Trophy /> Challenges</Button
-		>
-		<Button size="sm" variant="outline" onclick={() => (levelsOpen = true)}><Medal /> Levels</Button
-		>
+			<Mail /> Email
+		</Button>
+		<Button size="sm" variant="outline" onclick={() => (chalOpen = true)}>
+			<Trophy /> Challenges
+		</Button>
+		<Button size="sm" variant="outline" onclick={() => (levelsOpen = true)}>
+			<Medal /> Levels
+		</Button>
 		<Button size="sm" onclick={() => (open = true)}><Plus /> Add member</Button>
 	{/snippet}
 </PageHeader>
@@ -741,13 +744,13 @@
 			/>
 		</div>
 		<Select.Root type="single" bind:value={statusFilter} onValueChange={() => void refilter()}>
-			<Select.Trigger class="w-32"
-				>{statusFilter === '__all'
+			<Select.Trigger class="w-32">
+				{statusFilter === '__all'
 					? 'Any status'
 					: statusFilter === 'active'
 						? 'Active'
-						: 'Inactive'}</Select.Trigger
-			>
+						: 'Inactive'}
+			</Select.Trigger>
 			<Select.Content>
 				<Select.Item value="__all">Any status</Select.Item>
 				<Select.Item value="active">Active</Select.Item>
@@ -767,8 +770,8 @@
 		{/if}
 		{#if audiencePlans.length}
 			<Select.Root type="single" bind:value={planFilter} onValueChange={() => void refilter()}>
-				<Select.Trigger class="w-40"
-					>{planFilter === '__all'
+				<Select.Trigger class="w-40">
+					{planFilter === '__all'
 						? 'All plans'
 						: planFilter === '__none'
 							? 'No plan'
@@ -776,9 +779,8 @@
 								? 'Has pack'
 								: planFilter === 'recurring'
 									? 'On a plan'
-									: (audiencePlans.find((p) => p.id === planFilter)?.name ??
-										'Plan')}</Select.Trigger
-				>
+									: (audiencePlans.find((p) => p.id === planFilter)?.name ?? 'Plan')}
+				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="__all">All plans</Select.Item>
 					<Select.Item value="__none">No plan</Select.Item>
@@ -791,8 +793,8 @@
 			</Select.Root>
 		{/if}
 		<Select.Root type="single" bind:value={owesFilter} onValueChange={() => void refilter()}>
-			<Select.Trigger class="w-36"
-				>{owesFilter === 'owes'
+			<Select.Trigger class="w-36">
+				{owesFilter === 'owes'
 					? 'Owes money'
 					: owesFilter === 'suspended'
 						? 'Suspended'
@@ -844,8 +846,8 @@
 																													? 'Retention exempt'
 																													: owesFilter === '__doorblocked'
 																														? 'Door blocked'
-																														: 'Any balance'}</Select.Trigger
-			>
+																														: 'Any balance'}
+			</Select.Trigger>
 			<Select.Content>
 				<Select.Item value="any">Any balance</Select.Item>
 				<Select.Item value="owes">Owes money</Select.Item>
@@ -920,10 +922,9 @@
 					void refilter();
 				}}
 			>
-				<Select.Trigger class="w-44"
-					>{memberFields.fields.find((f) => f.id === cfFieldId)?.name ??
-						'Custom field…'}</Select.Trigger
-				>
+				<Select.Trigger class="w-44">
+					{memberFields.fields.find((f) => f.id === cfFieldId)?.name ?? 'Custom field…'}
+				</Select.Trigger>
 				<Select.Content>
 					{#each memberFields.fields as f (f.id)}
 						<Select.Item value={f.id}>{f.name}</Select.Item>
@@ -940,17 +941,19 @@
 		<div
 			class="flex flex-col gap-1 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40"
 		>
-			<span class="font-medium"
-				>{dupes.length} possible duplicate{dupes.length === 1 ? '' : 's'} — open a member to merge</span
-			>
+			<span class="font-medium">
+				{dupes.length} possible duplicate{dupes.length === 1 ? '' : 's'} — open a member to merge
+			</span>
 			{#each dupes as d (d.reason)}
-				<span class="text-muted-foreground"
-					>{d.reason}:
+				<span class="text-muted-foreground">
+					{d.reason}:
 					{#each d.members as m, i (m.id)}{#if i},&nbsp;{/if}<a
 							class="underline underline-offset-2 hover:text-foreground"
-							href="/members/{m.id}">{m.name}</a
-						>{/each}</span
-				>
+							href="/members/{m.id}"
+						>
+							{m.name}
+						</a>{/each}
+				</span>
 			{/each}
 		</div>
 	{/if}
@@ -959,9 +962,9 @@
 		<div class="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
 			<span class="font-medium tabular-nums">{selected.size} selected</span>
 			<Button size="sm" variant="outline" onclick={() => (tagOpen = true)}><TagIcon /> Tag</Button>
-			<Button size="sm" variant="outline" onclick={() => (compOpen = true)}
-				><TicketCheck /> Comp classes</Button
-			>
+			<Button size="sm" variant="outline" onclick={() => (compOpen = true)}>
+				<TicketCheck /> Comp classes
+			</Button>
 			<Button
 				size="sm"
 				variant="outline"
@@ -981,8 +984,10 @@
 							}
 						}
 					});
-				}}>Mark inactive</Button
+				}}
 			>
+				Mark inactive
+			</Button>
 			{#if entitlements.dataRetention}
 				<Button
 					size="sm"
@@ -1005,8 +1010,10 @@
 								}
 							}
 						});
-					}}>Anonymize</Button
+					}}
 				>
+					Anonymize
+				</Button>
 			{/if}
 			<Button size="sm" variant="ghost" onclick={() => selected.clear()}>Clear</Button>
 		</div>
@@ -1054,8 +1061,9 @@
 									{:else}
 										<span
 											class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground"
-											>{initials(m.name)}</span
 										>
+											{initials(m.name)}
+										</span>
 									{/if}
 									{m.name}
 									{#if m.guardianId}
@@ -1071,9 +1079,9 @@
 											<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">{t}</Badge>
 										{/each}
 										{#if m.tags.length > 3}
-											<Badge variant="secondary" class="px-1.5 py-0 text-[10px]"
-												>+{m.tags.length - 3}</Badge
-											>
+											<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">
+												+{m.tags.length - 3}
+											</Badge>
 										{/if}
 									</span>
 								{/if}
@@ -1081,13 +1089,11 @@
 							<Table.Cell class="hidden text-muted-foreground md:table-cell">
 								{m.email ?? m.phone ?? '—'}
 							</Table.Cell>
-							<Table.Cell class="text-muted-foreground"
-								>{m.planName ??
+							<Table.Cell class="text-muted-foreground">
+								{m.planName ??
 									'—'}{#if m.memberEnds && new Date(m.memberEnds).getTime() > Date.now() && new Date(m.memberEnds).getTime() - Date.now() < 30 * 86400_000}
-									<span class="text-amber-600">
-										· ends {formatDate(m.memberEnds)}</span
-									>{/if}</Table.Cell
-							>
+									<span class="text-amber-600"> · ends {formatDate(m.memberEnds)}</span>{/if}
+							</Table.Cell>
 							<Table.Cell class="hidden text-muted-foreground lg:table-cell">
 								{m.lastVisit ? formatDate(m.lastVisit) : '—'}
 							</Table.Cell>
@@ -1106,13 +1112,13 @@
 									<Empty.Header>
 										<Empty.Media><Users /></Empty.Media>
 										<Empty.Title>No members yet</Empty.Title>
-										<Empty.Description
-											>Add your first member, or load the demo data to look around.</Empty.Description
-										>
+										<Empty.Description>
+											Add your first member, or load the demo data to look around.
+										</Empty.Description>
 									</Empty.Header>
-									<Empty.Content
-										><Button onclick={() => (open = true)}>Add member</Button></Empty.Content
-									>
+									<Empty.Content>
+										<Button onclick={() => (open = true)}>Add member</Button>
+									</Empty.Content>
 								</Empty.Root>
 							</Table.Cell>
 						</Table.Row>
@@ -1153,9 +1159,9 @@
 <Modal.Root bind:open={compOpen}>
 	<Modal.Content class="sm:max-w-sm">
 		<Modal.Header>
-			<Modal.Title
-				>Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}</Modal.Title
-			>
+			<Modal.Title>
+				Comp classes for {selected.size} member{selected.size === 1 ? '' : 's'}
+			</Modal.Title>
 			<Modal.Description>
 				Adds bonus class credits to each selected member's active membership — on top of their plan
 				or pack.
@@ -1179,9 +1185,9 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>Add member</Modal.Title>
-			<Modal.Description
-				>A name is enough to start — contact details are optional.</Modal.Description
-			>
+			<Modal.Description>
+				A name is enough to start — contact details are optional.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submit}>
 			<Field.Field>
@@ -1269,8 +1275,10 @@
 					<button
 						type="button"
 						class="text-xs text-muted-foreground hover:underline"
-						onclick={removeTemplate}>Delete "{templateApplied.name}"</button
+						onclick={removeTemplate}
 					>
+						Delete "{templateApplied.name}"
+					</button>
 				{/if}
 			</div>
 		{/if}
@@ -1283,11 +1291,13 @@
 							type="button"
 							size="sm"
 							disabled={aiPending || !aiGoal.trim()}
-							onclick={runAiDraft}>{aiPending ? 'Drafting…' : 'Draft'}</Button
+							onclick={runAiDraft}
 						>
-						<Button type="button" variant="ghost" size="sm" onclick={() => (aiDraftOpen = false)}
-							>Cancel</Button
-						>
+							{aiPending ? 'Drafting…' : 'Draft'}
+						</Button>
+						<Button type="button" variant="ghost" size="sm" onclick={() => (aiDraftOpen = false)}>
+							Cancel
+						</Button>
 					</div>
 					<p class="mt-1.5 text-xs text-muted-foreground">
 						Describe the announcement — AI writes the subject + body for review.
@@ -1296,8 +1306,10 @@
 					<button
 						type="button"
 						class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-						onclick={() => (aiDraftOpen = true)}><Sparkles class="size-3.5" /> Draft with AI</button
+						onclick={() => (aiDraftOpen = true)}
 					>
+						<Sparkles class="size-3.5" /> Draft with AI
+					</button>
 				{/if}
 			{:else}
 				<p class="text-xs text-muted-foreground">
@@ -1316,9 +1328,9 @@
 							<span class="shrink-0 text-xs text-muted-foreground">
 								{#if a.action === 'scheduled'}
 									Sends {new Date(a.sendAt!).toLocaleString()}
-									<button class="ml-1 underline" onclick={() => cancelScheduled(a.id)}
-										>cancel</button
-									>
+									<button class="ml-1 underline" onclick={() => cancelScheduled(a.id)}>
+										cancel
+									</button>
 								{:else}
 									{formatDate(a.createdAt)} · {a.sent} sent{a.read ? ` · ${a.read} read` : ''}{a.tag
 										? ` · tag: ${a.tag}`
@@ -1327,8 +1339,9 @@
 										<button
 											class="ml-1 underline"
 											onclick={() => resendAnnouncement(a.id, a.sent - (a.read ?? 0))}
-											>resend to {a.sent - (a.read ?? 0)} unopened</button
 										>
+											resend to {a.sent - (a.read ?? 0)} unopened
+										</button>
 									{/if}
 								{/if}
 							</span>
@@ -1349,9 +1362,9 @@
 								{r.rule.time}{r.rule.tag ? ` · tag: ${r.rule.tag}` : ''}{r.planName
 									? ` · plan: ${r.planName}`
 									: ''}
-								<button class="ml-1 underline" onclick={() => dropRecurring(r.rule.id)}
-									>remove</button
-								>
+								<button class="ml-1 underline" onclick={() => dropRecurring(r.rule.id)}>
+									remove
+								</button>
 							</span>
 						</li>
 					{/each}
@@ -1402,8 +1415,10 @@
 							size="sm"
 							class="h-6 px-2 text-xs"
 							disabled={subjectBusy}
-							onclick={suggestSubjects}>Suggest subjects</Button
+							onclick={suggestSubjects}
 						>
+							Suggest subjects
+						</Button>
 						{#each subjectVariants as vsub (vsub)}
 							<button
 								type="button"
@@ -1411,8 +1426,10 @@
 								onclick={() => {
 									emailSubject = vsub;
 									subjectVariants = [];
-								}}>{vsub}</button
+								}}
 							>
+								{vsub}
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -1437,8 +1454,10 @@
 						variant="outline"
 						size="sm"
 						disabled={emailPending}
-						onclick={saveRecurringEmail}>Repeat weekly</Button
+						onclick={saveRecurringEmail}
 					>
+						Repeat weekly
+					</Button>
 				</div>
 			{/if}
 			<Field.Field>
@@ -1460,8 +1479,10 @@
 						size="sm"
 						class="h-6 w-fit px-2 text-xs"
 						disabled={improveBusy || !emailBody.trim()}
-						onclick={improveDraft}>Improve draft</Button
+						onclick={improveDraft}
 					>
+						Improve draft
+					</Button>
 				{/if}
 			</Field.Field>
 			{#if emailPreview != null}
@@ -1484,18 +1505,21 @@
 						size="sm"
 						onclick={sendTest}
 						disabled={testPending || !emailSubject.trim() || !emailBody.trim()}
-						>{testPending ? 'Sending…' : 'Send me a test'}</Button
 					>
-					<Button type="button" variant="ghost" size="sm" onclick={togglePreview}
-						>{emailPreview != null ? 'Hide preview' : 'Preview'}</Button
-					>
+						{testPending ? 'Sending…' : 'Send me a test'}
+					</Button>
+					<Button type="button" variant="ghost" size="sm" onclick={togglePreview}>
+						{emailPreview != null ? 'Hide preview' : 'Preview'}
+					</Button>
 					<Button
 						type="button"
 						variant="ghost"
 						size="sm"
 						onclick={saveTemplate}
-						disabled={!emailSubject.trim() || !emailBody.trim()}>Save template</Button
+						disabled={!emailSubject.trim() || !emailBody.trim()}
 					>
+						Save template
+					</Button>
 					<Button type="submit" disabled={emailPending || audienceCount === 0}>
 						{emailPending
 							? 'Sending…'
@@ -1507,8 +1531,8 @@
 										? `Send to ${selected.size} selected`
 										: `Send to ${audLabel.replace(/^(Tag|Plan): /, '')}`}
 					</Button>
-				</div></Modal.Footer
-			>
+				</div>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -1530,8 +1554,10 @@
 								<span class="font-medium">{c.challenge.name}</span>
 								<Badge
 									variant={c.state === 'live' ? 'default' : 'secondary'}
-									class="ml-2 align-middle">{c.state}</Badge
+									class="ml-2 align-middle"
 								>
+									{c.state}
+								</Badge>
 								<p class="text-xs text-muted-foreground">
 									{formatDate(c.challenge.startDate)} → {formatDate(c.challenge.endDate)} ·
 									{c.challenge.goal} check-ins{c.challenge.teamMode ? ' · team mode' : ''} · {c.joined}
@@ -1610,9 +1636,9 @@
 				</Field.Field>
 			</div>
 			<Modal.Footer>
-				<Button type="submit" disabled={cPending || !cName.trim() || !cEnd}
-					>{cPending ? 'Creating…' : 'Create challenge'}</Button
-				>
+				<Button type="submit" disabled={cPending || !cName.trim() || !cEnd}>
+					{cPending ? 'Creating…' : 'Create challenge'}
+				</Button>
 			</Modal.Footer>
 		</form>
 	</Modal.Content>
@@ -1622,10 +1648,10 @@
 	<Modal.Content class="sm:max-w-md">
 		<Modal.Header>
 			<Modal.Title>Progression levels</Modal.Title>
-			<Modal.Description
-				>Belts, ranks, skill tiers — whatever your gym calls them. Set a member's level on their
-				page.</Modal.Description
-			>
+			<Modal.Description>
+				Belts, ranks, skill tiers — whatever your gym calls them. Set a member's level on their
+				page.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="flex items-center gap-2" onsubmit={addLevelSubmit}>
 			<Input placeholder="Blue belt" bind:value={newLevelName} required />
@@ -1648,8 +1674,10 @@
 						onclick={async () => {
 							await removeLevel(l.id);
 							toast.success('Removed');
-						}}>Remove</Button
+						}}
 					>
+						Remove
+					</Button>
 				</li>
 			{:else}
 				<li class="py-6 text-sm text-muted-foreground">

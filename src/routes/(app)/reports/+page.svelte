@@ -312,8 +312,10 @@
 									style="background: {c?.n
 										? `rgb(37 99 235 / ${Math.round(15 + 85 * (c.n / maxCell))}%)`
 										: 'transparent'}"
-									title="{d} {hourLabel(h)} — {c?.n ?? 0} check-ins">{c?.n || ''}</td
+									title="{d} {hourLabel(h)} — {c?.n ?? 0} check-ins"
 								>
+									{c?.n || ''}
+								</td>
 							{/each}
 						</tr>
 					{/each}
@@ -353,9 +355,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Retention by cohort</Card.Title>
-			<Card.Description
-				>Members who joined each month and are still active — newest month first</Card.Description
-			>
+			<Card.Description>
+				Members who joined each month and are still active — newest month first
+			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			{#if retentionPct.length}
@@ -383,8 +385,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Why members leave</Card.Title>
-			<Card.Description>Stated reasons on current cancelled and paused memberships</Card.Description
-			>
+			<Card.Description>
+				Stated reasons on current cancelled and paused memberships
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="px-0">
 			<Table.Root>
@@ -403,11 +406,11 @@
 							<Table.Cell class="text-right tabular-nums">{c.paused}</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground"
-								>Nobody has left yet.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={3} class="text-muted-foreground">
+								Nobody has left yet.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -436,11 +439,11 @@
 							<Table.Cell class="text-right tabular-nums">{c.claimed}</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground"
-								>No cover activity yet.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={3} class="text-muted-foreground">
+								No cover activity yet.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -495,14 +498,14 @@
 							<Table.Cell class="text-right tabular-nums">{p.active}</Table.Cell>
 							<Table.Cell
 								class="text-right tabular-nums {p.cancelled > p.active ? 'text-red-500' : ''}"
-								>{p.cancelled}</Table.Cell
 							>
+								{p.cancelled}
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground">No memberships yet.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={3} class="text-muted-foreground">No memberships yet.</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -512,8 +515,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Recurring revenue</Card.Title>
-			<Card.Description>Monthly run rate from {r.mrr.activeMembers} active members</Card.Description
-			>
+			<Card.Description>
+				Monthly run rate from {r.mrr.activeMembers} active members
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			<p class="text-3xl font-semibold tabular-nums">{formatMoney(r.mrr.total, currency, true)}</p>
@@ -529,9 +533,9 @@
 				{#if r.compValue.members > 0}
 					<div class="flex justify-between text-muted-foreground">
 						<span>Comp'd ({r.compValue.members})</span>
-						<span class="tabular-nums"
-							>{formatMoney(r.compValue.monthly, currency, true)}/mo foregone</span
-						>
+						<span class="tabular-nums">
+							{formatMoney(r.compValue.monthly, currency, true)}/mo foregone
+						</span>
 					</div>
 				{/if}
 				<div class="flex justify-between border-t pt-1 text-muted-foreground">
@@ -558,13 +562,14 @@
 				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Avg per active member</span>
-					<span class="tabular-nums">{formatMoney(r.memberValue.avgPerActive, currency, true)}</span
-					>
+					<span class="tabular-nums">
+						{formatMoney(r.memberValue.avgPerActive, currency, true)}
+					</span>
 				</div>
 				<div class="flex justify-between">
-					<span class="text-muted-foreground"
-						>Avg per paying member ({r.memberValue.payingMembers})</span
-					>
+					<span class="text-muted-foreground">
+						Avg per paying member ({r.memberValue.payingMembers})
+					</span>
 					<span class="tabular-nums">{formatMoney(r.memberValue.avgPerPayer, currency, true)}</span>
 				</div>
 			</div>
@@ -732,19 +737,19 @@
 			{:else}
 				{#each r.wrongPlan.overpaying as m (m.memberId)}
 					<div class="flex items-center justify-between gap-2">
-						<span class="min-w-0 flex-1 truncate"
-							><a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
-							<span class="text-muted-foreground"> · {m.plan}</span></span
-						>
+						<span class="min-w-0 flex-1 truncate">
+							<a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
+							<span class="text-muted-foreground"> · {m.plan}</span>
+						</span>
 						<span class="shrink-0 text-xs text-amber-600 dark:text-amber-400">{m.alt}</span>
 					</div>
 				{/each}
 				{#each r.wrongPlan.upgrading as m (m.memberId)}
 					<div class="flex items-center justify-between gap-2">
-						<span class="min-w-0 flex-1 truncate"
-							><a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
-							<span class="text-muted-foreground"> · {m.plan}</span></span
-						>
+						<span class="min-w-0 flex-1 truncate">
+							<a class="font-medium hover:underline" href="/members/{m.memberId}">{m.name}</a>
+							<span class="text-muted-foreground"> · {m.plan}</span>
+						</span>
 						<span class="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">{m.alt}</span>
 					</div>
 				{/each}
@@ -760,12 +765,12 @@
 		<Card.Content class="space-y-1.5 text-sm">
 			{#each r.guestStats.bringers as g (g.memberId)}
 				<div class="flex items-center justify-between">
-					<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{g.memberId}"
-						>{g.name}</a
-					>
-					<span class="text-muted-foreground tabular-nums"
-						>{g.guests} guest{g.guests === 1 ? '' : 's'}</span
-					>
+					<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{g.memberId}">
+						{g.name}
+					</a>
+					<span class="text-muted-foreground tabular-nums">
+						{g.guests} guest{g.guests === 1 ? '' : 's'}
+					</span>
 				</div>
 			{:else}
 				<p class="text-muted-foreground">No guest check-ins yet this month.</p>
@@ -805,9 +810,9 @@
 			{#each r.leadTimes.byClass as c (c.name)}
 				<div class="flex items-center justify-between">
 					<span class="min-w-0 flex-1 truncate">{c.name}</span>
-					<span class="text-muted-foreground tabular-nums"
-						>{c.avgHours >= 24 ? `${Math.round(c.avgHours / 24)}d` : `${c.avgHours}h`} ahead</span
-					>
+					<span class="text-muted-foreground tabular-nums">
+						{c.avgHours >= 24 ? `${Math.round(c.avgHours / 24)}d` : `${c.avgHours}h`} ahead
+					</span>
 				</div>
 			{:else}
 				<p class="text-muted-foreground">No bookings in the last 30 days.</p>
@@ -825,10 +830,10 @@
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Session cancels</Card.Title>
-			<Card.Description
-				>{r.sessionCancels.cancelled} cancelled of {r.sessionCancels.cancelled +
-					r.sessionCancels.held} sessions — last 30 days</Card.Description
-			>
+			<Card.Description>
+				{r.sessionCancels.cancelled} cancelled of {r.sessionCancels.cancelled +
+					r.sessionCancels.held} sessions — last 30 days
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-1.5 text-sm">
 			{#each r.sessionCancels.byClass as c (c.name)}
@@ -851,9 +856,9 @@
 			<Card.Content class="space-y-1.5 text-sm">
 				{#each r.lockers.rows as l (l.id)}
 					<div class="flex items-center justify-between">
-						<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{l.memberId}"
-							>{l.memberName}</a
-						>
+						<a class="min-w-0 flex-1 truncate hover:underline" href="/members/{l.memberId}">
+							{l.memberName}
+						</a>
 						<span class="text-muted-foreground">{l.label}</span>
 					</div>
 				{/each}
@@ -869,29 +874,29 @@
 			</Card.Header>
 			<Card.Content class="space-y-1.5 text-sm">
 				<div class="flex items-center justify-between">
-					<span>Under 18</span><span class="text-muted-foreground tabular-nums"
-						>{r.ages.buckets.u18}</span
-					>
+					<span>Under 18</span><span class="text-muted-foreground tabular-nums">
+						{r.ages.buckets.u18}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>18–25</span><span class="text-muted-foreground tabular-nums"
-						>{r.ages.buckets.y18_25}</span
-					>
+					<span>18–25</span><span class="text-muted-foreground tabular-nums">
+						{r.ages.buckets.y18_25}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>26–35</span><span class="text-muted-foreground tabular-nums"
-						>{r.ages.buckets.y26_35}</span
-					>
+					<span>26–35</span><span class="text-muted-foreground tabular-nums">
+						{r.ages.buckets.y26_35}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>36–50</span><span class="text-muted-foreground tabular-nums"
-						>{r.ages.buckets.y36_50}</span
-					>
+					<span>36–50</span><span class="text-muted-foreground tabular-nums">
+						{r.ages.buckets.y36_50}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>50+</span><span class="text-muted-foreground tabular-nums"
-						>{r.ages.buckets.over50}</span
-					>
+					<span>50+</span><span class="text-muted-foreground tabular-nums">
+						{r.ages.buckets.over50}
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -909,16 +914,16 @@
 					<span class="text-muted-foreground tabular-nums">
 						{r.checkInMethods.qr} ({Math.round(
 							(r.checkInMethods.qr / r.checkInMethods.total) * 100
-						)}%)</span
-					>
+						)}%)
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
 					<span>Manual desk entry</span>
 					<span class="text-muted-foreground tabular-nums">
 						{r.checkInMethods.manual} ({Math.round(
 							(r.checkInMethods.manual / r.checkInMethods.total) * 100
-						)}%)</span
-					>
+						)}%)
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -934,11 +939,11 @@
 				{#each r.planRevenue as p (p.planName)}
 					<div class="flex items-center justify-between">
 						<span class="truncate">{p.planName}</span>
-						<span class="text-muted-foreground tabular-nums"
-							>{formatMoney(p.collected, currency, true)} · {p.payers} payer{p.payers === 1
+						<span class="text-muted-foreground tabular-nums">
+							{formatMoney(p.collected, currency, true)} · {p.payers} payer{p.payers === 1
 								? ''
-								: 's'}</span
-						>
+								: 's'}
+						</span>
 					</div>
 				{/each}
 			</Card.Content>
@@ -953,16 +958,16 @@
 			</Card.Header>
 			<Card.Content class="space-y-1.5 text-sm">
 				<div class="flex items-center justify-between">
-					<span>Referred members</span><span class="text-muted-foreground tabular-nums"
-						>{r.referralConversion.referred}</span
-					>
+					<span>Referred members</span><span class="text-muted-foreground tabular-nums">
+						{r.referralConversion.referred}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>Now paying</span><span class="text-muted-foreground tabular-nums"
-						>{r.referralConversion.paying} ({Math.round(
+					<span>Now paying</span><span class="text-muted-foreground tabular-nums">
+						{r.referralConversion.paying} ({Math.round(
 							(r.referralConversion.paying / r.referralConversion.referred) * 100
-						)}%)</span
-					>
+						)}%)
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -976,19 +981,19 @@
 			</Card.Header>
 			<Card.Content class="space-y-1.5 text-sm">
 				<div class="flex items-center justify-between">
-					<span>New members (&lt;30d)</span><span class="text-muted-foreground tabular-nums"
-						>{r.newVsReturning.newMembers}</span
-					>
+					<span>New members (&lt;30d)</span><span class="text-muted-foreground tabular-nums">
+						{r.newVsReturning.newMembers}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>Returning members</span><span class="text-muted-foreground tabular-nums"
-						>{r.newVsReturning.returning}</span
-					>
+					<span>Returning members</span><span class="text-muted-foreground tabular-nums">
+						{r.newVsReturning.returning}
+					</span>
 				</div>
 				<div class="flex items-center justify-between">
-					<span>Guests</span><span class="text-muted-foreground tabular-nums"
-						>{r.newVsReturning.guests}</span
-					>
+					<span>Guests</span><span class="text-muted-foreground tabular-nums">
+						{r.newVsReturning.guests}
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -1004,9 +1009,9 @@
 				{#each r.waitlistedNow as w (w.startsAt + w.className)}
 					<div class="flex items-center justify-between">
 						<span class="truncate">{w.className}</span>
-						<span class="text-muted-foreground tabular-nums"
-							>{formatDate(w.startsAt)} · {w.waiting} waiting</span
-						>
+						<span class="text-muted-foreground tabular-nums">
+							{formatDate(w.startsAt)} · {w.waiting} waiting
+						</span>
 					</div>
 				{/each}
 			</Card.Content>
@@ -1017,17 +1022,17 @@
 		<Card.Root>
 			<Card.Header class="pb-2">
 				<Card.Title class="text-base">Tenure at cancel</Card.Title>
-				<Card.Description
-					>How long members kept each plan before cancelling (12 months)</Card.Description
-				>
+				<Card.Description>
+					How long members kept each plan before cancelling (12 months)
+				</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-1.5 text-sm">
 				{#each r.tenureAtCancel as t (t.name)}
 					<div class="flex items-center justify-between">
 						<span class="truncate">{t.name}</span>
-						<span class="text-muted-foreground tabular-nums"
-							>{Math.round(t.avgDays / 30)} mo avg · {t.n} cancelled</span
-						>
+						<span class="text-muted-foreground tabular-nums">
+							{Math.round(t.avgDays / 30)} mo avg · {t.n} cancelled
+						</span>
 					</div>
 				{/each}
 			</Card.Content>
@@ -1042,12 +1047,12 @@
 			</Card.Header>
 			<Card.Content class="text-sm">
 				<div class="flex items-center justify-between">
-					<span class="text-2xl font-semibold tabular-nums"
-						>{formatMoney(Math.round(r.arpu.collected / r.arpu.members), currency)}</span
-					>
-					<span class="text-muted-foreground tabular-nums"
-						>{formatMoney(r.arpu.collected, currency)} ÷ {r.arpu.members}</span
-					>
+					<span class="text-2xl font-semibold tabular-nums">
+						{formatMoney(Math.round(r.arpu.collected / r.arpu.members), currency)}
+					</span>
+					<span class="text-muted-foreground tabular-nums">
+						{formatMoney(r.arpu.collected, currency)} ÷ {r.arpu.members}
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -1061,12 +1066,12 @@
 			</Card.Header>
 			<Card.Content class="text-sm">
 				<div class="flex items-center justify-between">
-					<span class="text-2xl font-semibold text-destructive tabular-nums"
-						>{formatMoney(r.lostMrr.lost, currency)}/mo</span
-					>
-					<span class="text-muted-foreground tabular-nums"
-						>{r.lostMrr.n} cancellation{r.lostMrr.n === 1 ? '' : 's'}</span
-					>
+					<span class="text-2xl font-semibold text-destructive tabular-nums">
+						{formatMoney(r.lostMrr.lost, currency)}/mo
+					</span>
+					<span class="text-muted-foreground tabular-nums">
+						{r.lostMrr.n} cancellation{r.lostMrr.n === 1 ? '' : 's'}
+					</span>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -1100,10 +1105,10 @@
 						{#each r.instructorReliability as i (i.instructorName)}
 							<li class="flex items-center justify-between gap-2">
 								<span class="truncate">{i.instructorName}</span>
-								<span class="shrink-0 text-muted-foreground tabular-nums"
-									>{i.taught} taught{#if i.cancelled}
-										· <span class="text-amber-600">{i.cancelled} cancelled</span>{/if}</span
-								>
+								<span class="shrink-0 text-muted-foreground tabular-nums">
+									{i.taught} taught{#if i.cancelled}
+										· <span class="text-amber-600">{i.cancelled} cancelled</span>{/if}
+								</span>
 							</li>
 						{/each}
 					</ul>
@@ -1123,9 +1128,9 @@
 						{#each r.shopTop as i (i.itemName)}
 							<li class="flex items-center justify-between gap-2">
 								<span class="truncate">{i.itemName}</span>
-								<span class="shrink-0 text-muted-foreground tabular-nums"
-									>{i.units} × · {formatMoney(i.revenue, currency)}</span
-								>
+								<span class="shrink-0 text-muted-foreground tabular-nums">
+									{i.units} × · {formatMoney(i.revenue, currency)}
+								</span>
 							</li>
 						{/each}
 					</ul>
@@ -1140,9 +1145,9 @@
 			<Card.Content>
 				<div class="flex flex-wrap gap-2">
 					{#each r.statusBreakdown as b (b.status)}
-						<Badge variant={b.status === 'active' ? 'default' : 'outline'} class="text-sm"
-							>{b.status}: <span class="ml-1 font-semibold tabular-nums">{b.n}</span></Badge
-						>
+						<Badge variant={b.status === 'active' ? 'default' : 'outline'} class="text-sm">
+							{b.status}: <span class="ml-1 font-semibold tabular-nums">{b.n}</span>
+						</Badge>
 					{:else}
 						<p class="text-sm text-muted-foreground">No members yet.</p>
 					{/each}
@@ -1154,36 +1159,35 @@
 	<Card.Root>
 		<Card.Header class="pb-2">
 			<Card.Title class="text-base">Visit frequency</Card.Title>
-			<Card.Description
-				>Active members bucketed by check-ins this month (of {r.visitFrequency
-					.total})</Card.Description
-			>
+			<Card.Description>
+				Active members bucketed by check-ins this month (of {r.visitFrequency.total})
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-1.5 text-sm">
 			<div class="flex items-center justify-between">
-				<span>0 visits</span><span class="text-muted-foreground tabular-nums"
-					>{r.visitFrequency.buckets.zero}</span
-				>
+				<span>0 visits</span><span class="text-muted-foreground tabular-nums">
+					{r.visitFrequency.buckets.zero}
+				</span>
 			</div>
 			<div class="flex items-center justify-between">
-				<span>1 visit</span><span class="text-muted-foreground tabular-nums"
-					>{r.visitFrequency.buckets.one}</span
-				>
+				<span>1 visit</span><span class="text-muted-foreground tabular-nums">
+					{r.visitFrequency.buckets.one}
+				</span>
 			</div>
 			<div class="flex items-center justify-between">
-				<span>2–3 visits</span><span class="text-muted-foreground tabular-nums"
-					>{r.visitFrequency.buckets.few}</span
-				>
+				<span>2–3 visits</span><span class="text-muted-foreground tabular-nums">
+					{r.visitFrequency.buckets.few}
+				</span>
 			</div>
 			<div class="flex items-center justify-between">
-				<span>4–7 visits</span><span class="text-muted-foreground tabular-nums"
-					>{r.visitFrequency.buckets.regular}</span
-				>
+				<span>4–7 visits</span><span class="text-muted-foreground tabular-nums">
+					{r.visitFrequency.buckets.regular}
+				</span>
 			</div>
 			<div class="flex items-center justify-between">
-				<span>8+ visits</span><span class="text-muted-foreground tabular-nums"
-					>{r.visitFrequency.buckets.frequent}</span
-				>
+				<span>8+ visits</span><span class="text-muted-foreground tabular-nums">
+					{r.visitFrequency.buckets.frequent}
+				</span>
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -1197,9 +1201,9 @@
 			{#each r.waitlist as w (w.name)}
 				<div class="flex items-center justify-between gap-2">
 					<span class="min-w-0 flex-1 truncate">{w.name}</span>
-					<span class="text-muted-foreground tabular-nums"
-						>{w.promoted} promoted · {w.queued} queued · {w.pct}%</span
-					>
+					<span class="text-muted-foreground tabular-nums">
+						{w.promoted} promoted · {w.queued} queued · {w.pct}%
+					</span>
 				</div>
 			{:else}
 				<p class="text-muted-foreground">No waitlist activity in the last 90 days.</p>
@@ -1216,11 +1220,11 @@
 			{#each r.refunds.slice(0, 6) as m (m.month)}
 				<div class="flex items-center justify-between gap-2">
 					<span>{m.month}</span>
-					<span class="text-muted-foreground tabular-nums"
-						>{m.n} · {formatMoney(m.total, currency, true)}{m.methods.length
+					<span class="text-muted-foreground tabular-nums">
+						{m.n} · {formatMoney(m.total, currency, true)}{m.methods.length
 							? ` (${m.methods.map((x) => x.method).join(', ')})`
-							: ''}</span
-					>
+							: ''}
+					</span>
 				</div>
 			{:else}
 				<p class="text-muted-foreground">No refunds yet.</p>
@@ -1231,9 +1235,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Gift cards</Card.Title>
-			<Card.Description
-				>Unredeemed balance — services the gym still owes cardholders</Card.Description
-			>
+			<Card.Description>
+				Unredeemed balance — services the gym still owes cardholders
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-3">
 			{#if r.giftCards.issued === 0}
@@ -1247,9 +1251,9 @@
 				<div class="space-y-1 text-sm">
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Issued</span>
-						<span class="tabular-nums"
-							>{r.giftCards.issued} · {formatMoney(r.giftCards.issuedValue, currency, true)}</span
-						>
+						<span class="tabular-nums">
+							{r.giftCards.issued} · {formatMoney(r.giftCards.issuedValue, currency, true)}
+						</span>
 					</div>
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Redeemed</span>
@@ -1274,13 +1278,13 @@
 				<div class="mb-3 space-y-1">
 					<div class="flex justify-between text-xs text-muted-foreground">
 						<span>This month vs target</span>
-						<span class="tabular-nums"
-							>{formatMoney(thisMonthRevenue, currency, true)} / {formatMoney(
+						<span class="tabular-nums">
+							{formatMoney(thisMonthRevenue, currency, true)} / {formatMoney(
 								repSettings.revenueTarget,
 								currency,
 								true
-							)}</span
-						>
+							)}
+						</span>
 					</div>
 					<div class="h-2 rounded bg-muted">
 						<div
@@ -1346,23 +1350,25 @@
 							{#each r.pnl.months.slice(-8).reverse() as m (m.month)}
 								<Table.Row>
 									<Table.Cell class="text-muted-foreground">{monthLabel(m.month)}</Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(m.revenue, currency)}</Table.Cell
-									>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(m.expenses, currency)}</Table.Cell
-									>
-									<Table.Cell class="text-right tabular-nums"
-										>{m.cogs ? formatMoney(m.cogs, currency) : '—'}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(m.revenue, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(m.expenses, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-right tabular-nums">
+										{m.cogs ? formatMoney(m.cogs, currency) : '—'}
+									</Table.Cell>
 									<Table.Cell
 										class="text-right font-medium tabular-nums {m.net < 0
 											? 'text-destructive'
-											: ''}">{formatMoney(m.net, currency)}</Table.Cell
+											: ''}"
 									>
-									<Table.Cell class="text-right text-muted-foreground tabular-nums"
-										>{m.revenue > 0 ? `${Math.round((100 * m.net) / m.revenue)}%` : '—'}</Table.Cell
-									>
+										{formatMoney(m.net, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-right text-muted-foreground tabular-nums">
+										{m.revenue > 0 ? `${Math.round((100 * m.net) / m.revenue)}%` : '—'}
+									</Table.Cell>
 								</Table.Row>
 							{/each}
 						</Table.Body>
@@ -1527,11 +1533,11 @@
 							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={4} class="text-muted-foreground"
-								>No sessions in the last 30 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={4} class="text-muted-foreground">
+								No sessions in the last 30 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1552,8 +1558,10 @@
 						<li class="flex items-center justify-between gap-2 text-sm">
 							<a
 								href="/members/{m.memberId}"
-								class="truncate font-medium underline-offset-2 hover:underline">{m.memberName}</a
+								class="truncate font-medium underline-offset-2 hover:underline"
 							>
+								{m.memberName}
+							</a>
 							<Badge variant="destructive">{m.streak} in a row</Badge>
 						</li>
 					{/each}
@@ -1585,16 +1593,16 @@
 							<Table.Cell class="font-medium">{c.className}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{c.attended}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{c.noShows}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums {c.rate >= 20 ? 'text-destructive' : ''}"
-								>{c.rate}%</Table.Cell
-							>
+							<Table.Cell class="text-right tabular-nums {c.rate >= 20 ? 'text-destructive' : ''}">
+								{c.rate}%
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={4} class="text-muted-foreground"
-								>No concluded bookings in the last 90 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={4} class="text-muted-foreground">
+								No concluded bookings in the last 90 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1617,9 +1625,9 @@
 								<span class="size-2 shrink-0 rounded-full" style:background={u.color}></span>
 								<span class="truncate">{u.className}</span>
 							</span>
-							<span class="shrink-0 text-muted-foreground tabular-nums"
-								>{u.fill}% · {u.sessions} sessions</span
-							>
+							<span class="shrink-0 text-muted-foreground tabular-nums">
+								{u.fill}% · {u.sessions} sessions
+							</span>
 						</li>
 					{/each}
 				</ul>
@@ -1632,10 +1640,10 @@
 	<Card.Root class="lg:col-span-2">
 		<Card.Header>
 			<Card.Title class="text-base">Class economics — last 30 days</Card.Title>
-			<Card.Description
-				>Sessions run, average attendance, drop-in revenue and instructor cost per class. Margin
-				counts drop-in sales only — membership revenue isn't attributable to one class.</Card.Description
-			>
+			<Card.Description>
+				Sessions run, average attendance, drop-in revenue and instructor cost per class. Margin
+				counts drop-in sales only — membership revenue isn't attributable to one class.
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="px-0">
 			<Table.Root>
@@ -1661,25 +1669,26 @@
 							</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{c.sessions}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{c.avgAttendance}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{formatMoney(c.dropIn, currency, true)}</Table.Cell
-							>
-							<Table.Cell class="text-right tabular-nums"
-								>{c.cost === null ? '—' : formatMoney(c.cost, currency, true)}</Table.Cell
-							>
+							<Table.Cell class="text-right tabular-nums">
+								{formatMoney(c.dropIn, currency, true)}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">
+								{c.cost === null ? '—' : formatMoney(c.cost, currency, true)}
+							</Table.Cell>
 							<Table.Cell
 								class="text-right tabular-nums {c.margin !== null && c.margin < 0
 									? 'text-destructive'
 									: ''}"
-								>{c.margin === null ? '—' : formatMoney(c.margin, currency, true)}</Table.Cell
 							>
+								{c.margin === null ? '—' : formatMoney(c.margin, currency, true)}
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={6} class="text-muted-foreground"
-								>No sessions ran in the last 30 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={6} class="text-muted-foreground">
+								No sessions ran in the last 30 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1689,9 +1698,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Events</Card.Title>
-			<Card.Description
-				>Signups, show rate and signup revenue per event, last 90 days + upcoming</Card.Description
-			>
+			<Card.Description>
+				Signups, show rate and signup revenue per event, last 90 days + upcoming
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="px-0">
 			<Table.Root>
@@ -1712,19 +1721,19 @@
 							<Table.Cell>{formatDate(e.event.startsAt)}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{e.registered}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{e.past ? e.attended : '—'}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{e.past ? `${e.showRate}%` : '—'}</Table.Cell
-							>
-							<Table.Cell class="text-right tabular-nums"
-								>{e.revenue ? formatMoney(e.revenue, currency) : '—'}</Table.Cell
-							>
+							<Table.Cell class="text-right tabular-nums">
+								{e.past ? `${e.showRate}%` : '—'}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">
+								{e.revenue ? formatMoney(e.revenue, currency) : '—'}
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={6} class="text-muted-foreground"
-								>No events in the last 90 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={6} class="text-muted-foreground">
+								No events in the last 90 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1735,9 +1744,9 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Amenity use</Card.Title>
-				<Card.Description
-					>Portal reservations in the last 30 days, against each amenity's open-slot capacity</Card.Description
-				>
+				<Card.Description>
+					Portal reservations in the last 30 days, against each amenity's open-slot capacity
+				</Card.Description>
 			</Card.Header>
 			<Card.Content class="px-0">
 				<Table.Root>
@@ -1755,9 +1764,9 @@
 								<Table.Cell class="font-medium">{a.name}</Table.Cell>
 								<Table.Cell class="text-muted-foreground">{a.kind || '—'}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{a.bookings}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{a.util}%{a.util >= 90 ? ' · near capacity' : ''}</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{a.util}%{a.util >= 90 ? ' · near capacity' : ''}
+								</Table.Cell>
 							</Table.Row>
 						{/each}
 					</Table.Body>
@@ -1812,11 +1821,11 @@
 							<Table.Cell class="text-right tabular-nums">{t.noShow}</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={5} class="text-muted-foreground"
-								>No instructor-assigned sessions in the last 30 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={5} class="text-muted-foreground">
+								No instructor-assigned sessions in the last 30 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -1831,13 +1840,13 @@
 			</div>
 			<div class="flex items-center gap-1">
 				{#if payrollPaidMonth === thisMonth}
-					<Badge variant="secondary" class="text-emerald-600 dark:text-emerald-400"
-						>Paid {thisMonth}</Badge
-					>
+					<Badge variant="secondary" class="text-emerald-600 dark:text-emerald-400">
+						Paid {thisMonth}
+					</Badge>
 				{:else}
-					<Button variant="outline" size="sm" disabled={payrollPending} onclick={markPaid}
-						>Mark paid</Button
-					>
+					<Button variant="outline" size="sm" disabled={payrollPending} onclick={markPaid}>
+						Mark paid
+					</Button>
 				{/if}
 				{#if r.payrollDetail.length}
 					<Button variant="ghost" size="sm" onclick={exportPayroll}>
@@ -1872,23 +1881,24 @@
 						<Table.Row>
 							<Table.Cell class="font-medium">{t.instructor}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{t.sessions}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums">{formatMoney(t.pay, currency)}</Table.Cell
-							>
+							<Table.Cell class="text-right tabular-nums">
+								{formatMoney(t.pay, currency)}
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground"
-								>No rated classes this month — set a pay rate on a class type.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={3} class="text-muted-foreground">
+								No rated classes this month — set a pay rate on a class type.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 					{#if r.payroll.rows.length > 1}
 						<Table.Row class="font-medium">
 							<Table.Cell>Total</Table.Cell>
 							<Table.Cell></Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{formatMoney(r.payroll.total, currency)}</Table.Cell
-							>
+							<Table.Cell class="text-right tabular-nums">
+								{formatMoney(r.payroll.total, currency)}
+							</Table.Cell>
 						</Table.Row>
 					{/if}
 				</Table.Body>
@@ -1917,28 +1927,28 @@
 							<Table.Cell class="font-medium">{s.staffName}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{s.shifts}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{(s.minutes / 60).toFixed(1)}</Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{s.hourlyRateCents != null
+							<Table.Cell class="text-right tabular-nums">
+								{s.hourlyRateCents != null
 									? formatMoney(Math.round((s.minutes / 60) * s.hourlyRateCents), currency)
-									: '—'}</Table.Cell
-							>
+									: '—'}
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={4} class="text-muted-foreground"
-								>No shifts yet — staff clock in from the dashboard.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={4} class="text-muted-foreground">
+								No shifts yet — staff clock in from the dashboard.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 					{#if r.staffShifts.length > 1}
 						<Table.Row class="font-medium">
 							<Table.Cell>Total</Table.Cell>
 							<Table.Cell></Table.Cell>
-							<Table.Cell class="text-right tabular-nums"
-								>{(r.staffShifts.reduce((n, s) => n + s.minutes, 0) / 60).toFixed(1)}</Table.Cell
-							>
-							<Table.Cell class="text-right tabular-nums"
-								>{formatMoney(
+							<Table.Cell class="text-right tabular-nums">
+								{(r.staffShifts.reduce((n, s) => n + s.minutes, 0) / 60).toFixed(1)}
+							</Table.Cell>
+							<Table.Cell class="text-right tabular-nums">
+								{formatMoney(
 									r.staffShifts.reduce(
 										(n, s) =>
 											n +
@@ -1946,8 +1956,8 @@
 										0
 									),
 									currency
-								)}</Table.Cell
-							>
+								)}
+							</Table.Cell>
 						</Table.Row>
 					{/if}
 				</Table.Body>
@@ -1959,9 +1969,9 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Desk staffing — this month</Card.Title>
-				<Card.Description
-					>Rota'd (scheduled) vs clocked (actual) hours per staff member</Card.Description
-				>
+				<Card.Description>
+					Rota'd (scheduled) vs clocked (actual) hours per staff member
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<Table.Root>
@@ -2021,9 +2031,9 @@
 								<Table.Cell class="text-right tabular-nums">{c.challenge.goal}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{c.joined}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{c.finished}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{c.joined ? Math.round((c.finished / c.joined) * 100) : 0}%</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{c.joined ? Math.round((c.finished / c.joined) * 100) : 0}%
+								</Table.Cell>
 							</Table.Row>
 						{/each}
 					</Table.Body>
@@ -2036,9 +2046,9 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Save offers</Card.Title>
-				<Card.Description
-					>Members who took the stay-instead discount — and how many stayed</Card.Description
-				>
+				<Card.Description>
+					Members who took the stay-instead discount — and how many stayed
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<Table.Root>
@@ -2056,9 +2066,9 @@
 								<Table.Cell class="font-medium">{m.month}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{m.taken}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{m.stayed}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{Math.round((m.stayed / m.taken) * 100)}%</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{Math.round((m.stayed / m.taken) * 100)}%
+								</Table.Cell>
 							</Table.Row>
 						{/each}
 					</Table.Body>
@@ -2091,9 +2101,9 @@
 								<Table.Cell class="font-medium">{l.name}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{l.members}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{l.sessions}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{l.capacity ? `${Math.round((l.booked / l.capacity) * 100)}%` : '—'}</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{l.capacity ? `${Math.round((l.booked / l.capacity) * 100)}%` : '—'}
+								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{l.noShows}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{l.checkIns}</Table.Cell>
 							</Table.Row>
@@ -2165,16 +2175,16 @@
 								{#each r.ratings.recent as f (f.createdAt)}
 									<Table.Row>
 										<Table.Cell class="font-medium whitespace-nowrap text-amber-500">
-											{'★'.repeat(f.rating)}<span class="text-muted-foreground"
-												>{'★'.repeat(5 - f.rating)}</span
-											>
+											{'★'.repeat(f.rating)}<span class="text-muted-foreground">
+												{'★'.repeat(5 - f.rating)}
+											</span>
 										</Table.Cell>
 										<Table.Cell class="font-medium">{f.className}</Table.Cell>
 										<Table.Cell>{f.comment}</Table.Cell>
 										<Table.Cell class="text-muted-foreground">{f.memberName}</Table.Cell>
-										<Table.Cell class="text-right whitespace-nowrap text-muted-foreground"
-											>{formatDate(f.createdAt)}</Table.Cell
-										>
+										<Table.Cell class="text-right whitespace-nowrap text-muted-foreground">
+											{formatDate(f.createdAt)}
+										</Table.Cell>
 									</Table.Row>
 								{/each}
 							</Table.Body>
@@ -2208,8 +2218,10 @@
 								<Table.Cell>
 									<a
 										class="font-medium underline-offset-2 hover:underline"
-										href="/members/{m.memberId}">{m.name}</a
+										href="/members/{m.memberId}"
 									>
+										{m.name}
+									</a>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{m.joinedAt ?? '—'}</Table.Cell>
 							</Table.Row>
@@ -2224,9 +2236,9 @@
 		<Card.Header class="flex-row items-center justify-between space-y-0">
 			<Card.Title class="text-base">At-risk members</Card.Title>
 			{#if r.atRisk.length}
-				<Button size="sm" variant="outline" onclick={() => (emailOpen = true)}
-					><Mail /> Email list</Button
-				>
+				<Button size="sm" variant="outline" onclick={() => (emailOpen = true)}>
+					<Mail /> Email list
+				</Button>
 			{/if}
 			<Card.Description>
 				{r.atRisk.length} active member{r.atRisk.length === 1 ? '' : 's'} with no check-in in 30+ days
@@ -2248,8 +2260,10 @@
 							<Table.Cell>
 								<a
 									class="font-medium underline-offset-2 hover:underline"
-									href="/members/{m.memberId}">{m.name}</a
+									href="/members/{m.memberId}"
 								>
+									{m.name}
+								</a>
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground">{m.email ?? '—'}</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">
@@ -2260,11 +2274,11 @@
 							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={4} class="text-muted-foreground"
-								>Everyone has checked in within the last 30 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={4} class="text-muted-foreground">
+								Everyone has checked in within the last 30 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -2289,11 +2303,13 @@
 						} finally {
 							churnBusy = false;
 						}
-					}}>{churnBusy ? 'Analyzing…' : 'Analyze with AI'}</Button
+					}}
 				>
-				<Card.Description
-					>AI-ranked at-risk members with a suggested save play each.</Card.Description
-				>
+					{churnBusy ? 'Analyzing…' : 'Analyze with AI'}
+				</Button>
+				<Card.Description>
+					AI-ranked at-risk members with a suggested save play each.
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				{#if churn?.members?.length}
@@ -2312,13 +2328,15 @@
 									<Table.Cell>
 										<a
 											class="font-medium underline-offset-2 hover:underline"
-											href="/members/{c.memberId}">{c.name}</a
+											href="/members/{c.memberId}"
 										>
+											{c.name}
+										</a>
 									</Table.Cell>
 									<Table.Cell>
-										<Badge variant={c.risk === 'high' ? 'destructive' : 'secondary'}
-											>{c.risk ?? '—'}</Badge
-										>
+										<Badge variant={c.risk === 'high' ? 'destructive' : 'secondary'}>
+											{c.risk ?? '—'}
+										</Badge>
 									</Table.Cell>
 									<Table.Cell class="text-muted-foreground">{c.reason ?? '—'}</Table.Cell>
 									<Table.Cell class="text-muted-foreground">{c.action ?? '—'}</Table.Cell>
@@ -2340,8 +2358,9 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Top attendees — last 30 days</Card.Title>
-			<Card.Description>Your most consistent members (member check-ins, no guests)</Card.Description
-			>
+			<Card.Description>
+				Your most consistent members (member check-ins, no guests)
+			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<Table.Root>
@@ -2352,16 +2371,17 @@
 							<Table.Cell>
 								<a
 									class="font-medium underline-offset-2 hover:underline"
-									href="/members/{m.memberId}">{m.name}</a
+									href="/members/{m.memberId}"
 								>
+									{m.name}
+								</a>
 							</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{m.visits} visits</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell class="text-muted-foreground">No check-ins yet this period.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell class="text-muted-foreground">No check-ins yet this period.</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -2396,12 +2416,10 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="text-base">Leads</Card.Title>
-			<Card.Description
-				>Join-page lead form captures — last 6 months, {r.leads.converted} of {r.leads.total}
-				joined ({r.leads.total
-					? Math.round((r.leads.converted / r.leads.total) * 100)
-					: 0}%)</Card.Description
-			>
+			<Card.Description>
+				Join-page lead form captures — last 6 months, {r.leads.converted} of {r.leads.total}
+				joined ({r.leads.total ? Math.round((r.leads.converted / r.leads.total) * 100) : 0}%)
+			</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			{#if r.leads.byMonth.length}
@@ -2472,11 +2490,11 @@
 							<Table.Cell class="text-right">{formatMoney(m.total, currency, true)}</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={3} class="text-muted-foreground"
-								>No renewals due in the next 90 days.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell colspan={3} class="text-muted-foreground">
+								No renewals due in the next 90 days.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -2506,26 +2524,26 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Member feedback</Card.Title>
-				<Card.Description
-					>One-tap scores members leave in the portal — promoters minus detractors is the NPS.</Card.Description
-				>
+				<Card.Description>
+					One-tap scores members leave in the portal — promoters minus detractors is the NPS.
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				{#if r.nps.n}
 					<div class="flex items-baseline gap-2">
 						<span class="text-2xl font-bold tabular-nums">{r.nps.score ?? '—'}</span>
-						<span class="text-sm text-muted-foreground"
-							>NPS · {r.nps.avg}/10 avg across {r.nps.n} response{r.nps.n === 1 ? '' : 's'}</span
-						>
+						<span class="text-sm text-muted-foreground">
+							NPS · {r.nps.avg}/10 avg across {r.nps.n} response{r.nps.n === 1 ? '' : 's'}
+						</span>
 					</div>
 					{#if r.nps.recent.length}
 						<ul class="mt-3 divide-y text-sm">
 							{#each r.nps.recent as nr (nr.createdAt)}
 								<li class="flex items-baseline justify-between gap-2 py-1.5">
 									<span class="font-medium">{nr.memberName}</span>
-									<span class="text-muted-foreground"
-										>{nr.score}/10{nr.comment ? ` — ${nr.comment}` : ''}</span
-									>
+									<span class="text-muted-foreground">
+										{nr.score}/10{nr.comment ? ` — ${nr.comment}` : ''}
+									</span>
 								</li>
 							{/each}
 						</ul>
@@ -2539,9 +2557,9 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Courses</Card.Title>
-				<Card.Description
-					>Enrollees, sessions held, attendance, and revenue per course</Card.Description
-				>
+				<Card.Description>
+					Enrollees, sessions held, attendance, and revenue per course
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<Table.Root>
@@ -2560,12 +2578,12 @@
 								<Table.Cell class="font-medium">{c.name}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{c.enrollees}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{c.sessions}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{c.attendancePct == null ? '—' : `${c.attendancePct}%`}</Table.Cell
-								>
-								<Table.Cell class="text-right tabular-nums"
-									>{formatMoney(c.revenue, currency, true)}</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{c.attendancePct == null ? '—' : `${c.attendancePct}%`}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{formatMoney(c.revenue, currency, true)}
+								</Table.Cell>
 							</Table.Row>
 						{/each}
 					</Table.Body>
@@ -2588,17 +2606,19 @@
 							<Table.Cell>
 								<a
 									class="font-medium underline-offset-2 hover:underline"
-									href="/members/{m.memberId}">{m.name}</a
+									href="/members/{m.memberId}"
 								>
+									{m.name}
+								</a>
 							</Table.Cell>
 							<Table.Cell class="text-right tabular-nums">{m.joins} joined</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell class="text-muted-foreground"
-								>No referred signups yet — members get their link in the portal.</Table.Cell
-							></Table.Row
-						>
+						<Table.Row>
+							<Table.Cell class="text-muted-foreground">
+								No referred signups yet — members get their link in the portal.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
@@ -2630,11 +2650,11 @@
 					placeholder="We miss you at the gym — your next class is on us…"
 				/>
 			</Field.Field>
-			<Modal.Footer
-				><Button type="submit" disabled={emailPending}>
+			<Modal.Footer>
+				<Button type="submit" disabled={emailPending}>
 					{emailPending ? 'Sending…' : 'Send'}
-				</Button></Modal.Footer
-			>
+				</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
