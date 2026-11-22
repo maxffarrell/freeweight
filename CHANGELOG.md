@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.3.4
+
+### Patch Changes
+
+- 3e7d2d6: Update dependencies to latest versions and patch security vulnerabilities.
+
 ## 0.3.3
 
 ### Patch Changes
