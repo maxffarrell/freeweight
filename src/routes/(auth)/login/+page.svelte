@@ -54,7 +54,7 @@
 {#if page.data.demo}
 	<form method="POST" action="/demo" class="mb-8 space-y-3 rounded-xl border bg-muted/40 p-4">
 		<div class="space-y-1">
-			<h2 class="font-semibold">Try it first — no sign-up needed</h2>
+			<h2 class="font-semibold">Try the live demo — no sign-up needed</h2>
 			<p class="text-sm text-muted-foreground">
 				Explore a seeded demo — staff or member view. Sessions last 8 minutes.
 			</p>
