@@ -125,3 +125,22 @@ func indexOf(s []string, v string) int {
 	}
 	return -1
 }
+
+// The verify login check must match the copy actually rendered on the sign-in
+// page; it silently rolled back releases when the copy changed without it.
+func TestDemoLoginMarkerMatchesLoginPage(t *testing.T) {
+	page, err := os.ReadFile(filepath.Join(
+		"..", "..", "..", "src", "routes", "(auth)", "login", "+page.svelte"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(page), demoLoginMarker) {
+		t.Fatalf("login page no longer contains %q; update demoLoginMarker", demoLoginMarker)
+	}
+	if !demoLoginOK(`<p>Explore a seeded demo — staff view.</p>`) {
+		t.Fatal("demoLoginOK rejected current login copy")
+	}
+	if demoLoginOK(`<p>Try the live demo</p>`) {
+		t.Fatal("demoLoginOK accepted stale login copy")
+	}
+}
