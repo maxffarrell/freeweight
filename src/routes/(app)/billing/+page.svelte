@@ -58,6 +58,7 @@
 	import Gift from '@lucide/svelte/icons/gift';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { toCsv } from '#lib/csv.ts';
+	import { confirmDialog, replaceConfirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const currency = await getCurrency();
 	const memberList = await getMembers();
@@ -223,8 +224,15 @@
 	}
 
 	let remindingAll = $state(false);
-	async function emailAllDebtors() {
-		if (!confirm(`Email a payment request to all ${aging.debtors} members owing?`)) return;
+	function emailAllDebtors() {
+		confirmDialog({
+			title: `Email a payment request to all ${aging.debtors} members owing?`,
+			confirm: { text: 'Send' },
+			onConfirm: () => emailAllDebtorsNow()
+		});
+	}
+
+	async function emailAllDebtorsNow() {
 		remindingAll = true;
 		try {
 			const r = await requestAllPayments();
@@ -235,8 +243,16 @@
 		remindingAll = false;
 	}
 
-	async function refund(paymentId: string, amount: number) {
-		if (!confirm(`Refund ${formatMoney(amount, currency)}? The charge it covered reopens.`)) return;
+	function refund(paymentId: string, amount: number) {
+		confirmDialog({
+			title: `Refund ${formatMoney(amount, currency)}?`,
+			description: 'The charge it covered reopens.',
+			confirm: { text: 'Refund' },
+			onConfirm: () => refundNow(paymentId)
+		});
+	}
+
+	async function refundNow(paymentId: string) {
 		try {
 			await refundPayment(paymentId);
 			payments = await getPayments();
@@ -310,10 +326,17 @@
 			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
-	async function deleteRecurring(r: { rec: { id: string; description: string } }) {
-		if (!confirm(`Delete the recurring "${r.rec.description}"? Past charges stay.`)) return;
+	function deleteRecurring(r: { rec: { id: string; description: string } }) {
+		confirmDialog({
+			title: `Delete the recurring "${r.rec.description}"?`,
+			description: 'Past charges stay.',
+			onConfirm: () => deleteRecurringNow(r.rec.id)
+		});
+	}
+
+	async function deleteRecurringNow(id: string) {
 		try {
-			await removeRecurring(r.rec.id);
+			await removeRecurring(id);
 			recurring = await getRecurring();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not delete'));
@@ -436,9 +459,16 @@
 
 	let selectedCharges = $state<string[]>([]);
 	let voidingMany = $state(false);
-	async function voidSelected() {
+	function voidSelected() {
 		if (!selectedCharges.length) return;
-		if (!confirm(`Void ${selectedCharges.length} open charge(s)?`)) return;
+		confirmDialog({
+			title: `Void ${selectedCharges.length} open charge(s)?`,
+			confirm: { text: 'Void' },
+			onConfirm: () => voidSelectedNow()
+		});
+	}
+
+	async function voidSelectedNow() {
 		voidingMany = true;
 		try {
 			for (const id of selectedCharges) await updateCharge({ id, status: 'void' });
@@ -460,8 +490,16 @@
 			toast.error(errMsg(err, 'Could not void'));
 		}
 	}
-	async function writeOffCharge(id: string) {
-		if (!confirm("Write this charge off as bad debt? It leaves the member's open balance.")) return;
+	function writeOffCharge(id: string) {
+		confirmDialog({
+			title: 'Write this charge off as bad debt?',
+			description: "It leaves the member's open balance.",
+			confirm: { text: 'Write off' },
+			onConfirm: () => writeOffNow(id)
+		});
+	}
+
+	async function writeOffNow(id: string) {
 		try {
 			await updateCharge({ id, status: 'written_off' });
 			await refreshCharges();
@@ -526,29 +564,51 @@
 		lowStockAt: number | null;
 		cost: number | null;
 	}) {
-		const raw = prompt(
-			`${item.name} — units on hand (blank = unlimited)`,
-			String(item.stock ?? '')
-		);
-		if (raw === null) return;
-		const n = raw.trim() === '' ? null : Math.max(0, Math.floor(Number(raw)));
-		if (n !== null && !Number.isFinite(n)) return toast.error('Not a number');
-		const rawLow = prompt(
-			`${item.name} — alert staff when stock drops to (blank = never)`,
-			String(item.lowStockAt ?? '')
-		);
-		if (rawLow === null) return;
-		const low = rawLow.trim() === '' ? null : Math.max(0, Math.floor(Number(rawLow)));
-		if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
-		const rawCost = prompt(
-			`${item.name} — unit cost in cents (blank = untracked)`,
-			String(item.cost ?? '')
-		);
-		if (rawCost === null) return;
-		const cost = rawCost.trim() === '' ? null : Math.max(0, Math.floor(Number(rawCost)));
-		if (cost !== null && !Number.isFinite(cost)) return toast.error('Not a number');
+		const num = (v: string) => (v.trim() === '' ? null : Math.max(0, Math.floor(Number(v))));
+		confirmDialog({
+			title: `${item.name} — units on hand`,
+			input: { label: 'Units (blank = unlimited)', defaultValue: String(item.stock ?? '') },
+			confirm: { text: 'Next' },
+			onConfirm: (raw) => {
+				const n = num(raw);
+				if (n !== null && !Number.isFinite(n)) return toast.error('Not a number');
+				replaceConfirmDialog({
+					title: `${item.name} — low-stock alert`,
+					input: {
+						label: 'Alert staff when stock drops to (blank = never)',
+						defaultValue: String(item.lowStockAt ?? '')
+					},
+					confirm: { text: 'Next' },
+					onConfirm: (rawLow) => {
+						const low = num(rawLow);
+						if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
+						replaceConfirmDialog({
+							title: `${item.name} — unit cost`,
+							input: {
+								label: 'Unit cost in cents (blank = untracked)',
+								defaultValue: String(item.cost ?? '')
+							},
+							confirm: { text: 'Save' },
+							onConfirm: (rawCost) => {
+								const cost = num(rawCost);
+								if (cost !== null && !Number.isFinite(cost)) return toast.error('Not a number');
+								return saveShopStock(item.id, n, low, cost);
+							}
+						});
+					}
+				});
+			}
+		});
+	}
+
+	async function saveShopStock(
+		id: string,
+		n: number | null,
+		low: number | null,
+		cost: number | null
+	) {
 		try {
-			await updateShopItem({ id: item.id, stock: n, lowStockAt: low, cost });
+			await updateShopItem({ id, stock: n, lowStockAt: low, cost });
 			shopItems = await getShopItems();
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not update stock'));

@@ -103,6 +103,7 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import { errMsg, formatDate, formatMoney } from '#lib/format.ts';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const settings = await getSettings();
 	const ai = $derived(await getAiStatus());
@@ -163,14 +164,17 @@
 		if (bulkChecked.has(id)) bulkChecked.delete(id);
 		else bulkChecked.add(id);
 	}
-	async function runBulkCancel() {
+	function runBulkCancel() {
 		if (!bulkChecked.size) return;
-		if (
-			!confirm(
-				`Cancel ${bulkChecked.size} session${bulkChecked.size === 1 ? '' : 's'}? Booked members get the usual cancellation emails and credits back.`
-			)
-		)
-			return;
+		confirmDialog({
+			title: `Cancel ${bulkChecked.size} session${bulkChecked.size === 1 ? '' : 's'}?`,
+			description: 'Booked members get the usual cancellation emails and credits back.',
+			confirm: { text: 'Cancel sessions' },
+			onConfirm: () => runBulkCancelNow()
+		});
+	}
+
+	async function runBulkCancelNow() {
 		bulkPending = true;
 		let done = 0;
 		for (const id of bulkChecked) {
@@ -647,9 +651,16 @@
 		}
 	}
 
-	async function unenrollRow(enrollmentId: string, name: string) {
+	function unenrollRow(enrollmentId: string, name: string) {
 		if (!cRosterId) return;
-		if (!confirm(`Remove ${name} from this course? Their seat frees up for the waitlist.`)) return;
+		confirmDialog({
+			title: `Remove ${name} from this course?`,
+			description: 'Their seat frees up for the waitlist.',
+			onConfirm: () => unenrollRowNow(enrollmentId, name)
+		});
+	}
+
+	async function unenrollRowNow(enrollmentId: string, name: string) {
 		try {
 			await unenrollCourseMember({ courseId: cRosterId, enrollmentId });
 			toast.success(`${name} removed`);
@@ -659,8 +670,15 @@
 		}
 	}
 
-	async function removeCourseRow(id: string) {
-		if (!confirm('Remove this course? (only possible with no enrollees)')) return;
+	function removeCourseRow(id: string) {
+		confirmDialog({
+			title: 'Remove this course?',
+			description: 'Only possible with no enrollees.',
+			onConfirm: () => removeCourseRowNow(id)
+		});
+	}
+
+	async function removeCourseRowNow(id: string) {
 		try {
 			await removeCourse(id);
 			toast.success('Course removed');
@@ -766,13 +784,16 @@
 			toast.error(errMsg(err, 'Could not update'));
 		}
 	}
-	async function cancelWholeEvent(id: string) {
-		if (
-			!confirm(
-				'Cancel this event? Registered members are emailed and unpaid signup charges voided.'
-			)
-		)
-			return;
+	function cancelWholeEvent(id: string) {
+		confirmDialog({
+			title: 'Cancel this event?',
+			description: 'Registered members are emailed and unpaid signup charges voided.',
+			confirm: { text: 'Cancel event' },
+			onConfirm: () => cancelWholeEventNow(id)
+		});
+	}
+
+	async function cancelWholeEventNow(id: string) {
 		try {
 			await cancelEvent(id);
 			toast.success('Event cancelled — registrants notified');
@@ -937,9 +958,21 @@
 		}
 	}
 
-	async function setResourceStatus(id: string, status: 'open' | 'maintenance' | 'closed') {
-		const statusNote =
-			status === 'open' ? '' : String(prompt('Why? (shown to members, optional)') ?? '').trim();
+	function setResourceStatus(id: string, status: 'open' | 'maintenance' | 'closed') {
+		if (status === 'open') return setResourceStatusNow(id, status, '');
+		confirmDialog({
+			title: 'Why? (shown to members, optional)',
+			input: { label: 'Reason' },
+			confirm: { text: 'Update' },
+			onConfirm: (note) => setResourceStatusNow(id, status, String(note ?? '').trim())
+		});
+	}
+
+	async function setResourceStatusNow(
+		id: string,
+		status: 'open' | 'maintenance' | 'closed',
+		statusNote: string
+	) {
 		try {
 			await updateResource({ id, status, statusNote });
 			await getResources().refresh();
@@ -1692,21 +1725,24 @@
 						variant="outline"
 						class="w-full"
 						title="Cancel this session and try booking its members into the next session of this class"
-						onclick={async () => {
-							if (
-								!confirm(
-									'Cancel this session and try booking its members into the next session of this class?'
-								)
-							)
-								return;
-							try {
-								await updateSession({ id: focusId, cancelled: true, rebookNext: true });
-								toast.success('Session cancelled — members moved to the next class if one exists');
-								await reload();
-								rosterOpen = false;
-							} catch (err) {
-								toast.error(errMsg(err, 'Failed'));
-							}
+						onclick={() => {
+							confirmDialog({
+								title:
+									'Cancel this session and try booking its members into the next session of this class?',
+								confirm: { text: 'Cancel & rebook' },
+								onConfirm: async () => {
+									try {
+										await updateSession({ id: focusId, cancelled: true, rebookNext: true });
+										toast.success(
+											'Session cancelled — members moved to the next class if one exists'
+										);
+										await reload();
+										rosterOpen = false;
+									} catch (err) {
+										toast.error(errMsg(err, 'Failed'));
+									}
+								}
+							});
 						}}
 					>
 						Cancel + rebook members
@@ -3325,11 +3361,15 @@
 								class="text-muted-foreground"
 								title="Set next service date"
 								onclick={() => {
-									const d = prompt(
-										'Next service date (YYYY-MM-DD, blank to clear)',
-										eq.nextServiceOn ?? ''
-									);
-									if (d !== null) setEquipment(eq.id, { nextServiceOn: d.trim() || null });
+									confirmDialog({
+										title: 'Next service date',
+										input: {
+											label: 'YYYY-MM-DD (blank to clear)',
+											defaultValue: eq.nextServiceOn ?? ''
+										},
+										confirm: { text: 'Save' },
+										onConfirm: (d) => setEquipment(eq.id, { nextServiceOn: d.trim() || null })
+									});
 								}}><Pencil /></Button
 							>
 							<Button
@@ -3337,14 +3377,18 @@
 								variant="ghost"
 								class="text-muted-foreground"
 								title="Remove"
-								onclick={async () => {
-									if (!confirm(`Remove ${eq.name}?`)) return;
-									try {
-										await removeEquipment(eq.id);
-										toast.success('Removed');
-									} catch (err) {
-										toast.error(errMsg(err, 'Could not remove'));
-									}
+								onclick={() => {
+									confirmDialog({
+										title: `Remove ${eq.name}?`,
+										onConfirm: async () => {
+											try {
+												await removeEquipment(eq.id);
+												toast.success('Removed');
+											} catch (err) {
+												toast.error(errMsg(err, 'Could not remove'));
+											}
+										}
+									});
 								}}><Trash2 /></Button
 							>
 						</div>

@@ -5,6 +5,7 @@
 	import Logo from '#lib/components/app/logo.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { ConfirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	let { children, data } = $props();
 </script>
@@ -43,14 +44,11 @@
 			>
 		</div>
 	</header>
-	<main
-		class="mx-auto max-w-3xl space-y-6 p-4 py-8 {data.demo && data.demoExpiresAt
-			? 'max-sm:pt-14'
-			: ''}"
-	>
+	<main class="mx-auto max-w-3xl space-y-6 p-4 py-8">
 		<svelte:boundary>
 			{@render children()}
 			{#snippet pending()}<Skeleton class="h-40 w-full" />{/snippet}
 		</svelte:boundary>
 	</main>
 </div>
+<ConfirmDialog />
