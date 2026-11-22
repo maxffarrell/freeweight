@@ -263,8 +263,10 @@
 								variant="ghost"
 								size="icon"
 								title="Copy join-page link for {p.name}"
-								onclick={() => copyPlanLink(p)}><Link2 /></Button
+								onclick={() => copyPlanLink(p)}
 							>
+								<Link2 />
+							</Button>
 						{/if}
 						<Button
 							variant="ghost"
@@ -273,58 +275,67 @@
 							onclick={() => {
 								migFrom = p;
 								migTarget = '';
-							}}><ArrowRightLeft /></Button
+							}}
 						>
+							<ArrowRightLeft />
+						</Button>
 						<Button variant="ghost" size="icon" onclick={() => openEdit(p)}><Pencil /></Button>
 					</div>
 				</Card.Header>
 				<Card.Content class="space-y-2 px-6">
 					<div class="flex items-baseline gap-1">
-						<span class="text-2xl font-semibold tabular-nums"
-							>{formatMoney(p.amount, currency)}</span
-						>
+						<span class="text-2xl font-semibold tabular-nums">
+							{formatMoney(p.amount, currency)}
+						</span>
 						{#if p.isPack}<span class="text-sm text-muted-foreground">one-time</span>{:else}<span
-								class="text-sm text-muted-foreground">/ {p.interval}</span
-							>{/if}
+								class="text-sm text-muted-foreground"
+							>
+								/ {p.interval}
+							</span>{/if}
 					</div>
 					<div class="flex flex-wrap gap-1.5 text-xs">
-						{#if p.signupFee > 0}<Badge variant="outline"
-								>{formatMoney(p.signupFee, currency)} signup</Badge
-							>{/if}
-						{#if p.isPack}<Badge variant="secondary"
-								>pack{p.packDays ? ` · ${p.packDays} days` : ''}</Badge
-							>{/if}
-						{#if p.isPack && p.packClassName}<Badge variant="outline">{p.packClassName} only</Badge
-							>{/if}
+						{#if p.signupFee > 0}<Badge variant="outline">
+								{formatMoney(p.signupFee, currency)} signup
+							</Badge>{/if}
+						{#if p.isPack}<Badge variant="secondary">
+								pack{p.packDays ? ` · ${p.packDays} days` : ''}
+							</Badge>{/if}
+						{#if p.isPack && p.packClassName}<Badge variant="outline">
+								{p.packClassName} only
+							</Badge>{/if}
 						{#if p.classCredits}<Badge variant="outline">{p.classCredits} credits</Badge>{/if}
 						{#if p.trialDays > 0}<Badge variant="outline">{p.trialDays}d free trial</Badge>{/if}
 						{#if p.guestPasses}<Badge variant="outline">{p.guestPasses} guest passes/mo</Badge>{/if}
-						{#if p.commitmentMonths}<Badge variant="outline"
-								>{p.commitmentMonths}-mo commitment</Badge
-							>{/if}
-						{#if p.bookAheadDays}<Badge variant="outline">books {p.bookAheadDays}d ahead</Badge
-							>{/if}
+						{#if p.commitmentMonths}<Badge variant="outline">
+								{p.commitmentMonths}-mo commitment
+							</Badge>{/if}
+						{#if p.bookAheadDays}<Badge variant="outline">
+								books {p.bookAheadDays}d ahead
+							</Badge>{/if}
 						{#if p.listed}<Badge variant="secondary">public page</Badge>{/if}
 						{#if p.activeMembers > 0 || p.memberLimit}<Badge
 								variant={p.memberLimit !== null && p.activeMembers >= p.memberLimit
 									? 'destructive'
 									: 'outline'}
-								>{p.activeMembers}{p.memberLimit !== null ? `/${p.memberLimit}` : ''} member{p.activeMembers ===
+							>
+								{p.activeMembers}{p.memberLimit !== null ? `/${p.memberLimit}` : ''} member{p.activeMembers ===
 									1 && !p.memberLimit
 									? ''
 									: 's'}{p.memberLimit !== null && p.activeMembers >= p.memberLimit
 									? ' · full'
-									: ''}</Badge
-							>{/if}
+									: ''}
+							</Badge>{/if}
 						{#if p.activeMembers > 0}
 							<a
 								class="self-center text-xs text-muted-foreground underline-offset-2 hover:underline"
-								href="/members?plan={p.id}">view members →</a
+								href="/members?plan={p.id}"
 							>
+								view members →
+							</a>
 						{/if}
-						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600"
-								>{p.endingSoon} ending soon</Badge
-							>{/if}
+						{#if p.endingSoon > 0}<Badge variant="outline" class="text-amber-600">
+								{p.endingSoon} ending soon
+							</Badge>{/if}
 						{#if p.comped > 0}<Badge variant="outline">{p.comped} comp'd</Badge>{/if}
 						{#if !p.isPack && p.activeMembers > 0}
 							{@const mrr = Math.round(
@@ -332,9 +343,9 @@
 									p.activeMembers *
 									(p.interval === 'week' ? 52 / 12 : p.interval === 'year' ? 1 / 12 : 1)
 							)}
-							<Badge variant="outline" class="text-muted-foreground"
-								>≈ {formatMoney(mrr, currency, true)}/mo</Badge
-							>
+							<Badge variant="outline" class="text-muted-foreground">
+								≈ {formatMoney(mrr, currency, true)}/mo
+							</Badge>
 						{/if}
 						<StatusBadge status={p.active ? 'active' : 'inactive'} />
 					</div>
@@ -346,8 +357,9 @@
 					<p class="text-sm text-muted-foreground">
 						No plans yet — create one to start billing members.
 					</p>
-					<Button class="mt-3" onclick={() => (resetNew(), (open = true))}><Plus /> New plan</Button
-					>
+					<Button class="mt-3" onclick={() => (resetNew(), (open = true))}>
+						<Plus /> New plan
+					</Button>
 				</Card.Content>
 			</Card.Root>
 		{/each}
@@ -359,9 +371,9 @@
 				<Card.Title class="text-base">Promo codes</Card.Title>
 				<Card.Description>Discount the up-front charge on your public join page.</Card.Description>
 			</div>
-			<Button size="sm" variant="outline" onclick={() => (promoOpen = true)}
-				><Plus /> New code</Button
-			>
+			<Button size="sm" variant="outline" onclick={() => (promoOpen = true)}>
+				<Plus /> New code
+			</Button>
 		</Card.Header>
 		<Card.Content class="px-6">
 			<div class="divide-y">
@@ -399,21 +411,21 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>New promo code</Modal.Title>
-			<Modal.Description
-				>Applies to the signup fee (and pack price) on the public join page.</Modal.Description
-			>
+			<Modal.Description>
+				Applies to the signup fee (and pack price) on the public join page.
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submitPromo}>
-			<Field.Field
-				><Field.Label for="pc-code">Code</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="pc-code">Code</Field.Label><Input
 					id="pc-code"
 					required
 					bind:value={pcCode}
 					placeholder="LAUNCH20"
 					class="font-mono uppercase"
 					autofocus
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label for="pc-pct">Percent off</Field.Label>
@@ -456,9 +468,9 @@
 					<Input id="pc-exp" type="date" bind:value={pcExpires} />
 				</Field.Field>
 			</div>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !pcCode}>Create code</Button></Modal.Footer
-			>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !pcCode}>Create code</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -494,36 +506,36 @@
 	<Modal.Content>
 		<Modal.Header>
 			<Modal.Title>{editing ? `Edit ${editing.name}` : 'New plan'}</Modal.Title>
-			<Modal.Description
-				>{editing
+			<Modal.Description>
+				{editing
 					? 'Changes apply to new memberships only.'
-					: 'Shown on your public page when "listed" is on.'}</Modal.Description
-			>
+					: 'Shown on your public page when "listed" is on.'}
+			</Modal.Description>
 		</Modal.Header>
 		<form class="space-y-4" onsubmit={submit}>
-			<Field.Field
-				><Field.Label for="p-name">Name</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="p-name">Name</Field.Label><Input
 					id="p-name"
 					required
 					bind:value={name}
 					placeholder="Unlimited"
 					autofocus
-				/></Field.Field
-			>
-			<Field.Field
-				><Field.Label for="p-desc">Description</Field.Label><Input
+				/>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="p-desc">Description</Field.Label><Input
 					id="p-desc"
 					bind:value={description}
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label>Price</Field.Label>
 					<MoneyInput bind:value={amount} required />
 					{#if editing}
-						<Field.Description
-							>Members on this plan get an email when the price changes.</Field.Description
-						>
+						<Field.Description>
+							Members on this plan get an email when the price changes.
+						</Field.Description>
 					{/if}
 				</Field.Field>
 				{#if isPack}
@@ -626,8 +638,8 @@
 						<Select.Trigger class="w-full">
 							{packClassType === 'any'
 								? 'Any class'
-								: classTypes.find((c) => c.id === packClassType)?.name}</Select.Trigger
-						>
+								: classTypes.find((c) => c.id === packClassType)?.name}
+						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="any">Any class</Select.Item>
 							{#each classTypes as c (c.id)}
@@ -635,9 +647,9 @@
 							{/each}
 						</Select.Content>
 					</Select.Root>
-					<Field.Description
-						>A restricted pack can't book other class types — a "Yoga 10-pack" only covers yoga.</Field.Description
-					>
+					<Field.Description>
+						A restricted pack can't book other class types — a "Yoga 10-pack" only covers yoga.
+					</Field.Description>
 				</Field.Field>
 			{/if}
 			<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
@@ -650,18 +662,18 @@
 			</div>
 			{#if editing && !isPack && amount != null && amount !== editing.amount}
 				<div class="flex items-center justify-between rounded-lg border p-3 text-sm">
-					<span
-						>Keep current members at {formatMoney(editing.amount, currency)}
-						— only new joins pay {formatMoney(amount, currency)}</span
-					>
+					<span>
+						Keep current members at {formatMoney(editing.amount, currency)}
+						— only new joins pay {formatMoney(amount, currency)}
+					</span>
 					<Switch bind:checked={grandfather} />
 				</div>
 			{/if}
-			<Modal.Footer
-				><Button type="submit" disabled={pending || amount == null}
-					>{editing ? 'Save' : 'Create plan'}</Button
-				></Modal.Footer
-			>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || amount == null}>
+					{editing ? 'Save' : 'Create plan'}
+				</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>

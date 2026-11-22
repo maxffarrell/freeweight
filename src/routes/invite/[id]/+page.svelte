@@ -32,8 +32,8 @@
 			<h1 class="text-2xl font-semibold tracking-tight">You've been invited</h1>
 			<p class="text-sm text-muted-foreground">Signed in as {data.email}.</p>
 		</div>
-		<Button class="w-full" disabled={pending} onclick={accept}
-			>{pending ? 'Joining…' : 'Accept invitation'}</Button
-		>
+		<Button class="w-full" disabled={pending} onclick={accept}>
+			{pending ? 'Joining…' : 'Accept invitation'}
+		</Button>
 	</div>
 </div>

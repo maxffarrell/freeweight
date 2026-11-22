@@ -195,14 +195,17 @@
 							></span>
 							<a
 								href="/schedule?focus={row.session.id}"
-								class="truncate font-medium hover:underline">{row.className}</a
+								class="truncate font-medium hover:underline"
 							>
-							{#if needsCover}<Badge variant="secondary" class="text-amber-600">needs cover</Badge
-								>{/if}
+								{row.className}
+							</a>
+							{#if needsCover}<Badge variant="secondary" class="text-amber-600">
+									needs cover
+								</Badge>{/if}
 							{#if row.session.checkinCode}
-								<Badge variant="outline" class="font-mono tracking-widest"
-									>code {row.session.checkinCode}</Badge
-								>
+								<Badge variant="outline" class="font-mono tracking-widest">
+									code {row.session.checkinCode}
+								</Badge>
 							{/if}
 						</div>
 						<div class="text-sm text-muted-foreground">
@@ -215,8 +218,10 @@
 									href={row.session.streamUrl}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="text-primary hover:underline">stream</a
-								>{/if}
+									class="text-primary hover:underline"
+								>
+									stream
+								</a>{/if}
 						</div>
 					</div>
 					<div class="text-sm whitespace-nowrap text-muted-foreground">
@@ -253,9 +258,9 @@
 						{o.startDate} → {o.endDate}{#if o.note}
 							· <span class="text-muted-foreground">{o.note}</span>{/if}
 					</span>
-					<Button variant="ghost" size="sm" class="ml-auto" onclick={() => removeOff(o.id)}
-						>Remove</Button
-					>
+					<Button variant="ghost" size="sm" class="ml-auto" onclick={() => removeOff(o.id)}>
+						Remove
+					</Button>
 				</div>
 			{/each}
 			<form class="flex flex-wrap items-end gap-3 pt-1" onsubmit={addOff}>
@@ -308,16 +313,19 @@
 						size="icon"
 						class="ml-auto"
 						onclick={() => windows.splice(i, 1)}
-						aria-label="Remove window"><Trash2 class="size-4" /></Button
+						aria-label="Remove window"
 					>
+						<Trash2 class="size-4" />
+					</Button>
 				</div>
 			{/each}
 			<div class="flex items-center gap-2 pt-1">
 				<Button
 					variant="outline"
 					onclick={() => windows.push({ weekday: '1', startTime: '06:00', endTime: '12:00' })}
-					>Add window</Button
 				>
+					Add window
+				</Button>
 				<Button onclick={saveAvailability} disabled={availBusy}>Save</Button>
 			</div>
 		</Card.Content>
@@ -337,9 +345,9 @@
 				<p>
 					<span class="text-3xl font-semibold tabular-nums">{ratings.avg}</span>
 					<span class="text-amber-500">★</span>
-					<span class="ml-2 text-sm text-muted-foreground"
-						>from {ratings.count} rating{ratings.count === 1 ? '' : 's'}</span
-					>
+					<span class="ml-2 text-sm text-muted-foreground">
+						from {ratings.count} rating{ratings.count === 1 ? '' : 's'}
+					</span>
 				</p>
 				{#if ratings.recent.length}
 					<div class="divide-y">
@@ -384,11 +392,13 @@
 									onclick={() => {
 										ptApproveId = r.request.id;
 										ptApproveAt = '';
-									}}>Approve</Button
+									}}
 								>
-								<Button variant="ghost" size="sm" onclick={() => declinePt(r.request.id)}
-									>Decline</Button
-								>
+									Approve
+								</Button>
+								<Button variant="ghost" size="sm" onclick={() => declinePt(r.request.id)}>
+									Decline
+								</Button>
 							{/if}
 						</div>
 						{#if ptApproveId === r.request.id}
@@ -415,9 +425,9 @@
 										placeholder="requested time"
 									/>
 								</div>
-								<Button size="sm" disabled={ptBusy} onclick={() => approvePt(r.request.id)}
-									>Book it</Button
-								>
+								<Button size="sm" disabled={ptBusy} onclick={() => approvePt(r.request.id)}>
+									Book it
+								</Button>
 							</div>
 						{/if}
 					</div>
@@ -441,8 +451,10 @@
 								></span>
 								<a
 									href="/schedule?focus={row.session.id}"
-									class="truncate font-medium hover:underline">{row.className}</a
+									class="truncate font-medium hover:underline"
 								>
+									{row.className}
+								</a>
 							</div>
 							<div class="text-sm text-muted-foreground">
 								{formatDate(row.session.startsAt)} · {localTime(
@@ -459,8 +471,10 @@
 						<Button
 							size="sm"
 							disabled={claiming === row.session.id}
-							onclick={() => claim(row.session.id)}>Cover it</Button
+							onclick={() => claim(row.session.id)}
 						>
+							Cover it
+						</Button>
 					</div>
 				{/each}
 			</Card.Content>

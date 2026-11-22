@@ -117,7 +117,9 @@
 		</div>
 		<button
 			class="absolute top-4 left-4 text-xs text-muted-foreground underline-offset-4 hover:underline"
-			onclick={() => (open = false)}>Skip tour</button
+			onclick={() => (open = false)}
 		>
+			Skip tour
+		</button>
 	</Modal.Content>
 </Modal.Root>

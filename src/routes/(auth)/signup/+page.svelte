@@ -55,7 +55,9 @@
 	<p class="text-center text-sm text-muted-foreground">
 		Already have an account? <a
 			href="/login"
-			class="font-medium text-foreground underline-offset-4 hover:underline">Sign in</a
+			class="font-medium text-foreground underline-offset-4 hover:underline"
 		>
+			Sign in
+		</a>
 	</p>
 </form>

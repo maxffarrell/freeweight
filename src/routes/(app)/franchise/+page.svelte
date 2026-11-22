@@ -114,9 +114,9 @@
 				<Card.Root class="gap-0 py-4">
 					<Card.Header class="px-4 pb-1">
 						<Card.Description class="text-xs">Revenue this month</Card.Description>
-						<Card.Title class="text-2xl tabular-nums"
-							>{formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}</Card.Title
-						>
+						<Card.Title class="text-2xl tabular-nums">
+							{formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}
+						</Card.Title>
 					</Card.Header>
 					<Card.Content class="px-4 text-xs text-muted-foreground">
 						MRR {formatMoney(totals.mrr, f.gyms[0].currency, true)}
@@ -140,9 +140,9 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="text-base">Find a member across gyms</Card.Title>
-				<Card.Description
-					>Name or email — searches every gym you own or administer.</Card.Description
-				>
+				<Card.Description>
+					Name or email — searches every gym you own or administer.
+				</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<form
@@ -153,9 +153,9 @@
 					}}
 				>
 					<Input class="max-w-xs" placeholder="member@email.com or a name" bind:value={memberQ} />
-					<Button type="submit" variant="outline" disabled={searchPending}
-						>{searchPending ? 'Searching…' : 'Search'}</Button
-					>
+					<Button type="submit" variant="outline" disabled={searchPending}>
+						{searchPending ? 'Searching…' : 'Search'}
+					</Button>
 				</form>
 				{#if memberHits.length}
 					<Table.Root class="mt-4">
@@ -237,30 +237,31 @@
 						{#each f.gyms as g (g.id)}
 							<Table.Row class="cursor-pointer" onclick={() => toggle(g)}>
 								<Table.Cell class="font-medium">
-									<span class="mr-1 inline-block w-3 text-muted-foreground"
-										>{expanded.has(g.id) ? '▾' : '▸'}</span
-									>
+									<span class="mr-1 inline-block w-3 text-muted-foreground">
+										{expanded.has(g.id) ? '▾' : '▸'}
+									</span>
 									{g.name}
 									<span class="ml-1 text-xs font-normal text-muted-foreground">{g.role}</span>
 								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.members}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{g.newMembers30}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{formatMoney(g.mrr, g.currency, true)}</Table.Cell
-								>
-								<Table.Cell class="text-right tabular-nums"
-									>{formatMoney(g.monthRevenue, g.currency, true)}</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{formatMoney(g.mrr, g.currency, true)}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{formatMoney(g.monthRevenue, g.currency, true)}
+								</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">
 									{#if g.prevMonthRevenue > 0}
 										<span
 											class={g.monthRevenue >= g.prevMonthRevenue
 												? 'text-emerald-600'
 												: 'text-destructive'}
-											>{g.monthRevenue >= g.prevMonthRevenue ? '+' : ''}{Math.round(
-												((g.monthRevenue - g.prevMonthRevenue) / g.prevMonthRevenue) * 100
-											)}%</span
 										>
+											{g.monthRevenue >= g.prevMonthRevenue ? '+' : ''}{Math.round(
+												((g.monthRevenue - g.prevMonthRevenue) / g.prevMonthRevenue) * 100
+											)}%
+										</span>
 									{:else}
 										<span class="text-muted-foreground">—</span>
 									{/if}
@@ -275,8 +276,10 @@
 											size="sm"
 											variant="outline"
 											disabled={switching !== null}
-											onclick={() => switchTo(g.id, g.name)}>Switch</Button
+											onclick={() => switchTo(g.id, g.name)}
 										>
+											Switch
+										</Button>
 									{/if}
 								</Table.Cell>
 							</Table.Row>
@@ -284,14 +287,14 @@
 								<Table.Row class="bg-muted/40 hover:bg-muted/40">
 									<Table.Cell colspan={9} class="py-3">
 										<div class="flex flex-wrap gap-x-8 gap-y-1 text-sm">
-											<span
-												><span class="text-muted-foreground">Seats booked (7d):</span>
-												{g.seatsBooked7}</span
-											>
-											<span
-												><span class="text-muted-foreground">Members owing:</span>
-												{g.debtors}</span
-											>
+											<span>
+												<span class="text-muted-foreground">Seats booked (7d):</span>
+												{g.seatsBooked7}
+											</span>
+											<span>
+												<span class="text-muted-foreground">Members owing:</span>
+												{g.debtors}
+											</span>
 											<span>
 												<span class="text-muted-foreground">Plans:</span>
 												{#if g.planMix.length}
@@ -310,16 +313,12 @@
 								<Table.Cell>Total</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{totals.members}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{totals.newMembers30}</Table.Cell>
-								<Table.Cell class="text-right tabular-nums"
-									>{multiCurrency
-										? '—'
-										: formatMoney(totals.mrr, f.gyms[0].currency, true)}</Table.Cell
-								>
-								<Table.Cell class="text-right tabular-nums"
-									>{multiCurrency
-										? '—'
-										: formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}</Table.Cell
-								>
+								<Table.Cell class="text-right tabular-nums">
+									{multiCurrency ? '—' : formatMoney(totals.mrr, f.gyms[0].currency, true)}
+								</Table.Cell>
+								<Table.Cell class="text-right tabular-nums">
+									{multiCurrency ? '—' : formatMoney(totals.monthRevenue, f.gyms[0].currency, true)}
+								</Table.Cell>
 								<Table.Cell class="text-right text-muted-foreground">—</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{totals.monthCheckIns}</Table.Cell>
 								<Table.Cell class="text-right tabular-nums">{totals.sessionsNext7}</Table.Cell>

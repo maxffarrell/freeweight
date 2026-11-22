@@ -121,9 +121,9 @@
 				<Card.Description>Every staff and system event — who did what, when.</Card.Description>
 			</div>
 			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm" onclick={exportCsv} disabled={!items.length}
-					>Export</Button
-				>
+				<Button variant="outline" size="sm" onclick={exportCsv} disabled={!items.length}>
+					Export
+				</Button>
 				{#if entitlements.auditExport}
 					<Input type="date" class="w-36" bind:value={auditFrom} aria-label="Audit from" />
 					<Input type="date" class="w-36" bind:value={auditTo} aria-label="Audit to" />
@@ -148,8 +148,10 @@
 							} finally {
 								auditBusy = false;
 							}
-						}}>{auditBusy ? 'Exporting…' : 'Export all'}</Button
+						}}
 					>
+						{auditBusy ? 'Exporting…' : 'Export all'}
+					</Button>
 				{/if}
 				{#if actors.length > 1}
 					<Input placeholder="Search…" class="w-36" bind:value={q} />
@@ -204,16 +206,16 @@
 					<div class="min-w-0 flex-1">
 						<p class="text-sm">{a.summary}</p>
 						<p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-							<Badge variant="outline" class="font-normal"
-								>{typeLabel(a.entityType)} · {a.action}</Badge
-							>
+							<Badge variant="outline" class="font-normal">
+								{typeLabel(a.entityType)} · {a.action}
+							</Badge>
 							{#if a.actorName}<span>{a.actorName}</span>{/if}
-							<span
-								>{localDate(new Date(a.createdAt), settings.timezone)} · {localTime(
+							<span>
+								{localDate(new Date(a.createdAt), settings.timezone)} · {localTime(
 									a.createdAt,
 									settings.timezone
-								)}</span
-							>
+								)}
+							</span>
 						</p>
 					</div>
 				</div>
@@ -254,8 +256,10 @@
 						el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
 						el.download = `access-log-${new Date().toISOString().slice(0, 10)}.csv`;
 						el.click();
-					}}>Export</Button
+					}}
 				>
+					Export
+				</Button>
 				<Card.Description>Recent staff sign-ins — audit trail</Card.Description>
 			</Card.Header>
 			<Card.Content class="divide-y px-6">
@@ -263,12 +267,12 @@
 					<div class="py-2.5 first:pt-0 last:pb-0">
 						<p class="text-sm">{a.name} <span class="text-muted-foreground">{a.email}</span></p>
 						<p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-							<span
-								>{localDate(new Date(a.signedInAt), settings.timezone)} · {localTime(
+							<span>
+								{localDate(new Date(a.signedInAt), settings.timezone)} · {localTime(
 									a.signedInAt,
 									settings.timezone
-								)}</span
-							>
+								)}
+							</span>
 							{#if a.ipAddress}<span>{a.ipAddress}</span>{/if}
 							{#if a.userAgent}<span class="truncate">{a.userAgent}</span>{/if}
 						</p>

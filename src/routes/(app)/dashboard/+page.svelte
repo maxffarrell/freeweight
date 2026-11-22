@@ -240,9 +240,9 @@
 		<Card.Root>
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
 				<div>
-					<Card.Title class="text-base"
-						>Getting set up — {done} of {checklist.length} done</Card.Title
-					>
+					<Card.Title class="text-base">
+						Getting set up — {done} of {checklist.length} done
+					</Card.Title>
 					<Card.Description>A few steps before launch</Card.Description>
 				</div>
 				<Button size="sm" variant="ghost" onclick={() => dismissChecklist()}>Dismiss</Button>
@@ -287,9 +287,9 @@
 
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base"
-				><Sparkles class="size-4" /> AI insights</Card.Title
-			>
+			<Card.Title class="flex items-center gap-2 text-base">
+				<Sparkles class="size-4" /> AI insights
+			</Card.Title>
 		</Card.Header>
 		<Card.Content class="px-4">
 			{#if !ai.decisionConfigured}
@@ -332,21 +332,21 @@
 									<Table.Cell>
 										<span class="mr-2 inline-block size-2 rounded-full" style:background={s.color}
 										></span>{s.name}
-										{#if s.instructorName}<span class="text-muted-foreground"
-												>· {s.instructorName}</span
-											>{/if}
+										{#if s.instructorName}<span class="text-muted-foreground">
+												· {s.instructorName}
+											</span>{/if}
 									</Table.Cell>
-									<Table.Cell class="w-24 text-muted-foreground"
-										>{localTime(s.startsAt, d.timezone)}</Table.Cell
-									>
+									<Table.Cell class="w-24 text-muted-foreground">
+										{localTime(s.startsAt, d.timezone)}
+									</Table.Cell>
 									<Table.Cell class="w-28 text-right">
 										<Badge variant="secondary">{s.booked}/{s.capacity}</Badge>
 										{#if s.expected > 0 && new Date(s.startsAt).getTime() > Date.now()}
 											<Badge variant="outline" class="ml-1">{s.expected} due in</Badge>
 										{/if}
-										{#if s.waitlisted > 0}<Badge variant="outline" class="ml-1"
-												>+{s.waitlisted} wait</Badge
-											>{/if}
+										{#if s.waitlisted > 0}<Badge variant="outline" class="ml-1">
+												+{s.waitlisted} wait
+											</Badge>{/if}
 									</Table.Cell>
 								</Table.Row>
 							{/each}
@@ -366,14 +366,14 @@
 		<div class="space-y-6">
 			<Card.Root>
 				<Card.Header class="flex flex-row items-center justify-between space-y-0">
-					<Card.Title class="flex items-center gap-2 text-base"
-						><Timer class="size-4" /> On shift</Card.Title
-					>
+					<Card.Title class="flex items-center gap-2 text-base">
+						<Timer class="size-4" /> On shift
+					</Card.Title>
 					<div class="flex items-center gap-1.5">
 						<Button size="sm" variant="ghost" onclick={() => (logOpen = true)}>Log</Button>
-						<Button size="sm" variant={myShift.shift ? 'outline' : 'default'} onclick={toggleShift}
-							>{myShift.shift ? 'Clock out' : 'Clock in'}</Button
-						>
+						<Button size="sm" variant={myShift.shift ? 'outline' : 'default'} onclick={toggleShift}>
+							{myShift.shift ? 'Clock out' : 'Clock in'}
+						</Button>
 					</div>
 				</Card.Header>
 				<Card.Content class="px-4">
@@ -382,11 +382,11 @@
 							{#each onShift as r (r.shift.id)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<span class="truncate font-medium">{r.staffName}</span>
-									<Badge variant="outline" class="shrink-0"
-										>since {localTime(r.shift.clockedInAt, d.timezone)}{r.locationName
+									<Badge variant="outline" class="shrink-0">
+										since {localTime(r.shift.clockedInAt, d.timezone)}{r.locationName
 											? ` · ${r.locationName}`
-											: ''}</Badge
-									>
+											: ''}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -402,8 +402,10 @@
 										variant="outline"
 										class="shrink-0 {s.late
 											? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
-											: ''}">{s.late ? 'late · ' : ''}rota {s.startTime}–{s.endTime}</Badge
+											: ''}"
 									>
+										{s.late ? 'late · ' : ''}rota {s.startTime}–{s.endTime}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -414,9 +416,9 @@
 			{#if deskTasks.length || isAdmin}
 				<Card.Root>
 					<Card.Header>
-						<Card.Title class="flex items-center gap-2 text-base"
-							><ListChecks class="size-4" /> Desk checklist</Card.Title
-						>
+						<Card.Title class="flex items-center gap-2 text-base">
+							<ListChecks class="size-4" /> Desk checklist
+						</Card.Title>
 					</Card.Header>
 					<Card.Content class="px-4">
 						{#if deskTasks.length}
@@ -434,9 +436,9 @@
 											{t.label}
 										</span>
 										{#if t.done}
-											<span class="ml-auto shrink-0 text-xs text-muted-foreground"
-												>{t.done.staffName} · {localTime(t.done.at, d.timezone)}</span
-											>
+											<span class="ml-auto shrink-0 text-xs text-muted-foreground">
+												{t.done.staffName} · {localTime(t.done.at, d.timezone)}
+											</span>
 										{/if}
 										{#if isAdmin}
 											<Button
@@ -481,8 +483,10 @@
 											? '/schedule'
 											: `/members/{r.memberId}`}
 										class="truncate hover:underline"
-										title={r.requestReason ?? undefined}>{r.memberName}</a
+										title={r.requestReason ?? undefined}
 									>
+										{r.memberName}
+									</a>
 									<Badge variant="outline" class="shrink-0">
 										{r.kind === 'cancel'
 											? `cancel ${r.planName}`
@@ -516,9 +520,9 @@
 			{/if}
 			{#if d.inGymNow > 0}
 				<Card.Root>
-					<Card.Header
-						><Card.Title class="text-base">Inside now · {d.inGymNow}</Card.Title></Card.Header
-					>
+					<Card.Header>
+						<Card.Title class="text-base">Inside now · {d.inGymNow}</Card.Title>
+					</Card.Header>
 					<Card.Content class="px-4">
 						<p class="text-sm">
 							{d.insideNames.slice(0, 8).join(', ')}{d.inGymNow > 8
@@ -528,8 +532,9 @@
 						<a
 							href="/checkins"
 							class="mt-2 inline-block text-xs text-muted-foreground hover:underline"
-							>Check-in log</a
 						>
+							Check-in log
+						</a>
 					</Card.Content>
 				</Card.Root>
 			{/if}
@@ -540,11 +545,11 @@
 						<ul class="space-y-2">
 							{#each d.fullSessions as s (s.sessionId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/schedule?focus={s.sessionId}" class="truncate hover:underline"
-										>{s.className}
+									<a href="/schedule?focus={s.sessionId}" class="truncate hover:underline">
+										{s.className}
 										{localDate(s.startsAt, d.timezone)}
-										{localTime(s.startsAt, d.timezone)}</a
-									>
+										{localTime(s.startsAt, d.timezone)}
+									</a>
 									<Badge variant="outline" class="shrink-0">{s.waiting} waiting</Badge>
 								</li>
 							{/each}
@@ -563,9 +568,9 @@
 							{#each atRisk.slice(0, 6) as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.name}</a>
-									<Badge variant="outline" class="shrink-0"
-										>{r.daysSince ? `${r.daysSince}d ago` : 'never visited'}</Badge
-									>
+									<Badge variant="outline" class="shrink-0">
+										{r.daysSince ? `${r.daysSince}d ago` : 'never visited'}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -621,9 +626,9 @@
 							{#each d.inSessionNow as sess (sess.id)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<span class="truncate font-medium">{sess.name}</span>
-									<Badge variant="outline" class="shrink-0"
-										>ends {localTime(sess.endsAt, d.timezone)} · {sess.booked}/{sess.capacity}</Badge
-									>
+									<Badge variant="outline" class="shrink-0">
+										ends {localTime(sess.endsAt, d.timezone)} · {sess.booked}/{sess.capacity}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -638,9 +643,9 @@
 							{#each d.upcomingEvents as e (e.event.id)}
 								<li class="flex items-center justify-between gap-2 text-sm">
 									<span class="truncate font-medium">{e.event.name}</span>
-									<Badge variant="outline" class="shrink-0"
-										>{formatDate(e.event.startsAt)} · {e.registered}/{e.event.capacity}</Badge
-									>
+									<Badge variant="outline" class="shrink-0">
+										{formatDate(e.event.startsAt)} · {e.registered}/{e.event.capacity}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -671,8 +676,9 @@
 						<ul class="space-y-2">
 							{#each d.birthdaysThisWeek as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
-									>
+									<a href="/members/{r.memberId}" class="truncate hover:underline">
+										{r.memberName}
+									</a>
 									<Badge variant={r.days === 0 ? 'default' : 'outline'} class="shrink-0">
 										{r.days === 0 ? 'today' : formatDate(r.when)}
 									</Badge>
@@ -700,11 +706,12 @@
 						<ul class="space-y-2">
 							{#each d.renewalsThisWeek as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
-									>
-									<Badge variant="outline" class="shrink-0"
-										>{r.planName} · ends {formatDate(r.endsAt)}</Badge
-									>
+									<a href="/members/{r.memberId}" class="truncate hover:underline">
+										{r.memberName}
+									</a>
+									<Badge variant="outline" class="shrink-0">
+										{r.planName} · ends {formatDate(r.endsAt)}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -718,11 +725,12 @@
 						<ul class="space-y-2">
 							{#each d.trialsEnding as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
-									>
-									<Badge variant="outline" class="shrink-0"
-										>{r.planName} · bills {formatDate(r.firstBillAt)}</Badge
-									>
+									<a href="/members/{r.memberId}" class="truncate hover:underline">
+										{r.memberName}
+									</a>
+									<Badge variant="outline" class="shrink-0">
+										{r.planName} · bills {formatDate(r.firstBillAt)}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -736,11 +744,12 @@
 						<ul class="space-y-2">
 							{#each d.packsExpiring as r (r.memberId)}
 								<li class="flex items-center justify-between gap-2 text-sm">
-									<a href="/members/{r.memberId}" class="truncate hover:underline">{r.memberName}</a
-									>
-									<Badge variant="outline" class="shrink-0"
-										>{r.planName} · expires {formatDate(r.endsAt)}</Badge
-									>
+									<a href="/members/{r.memberId}" class="truncate hover:underline">
+										{r.memberName}
+									</a>
+									<Badge variant="outline" class="shrink-0">
+										{r.planName} · expires {formatDate(r.endsAt)}
+									</Badge>
 								</li>
 							{/each}
 						</ul>
@@ -819,10 +828,10 @@
 								{#if r.locationName}
 									<span class="text-xs text-muted-foreground"> · {r.locationName}</span>{/if}
 							</Table.Cell>
-							<Table.Cell class="text-sm whitespace-nowrap"
-								>{formatDate(r.shift.clockedInAt)}
-								{localTime(r.shift.clockedInAt, tzName)}</Table.Cell
-							>
+							<Table.Cell class="text-sm whitespace-nowrap">
+								{formatDate(r.shift.clockedInAt)}
+								{localTime(r.shift.clockedInAt, tzName)}
+							</Table.Cell>
 							<Table.Cell class="text-sm whitespace-nowrap">
 								{#if r.shift.clockedOutAt}
 									{formatDate(r.shift.clockedOutAt)} {localTime(r.shift.clockedOutAt, tzName)}
@@ -846,16 +855,20 @@
 													} catch (e) {
 														toast.error(errMsg(e, 'Could not close'));
 													}
-												}}>Close</Button
+												}}
 											>
+												Close
+											</Button>
 										{/if}
 										<Button
 											size="xs"
 											variant="ghost"
 											class="text-muted-foreground"
 											title="Edit times"
-											onclick={() => editShift(r.shift)}><Pencil /></Button
+											onclick={() => editShift(r.shift)}
 										>
+											<Pencil />
+										</Button>
 										<Button
 											size="xs"
 											variant="ghost"
@@ -873,17 +886,19 @@
 														}
 													}
 												});
-											}}><Trash2 /></Button
+											}}
 										>
+											<Trash2 />
+										</Button>
 									</div>
 								</Table.Cell>
 							{/if}
 						</Table.Row>
 					{:else}
 						<Table.Row>
-							<Table.Cell colspan={isAdmin ? 5 : 4} class="text-muted-foreground"
-								>No shifts yet — use Clock in on the dashboard.</Table.Cell
-							>
+							<Table.Cell colspan={isAdmin ? 5 : 4} class="text-muted-foreground">
+								No shifts yet — use Clock in on the dashboard.
+							</Table.Cell>
 						</Table.Row>
 					{/each}
 				</Table.Body>
@@ -893,11 +908,9 @@
 			<div class="mt-4 space-y-3 border-t pt-4">
 				<p class="text-sm font-medium">Weekly rota</p>
 				<Select.Root type="single" value={rotaStaff} onValueChange={(v) => pickRotaStaff(v)}>
-					<Select.Trigger class="w-56"
-						>{rotaStaff
-							? staff.find((s) => s.id === rotaStaff)?.name
-							: 'Pick a staff member'}</Select.Trigger
-					>
+					<Select.Trigger class="w-56">
+						{rotaStaff ? staff.find((s) => s.id === rotaStaff)?.name : 'Pick a staff member'}
+					</Select.Trigger>
 					<Select.Content>
 						{#each staff as s (s.id)}
 							<Select.Item value={s.id}>{s.name}</Select.Item>
@@ -923,13 +936,15 @@
 								size="icon"
 								class="ml-auto"
 								onclick={() => rotaWindows.splice(i, 1)}
-								aria-label="Remove window"><Trash2 class="size-4" /></Button
+								aria-label="Remove window"
 							>
+								<Trash2 class="size-4" />
+							</Button>
 						</div>
 					{/each}
 					<div class="flex items-center gap-2">
-						<label class="flex items-center gap-2 text-sm text-muted-foreground"
-							>$/hour
+						<label class="flex items-center gap-2 text-sm text-muted-foreground">
+							$/hour
 							<Input
 								type="number"
 								min="0"
@@ -937,8 +952,8 @@
 								placeholder="—"
 								class="w-24"
 								bind:value={rotaRate}
-							/></label
-						>
+							/>
+						</label>
 					</div>
 					<div class="flex items-center gap-2">
 						<Button
@@ -946,11 +961,12 @@
 							size="sm"
 							onclick={() =>
 								rotaWindows.push({ weekday: '1', startTime: '09:00', endTime: '17:00' })}
-							>Add window</Button
 						>
-						<Button size="sm" disabled={rotaBusy} onclick={saveRota}
-							>{rotaBusy ? 'Saving…' : 'Save rota'}</Button
-						>
+							Add window
+						</Button>
+						<Button size="sm" disabled={rotaBusy} onclick={saveRota}>
+							{rotaBusy ? 'Saving…' : 'Save rota'}
+						</Button>
 					</div>
 				{/if}
 			</div>

@@ -714,8 +714,10 @@
 							size="sm"
 							class="ml-auto"
 							disabled={remindingAll}
-							onclick={emailAllDebtors}>Email all</Button
+							onclick={emailAllDebtors}
 						>
+							Email all
+						</Button>
 					</Card.Content>
 				</Card.Root>
 			{/if}
@@ -737,9 +739,9 @@
 					{/each}
 				</NativeSelect>
 				{#if selectedCharges.length}
-					<Button size="sm" variant="destructive" disabled={voidingMany} onclick={voidSelected}
-						>Void {selectedCharges.length}</Button
-					>
+					<Button size="sm" variant="destructive" disabled={voidingMany} onclick={voidSelected}>
+						Void {selectedCharges.length}
+					</Button>
 				{/if}
 				<Button size="sm" variant="outline" onclick={exportCharges}><Download /> Export</Button>
 			</div>
@@ -774,48 +776,51 @@
 										{/if}
 									</Table.Cell>
 									<Table.Cell>
-										<a class="font-medium hover:underline" href="/members/{c.charge.memberId}"
-											>{c.memberName}</a
-										>
+										<a class="font-medium hover:underline" href="/members/{c.charge.memberId}">
+											{c.memberName}
+										</a>
 									</Table.Cell>
-									<Table.Cell class="text-muted-foreground"
-										>{c.charge.description ?? c.charge.kind}</Table.Cell
-									>
-									<Table.Cell
-										>{formatDate(
+									<Table.Cell class="text-muted-foreground">
+										{c.charge.description ?? c.charge.kind}
+									</Table.Cell>
+									<Table.Cell>
+										{formatDate(
 											c.charge.dueDate
 										)}{#if c.charge.status === 'open' && c.charge.dueDate < todayISO()}
-											<Badge variant="destructive" class="ml-1">overdue</Badge>{/if}</Table.Cell
-									>
+											<Badge variant="destructive" class="ml-1">overdue</Badge>{/if}
+									</Table.Cell>
 									<Table.Cell><StatusBadge status={c.charge.status} /></Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(c.charge.amount, currency)}</Table.Cell
-									>
-									<Table.Cell class="text-right text-muted-foreground tabular-nums"
-										>{formatMoney(c.paid, currency)}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(c.charge.amount, currency)}
+									</Table.Cell>
+									<Table.Cell class="text-right text-muted-foreground tabular-nums">
+										{formatMoney(c.paid, currency)}
+									</Table.Cell>
 									<Table.Cell class="text-right">
 										{#if c.charge.status === 'open'}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => voidCharge(c.charge.id)}>Void</Button
+												onclick={() => voidCharge(c.charge.id)}
 											>
+												Void
+											</Button>
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => writeOffCharge(c.charge.id)}>Write off</Button
+												onclick={() => writeOffCharge(c.charge.id)}
 											>
+												Write off
+											</Button>
 										{/if}
 									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={7} class="text-muted-foreground">No charges.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={7} class="text-muted-foreground">No charges.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -838,11 +843,9 @@
 					<option value="suspended">Suspended</option>
 					<option value="cancelled">Cancelled</option>
 				</NativeSelect>
-				<span class="ml-auto text-xs text-muted-foreground"
-					>{filteredMemberships.length} membership{filteredMemberships.length === 1
-						? ''
-						: 's'}</span
-				>
+				<span class="ml-auto text-xs text-muted-foreground">
+					{filteredMemberships.length} membership{filteredMemberships.length === 1 ? '' : 's'}
+				</span>
 			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
@@ -861,68 +864,77 @@
 							{#each filteredMemberships as mm (mm.membership.id)}
 								<Table.Row>
 									<Table.Cell>
-										<a class="font-medium hover:underline" href="/members/{mm.membership.memberId}"
-											>{mm.memberName}</a
-										>
-										{#if mm.membership.noBill}<Badge variant="outline" class="ml-1 text-xs"
-												>comp'd</Badge
-											>{/if}
+										<a class="font-medium hover:underline" href="/members/{mm.membership.memberId}">
+											{mm.memberName}
+										</a>
+										{#if mm.membership.noBill}<Badge variant="outline" class="ml-1 text-xs">
+												comp'd
+											</Badge>{/if}
 									</Table.Cell>
-									<Table.Cell
-										>{mm.planName}
-										<span class="text-muted-foreground"
-											>· {formatMoney(mm.amount, currency)}/{mm.interval}</span
-										></Table.Cell
-									>
+									<Table.Cell>
+										{mm.planName}
+										<span class="text-muted-foreground">
+											· {formatMoney(mm.amount, currency)}/{mm.interval}
+										</span>
+									</Table.Cell>
 									<Table.Cell>{formatDate(mm.membership.startsAt)}</Table.Cell>
-									<Table.Cell
-										>{mm.membership.status === 'active'
+									<Table.Cell>
+										{mm.membership.status === 'active'
 											? formatDate(mm.membership.nextChargeAt)
 											: '—'}
 										{#if mm.membership.endsAt && new Date(mm.membership.endsAt).getTime() > Date.now() && new Date(mm.membership.endsAt).getTime() - Date.now() < 30 * 86400_000}
 											<Badge variant="outline" class="ml-1 text-amber-600">ending soon</Badge>
-										{/if}</Table.Cell
-									>
-									<Table.Cell
-										><StatusBadge
+										{/if}
+									</Table.Cell>
+									<Table.Cell>
+										<StatusBadge
 											status={mm.membership.status}
 										/>{#if mm.membership.cancelRequestedAt}<Badge
 												variant="outline"
-												class="ml-1 text-amber-600">cancel req</Badge
-											>{/if}{#if mm.membership.pauseRequestedAt}<Badge
+												class="ml-1 text-amber-600"
+											>
+												cancel req
+											</Badge>{/if}{#if mm.membership.pauseRequestedAt}<Badge
 												variant="outline"
-												class="ml-1 text-amber-600">pause req</Badge
-											>{/if}</Table.Cell
-									>
+												class="ml-1 text-amber-600"
+											>
+												pause req
+											</Badge>{/if}
+									</Table.Cell>
 									<Table.Cell class="text-right">
 										{#if mm.membership.status === 'active'}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => setMembership(mm.membership.id, 'paused')}>Pause</Button
+												onclick={() => setMembership(mm.membership.id, 'paused')}
 											>
+												Pause
+											</Button>
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs text-destructive"
-												onclick={() => setMembership(mm.membership.id, 'cancelled')}>Cancel</Button
+												onclick={() => setMembership(mm.membership.id, 'cancelled')}
 											>
+												Cancel
+											</Button>
 										{:else if mm.membership.status === 'paused'}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => setMembership(mm.membership.id, 'active')}>Resume</Button
+												onclick={() => setMembership(mm.membership.id, 'active')}
 											>
+												Resume
+											</Button>
 										{/if}
 									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={6} class="text-muted-foreground">No memberships.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={6} class="text-muted-foreground">No memberships.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -938,8 +950,8 @@
 						<option value={m} class="capitalize">{m}</option>
 					{/each}
 				</NativeSelect>
-				<span class="text-xs text-muted-foreground"
-					>{formatMoney(
+				<span class="text-xs text-muted-foreground">
+					{formatMoney(
 						payments
 							.filter(
 								(p) =>
@@ -955,11 +967,11 @@
 									.reduce((a, p) => a + p.payment.amount, 0),
 								currency
 							)} refunded`
-						: ''}</span
-				>
-				<Button size="sm" variant="outline" class="ml-auto" onclick={exportPayments}
-					><Download /> Export</Button
-				>
+						: ''}
+				</span>
+				<Button size="sm" variant="outline" class="ml-auto" onclick={exportPayments}>
+					<Download /> Export
+				</Button>
 			</div>
 			<Card.Root class="py-0">
 				<Card.Content class="px-0">
@@ -977,20 +989,20 @@
 							{#each payments.filter((p) => !payMethodFilter || p.payment.method === payMethodFilter) as p (p.payment.id)}
 								<Table.Row class={p.payment.refundedAt ? 'opacity-50' : ''}>
 									<Table.Cell>
-										<a class="font-medium hover:underline" href="/members/{p.payment.memberId}"
-											>{p.memberName}</a
-										>
+										<a class="font-medium hover:underline" href="/members/{p.payment.memberId}">
+											{p.memberName}
+										</a>
 									</Table.Cell>
 									<Table.Cell>{formatDate(p.payment.paidAt)}</Table.Cell>
 									<Table.Cell class="capitalize">{p.payment.method}</Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(p.payment.amount, currency)}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(p.payment.amount, currency)}
+									</Table.Cell>
 									<Table.Cell class="text-right">
 										{#if p.payment.refundedAt}
-											<span class="text-xs text-muted-foreground"
-												>refunded {formatDate(p.payment.refundedAt)}</span
-											>
+											<span class="text-xs text-muted-foreground">
+												refunded {formatDate(p.payment.refundedAt)}
+											</span>
 										{:else}
 											<Button
 												variant="ghost"
@@ -1003,22 +1015,25 @@
 													} catch (err) {
 														toast.error(errMsg(err, 'Could not resend'));
 													}
-												}}>Receipt</Button
+												}}
 											>
+												Receipt
+											</Button>
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => refund(p.payment.id, p.payment.amount)}>Refund</Button
+												onclick={() => refund(p.payment.id, p.payment.amount)}
 											>
+												Refund
+											</Button>
 										{/if}
 									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={5} class="text-muted-foreground">No payments.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={5} class="text-muted-foreground">No payments.</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -1044,39 +1059,42 @@
 								{#each shopItems as i (i.id)}
 									<Table.Row class={i.active ? '' : 'opacity-50'}>
 										<Table.Cell class="font-medium">{i.name}</Table.Cell>
-										<Table.Cell class="text-right tabular-nums"
-											>{formatMoney(i.price, currency)}{#if i.cost !== null}<div
+										<Table.Cell class="text-right tabular-nums">
+											{formatMoney(i.price, currency)}{#if i.cost !== null}<div
 													class="text-xs {i.cost >= i.price
 														? 'text-destructive'
 														: 'text-muted-foreground'}"
 												>
 													margin {formatMoney(i.price - i.cost, currency)}
-												</div>{/if}</Table.Cell
-										>
+												</div>{/if}
+										</Table.Cell>
 										<Table.Cell class="text-right tabular-nums">
 											{#if i.stock === null}—{:else}<span
 													class={i.stock === 0
 														? 'text-destructive'
 														: i.lowStockAt !== null && i.stock <= i.lowStockAt
 															? 'font-medium text-amber-600 dark:text-amber-400'
-															: ''}>{i.stock}</span
-												>{#if i.lowStockAt !== null}<span
+															: ''}
+												>
+													{i.stock}
+												</span>{#if i.lowStockAt !== null}<span
 														class="ml-1 text-xs text-muted-foreground"
-														title="Alert level">≤{i.lowStockAt}</span
-													>{/if}{/if}
+														title="Alert level"
+													>
+														≤{i.lowStockAt}
+													</span>{/if}{/if}
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-1.5 text-xs text-muted-foreground"
-												onclick={() => setStock(i)}>Set</Button
+												onclick={() => setStock(i)}
 											>
+												Set
+											</Button>
 										</Table.Cell>
-										<Table.Cell
-											><Switch
-												checked={i.active}
-												onCheckedChange={() => toggleItem(i)}
-											/></Table.Cell
-										>
+										<Table.Cell>
+											<Switch checked={i.active} onCheckedChange={() => toggleItem(i)} />
+										</Table.Cell>
 										<Table.Cell class="text-right">
 											{#if i.active}
 												{#if i.stock === 0}
@@ -1089,18 +1107,20 @@
 														onclick={() => {
 															sellItemId = i.id;
 															sellOpen = true;
-														}}>Sell</Button
+														}}
 													>
+														Sell
+													</Button>
 												{/if}
 											{/if}
 										</Table.Cell>
 									</Table.Row>
 								{:else}
-									<Table.Row
-										><Table.Cell colspan={5} class="text-muted-foreground"
-											>No items yet — add one on the right.</Table.Cell
-										></Table.Row
-									>
+									<Table.Row>
+										<Table.Cell colspan={5} class="text-muted-foreground">
+											No items yet — add one on the right.
+										</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
@@ -1148,9 +1168,9 @@
 									placeholder="Email staff at this count"
 								/>
 							</Field.Field>
-							<Button type="submit" disabled={pending || itemPrice == null || !itemName.trim()}
-								>Add item</Button
-							>
+							<Button type="submit" disabled={pending || itemPrice == null || !itemName.trim()}>
+								Add item
+							</Button>
 						</form>
 					</Card.Content>
 				</Card.Root>
@@ -1175,8 +1195,10 @@
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => pickup(p.id)}>Picked up</Button
+												onclick={() => pickup(p.id)}
 											>
+												Picked up
+											</Button>
 										</Table.Cell>
 									</Table.Row>
 								{/each}
@@ -1194,9 +1216,9 @@
 							Sell store credit with a desk-typed code; members redeem it in their portal.
 						</Card.Description>
 					</div>
-					<Button size="sm" variant="outline" onclick={() => (gcOpen = true)}
-						><Plus /> Sell a card</Button
-					>
+					<Button size="sm" variant="outline" onclick={() => (gcOpen = true)}>
+						<Plus /> Sell a card
+					</Button>
 				</Card.Header>
 				<Card.Content class="px-0">
 					<Table.Root>
@@ -1215,32 +1237,34 @@
 										<button
 											class="font-mono text-xs hover:underline"
 											title="Copy code"
-											onclick={() => copyCode(g.card.code)}>{g.card.code}</button
+											onclick={() => copyCode(g.card.code)}
 										>
+											{g.card.code}
+										</button>
 									</Table.Cell>
 									<Table.Cell class="text-muted-foreground">
 										{g.purchaserName ?? '—'}
 									</Table.Cell>
-									<Table.Cell class="text-right tabular-nums"
-										>{formatMoney(g.card.amount, currency)}</Table.Cell
-									>
+									<Table.Cell class="text-right tabular-nums">
+										{formatMoney(g.card.amount, currency)}
+									</Table.Cell>
 									<Table.Cell>
 										{#if g.card.balance > 0}
 											<StatusBadge status="open" />
 										{:else}
-											<span class="text-xs text-muted-foreground"
-												>redeemed {g.redeemerName ? `by ${g.redeemerName}` : ''}
-												{formatDate(g.card.redeemedAt)}</span
-											>
+											<span class="text-xs text-muted-foreground">
+												redeemed {g.redeemerName ? `by ${g.redeemerName}` : ''}
+												{formatDate(g.card.redeemedAt)}
+											</span>
 										{/if}
 									</Table.Cell>
 								</Table.Row>
 							{:else}
-								<Table.Row
-									><Table.Cell colspan={4} class="text-muted-foreground"
-										>No gift cards sold yet.</Table.Cell
-									></Table.Row
-								>
+								<Table.Row>
+									<Table.Cell colspan={4} class="text-muted-foreground">
+										No gift cards sold yet.
+									</Table.Cell>
+								</Table.Row>
 							{/each}
 						</Table.Body>
 					</Table.Root>
@@ -1267,45 +1291,45 @@
 								{#each recurring as r (r.rec.id)}
 									<Table.Row class={r.rec.active ? '' : 'opacity-50'}>
 										<Table.Cell>
-											<a class="font-medium hover:underline" href="/members/{r.rec.memberId}"
-												>{r.memberName}</a
-											>
+											<a class="font-medium hover:underline" href="/members/{r.rec.memberId}">
+												{r.memberName}
+											</a>
 										</Table.Cell>
-										<Table.Cell class="text-muted-foreground"
-											>{r.rec.description} · {r.rec
+										<Table.Cell class="text-muted-foreground">
+											{r.rec.description} · {r.rec
 												.interval}ly{#if r.rec.active && r.rec.removalRequestedAt}
 												<Badge
 													variant="outline"
 													class="ml-2 border-amber-500/50 text-amber-600 dark:text-amber-400"
-													>removal requested</Badge
 												>
-											{/if}</Table.Cell
-										>
-										<Table.Cell class="text-right tabular-nums"
-											>{formatMoney(r.rec.amount, currency)}</Table.Cell
-										>
+													removal requested
+												</Badge>
+											{/if}
+										</Table.Cell>
+										<Table.Cell class="text-right tabular-nums">
+											{formatMoney(r.rec.amount, currency)}
+										</Table.Cell>
 										<Table.Cell class="tabular-nums">{r.rec.nextDue}</Table.Cell>
-										<Table.Cell
-											><Switch
-												checked={r.rec.active}
-												onCheckedChange={() => toggleRecurring(r)}
-											/></Table.Cell
-										>
+										<Table.Cell>
+											<Switch checked={r.rec.active} onCheckedChange={() => toggleRecurring(r)} />
+										</Table.Cell>
 										<Table.Cell class="text-right">
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => deleteRecurring(r)}><Trash2 /></Button
+												onclick={() => deleteRecurring(r)}
 											>
+												<Trash2 />
+											</Button>
 										</Table.Cell>
 									</Table.Row>
 								{:else}
-									<Table.Row
-										><Table.Cell colspan={6} class="text-muted-foreground"
-											>No recurring add-ons — PT packages, towel service, locker rental live here.</Table.Cell
-										></Table.Row
-									>
+									<Table.Row>
+										<Table.Cell colspan={6} class="text-muted-foreground">
+											No recurring add-ons — PT packages, towel service, locker rental live here.
+										</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
@@ -1358,9 +1382,12 @@
 									<Input id="rc-due" type="date" required bind:value={rcNextDue} />
 								</Field.Field>
 							</div>
-							<Button type="submit" disabled={pending || !rcAmount || !rcDesc.trim() || !rcMemberId}
-								>Add recurring</Button
+							<Button
+								type="submit"
+								disabled={pending || !rcAmount || !rcDesc.trim() || !rcMemberId}
 							>
+								Add recurring
+							</Button>
 						</form>
 					</Card.Content>
 				</Card.Root>
@@ -1386,28 +1413,30 @@
 									<Table.Row>
 										<Table.Cell class="tabular-nums">{e.expenseOn}</Table.Cell>
 										<Table.Cell class="font-medium">{e.label}</Table.Cell>
-										<Table.Cell
-											><Badge variant="outline" class="capitalize">{e.category}</Badge></Table.Cell
-										>
-										<Table.Cell class="text-right tabular-nums"
-											>{formatMoney(e.amountCents, currency)}</Table.Cell
-										>
+										<Table.Cell>
+											<Badge variant="outline" class="capitalize">{e.category}</Badge>
+										</Table.Cell>
+										<Table.Cell class="text-right tabular-nums">
+											{formatMoney(e.amountCents, currency)}
+										</Table.Cell>
 										<Table.Cell class="text-right">
 											<Button
 												variant="ghost"
 												size="sm"
 												class="h-7 px-2 text-xs"
-												onclick={() => deleteExpense(e.id)}><Trash2 /></Button
+												onclick={() => deleteExpense(e.id)}
 											>
+												<Trash2 />
+											</Button>
 										</Table.Cell>
 									</Table.Row>
 								{:else}
-									<Table.Row
-										><Table.Cell colspan={5} class="text-muted-foreground"
-											>No expenses logged — rent, payroll and equipment buys feed the P&amp;L on
-											Reports.</Table.Cell
-										></Table.Row
-									>
+									<Table.Row>
+										<Table.Cell colspan={5} class="text-muted-foreground">
+											No expenses logged — rent, payroll and equipment buys feed the P&amp;L on
+											Reports.
+										</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
@@ -1447,9 +1476,9 @@
 									<Input id="exp-on" type="date" required bind:value={expOn} />
 								</Field.Field>
 							</div>
-							<Button type="submit" disabled={pending || !expAmount || !expLabel.trim()}
-								>Log expense</Button
-							>
+							<Button type="submit" disabled={pending || !expAmount || !expLabel.trim()}>
+								Log expense
+							</Button>
 						</form>
 					</Card.Content>
 				</Card.Root>
@@ -1480,14 +1509,17 @@
 											size="sm"
 											class="h-7 px-2 text-xs"
 											onclick={() => toggleRecExpense(r.id, !r.active)}
-											>{r.active ? 'Pause' : 'Resume'}</Button
 										>
+											{r.active ? 'Pause' : 'Resume'}
+										</Button>
 										<Button
 											variant="ghost"
 											size="sm"
 											class="h-7 px-2 text-xs"
-											onclick={() => deleteRecExpense(r.id)}><Trash2 /></Button
+											onclick={() => deleteRecExpense(r.id)}
 										>
+											<Trash2 />
+										</Button>
 									</span>
 								</div>
 							{/each}
@@ -1604,9 +1636,9 @@
 			<Field.Field>
 				<Field.Label>Member</Field.Label>
 				<Select.Root type="single" bind:value={payMemberId}>
-					<Select.Trigger class="w-full"
-						>{memberList.find((mm) => mm.id === payMemberId)?.name ?? 'Choose…'}</Select.Trigger
-					>
+					<Select.Trigger class="w-full">
+						{memberList.find((mm) => mm.id === payMemberId)?.name ?? 'Choose…'}
+					</Select.Trigger>
 					<Select.Content>
 						{#each memberList as mm (mm.id)}
 							<Select.Item value={mm.id}>{mm.name}</Select.Item>
@@ -1629,16 +1661,12 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Field.Field
-				><Field.Label for="bp-notes">Note</Field.Label><Input
-					id="bp-notes"
-					bind:value={payNotes}
-				/></Field.Field
-			>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !payMemberId || !payAmount}>Record</Button
-				></Modal.Footer
-			>
+			<Field.Field>
+				<Field.Label for="bp-notes">Note</Field.Label><Input id="bp-notes" bind:value={payNotes} />
+			</Field.Field>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !payMemberId || !payAmount}>Record</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>
@@ -1663,9 +1691,9 @@
 				<Field.Field>
 					<Field.Label>Member</Field.Label>
 					<Select.Root type="single" bind:value={cMemberId}>
-						<Select.Trigger class="w-full"
-							>{memberList.find((mm) => mm.id === cMemberId)?.name ?? 'Choose…'}</Select.Trigger
-						>
+						<Select.Trigger class="w-full">
+							{memberList.find((mm) => mm.id === cMemberId)?.name ?? 'Choose…'}
+						</Select.Trigger>
 						<Select.Content>
 							{#each memberList as mm (mm.id)}
 								<Select.Item value={mm.id}>{mm.name}</Select.Item>
@@ -1685,13 +1713,13 @@
 					</Select.Content>
 				</Select.Root>
 			</Field.Field>
-			<Field.Field
-				><Field.Label for="c-desc">Description</Field.Label><Input
+			<Field.Field>
+				<Field.Label for="c-desc">Description</Field.Label><Input
 					id="c-desc"
 					bind:value={cDesc}
 					placeholder="Drop-in, towel service, merch…"
-				/></Field.Field
-			>
+				/>
+			</Field.Field>
 			<div class="grid grid-cols-2 gap-3">
 				<Field.Field>
 					<Field.Label>Amount</Field.Label>
@@ -1702,11 +1730,11 @@
 					<Input id="c-due" type="date" bind:value={cDue} />
 				</Field.Field>
 			</div>
-			<Modal.Footer
-				><Button type="submit" disabled={pending || !cAmount || (cAll ? !cDesc.trim() : !cMemberId)}
-					>{cAll ? `Post to ${activeCount} members` : 'Add charge'}</Button
-				></Modal.Footer
-			>
+			<Modal.Footer>
+				<Button type="submit" disabled={pending || !cAmount || (cAll ? !cDesc.trim() : !cMemberId)}>
+					{cAll ? `Post to ${activeCount} members` : 'Add charge'}
+				</Button>
+			</Modal.Footer>
 		</form>
 	</Modal.Content>
 </Modal.Root>

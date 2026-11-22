@@ -115,9 +115,10 @@
 		</Command.Group>
 		<Command.Group heading="Create">
 			{#each actions as action (action.href)}
-				<Command.Item value={action.label} onSelect={() => go(action.href)}
-					><Plus /> {action.label}</Command.Item
-				>
+				<Command.Item value={action.label} onSelect={() => go(action.href)}>
+					<Plus />
+					{action.label}
+				</Command.Item>
 			{/each}
 		</Command.Group>
 	</Command.List>

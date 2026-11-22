@@ -422,9 +422,9 @@
 		</div>
 		{#if insideRows.length}
 			<div class="flex items-center gap-1.5 overflow-x-auto px-4 pb-3">
-				<span class="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase"
-					>Inside</span
-				>
+				<span class="shrink-0 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					Inside
+				</span>
 				{#each insideRows.slice(0, 12) as c (c.checkIn.id)}
 					<Badge variant="outline" class="shrink-0">
 						{c.checkIn.guestName ?? c.memberName}
@@ -451,8 +451,10 @@
 								}
 							}
 						});
-					}}>Out all</Button
+					}}
 				>
+					Out all
+				</Button>
 			</div>
 		{/if}
 	</header>
@@ -481,9 +483,9 @@
 						{#if k === ''}
 							<div></div>
 						{:else}
-							<Button variant="outline" class="h-12 text-lg" onclick={() => pinKey(k)}
-								>{k === 'back' ? '←' : k}</Button
-							>
+							<Button variant="outline" class="h-12 text-lg" onclick={() => pinKey(k)}>
+								{k === 'back' ? '←' : k}
+							</Button>
 						{/if}
 					{/each}
 				</div>
@@ -509,9 +511,9 @@
 					<span>
 						{flash.text}
 						{#if flash.note}
-							<span class="ml-2 rounded-md bg-amber-500/25 px-2 py-0.5 text-base font-semibold"
-								>{flash.note}</span
-							>
+							<span class="ml-2 rounded-md bg-amber-500/25 px-2 py-0.5 text-base font-semibold">
+								{flash.note}
+							</span>
 						{/if}
 					</span>
 				</div>
@@ -550,16 +552,17 @@
 										{:else}
 											<span
 												class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
-												>{initials(m.name)}</span
 											>
+												{initials(m.name)}
+											</span>
 										{/if}
 										<span class="min-w-0">
 											<span class="block truncate font-medium">
 												{m.name}
 												{#if m.planName}
-													<span class="ml-1.5 text-xs font-normal text-muted-foreground"
-														>{m.planName}</span
-													>
+													<span class="ml-1.5 text-xs font-normal text-muted-foreground">
+														{m.planName}
+													</span>
 												{/if}
 												{#each m.tags.slice(0, 3) as t (t)}
 													<Badge variant="secondary" class="ml-1 px-1 py-0 text-[10px]">{t}</Badge>
@@ -568,22 +571,23 @@
 											{#if m.deskNote}
 												<span
 													class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
-													>{m.deskNote}</span
 												>
+													{m.deskNote}
+												</span>
 											{/if}
-											<span class="block truncate text-xs text-muted-foreground"
-												>{m.lastVisit
+											<span class="block truncate text-xs text-muted-foreground">
+												{m.lastVisit
 													? `last visit ${formatRelative(m.lastVisit)}`
-													: 'no visits yet'}</span
-											>
+													: 'no visits yet'}
+											</span>
 										</span>
 									</span>
 									<span class="flex items-center gap-2">
 										{#if m.status !== 'active'}<Badge variant="outline">{m.status}</Badge>{/if}
 										{#if m.openBalance > 0}
-											<Badge variant="destructive"
-												>owes {formatMoney(m.openBalance, settings.currency)}</Badge
-											>
+											<Badge variant="destructive">
+												owes {formatMoney(m.openBalance, settings.currency)}
+											</Badge>
 										{/if}
 									</span>
 								</button>
@@ -591,8 +595,10 @@
 									<button
 										type="button"
 										class="shrink-0 border-l px-3 text-xs font-medium text-muted-foreground hover:bg-muted"
-										onclick={() => openGuest(m)}>+ Guest</button
+										onclick={() => openGuest(m)}
 									>
+										+ Guest
+									</button>
 								{/if}
 							</div>
 							{#each families[m.id] ?? [] as dep (dep.id)}
@@ -612,8 +618,9 @@
 										{:else}
 											<span
 												class="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground"
-												>{initials(dep.name)}</span
 											>
+												{initials(dep.name)}
+											</span>
 										{/if}
 										<span class="min-w-0">
 											<span class="block truncate text-sm font-medium">
@@ -623,8 +630,9 @@
 											{#if dep.deskNote}
 												<span
 													class="block truncate text-xs font-medium text-amber-600 dark:text-amber-400"
-													>{dep.deskNote}</span
 												>
+													{dep.deskNote}
+												</span>
 											{/if}
 										</span>
 									</span>
@@ -642,16 +650,16 @@
 						onclick={openWalkIn}
 					>
 						<UserPlus class="size-5 shrink-0 text-muted-foreground" />
-						<span class="text-sm"
-							>No member found — <span class="font-medium">register "{code.trim()}"</span> as a walk-in</span
-						>
+						<span class="text-sm">
+							No member found — <span class="font-medium">register "{code.trim()}"</span> as a walk-in
+						</span>
 					</button>
 				{/if}
 			</form>
 
-			<Button variant="outline" size="sm" class="self-start" onclick={openWalkIn}
-				><UserPlus class="mr-1 h-4 w-4" /> Register walk-in</Button
-			>
+			<Button variant="outline" size="sm" class="self-start" onclick={openWalkIn}>
+				<UserPlus class="mr-1 h-4 w-4" /> Register walk-in
+			</Button>
 
 			{#if liveLocations.length > 1}
 				<div class="flex items-center gap-3 text-sm">
@@ -660,8 +668,10 @@
 						<Button
 							variant={locationId === l.id ? 'default' : 'outline'}
 							size="sm"
-							onclick={() => (locationId = l.id)}>{l.name}</Button
+							onclick={() => (locationId = l.id)}
 						>
+							{l.name}
+						</Button>
 					{/each}
 				</div>
 			{/if}
@@ -709,9 +719,9 @@
 											class="size-7 shrink-0 rounded-full object-cover"
 										/>
 									{/if}
-									<span class="truncate"
-										>{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}</span
-									>
+									<span class="truncate">
+										{c.checkIn.guestName ? `${c.checkIn.guestName} (guest)` : c.memberName}
+									</span>
 								</span>
 								<span class="flex items-center gap-2 text-muted-foreground">
 									{c.locationName ?? ''}
@@ -724,15 +734,19 @@
 											variant="ghost"
 											size="sm"
 											class="h-6 px-2 text-xs"
-											onclick={() => checkOutRow(c.checkIn.id)}>Check out</Button
+											onclick={() => checkOutRow(c.checkIn.id)}
 										>
+											Check out
+										</Button>
 									{/if}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs"
-										onclick={() => voidRow(c.checkIn.id)}>Void</Button
+										onclick={() => voidRow(c.checkIn.id)}
 									>
+										Void
+									</Button>
 								</span>
 							</div>
 						{/each}
@@ -812,9 +826,9 @@
 			<Modal.Description>
 				Check in the booked members as they arrive.
 				{#if rosterSess?.session.checkinCode}
-					Class code for self check-in: <code class="font-mono"
-						>{rosterSess.session.checkinCode}</code
-					>
+					Class code for self check-in: <code class="font-mono">
+						{rosterSess.session.checkinCode}
+					</code>
 				{/if}
 			</Modal.Description>
 		</Modal.Header>

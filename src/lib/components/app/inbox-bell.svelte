@@ -33,8 +33,9 @@
 				{#if notifications.length}
 					<span
 						class="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-						>{notifications.length > 9 ? '9+' : notifications.length}</span
 					>
+						{notifications.length > 9 ? '9+' : notifications.length}
+					</span>
 				{/if}
 			</Sidebar.MenuButton>
 		{/snippet}
@@ -61,9 +62,9 @@
 							<span class="mt-1.5 size-2 shrink-0 rounded-full bg-primary"></span>
 							<span class="min-w-0 flex-1">
 								<span class="block truncate text-sm font-medium">{n.label}</span>
-								<span class="mt-0.5 line-clamp-2 block text-xs text-muted-foreground"
-									>{n.detail}</span
-								>
+								<span class="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+									{n.detail}
+								</span>
 							</span>
 						</button>
 					</li>

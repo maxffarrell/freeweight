@@ -67,9 +67,9 @@
 {#if p.hub}
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base"
-				><UserRound class="size-4" /> Leroa Profile</Card.Title
-			>
+			<Card.Title class="flex items-center gap-2 text-base">
+				<UserRound class="size-4" /> Leroa Profile
+			</Card.Title>
 			<Card.Description>
 				{#if p.link}
 					Connected to {p.link.hubHost} · sharing {scopeLabels(p.link.scopes)} · updated {formatRelative(
@@ -98,9 +98,9 @@
 					<div class="flex items-center justify-between gap-4 rounded-lg border p-3">
 						<Label for="sync-{m.id}" class="flex-col items-start gap-0.5 font-normal">
 							<span class="font-medium">Keep {m.orgName} up to date</span>
-							<span class="text-xs text-muted-foreground"
-								>Changes to your name, email and phone are copied over automatically</span
-							>
+							<span class="text-xs text-muted-foreground">
+								Changes to your name, email and phone are copied over automatically
+							</span>
 						</Label>
 						<Switch
 							id="sync-{m.id}"
@@ -118,19 +118,21 @@
 		{/if}
 		<Card.Footer class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
 			{#if p.link}
-				<Button variant="outline" class="w-full sm:w-auto" disabled={busy} onclick={sync}
-					>Sync now</Button
-				>
+				<Button variant="outline" class="w-full sm:w-auto" disabled={busy} onclick={sync}>
+					Sync now
+				</Button>
 				<Button
 					variant="ghost"
 					class="w-full sm:w-auto"
 					disabled={busy}
-					onclick={() => run(disconnectProfile, 'Disconnected')}>Disconnect</Button
+					onclick={() => run(disconnectProfile, 'Disconnected')}
 				>
+					Disconnect
+				</Button>
 			{:else}
-				<Button class="w-full sm:w-auto" href="/api/profile/connect?next=/portal&keep=1"
-					>Connect your Leroa profile</Button
-				>
+				<Button class="w-full sm:w-auto" href="/api/profile/connect?next=/portal&keep=1">
+					Connect your Leroa profile
+				</Button>
 			{/if}
 		</Card.Footer>
 	</Card.Root>

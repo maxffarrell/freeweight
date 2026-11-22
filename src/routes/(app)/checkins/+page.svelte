@@ -152,9 +152,9 @@
 
 <PageHeader title="Check-ins">
 	{#snippet actions()}
-		<Button size="sm" variant="outline" onclick={exportCheckIns} disabled={!checkIns.length}
-			><Download /> Export</Button
-		>
+		<Button size="sm" variant="outline" onclick={exportCheckIns} disabled={!checkIns.length}>
+			<Download /> Export
+		</Button>
 		<Button size="sm" variant="outline" href="/kiosk"><MonitorSmartphone /> Open kiosk</Button>
 	{/snippet}
 </PageHeader>
@@ -162,9 +162,9 @@
 <div class="grid gap-6 p-4 md:p-6 lg:grid-cols-3">
 	<Card.Root>
 		<Card.Header>
-			<Card.Title class="flex items-center gap-2 text-base"
-				><QrCode /> Scan or enter a code</Card.Title
-			>
+			<Card.Title class="flex items-center gap-2 text-base">
+				<QrCode /> Scan or enter a code
+			</Card.Title>
 			<Card.Description>
 				Paste a member's QR code value, or their member ID. A USB scanner works too — it types and
 				hits Enter.
@@ -206,8 +206,8 @@
 	<Card.Root class="lg:col-span-2">
 		<Card.Header>
 			<Card.Title class="text-base">{viewDate === today ? 'Today' : viewDate}</Card.Title>
-			<Card.Description
-				>{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
+			<Card.Description>
+				{checkIns.length} check-in{checkIns.length === 1 ? '' : 's'}{viewDate === today
 					? ' so far'
 					: ''}{uniqueMembers !== checkIns.length
 					? ` · ${uniqueMembers} unique`
@@ -217,10 +217,8 @@
 					? ` · ${checkIns.filter((c) => c.checkIn.guestName).length} guest${checkIns.filter((c) => c.checkIn.guestName).length === 1 ? '' : 's'}`
 					: ''}{checkIns.filter((c) => c.firstVisit).length
 					? ` · ${checkIns.filter((c) => c.firstVisit).length} first visit${checkIns.filter((c) => c.firstVisit).length === 1 ? '' : 's'}`
-					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}{peakHour
-					? ` · peak ${peakHour}`
-					: ''}.</Card.Description
-			>
+					: ''}{avgVisit ? ` · avg ${avgVisit}` : ''}{peakHour ? ` · peak ${peakHour}` : ''}.
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="px-4">
 			<div class="mb-3 flex gap-2">
@@ -232,8 +230,10 @@
 					onclick={() => {
 						viewDate = todayISO();
 						void refilter();
-					}}>Today</Button
+					}}
 				>
+					Today
+				</Button>
 				<Input
 					placeholder="Search member or guest…"
 					class="flex-1"
@@ -247,8 +247,10 @@
 						insideOnly = !insideOnly;
 						guestsOnly = false;
 						void refilter();
-					}}>Still inside</Button
+					}}
 				>
+					Still inside
+				</Button>
 				<Button
 					size="sm"
 					variant={guestsOnly ? 'default' : 'outline'}
@@ -256,8 +258,10 @@
 						guestsOnly = !guestsOnly;
 						if (guestsOnly) insideOnly = false;
 						void refilter();
-					}}>Guests</Button
+					}}
 				>
+					Guests
+				</Button>
 				<Button
 					size="sm"
 					variant={firstOnly ? 'default' : 'outline'}
@@ -268,19 +272,21 @@
 							insideOnly = false;
 						}
 						void refilter();
-					}}>First visit</Button
+					}}
 				>
+					First visit
+				</Button>
 				{#if locations.length > 1}
 					<Select.Root
 						type="single"
 						bind:value={filterLocation}
 						onValueChange={() => void refilter()}
 					>
-						<Select.Trigger class="w-36"
-							>{filterLocation && filterLocation !== '__all'
+						<Select.Trigger class="w-36">
+							{filterLocation && filterLocation !== '__all'
 								? (locations.find((l) => l.id === filterLocation)?.name ?? 'Location')
-								: 'All locations'}</Select.Trigger
-						>
+								: 'All locations'}
+						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="__all">All locations</Select.Item>
 							{#each locations as l (l.id)}
@@ -295,16 +301,20 @@
 					onclick={() => {
 						method = method === 'qr' ? '' : 'qr';
 						void refilter();
-					}}>QR</Button
+					}}
 				>
+					QR
+				</Button>
 				<Button
 					size="sm"
 					variant={method === 'manual' ? 'default' : 'outline'}
 					onclick={() => {
 						method = method === 'manual' ? '' : 'manual';
 						void refilter();
-					}}>Manual</Button
+					}}
 				>
+					Manual
+				</Button>
 			</div>
 			<Table.Root>
 				<Table.Header>
@@ -328,35 +338,37 @@
 											class="size-7 shrink-0 rounded-full object-cover"
 										/>
 									{/if}
-									<span class="truncate"
-										>{c.checkIn.guestName
+									<span class="truncate">
+										{c.checkIn.guestName
 											? `${c.checkIn.guestName} (guest of ${c.memberName})`
-											: c.memberName}</span
-									>
+											: c.memberName}
+									</span>
 									{#if c.firstVisit}
 										<Badge variant="secondary" class="px-1.5 py-0 text-[10px]">1st</Badge>
 									{/if}
-								</span></Table.Cell
-							>
-							<Table.Cell class="text-muted-foreground"
-								>{localTime(c.checkIn.checkedAt, settings.timezone)}</Table.Cell
-							>
+								</span>
+							</Table.Cell>
+							<Table.Cell class="text-muted-foreground">
+								{localTime(c.checkIn.checkedAt, settings.timezone)}
+							</Table.Cell>
 							<Table.Cell class="text-muted-foreground">{c.locationName ?? '—'}</Table.Cell>
-							<Table.Cell
-								><Badge
+							<Table.Cell>
+								<Badge
 									variant={c.checkIn.method === 'qr' ? 'default' : 'secondary'}
-									class="uppercase">{c.checkIn.method}</Badge
-								></Table.Cell
-							>
-							<Table.Cell class="text-right"
-								><div class="flex items-center justify-end gap-1">
+									class="uppercase"
+								>
+									{c.checkIn.method}
+								</Badge>
+							</Table.Cell>
+							<Table.Cell class="text-right">
+								<div class="flex items-center justify-end gap-1">
 									{#if c.checkIn.checkedOutAt}
-										<span class="text-muted-foreground"
-											>out {localTime(c.checkIn.checkedOutAt, settings.timezone)} · {dur(
+										<span class="text-muted-foreground">
+											out {localTime(c.checkIn.checkedOutAt, settings.timezone)} · {dur(
 												c.checkIn.checkedAt,
 												c.checkIn.checkedOutAt
-											)}</span
-										>
+											)}
+										</span>
 									{:else}
 										{@const insideMs = Date.now() - c.checkIn.checkedAt.getTime()}
 										<Badge
@@ -367,10 +379,11 @@
 											title={insideMs > 4 * 3600_000
 												? 'Still inside after 4h — probably forgot to check out'
 												: ''}
-											>In {dur(c.checkIn.checkedAt, new Date())}{insideMs > 4 * 3600_000
-												? ' — long stay?'
-												: ''}</Badge
 										>
+											In {dur(c.checkIn.checkedAt, new Date())}{insideMs > 4 * 3600_000
+												? ' — long stay?'
+												: ''}
+										</Badge>
 										<Button
 											variant="ghost"
 											size="sm"
@@ -384,26 +397,30 @@
 												} catch (err) {
 													toast.error(errMsg(err, 'Failed'));
 												}
-											}}>Out</Button
+											}}
 										>
+											Out
+										</Button>
 									{/if}
 									<Button
 										variant="ghost"
 										size="sm"
 										class="h-6 px-2 text-xs"
-										onclick={() => voidRow(c.checkIn.id)}>Void</Button
+										onclick={() => voidRow(c.checkIn.id)}
 									>
-								</div></Table.Cell
-							>
+										Void
+									</Button>
+								</div>
+							</Table.Cell>
 						</Table.Row>
 					{:else}
-						<Table.Row
-							><Table.Cell colspan={5} class="text-muted-foreground"
-								>No check-ins{q.trim() ? ' match that search' : ''}{viewDate === today
+						<Table.Row>
+							<Table.Cell colspan={5} class="text-muted-foreground">
+								No check-ins{q.trim() ? ' match that search' : ''}{viewDate === today
 									? ' yet today'
-									: ' that day'}.</Table.Cell
-							></Table.Row
-						>
+									: ' that day'}.
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				</Table.Body>
 			</Table.Root>
