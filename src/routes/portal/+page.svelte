@@ -130,6 +130,8 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import type { PageProps } from './$types';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 
 	let { data }: PageProps = $props();
 	const memberId = $derived(data.memberId);
@@ -137,13 +139,17 @@
 	// ------- data export -------
 	let exportPending = $state(false);
 	let delPending = $state(false);
-	async function askDataDeletion() {
-		if (
-			!confirm(
-				'Request deletion of your personal data? The gym will scrub your name, contact details and profile. Your booking and payment history is kept anonymized for their records.'
-			)
-		)
-			return;
+	function askDataDeletion() {
+		confirmDialog({
+			title: 'Request deletion of your personal data?',
+			description:
+				'The gym will scrub your name, contact details and profile. Your booking and payment history is kept anonymized for their records.',
+			confirm: { text: 'Request deletion' },
+			onConfirm: () => askDataDeletionNow()
+		});
+	}
+
+	async function askDataDeletionNow() {
 		delPending = true;
 		try {
 			await requestDataDeletion(memberId);
@@ -364,9 +370,16 @@
 	// ------- gift cards -------
 	let gcCode = $state('');
 	let gcBusy = $state(false);
-	async function askRemoveAddon(addOnId: string) {
-		if (!confirm('Ask the front desk to stop this add-on? They will confirm before it ends.'))
-			return;
+	function askRemoveAddon(addOnId: string) {
+		confirmDialog({
+			title: 'Ask the front desk to stop this add-on?',
+			description: 'They will confirm before it ends.',
+			confirm: { text: 'Request removal' },
+			onConfirm: () => askRemoveAddonNow(addOnId)
+		});
+	}
+
+	async function askRemoveAddonNow(addOnId: string) {
 		try {
 			await requestAddonRemoval({ memberId, addOnId });
 			toast.success('Removal requested');
@@ -387,17 +400,26 @@
 		}
 		gcBusy = false;
 	}
-	async function editGoal() {
-		const v = prompt(
-			'How many visits this month are you aiming for? (1–60, blank clears)',
-			d.member.goalVisitsPerMonth ? String(d.member.goalVisitsPerMonth) : '12'
-		);
-		if (v === null) return;
-		const goal = v.trim() === '' ? null : Number(v);
-		if (goal !== null && (!Number.isInteger(goal) || goal < 1 || goal > 60)) {
-			toast.error('Pick a number of visits between 1 and 60');
-			return;
-		}
+	function editGoal() {
+		confirmDialog({
+			title: 'Monthly visit goal',
+			input: {
+				label: 'How many visits this month are you aiming for? (1–60, blank clears)',
+				defaultValue: d.member.goalVisitsPerMonth ? String(d.member.goalVisitsPerMonth) : '12'
+			},
+			confirm: { text: 'Save' },
+			onConfirm: (v) => {
+				const goal = v.trim() === '' ? null : Number(v);
+				if (goal !== null && (!Number.isInteger(goal) || goal < 1 || goal > 60)) {
+					toast.error('Pick a number of visits between 1 and 60');
+					return;
+				}
+				return saveGoal(goal);
+			}
+		});
+	}
+
+	async function saveGoal(goal: number | null) {
 		try {
 			await setVisitGoal({ memberId, goal });
 			toast.success(goal ? `Goal set: ${goal} visits` : 'Goal cleared');
@@ -531,13 +553,16 @@
 		}
 		return [...byType.values()].filter((r) => r.n >= 2);
 	});
-	async function cancelSeries(classTypeId: string, name: string, n: number) {
-		if (
-			!confirm(
-				`Cancel all ${n} upcoming ${name} bookings? Sessions inside the cancel cutoff are kept.`
-			)
-		)
-			return;
+	function cancelSeries(classTypeId: string, name: string, n: number) {
+		confirmDialog({
+			title: `Cancel all ${n} upcoming ${name} bookings?`,
+			description: 'Sessions inside the cancel cutoff are kept.',
+			confirm: { text: 'Cancel bookings' },
+			onConfirm: () => cancelSeriesNow(classTypeId)
+		});
+	}
+
+	async function cancelSeriesNow(classTypeId: string) {
 		busy = 'cancelSeries';
 		try {
 			const r = await memberCancelSeries({ memberId, classTypeId });
@@ -664,13 +689,20 @@
 		}
 	});
 	let chalBusy = $state('');
-	async function joinChal(challengeId: string, teamMode = false) {
-		let team: string | undefined;
+	function joinChal(challengeId: string, teamMode = false) {
 		if (teamMode) {
-			const t = window.prompt('Team name? Leave empty to play solo');
-			if (t === null) return;
-			team = t.trim() || undefined;
+			confirmDialog({
+				title: 'Team name?',
+				input: { label: 'Leave empty to play solo' },
+				confirm: { text: 'Join' },
+				onConfirm: (t) => joinChalNow(challengeId, t.trim() || undefined)
+			});
+			return;
 		}
+		joinChalNow(challengeId, undefined);
+	}
+
+	async function joinChalNow(challengeId: string, team: string | undefined) {
 		chalBusy = challengeId;
 		try {
 			await joinChallenge({ memberId, challengeId, team });
@@ -1083,8 +1115,15 @@
 	}
 	const nextOfType = (classTypeId: string) =>
 		bookable.find((b) => b.session.classTypeId === classTypeId && !b.myStatus);
-	async function bookSeriesAll(classTypeId: string, className: string) {
-		if (!confirm(`Book into every upcoming ${className} session?`)) return;
+	function bookSeriesAll(classTypeId: string, className: string) {
+		confirmDialog({
+			title: `Book into every upcoming ${className} session?`,
+			confirm: { text: 'Book all' },
+			onConfirm: () => bookSeriesAllNow(classTypeId)
+		});
+	}
+
+	async function bookSeriesAllNow(classTypeId: string) {
 		busy = `series:${classTypeId}`;
 		try {
 			const r = await memberBookSeries({ memberId, classTypeId });
@@ -2124,14 +2163,14 @@
 										</p>
 									{/if}
 									{#if c.mine && c.mySessions.length}
-										<details class="mt-1.5">
-											<summary
+										<Collapsible.Root class="mt-1.5">
+											<Collapsible.Trigger
 												class="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
 											>
 												My sessions ({c.mySessions.filter((s) => s.status !== 'cancelled').length}
 												upcoming)
-											</summary>
-											<div class="mt-1.5 space-y-1">
+											</Collapsible.Trigger>
+											<Collapsible.Content class="mt-1.5 space-y-1">
 												{#each c.mySessions as s (s.bookingId)}
 													<div class="flex items-center gap-2 text-xs">
 														<span class="min-w-28 text-muted-foreground"
@@ -2164,8 +2203,8 @@
 														{/if}
 													</div>
 												{/each}
-											</div>
-										</details>
+											</Collapsible.Content>
+										</Collapsible.Root>
 									{/if}
 								</div>
 								{#if c.mine}
@@ -2441,23 +2480,27 @@
 										class="text-xs text-muted-foreground underline-offset-4 hover:underline"
 										title="Give this spot to another member"
 										disabled={busy === `give:${u.booking.id}`}
-										onclick={async () => {
-											const email = window.prompt(
-												`Give your ${u.className} spot to which member? (their email)`
-											);
-											if (!email?.trim()) return;
-											busy = `give:${u.booking.id}`;
-											try {
-												const r = await memberGiveSpot({
-													memberId,
-													bookingId: u.booking.id,
-													email: email.trim()
-												});
-												toast.success(`Spot given to ${r.recipient}`);
-											} catch (err) {
-												toast.error(errMsg(err, 'Could not give the spot'));
-											}
-											busy = null;
+										onclick={() => {
+											confirmDialog({
+												title: `Give your ${u.className} spot to which member?`,
+												input: { label: 'Their email', placeholder: 'member@example.com' },
+												confirm: { text: 'Give spot' },
+												onConfirm: async (email) => {
+													if (!email?.trim()) return;
+													busy = `give:${u.booking.id}`;
+													try {
+														const r = await memberGiveSpot({
+															memberId,
+															bookingId: u.booking.id,
+															email: email.trim()
+														});
+														toast.success(`Spot given to ${r.recipient}`);
+													} catch (err) {
+														toast.error(errMsg(err, 'Could not give the spot'));
+													}
+													busy = null;
+												}
+											});
 										}}>Give</button
 									>
 								{/if}
@@ -3517,7 +3560,12 @@
 													await navigator.clipboard.writeText(url);
 													toast.success('Link copied');
 												} catch {
-													window.prompt('Copy this link:', url);
+													confirmDialog({
+														title: 'Copy this link',
+														input: { label: 'Link', defaultValue: url },
+														confirm: { text: 'Done' },
+														onConfirm: () => undefined
+													});
 												}
 											}}>Share</Button
 										>

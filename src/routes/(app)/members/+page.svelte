@@ -74,6 +74,7 @@
 		aiSubjectVariants,
 		getAiStatus
 	} from '#lib/remote/ai.remote.ts';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const currency = await getCurrency();
 	const ai = await getAiStatus();
@@ -415,12 +416,19 @@
 			}
 		}
 	});
-	async function saveTemplate() {
-		const name = window.prompt('Template name', emailSubject.slice(0, 40));
-		if (!name?.trim()) return;
+	function saveTemplate() {
+		confirmDialog({
+			title: 'Save template',
+			input: { label: 'Template name', defaultValue: emailSubject.slice(0, 40) },
+			confirm: { text: 'Save' },
+			onConfirm: (name) => (name?.trim() ? saveTemplateNow(name.trim()) : undefined)
+		});
+	}
+
+	async function saveTemplateNow(name: string) {
 		try {
 			await saveAnnouncementTemplate({
-				name: name.trim(),
+				name,
 				subject: emailSubject,
 				message: emailBody,
 				tag: emailAudience.startsWith('tag:') ? emailAudience.slice(4) : undefined
@@ -629,8 +637,15 @@
 			toast.error(errMsg(err, 'Could not remove'));
 		}
 	}
-	async function resendAnnouncement(id: string, n: number) {
-		if (!confirm(`Resend to the ${n} member${n === 1 ? '' : 's'} who haven't opened it?`)) return;
+	function resendAnnouncement(id: string, n: number) {
+		confirmDialog({
+			title: `Resend to the ${n} member${n === 1 ? '' : 's'} who haven't opened it?`,
+			confirm: { text: 'Resend' },
+			onConfirm: () => resendNow(id)
+		});
+	}
+
+	async function resendNow(id: string) {
 		try {
 			const r = await resendToNonOpeners(id);
 			toast.success(
@@ -950,44 +965,46 @@
 			<Button
 				size="sm"
 				variant="outline"
-				onclick={async () => {
-					if (
-						!confirm(
-							`Mark ${selected.size} member${selected.size === 1 ? '' : 's'} inactive? Their history is kept.`
-						)
-					)
-						return;
-					try {
-						const n = await bulkSetInactive({ memberIds: [...selected] });
-						toast.success(`Marked ${n} inactive`);
-						selected.clear();
-						await refilter();
-					} catch (e) {
-						toast.error(errMsg(e, 'Could not mark inactive'));
-					}
+				onclick={() => {
+					confirmDialog({
+						title: `Mark ${selected.size} member${selected.size === 1 ? '' : 's'} inactive?`,
+						description: 'Their history is kept.',
+						confirm: { text: 'Mark inactive' },
+						onConfirm: async () => {
+							try {
+								const n = await bulkSetInactive({ memberIds: [...selected] });
+								toast.success(`Marked ${n} inactive`);
+								selected.clear();
+								await refilter();
+							} catch (e) {
+								toast.error(errMsg(e, 'Could not mark inactive'));
+							}
+						}
+					});
 				}}>Mark inactive</Button
 			>
 			{#if entitlements.dataRetention}
 				<Button
 					size="sm"
 					variant="outline"
-					onclick={async () => {
-						if (
-							!confirm(
-								`Anonymize ${selected.size} member${selected.size === 1 ? '' : 's'}? This permanently scrubs their personal data and cannot be undone.`
-							)
-						)
-							return;
-						try {
-							const r = await anonymizeMembers({ memberIds: [...selected] });
-							toast.success(
-								`Anonymized ${r.anonymized} member${r.anonymized === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} on legal hold` : ''}`
-							);
-							selected.clear();
-							await refilter();
-						} catch (e) {
-							toast.error(errMsg(e, 'Could not anonymize'));
-						}
+					onclick={() => {
+						confirmDialog({
+							title: `Anonymize ${selected.size} member${selected.size === 1 ? '' : 's'}?`,
+							description: 'This permanently scrubs their personal data and cannot be undone.',
+							confirm: { text: 'Anonymize' },
+							onConfirm: async () => {
+								try {
+									const r = await anonymizeMembers({ memberIds: [...selected] });
+									toast.success(
+										`Anonymized ${r.anonymized} member${r.anonymized === 1 ? '' : 's'}${r.skipped ? ` — skipped ${r.skipped} on legal hold` : ''}`
+									);
+									selected.clear();
+									await refilter();
+								} catch (e) {
+									toast.error(errMsg(e, 'Could not anonymize'));
+								}
+							}
+						});
 					}}>Anonymize</Button
 				>
 			{/if}

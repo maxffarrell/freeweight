@@ -18,6 +18,7 @@
 	import { errMsg, todayISO } from '#lib/format.ts';
 	import { toCsv } from '#lib/csv.ts';
 	import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const settings = await getSettings();
 	const locations = await getLocations();
@@ -47,8 +48,16 @@
 		clearTimeout(searchTimer);
 		searchTimer = setTimeout(() => void refilter(), 250);
 	}
-	async function voidRow(id: string) {
-		if (!confirm('Void this check-in? Same-day attendance marks revert too.')) return;
+	function voidRow(id: string) {
+		confirmDialog({
+			title: 'Void this check-in?',
+			description: 'Same-day attendance marks revert too.',
+			confirm: { text: 'Void' },
+			onConfirm: () => voidRowNow(id)
+		});
+	}
+
+	async function voidRowNow(id: string) {
 		try {
 			await voidCheckIn(id);
 			toast.success('Check-in voided');

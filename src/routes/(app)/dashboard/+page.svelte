@@ -53,6 +53,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import Circle from '@lucide/svelte/icons/circle';
 	import { Progress } from '#lib/components/ui/progress/index.js';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const d = await getDashboard();
 	const ai = await getAiStatus();
@@ -91,16 +92,31 @@
 		clockedInAt: Date | string;
 		clockedOutAt: Date | string | null;
 	}) {
-		const inAt = prompt('Clock-in (YYYY-MM-DDTHH:mm, gym time)', fmtLocal(s.clockedInAt));
-		if (inAt === null) return;
-		const outAt = prompt(
-			'Clock-out (YYYY-MM-DDTHH:mm, blank = still open)',
-			s.clockedOutAt ? fmtLocal(s.clockedOutAt) : ''
-		);
-		if (outAt === null) return;
+		confirmDialog({
+			title: 'Edit shift times',
+			input: {
+				label: 'Clock-in (YYYY-MM-DDTHH:mm, gym time)',
+				defaultValue: fmtLocal(s.clockedInAt)
+			},
+			confirm: { text: 'Next' },
+			onConfirm: (inAt) =>
+				inAt !== null &&
+				confirmDialog({
+					title: 'Edit shift times',
+					input: {
+						label: 'Clock-out (YYYY-MM-DDTHH:mm, blank = still open)',
+						defaultValue: s.clockedOutAt ? fmtLocal(s.clockedOutAt) : ''
+					},
+					confirm: { text: 'Save' },
+					onConfirm: (outAt) => (outAt !== null ? saveShift(s.id, inAt, outAt) : undefined)
+				})
+		});
+	}
+
+	async function saveShift(id: string, inAt: string, outAt: string) {
 		try {
 			await updateShift({
-				id: s.id,
+				id,
 				clockedInAt: inAt.trim(),
 				clockedOutAt: outAt.trim() || null
 			});
@@ -845,14 +861,18 @@
 											variant="ghost"
 											class="text-muted-foreground"
 											title="Delete shift"
-											onclick={async () => {
-												if (!confirm('Delete this shift record?')) return;
-												try {
-													await deleteShift(r.shift.id);
-													toast.success('Deleted');
-												} catch (e) {
-													toast.error(errMsg(e, 'Could not delete'));
-												}
+											onclick={() => {
+												confirmDialog({
+													title: 'Delete this shift record?',
+													onConfirm: async () => {
+														try {
+															await deleteShift(r.shift.id);
+															toast.success('Deleted');
+														} catch (e) {
+															toast.error(errMsg(e, 'Could not delete'));
+														}
+													}
+												});
 											}}><Trash2 /></Button
 										>
 									</div>

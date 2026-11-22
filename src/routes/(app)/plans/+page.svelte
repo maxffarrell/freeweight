@@ -32,6 +32,7 @@
 	import Link2 from '@lucide/svelte/icons/link-2';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const currency = await getCurrency();
 	const joinInfo = await getJoinInfo();
@@ -52,12 +53,16 @@
 	let migBusy = $state(false);
 	async function doMigrate() {
 		if (!migFrom || !migTarget) return;
-		if (
-			!confirm(
-				`Move every active/paused membership from ${migFrom.name} to the selected plan? Pricing and billing dates are kept.`
-			)
-		)
-			return;
+		confirmDialog({
+			title: `Move every active/paused membership from ${migFrom.name} to the selected plan?`,
+			description: 'Pricing and billing dates are kept.',
+			confirm: { text: 'Move' },
+			onConfirm: () => doMigrateNow()
+		});
+	}
+
+	async function doMigrateNow() {
+		if (!migFrom || !migTarget) return;
 		migBusy = true;
 		try {
 			const r = await migratePlanMembers({ fromPlanId: migFrom.id, toPlanId: migTarget });

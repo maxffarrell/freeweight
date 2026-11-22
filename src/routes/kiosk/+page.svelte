@@ -29,6 +29,7 @@
 	import QrCode from '@lucide/svelte/icons/qr-code';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import { ConfirmDialog, confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const { data }: PageProps = $props();
 
@@ -359,8 +360,16 @@
 		}
 	}
 
-	async function voidRow(id: string) {
-		if (!confirm('Void this check-in? Same-day attendance marks revert too.')) return;
+	function voidRow(id: string) {
+		confirmDialog({
+			title: 'Void this check-in?',
+			description: 'Same-day attendance marks revert too.',
+			confirm: { text: 'Void' },
+			onConfirm: () => voidRowNow(id)
+		});
+	}
+
+	async function voidRowNow(id: string) {
 		try {
 			await voidCheckIn(id);
 			checkIns = await getTodayCheckIns();
@@ -429,14 +438,19 @@
 					variant="ghost"
 					size="sm"
 					class="ml-auto shrink-0"
-					onclick={async () => {
-						if (!confirm(`Check out all ${insideRows.length} member(s) still inside?`)) return;
-						try {
-							const n = await checkOutAll();
-							toast.success(`Checked out ${n}`);
-						} catch (err) {
-							toast.error(errMsg(err, 'Could not check out'));
-						}
+					onclick={() => {
+						confirmDialog({
+							title: `Check out all ${insideRows.length} member(s) still inside?`,
+							confirm: { text: 'Check out all' },
+							onConfirm: async () => {
+								try {
+									const n = await checkOutAll();
+									toast.success(`Checked out ${n}`);
+								} catch (err) {
+									toast.error(errMsg(err, 'Could not check out'));
+								}
+							}
+						});
 					}}>Out all</Button
 				>
 			</div>
@@ -837,3 +851,4 @@
 		{/if}
 	</Modal.Content>
 </Modal.Root>
+<ConfirmDialog />

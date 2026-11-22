@@ -87,6 +87,7 @@
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Map from '@lucide/svelte/icons/map';
 	import { tour } from '#lib/tour.svelte.ts';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	let settings = $state(await getSettings());
 	let locations = $state(await getLocations());
@@ -281,12 +282,15 @@
 	let fzPending = $state(false);
 	async function submitFreezeAll(e: SubmitEvent) {
 		e.preventDefault();
-		if (
-			!confirm(
-				`Pause every active plan until ${fzUntil}? They auto-resume that day and no fees are charged.`
-			)
-		)
-			return;
+		confirmDialog({
+			title: `Pause every active plan until ${fzUntil}?`,
+			description: 'They auto-resume that day and no fees are charged.',
+			confirm: { text: 'Pause all' },
+			onConfirm: () => freezeAllNow()
+		});
+	}
+
+	async function freezeAllNow() {
 		fzPending = true;
 		try {
 			const r = await freezeAllMemberships({ until: fzUntil });
@@ -1110,19 +1114,24 @@
 										type="button"
 										variant="outline"
 										disabled={anonBusy}
-										onclick={async () => {
-											if (!confirm('Scrub personal details of long-inactive members?')) return;
-											anonBusy = true;
-											try {
-												const r = await anonymizeInactiveMembers({});
-												toast.success(`Anonymized ${r.anonymized} members`);
-												anonPreview = null;
-												anonNames = [];
-											} catch (err) {
-												toast.error(errMsg(err, 'Failed'));
-											} finally {
-												anonBusy = false;
-											}
+										onclick={() => {
+											confirmDialog({
+												title: 'Scrub personal details of long-inactive members?',
+												confirm: { text: 'Scrub' },
+												onConfirm: async () => {
+													anonBusy = true;
+													try {
+														const r = await anonymizeInactiveMembers({});
+														toast.success(`Anonymized ${r.anonymized} members`);
+														anonPreview = null;
+														anonNames = [];
+													} catch (err) {
+														toast.error(errMsg(err, 'Failed'));
+													} finally {
+														anonBusy = false;
+													}
+												}
+											});
 										}}>Anonymize</Button
 									>
 								</div>
@@ -1174,17 +1183,22 @@
 									variant="outline"
 									size="sm"
 									disabled={resignAllBusy}
-									onclick={async () => {
-										if (!confirm('Email every member a re-sign request?')) return;
-										resignAllBusy = true;
-										try {
-											const r = await resignAllParq({});
-											toast.success(`Sent ${r.sent} re-sign requests`);
-										} catch (err) {
-											toast.error(errMsg(err, 'Could not send'));
-										} finally {
-											resignAllBusy = false;
-										}
+									onclick={() => {
+										confirmDialog({
+											title: 'Email every member a re-sign request?',
+											confirm: { text: 'Send' },
+											onConfirm: async () => {
+												resignAllBusy = true;
+												try {
+													const r = await resignAllParq({});
+													toast.success(`Sent ${r.sent} re-sign requests`);
+												} catch (err) {
+													toast.error(errMsg(err, 'Could not send'));
+												} finally {
+													resignAllBusy = false;
+												}
+											}
+										});
 									}}>Re-sign all</Button
 								>
 							</div>
@@ -1377,24 +1391,25 @@
 										variant="outline"
 										size="sm"
 										disabled={digestBusy}
-										onclick={async () => {
-											if (
-												!confirm(
-													"Send last month's digest to all recipients now? They won't get it again on the 1st."
-												)
-											)
-												return;
-											digestBusy = true;
-											try {
-												const r = await sendDigestNow();
-												toast.success(
-													`Digest sent to ${r.sent} recipient${r.sent === 1 ? '' : 's'}`
-												);
-											} catch (err) {
-												toast.error(errMsg(err, 'Could not send'));
-											} finally {
-												digestBusy = false;
-											}
+										onclick={() => {
+											confirmDialog({
+												title: "Send last month's digest to all recipients now?",
+												description: "They won't get it again on the 1st.",
+												confirm: { text: 'Send' },
+												onConfirm: async () => {
+													digestBusy = true;
+													try {
+														const r = await sendDigestNow();
+														toast.success(
+															`Digest sent to ${r.sent} recipient${r.sent === 1 ? '' : 's'}`
+														);
+													} catch (err) {
+														toast.error(errMsg(err, 'Could not send'));
+													} finally {
+														digestBusy = false;
+													}
+												}
+											});
 										}}>Send now</Button
 									>
 								</div>
@@ -1612,14 +1627,18 @@
 										size="sm"
 										variant="ghost"
 										class="text-destructive"
-										onclick={async () => {
-											if (!confirm(`Delete "${fld.name}" and its values?`)) return;
-											try {
-												await deleteMemberFieldCmd({ id: fld.id });
-												toast.success('Field deleted');
-											} catch (e) {
-												toast.error(errMsg(e, 'Something went wrong'));
-											}
+										onclick={() => {
+											confirmDialog({
+												title: `Delete "${fld.name}" and its values?`,
+												onConfirm: async () => {
+													try {
+														await deleteMemberFieldCmd({ id: fld.id });
+														toast.success('Field deleted');
+													} catch (e) {
+														toast.error(errMsg(e, 'Something went wrong'));
+													}
+												}
+											});
 										}}>Delete</Button
 									>
 								</div>
@@ -1878,15 +1897,20 @@
 							variant="outline"
 							size="sm"
 							disabled={passkeyBusy}
-							onclick={async () => {
-								passkeyBusy = true;
-								const name = window.prompt('Name this passkey', 'This device');
-								if (name) {
-									const res = await authClient.passkey.addPasskey({ name });
-									if (res?.error) toast.error(res.error.message ?? 'Passkey not created');
-									else passkeys = await listPasskeys();
-								}
-								passkeyBusy = false;
+							onclick={() => {
+								confirmDialog({
+									title: 'Name this passkey',
+									input: { label: 'Passkey name', defaultValue: 'This device' },
+									confirm: { text: 'Add passkey' },
+									onConfirm: async (name) => {
+										if (!name) return;
+										passkeyBusy = true;
+										const res = await authClient.passkey.addPasskey({ name });
+										if (res?.error) toast.error(res.error.message ?? 'Passkey not created');
+										else passkeys = await listPasskeys();
+										passkeyBusy = false;
+									}
+								});
 							}}>{passkeyBusy ? 'Working…' : 'Add passkey'}</Button
 						>
 					</Card.Content>

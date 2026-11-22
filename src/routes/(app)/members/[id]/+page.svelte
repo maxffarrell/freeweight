@@ -130,6 +130,8 @@
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Printer from '@lucide/svelte/icons/printer';
 	import { paymentMethods } from '#lib/schemas.ts';
+	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 
 	const id = page.params.id!;
 	const m = $derived(await getMember(id));
@@ -288,8 +290,16 @@
 			toast.error(errMsg(err, 'Could not resolve'));
 		}
 	}
-	async function closeIncident(incidentId: string) {
-		const followUp = prompt('Follow-up notes (what was done):') ?? '';
+	function closeIncident(incidentId: string) {
+		confirmDialog({
+			title: 'Close incident',
+			input: { label: 'Follow-up notes (what was done)' },
+			confirm: { text: 'Close' },
+			onConfirm: (followUp) => closeIncidentNow(incidentId, followUp ?? '')
+		});
+	}
+
+	async function closeIncidentNow(incidentId: string, followUp: string) {
 		try {
 			await updateIncidentEntry({ id: incidentId, memberId: id, status: 'closed', followUp });
 		} catch (err) {
@@ -314,11 +324,18 @@
 			}
 		}
 	});
-	async function saveSrTemplate() {
-		const name = window.prompt('Template name', srTitle.slice(0, 40));
-		if (!name?.trim()) return;
+	function saveSrTemplate() {
+		confirmDialog({
+			title: 'Save template',
+			input: { label: 'Template name', defaultValue: srTitle.slice(0, 40) },
+			confirm: { text: 'Save' },
+			onConfirm: (name) => (name?.trim() ? saveSrTemplateNow(name.trim()) : undefined)
+		});
+	}
+
+	async function saveSrTemplateNow(name: string) {
 		try {
-			await saveSignDocTemplate({ name: name.trim(), title: srTitle.trim(), body: srBody.trim() });
+			await saveSignDocTemplate({ name, title: srTitle.trim(), body: srBody.trim() });
 			toast.success('Template saved');
 		} catch (err) {
 			toast.error(errMsg(err, 'Could not save template'));
@@ -503,8 +520,14 @@
 		await getMemberDocuments(id).refresh();
 		if (fileInput) fileInput.value = '';
 	}
-	async function removeDoc(docId: string, docName: string) {
-		if (!confirm(`Delete ${docName}?`)) return;
+	function removeDoc(docId: string, docName: string) {
+		confirmDialog({
+			title: `Delete ${docName}?`,
+			onConfirm: () => removeDocNow(docId)
+		});
+	}
+
+	async function removeDocNow(docId: string) {
 		try {
 			await deleteDocument(docId);
 			await getMemberDocuments(id).refresh();
@@ -513,8 +536,16 @@
 		}
 	}
 
-	async function refund(paymentId: string, amount: number) {
-		if (!confirm(`Refund ${formatMoney(amount, currency)}? The charge it covered reopens.`)) return;
+	function refund(paymentId: string, amount: number) {
+		confirmDialog({
+			title: `Refund ${formatMoney(amount, currency)}?`,
+			description: 'The charge it covered reopens.',
+			confirm: { text: 'Refund' },
+			onConfirm: () => refundNow(paymentId)
+		});
+	}
+
+	async function refundNow(paymentId: string) {
 		try {
 			await refundPayment(paymentId);
 			toast.success('Payment refunded');
@@ -1037,13 +1068,17 @@
 		}
 	}
 
-	async function doAnonymize() {
-		if (
-			!confirm(
-				'Anonymize this member? Name, email, phone, birthday, notes, photo and measurements are permanently scrubbed. Booking and payment history is kept for accounting. This cannot be undone.'
-			)
-		)
-			return;
+	function doAnonymize() {
+		confirmDialog({
+			title: 'Anonymize this member?',
+			description:
+				'Name, email, phone, birthday, notes, photo and measurements are permanently scrubbed. Booking and payment history is kept for accounting. This cannot be undone.',
+			confirm: { text: 'Anonymize' },
+			onConfirm: () => doAnonymizeNow()
+		});
+	}
+
+	async function doAnonymizeNow() {
 		try {
 			await anonymizeMember(id);
 			toast.success('Personal data anonymized');
@@ -1348,21 +1383,23 @@
 								</div>
 							{/each}
 							{#if m.member.parqHistory?.length}
-								<details class="pt-1 text-muted-foreground">
-									<summary class="cursor-pointer">
+								<Collapsible.Root class="pt-1 text-muted-foreground">
+									<Collapsible.Trigger class="cursor-pointer">
 										{m.member.parqHistory.length} earlier signing{m.member.parqHistory.length === 1
 											? ''
 											: 's'}
-									</summary>
-									{#each m.member.parqHistory as h, i (i)}
-										<p class="pt-0.5">
-											Signed {formatDate(h.signedAt)} — {Object.values(h.answers).filter(Boolean)
-												.length} yes answer{Object.values(h.answers).filter(Boolean).length === 1
-												? ''
-												: 's'}
-										</p>
-									{/each}
-								</details>
+									</Collapsible.Trigger>
+									<Collapsible.Content>
+										{#each m.member.parqHistory as h, i (i)}
+											<p class="pt-0.5">
+												Signed {formatDate(h.signedAt)} — {Object.values(h.answers).filter(Boolean)
+													.length} yes answer{Object.values(h.answers).filter(Boolean).length === 1
+													? ''
+													: 's'}
+											</p>
+										{/each}
+									</Collapsible.Content>
+								</Collapsible.Root>
 							{/if}
 						</div>
 					{/if}
@@ -1750,22 +1787,25 @@
 										size="sm"
 										class="h-7 px-2 text-xs"
 										title="Push this pack's expiry out — 'paid before it lapsed' fixes"
-										onclick={async () => {
-											const days = Number(
-												window.prompt(
-													`Extend the pack by how many days? (currently ${
-														mm.membership.endsAt ? formatDate(mm.membership.endsAt) : 'no expiry'
-													})`,
-													'30'
-												)
-											);
-											if (!days || days <= 0) return;
-											try {
-												const r = await extendPack({ membershipId: mm.membership.id, days });
-												toast.success(`Pack extended to ${formatDate(r.endsAt)}`);
-											} catch (err) {
-												toast.error(errMsg(err, 'Could not extend'));
-											}
+										onclick={() => {
+											confirmDialog({
+												title: `Extend the pack by how many days?`,
+												description: `Currently ${
+													mm.membership.endsAt ? formatDate(mm.membership.endsAt) : 'no expiry'
+												}`,
+												input: { label: 'Days', defaultValue: '30' },
+												confirm: { text: 'Extend' },
+												onConfirm: async (value) => {
+													const days = Number(value);
+													if (!days || days <= 0) return;
+													try {
+														const r = await extendPack({ membershipId: mm.membership.id, days });
+														toast.success(`Pack extended to ${formatDate(r.endsAt)}`);
+													} catch (err) {
+														toast.error(errMsg(err, 'Could not extend'));
+													}
+												}
+											});
 										}}>Extend</Button
 									>
 								{:else}
@@ -3400,10 +3440,14 @@
 								variant="ghost"
 								size="sm"
 								class="h-7 px-2 text-xs text-destructive"
-								onclick={async () => {
-									if (!confirm(`Delete "${p.program.name}"?`)) return;
-									await removeProgram(p.program.id);
-									toast.success('Deleted');
+								onclick={() => {
+									confirmDialog({
+										title: `Delete "${p.program.name}"?`,
+										onConfirm: async () => {
+											await removeProgram(p.program.id);
+											toast.success('Deleted');
+										}
+									});
 								}}>Delete</Button
 							>
 						</span>
