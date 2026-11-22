@@ -111,6 +111,11 @@ func get(client *http.Client, url string) (string, string, error) {
 	return resp.Request.URL.String(), string(body), nil
 }
 
+// demoLoginMarker is copy on the sign-in page shown only in demo mode.
+const demoLoginMarker = "Explore a seeded demo"
+
+func demoLoginOK(body string) bool { return strings.Contains(body, demoLoginMarker) }
+
 // verify is a var so tests can stub it.
 var verify = func(app string) error {
 	base := fmt.Sprintf("https://%s.173.249.220.229.nip.io", app)
@@ -119,7 +124,7 @@ var verify = func(app string) error {
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(login, "Try the live demo") {
+	if !demoLoginOK(login) {
 		return errors.New("demo login missing")
 	}
 	req, err := http.NewRequest(http.MethodPost, base+"/demo", strings.NewReader(""))
