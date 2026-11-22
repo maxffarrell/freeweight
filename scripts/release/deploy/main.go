@@ -119,7 +119,7 @@ var verify = func(app string) error {
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(login, "Try the live demo") {
+	if !strings.Contains(login, "Explore a seeded demo") {
 		return errors.New("demo login missing")
 	}
 	req, err := http.NewRequest(http.MethodPost, base+"/demo", strings.NewReader(""))
