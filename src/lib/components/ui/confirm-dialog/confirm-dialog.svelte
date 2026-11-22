@@ -17,6 +17,13 @@
 			this.open = true;
 		}
 
+		replaceConfirmation(options: ConfirmDialogOptions) {
+			this.options = options;
+			this.inputText = options.input?.defaultValue ?? '';
+			this.loading = false;
+			this.open = true;
+		}
+
 		reset() {
 			this.open = false;
 			this.inputText = '';
@@ -24,16 +31,19 @@
 		}
 
 		confirm() {
+			if (this.loading) return;
 			if (this.options?.input?.confirmationText) {
 				if (this.inputText !== this.options.input.confirmationText) {
 					return;
 				}
 			}
 
+			const options = this.options;
 			this.loading = true;
-			Promise.resolve(this.options?.onConfirm(this.inputText))
+			Promise.resolve(options?.onConfirm(this.inputText))
 				.then(() => {
-					this.open = false;
+					// onConfirm may have opened a follow-up dialog; only close if still ours
+					if (this.options === options) this.open = false;
 				})
 				.finally(() => {
 					this.loading = false;
@@ -70,6 +80,11 @@
 	export function confirmDialog(options: ConfirmDialogOptions) {
 		dialogState.newConfirmation(options);
 	}
+
+	/** Swap the open dialog's contents in place — used for chained multi-step questions. */
+	export function replaceConfirmDialog(options: ConfirmDialogOptions) {
+		dialogState.replaceConfirmation(options);
+	}
 </script>
 
 <script lang="ts">
@@ -94,7 +109,7 @@
 					{dialogState.options?.title}
 				</AlertDialog.Title>
 				{#if dialogState.options?.description}
-					<AlertDialog.Description>
+					<AlertDialog.Description class="wrap-anywhere">
 						{dialogState.options.description}
 					</AlertDialog.Description>
 				{/if}

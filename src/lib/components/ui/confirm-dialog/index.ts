@@ -1,3 +1,7 @@
-import ConfirmDialog, { confirmDialog, type ConfirmDialogOptions } from './confirm-dialog.svelte';
+import ConfirmDialog, {
+	confirmDialog,
+	replaceConfirmDialog,
+	type ConfirmDialogOptions
+} from './confirm-dialog.svelte';
 
-export { ConfirmDialog, confirmDialog, type ConfirmDialogOptions };
+export { ConfirmDialog, confirmDialog, replaceConfirmDialog, type ConfirmDialogOptions };

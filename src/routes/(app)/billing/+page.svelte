@@ -58,7 +58,7 @@
 	import Gift from '@lucide/svelte/icons/gift';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { toCsv } from '#lib/csv.ts';
-	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
+	import { confirmDialog, replaceConfirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const currency = await getCurrency();
 	const memberList = await getMembers();
@@ -572,7 +572,7 @@
 			onConfirm: (raw) => {
 				const n = num(raw);
 				if (n !== null && !Number.isFinite(n)) return toast.error('Not a number');
-				confirmDialog({
+				replaceConfirmDialog({
 					title: `${item.name} — low-stock alert`,
 					input: {
 						label: 'Alert staff when stock drops to (blank = never)',
@@ -582,7 +582,7 @@
 					onConfirm: (rawLow) => {
 						const low = num(rawLow);
 						if (low !== null && !Number.isFinite(low)) return toast.error('Not a number');
-						confirmDialog({
+						replaceConfirmDialog({
 							title: `${item.name} — unit cost`,
 							input: {
 								label: 'Unit cost in cents (blank = untracked)',

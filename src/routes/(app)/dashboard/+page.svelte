@@ -53,7 +53,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import Circle from '@lucide/svelte/icons/circle';
 	import { Progress } from '#lib/components/ui/progress/index.js';
-	import { confirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
+	import { confirmDialog, replaceConfirmDialog } from '#lib/components/ui/confirm-dialog/index.js';
 
 	const d = await getDashboard();
 	const ai = await getAiStatus();
@@ -101,7 +101,7 @@
 			confirm: { text: 'Next' },
 			onConfirm: (inAt) =>
 				inAt !== null &&
-				confirmDialog({
+				replaceConfirmDialog({
 					title: 'Edit shift times',
 					input: {
 						label: 'Clock-out (YYYY-MM-DDTHH:mm, blank = still open)',
