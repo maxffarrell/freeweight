@@ -1,5 +1,11 @@
 # freeweight
 
+## 0.3.1
+
+### Patch Changes
+
+- 5a7f598: Restore the full-width sticky demo banner and replace native browser controls (confirm/prompt dialogs, details/summary) with shadcn-svelte components, including a new confirm-dialog UI component.
+
 ## 0.3.0
 
 ### Minor Changes
