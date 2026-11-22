@@ -25,9 +25,24 @@
 			document.removeEventListener('visibilitychange', update);
 		};
 	});
+
+	let el: HTMLDivElement;
+	$effect(() => {
+		if (!el) return;
+		const set = () =>
+			document.documentElement.style.setProperty('--demo-banner-h', `${el.offsetHeight}px`);
+		set();
+		const ro = new ResizeObserver(set);
+		ro.observe(el);
+		return () => {
+			ro.disconnect();
+			document.documentElement.style.removeProperty('--demo-banner-h');
+		};
+	});
 </script>
 
 <div
+	bind:this={el}
 	class="sticky top-0 z-50 flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-primary px-4 py-1.5 text-center text-xs text-primary-foreground"
 >
 	<span>
