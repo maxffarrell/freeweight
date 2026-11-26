@@ -115,6 +115,7 @@ jobs:
           FREEWEIGHT_DEMO: 'false'
         run: |
           npm install -g pnpm@12.4.1
+          python3 scripts/test_hostinger.py
           pnpm install --frozen-lockfile
           pnpm check
           pnpm lint
